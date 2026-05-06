@@ -105,6 +105,20 @@ import * as listSharepointSitePages from './list-sharepoint-site-pages.ts';
 import * as listExcelDefinedNames from './list-excel-defined-names.ts';
 import * as listExcelWorksheetCharts from './list-excel-worksheet-charts.ts';
 import * as microsoftSearchQuery from './microsoft-search-query.ts';
+import * as getDriveSpecialFolder from './get-drive-special-folder.ts';
+import * as getDriveRootDelta from './get-drive-root-delta.ts';
+import * as listFollowedDriveItems from './list-followed-drive-items.ts';
+import * as getDriveItemCreatedByUser from './get-drive-item-created-by-user.ts';
+import * as getDriveItemLastModifiedByUser from './get-drive-item-last-modified-by-user.ts';
+import * as getSiteAnalytics from './get-site-analytics.ts';
+import * as listSharepointListItemVersions from './list-sharepoint-list-item-versions.ts';
+import * as getMailRule from './get-mail-rule.ts';
+import * as listExcelComments from './list-excel-comments.ts';
+import * as listExcelWorksheetPivotTables from './list-excel-worksheet-pivot-tables.ts';
+import * as listSensitivityLabels from './list-sensitivity-labels.ts';
+import * as listMyTransitiveMemberships from './list-my-transitive-memberships.ts';
+import * as getTeamPrimaryChannel from './get-team-primary-channel.ts';
+import * as listTodoTasksDelta from './list-todo-tasks-delta.ts';
 import * as listMyMemberships from './list-my-memberships.ts';
 import * as getMyManager from './get-my-manager.ts';
 import * as getUserManager from './get-user-manager.ts';
@@ -284,6 +298,20 @@ const commands: Record<string, Command> = {
   'list-excel-defined-names': listExcelDefinedNames,
   'list-excel-worksheet-charts': listExcelWorksheetCharts,
   'microsoft-search-query': microsoftSearchQuery,
+  'get-drive-special-folder': getDriveSpecialFolder,
+  'get-drive-root-delta': getDriveRootDelta,
+  'list-followed-drive-items': listFollowedDriveItems,
+  'get-drive-item-created-by-user': getDriveItemCreatedByUser,
+  'get-drive-item-last-modified-by-user': getDriveItemLastModifiedByUser,
+  'get-site-analytics': getSiteAnalytics,
+  'list-sharepoint-list-item-versions': listSharepointListItemVersions,
+  'get-mail-rule': getMailRule,
+  'list-excel-comments': listExcelComments,
+  'list-excel-worksheet-pivot-tables': listExcelWorksheetPivotTables,
+  'list-sensitivity-labels': listSensitivityLabels,
+  'list-my-transitive-memberships': listMyTransitiveMemberships,
+  'get-team-primary-channel': getTeamPrimaryChannel,
+  'list-todo-tasks-delta': listTodoTasksDelta,
   'next-page': nextPage,
 };
 

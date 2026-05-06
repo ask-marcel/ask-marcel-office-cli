@@ -112,6 +112,20 @@ import * as listSharepointSitePages from './list-sharepoint-site-pages.ts';
 import * as listExcelDefinedNames from './list-excel-defined-names.ts';
 import * as listExcelWorksheetCharts from './list-excel-worksheet-charts.ts';
 import * as microsoftSearchQuery from './microsoft-search-query.ts';
+import * as getDriveSpecialFolder from './get-drive-special-folder.ts';
+import * as getDriveRootDelta from './get-drive-root-delta.ts';
+import * as listFollowedDriveItems from './list-followed-drive-items.ts';
+import * as getDriveItemCreatedByUser from './get-drive-item-created-by-user.ts';
+import * as getDriveItemLastModifiedByUser from './get-drive-item-last-modified-by-user.ts';
+import * as getSiteAnalytics from './get-site-analytics.ts';
+import * as listSharepointListItemVersions from './list-sharepoint-list-item-versions.ts';
+import * as getMailRule from './get-mail-rule.ts';
+import * as listExcelComments from './list-excel-comments.ts';
+import * as listExcelWorksheetPivotTables from './list-excel-worksheet-pivot-tables.ts';
+import * as listSensitivityLabels from './list-sensitivity-labels.ts';
+import * as listMyTransitiveMemberships from './list-my-transitive-memberships.ts';
+import * as getTeamPrimaryChannel from './get-team-primary-channel.ts';
+import * as listTodoTasksDelta from './list-todo-tasks-delta.ts';
 import * as listMyMemberships from './list-my-memberships.ts';
 import * as getMyManager from './get-my-manager.ts';
 import * as getUserManager from './get-user-manager.ts';
@@ -291,6 +305,20 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-excel-defined-names': listExcelDefinedNames,
   'list-excel-worksheet-charts': listExcelWorksheetCharts,
   'microsoft-search-query': microsoftSearchQuery,
+  'get-drive-special-folder': getDriveSpecialFolder,
+  'get-drive-root-delta': getDriveRootDelta,
+  'list-followed-drive-items': listFollowedDriveItems,
+  'get-drive-item-created-by-user': getDriveItemCreatedByUser,
+  'get-drive-item-last-modified-by-user': getDriveItemLastModifiedByUser,
+  'get-site-analytics': getSiteAnalytics,
+  'list-sharepoint-list-item-versions': listSharepointListItemVersions,
+  'get-mail-rule': getMailRule,
+  'list-excel-comments': listExcelComments,
+  'list-excel-worksheet-pivot-tables': listExcelWorksheetPivotTables,
+  'list-sensitivity-labels': listSensitivityLabels,
+  'list-my-transitive-memberships': listMyTransitiveMemberships,
+  'get-team-primary-channel': getTeamPrimaryChannel,
+  'list-todo-tasks-delta': listTodoTasksDelta,
   'next-page': nextPage,
 };
 
@@ -1770,6 +1798,20 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
   { name: 'microsoft-search-query', params: { query: 'q3 budget' } },
+  { name: 'get-drive-special-folder', params: { folderName: 'documents' } },
+  { name: 'get-drive-root-delta', params: {} },
+  { name: 'list-followed-drive-items', params: {} },
+  { name: 'get-drive-item-created-by-user', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'get-drive-item-last-modified-by-user', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'get-site-analytics', params: { siteId: 's1' } },
+  { name: 'list-sharepoint-list-item-versions', params: { siteId: 's1', listId: 'l1', listItemId: '12' } },
+  { name: 'get-mail-rule', params: { mailFolderId: 'inbox', messageRuleId: 'r1' } },
+  { name: 'list-excel-comments', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'list-excel-worksheet-pivot-tables', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
+  { name: 'list-sensitivity-labels', params: {} },
+  { name: 'list-my-transitive-memberships', params: {} },
+  { name: 'get-team-primary-channel', params: { teamId: 'tm1' } },
+  { name: 'list-todo-tasks-delta', params: { todoTaskListId: 'tl1' } },
   { name: 'next-page', params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' } },
 ];
 
@@ -2060,6 +2102,24 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-sharepoint-site-pages', params: { siteId: 's1' }, expectedPath: '/sites/s1/pages' },
   { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/workbook/names' },
   { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' }, expectedPath: '/drives/d1/items/i1/workbook/worksheets/Sheet1/charts' },
+  { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
+  { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },
+  { name: 'list-followed-drive-items', params: {}, expectedPath: '/me/drive/following' },
+  { name: 'get-drive-item-created-by-user', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/createdByUser' },
+  { name: 'get-drive-item-last-modified-by-user', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/lastModifiedByUser' },
+  { name: 'get-site-analytics', params: { siteId: 's1' }, expectedPath: '/sites/s1/analytics' },
+  { name: 'list-sharepoint-list-item-versions', params: { siteId: 's1', listId: 'l1', listItemId: '12' }, expectedPath: '/sites/s1/lists/l1/items/12/versions' },
+  { name: 'get-mail-rule', params: { mailFolderId: 'inbox', messageRuleId: 'r1' }, expectedPath: '/me/mailFolders/inbox/messageRules/r1' },
+  { name: 'list-excel-comments', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/workbook/comments' },
+  {
+    name: 'list-excel-worksheet-pivot-tables',
+    params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' },
+    expectedPath: '/drives/d1/items/i1/workbook/worksheets/Sheet1/pivotTables',
+  },
+  { name: 'list-sensitivity-labels', params: {}, expectedPath: '/me/informationProtection/sensitivityLabels' },
+  { name: 'list-my-transitive-memberships', params: {}, expectedPath: '/me/transitiveMemberOf' },
+  { name: 'get-team-primary-channel', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/primaryChannel' },
+  { name: 'list-todo-tasks-delta', params: { todoTaskListId: 'tl1' }, expectedPath: '/me/todo/lists/tl1/tasks/delta()' },
   {
     name: 'next-page',
     params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' },
