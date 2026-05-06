@@ -82,6 +82,46 @@ import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as searchSharepointSites from './search-sharepoint-sites.ts';
+import * as listChats from './list-chats.ts';
+import * as getChat from './get-chat.ts';
+import * as listMyDirectReports from './list-my-direct-reports.ts';
+import * as listUserDirectReports from './list-user-direct-reports.ts';
+import * as listMyMemberships from './list-my-memberships.ts';
+import * as getMyManager from './get-my-manager.ts';
+import * as getUserManager from './get-user-manager.ts';
+import * as listRelevantPeople from './list-relevant-people.ts';
+import * as listGroups from './list-groups.ts';
+import * as getGroup from './get-group.ts';
+import * as listGroupMembers from './list-group-members.ts';
+import * as listGroupOwners from './list-group-owners.ts';
+import * as listGroupEvents from './list-group-events.ts';
+import * as getGroupCalendarView from './get-group-calendar-view.ts';
+import * as listGroupConversations from './list-group-conversations.ts';
+import * as listGroupThreads from './list-group-threads.ts';
+import * as getMailMessageMime from './get-mail-message-mime.ts';
+import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
+import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
+import * as listSharedMailboxFolderMessages from './list-shared-mailbox-folder-messages.ts';
+import * as getSharedMailboxMessage from './get-shared-mailbox-message.ts';
+import * as listConversationMessages from './list-conversation-messages.ts';
+import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
+import * as listOutlookCategories from './list-outlook-categories.ts';
+import * as listSharedCalendarEvents from './list-shared-calendar-events.ts';
+import * as getSharedCalendarView from './get-shared-calendar-view.ts';
+import * as getSharepointSitesDelta from './get-sharepoint-sites-delta.ts';
+import * as listSharepointSiteItems from './list-sharepoint-site-items.ts';
+import * as getSharepointSiteItem from './get-sharepoint-site-item.ts';
+import * as listSharepointListColumns from './list-sharepoint-list-columns.ts';
+import * as getSharepointListColumn from './get-sharepoint-list-column.ts';
+import * as listSharepointSiteOnenoteNotebooks from './list-sharepoint-site-onenote-notebooks.ts';
+import * as listSharepointSiteOnenoteNotebookSections from './list-sharepoint-site-onenote-notebook-sections.ts';
+import * as listSharepointSiteOnenoteSectionPages from './list-sharepoint-site-onenote-section-pages.ts';
+import * as getSharepointSiteOnenotePageContent from './get-sharepoint-site-onenote-page-content.ts';
+import * as listDriveItemThumbnails from './list-drive-item-thumbnails.ts';
+import * as getExcelUsedRange from './get-excel-used-range.ts';
+import * as listRooms from './list-rooms.ts';
+import * as listRoomLists from './list-room-lists.ts';
+import * as listTrendingInsights from './list-trending-insights.ts';
 
 const commands: Record<string, Command> = {
   'list-drives': listDrives,
@@ -166,6 +206,46 @@ const commands: Record<string, Command> = {
   'get-team': getTeam,
   'list-team-channels': listTeamChannels,
   'get-team-channel': getTeamChannel,
+  'list-chats': listChats,
+  'get-chat': getChat,
+  'list-my-direct-reports': listMyDirectReports,
+  'list-user-direct-reports': listUserDirectReports,
+  'list-my-memberships': listMyMemberships,
+  'get-my-manager': getMyManager,
+  'get-user-manager': getUserManager,
+  'list-relevant-people': listRelevantPeople,
+  'list-groups': listGroups,
+  'get-group': getGroup,
+  'list-group-members': listGroupMembers,
+  'list-group-owners': listGroupOwners,
+  'list-group-events': listGroupEvents,
+  'get-group-calendar-view': getGroupCalendarView,
+  'list-group-conversations': listGroupConversations,
+  'list-group-threads': listGroupThreads,
+  'get-mail-message-mime': getMailMessageMime,
+  'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
+  'list-shared-mailbox-messages': listSharedMailboxMessages,
+  'list-shared-mailbox-folder-messages': listSharedMailboxFolderMessages,
+  'get-shared-mailbox-message': getSharedMailboxMessage,
+  'list-conversation-messages': listConversationMessages,
+  'list-focused-inbox-overrides': listFocusedInboxOverrides,
+  'list-outlook-categories': listOutlookCategories,
+  'list-shared-calendar-events': listSharedCalendarEvents,
+  'get-shared-calendar-view': getSharedCalendarView,
+  'get-sharepoint-sites-delta': getSharepointSitesDelta,
+  'list-sharepoint-site-items': listSharepointSiteItems,
+  'get-sharepoint-site-item': getSharepointSiteItem,
+  'list-sharepoint-list-columns': listSharepointListColumns,
+  'get-sharepoint-list-column': getSharepointListColumn,
+  'list-sharepoint-site-onenote-notebooks': listSharepointSiteOnenoteNotebooks,
+  'list-sharepoint-site-onenote-notebook-sections': listSharepointSiteOnenoteNotebookSections,
+  'list-sharepoint-site-onenote-section-pages': listSharepointSiteOnenoteSectionPages,
+  'get-sharepoint-site-onenote-page-content': getSharepointSiteOnenotePageContent,
+  'list-drive-item-thumbnails': listDriveItemThumbnails,
+  'get-excel-used-range': getExcelUsedRange,
+  'list-rooms': listRooms,
+  'list-room-lists': listRoomLists,
+  'list-trending-insights': listTrendingInsights,
   'next-page': nextPage,
 };
 

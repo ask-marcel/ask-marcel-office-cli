@@ -105,7 +105,7 @@ const ELEVATED_APP_IDS: ReadonlyArray<string> = [
   '4765445b-32c6-49b0-83e6-1d93765276ca', // OfficeHome (Graph audience also has the right scopes)
 ];
 
-const M365_CLOUD_URL = 'https://m365.cloud.microsoft';
+const M365_CLOUD_URL = 'https://m365.cloud.microsoft/search';
 
 const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
 
@@ -341,11 +341,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       trace(`[DEBUG] elevated nav error (non-fatal): ${msg}\n`);
     }
 
-    // Settle: typical capture happens within 3-8s of domcontentloaded
-    // when SSO cookies are warm; can be 15-25s on a cold profile while
-    // m365.cloud.microsoft completes its bootstrap. 60s is generous;
-    // capped well below the regular login flow's 5min poll deadline.
-    const elevatedDeadline = Date.now() + Math.min(pollDeadlineMs, 60_000);
+    // Settle: silent SSO capture happens within 3-8s when cookies are warm.
+    // Cold profile or expired federated-IdP session (e.g. IdP-fronted tenants
+    // where the ThirdPartyIdP session has lapsed) requires interactive sign-in inside
+    // the popup, which can take a minute or two. Use the full login deadline
+    // (default 5min) so the user has time to complete federated auth.
+    const elevatedDeadline = Date.now() + pollDeadlineMs;
     while (Date.now() < elevatedDeadline) {
       if (captured) {
         trace('[DEBUG] elevated capture: token found, closing\n');

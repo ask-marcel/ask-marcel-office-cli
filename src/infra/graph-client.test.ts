@@ -678,4 +678,72 @@ describe('graph client', () => {
       expect(result.error.message).toBe('Auth cancelled');
     }
   });
+
+  it('getElevated signs JSON GET requests with the elevated token and returns parsed JSON on success', async () => {
+    let capturedAuth = '';
+    const fetchFn: FetchFn = async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      capturedAuth = headers.get('authorization') ?? '';
+      return new Response(JSON.stringify({ value: [{ id: 'chat-1' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.getElevated('/me/chats');
+    expect(capturedAuth).toBe('Bearer test-elevated-token');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ value: [{ id: 'chat-1' }] });
+  });
+
+  it('getElevated surfaces api_error from non-2xx Graph responses', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'Forbidden', message: 'Insufficient privileges' } }), {
+        status: 403,
+        headers: { 'content-type': 'application/json' },
+      });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.getElevated('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(403);
+    }
+  });
+
+  it('getElevated surfaces auth_failed when the elevated auth manager rejects', async () => {
+    const failingAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test')),
+      getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(failingAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    const result = await client.getElevated('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('elevated capture timed out');
+    }
+  });
+
+  it('getElevated maps auth_cancelled to a friendly auth_failed message', async () => {
+    const cancelledAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test')),
+      getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(cancelledAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    const result = await client.getElevated('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toBe('Auth cancelled');
+    }
+  });
+
+  it('getElevated maps fetch network failures to network_error', async () => {
+    const fetchFn: FetchFn = async () => {
+      throw new Error('socket reset');
+    };
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.getElevated('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'network_error') {
+      expect(result.error.message).toContain('socket reset');
+    }
+  });
 });

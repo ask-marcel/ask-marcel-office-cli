@@ -7,6 +7,7 @@ const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
   get: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
+  getElevated: async () => ok({}),
   getBinaryElevated: async () => ok({}),
   fetchUrl: async () => ok({}),
   put: async () => ok({}),

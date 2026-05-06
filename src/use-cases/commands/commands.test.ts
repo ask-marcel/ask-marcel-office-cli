@@ -89,6 +89,46 @@ import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-m
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as searchSharepointSites from './search-sharepoint-sites.ts';
+import * as listChats from './list-chats.ts';
+import * as getChat from './get-chat.ts';
+import * as listMyDirectReports from './list-my-direct-reports.ts';
+import * as listUserDirectReports from './list-user-direct-reports.ts';
+import * as listMyMemberships from './list-my-memberships.ts';
+import * as getMyManager from './get-my-manager.ts';
+import * as getUserManager from './get-user-manager.ts';
+import * as listRelevantPeople from './list-relevant-people.ts';
+import * as listGroups from './list-groups.ts';
+import * as getGroup from './get-group.ts';
+import * as listGroupMembers from './list-group-members.ts';
+import * as listGroupOwners from './list-group-owners.ts';
+import * as listGroupEvents from './list-group-events.ts';
+import * as getGroupCalendarView from './get-group-calendar-view.ts';
+import * as listGroupConversations from './list-group-conversations.ts';
+import * as listGroupThreads from './list-group-threads.ts';
+import * as getMailMessageMime from './get-mail-message-mime.ts';
+import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
+import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
+import * as listSharedMailboxFolderMessages from './list-shared-mailbox-folder-messages.ts';
+import * as getSharedMailboxMessage from './get-shared-mailbox-message.ts';
+import * as listConversationMessages from './list-conversation-messages.ts';
+import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
+import * as listOutlookCategories from './list-outlook-categories.ts';
+import * as listSharedCalendarEvents from './list-shared-calendar-events.ts';
+import * as getSharedCalendarView from './get-shared-calendar-view.ts';
+import * as getSharepointSitesDelta from './get-sharepoint-sites-delta.ts';
+import * as listSharepointSiteItems from './list-sharepoint-site-items.ts';
+import * as getSharepointSiteItem from './get-sharepoint-site-item.ts';
+import * as listSharepointListColumns from './list-sharepoint-list-columns.ts';
+import * as getSharepointListColumn from './get-sharepoint-list-column.ts';
+import * as listSharepointSiteOnenoteNotebooks from './list-sharepoint-site-onenote-notebooks.ts';
+import * as listSharepointSiteOnenoteNotebookSections from './list-sharepoint-site-onenote-notebook-sections.ts';
+import * as listSharepointSiteOnenoteSectionPages from './list-sharepoint-site-onenote-section-pages.ts';
+import * as getSharepointSiteOnenotePageContent from './get-sharepoint-site-onenote-page-content.ts';
+import * as listDriveItemThumbnails from './list-drive-item-thumbnails.ts';
+import * as getExcelUsedRange from './get-excel-used-range.ts';
+import * as listRooms from './list-rooms.ts';
+import * as listRoomLists from './list-room-lists.ts';
+import * as listTrendingInsights from './list-trending-insights.ts';
 
 const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-drives': listDrives,
@@ -173,6 +213,46 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'get-team': getTeam,
   'list-team-channels': listTeamChannels,
   'get-team-channel': getTeamChannel,
+  'list-chats': listChats,
+  'get-chat': getChat,
+  'list-my-direct-reports': listMyDirectReports,
+  'list-user-direct-reports': listUserDirectReports,
+  'list-my-memberships': listMyMemberships,
+  'get-my-manager': getMyManager,
+  'get-user-manager': getUserManager,
+  'list-relevant-people': listRelevantPeople,
+  'list-groups': listGroups,
+  'get-group': getGroup,
+  'list-group-members': listGroupMembers,
+  'list-group-owners': listGroupOwners,
+  'list-group-events': listGroupEvents,
+  'get-group-calendar-view': getGroupCalendarView,
+  'list-group-conversations': listGroupConversations,
+  'list-group-threads': listGroupThreads,
+  'get-mail-message-mime': getMailMessageMime,
+  'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
+  'list-shared-mailbox-messages': listSharedMailboxMessages,
+  'list-shared-mailbox-folder-messages': listSharedMailboxFolderMessages,
+  'get-shared-mailbox-message': getSharedMailboxMessage,
+  'list-conversation-messages': listConversationMessages,
+  'list-focused-inbox-overrides': listFocusedInboxOverrides,
+  'list-outlook-categories': listOutlookCategories,
+  'list-shared-calendar-events': listSharedCalendarEvents,
+  'get-shared-calendar-view': getSharedCalendarView,
+  'get-sharepoint-sites-delta': getSharepointSitesDelta,
+  'list-sharepoint-site-items': listSharepointSiteItems,
+  'get-sharepoint-site-item': getSharepointSiteItem,
+  'list-sharepoint-list-columns': listSharepointListColumns,
+  'get-sharepoint-list-column': getSharepointListColumn,
+  'list-sharepoint-site-onenote-notebooks': listSharepointSiteOnenoteNotebooks,
+  'list-sharepoint-site-onenote-notebook-sections': listSharepointSiteOnenoteNotebookSections,
+  'list-sharepoint-site-onenote-section-pages': listSharepointSiteOnenoteSectionPages,
+  'get-sharepoint-site-onenote-page-content': getSharepointSiteOnenotePageContent,
+  'list-drive-item-thumbnails': listDriveItemThumbnails,
+  'get-excel-used-range': getExcelUsedRange,
+  'list-rooms': listRooms,
+  'list-room-lists': listRoomLists,
+  'list-trending-insights': listTrendingInsights,
   'next-page': nextPage,
 };
 
@@ -1593,6 +1673,46 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'get-team', params: { teamId: 'tm1' } },
   { name: 'list-team-channels', params: { teamId: 'tm1' } },
   { name: 'get-team-channel', params: { teamId: 'tm1', channelId: 'ch1' } },
+  { name: 'list-chats', params: {} },
+  { name: 'get-chat', params: { chatId: 'ch1' } },
+  { name: 'list-my-direct-reports', params: {} },
+  { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' } },
+  { name: 'list-my-memberships', params: {} },
+  { name: 'get-my-manager', params: {} },
+  { name: 'get-user-manager', params: { userId: 'alice@contoso.com' } },
+  { name: 'list-relevant-people', params: {} },
+  { name: 'list-groups', params: {} },
+  { name: 'get-group', params: { groupId: 'g1' } },
+  { name: 'list-group-members', params: { groupId: 'g1' } },
+  { name: 'list-group-owners', params: { groupId: 'g1' } },
+  { name: 'list-group-events', params: { groupId: 'g1' } },
+  { name: 'get-group-calendar-view', params: { groupId: 'g1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
+  { name: 'list-group-conversations', params: { groupId: 'g1' } },
+  { name: 'list-group-threads', params: { groupId: 'g1' } },
+  { name: 'get-mail-message-mime', params: { messageId: 'm1' } },
+  { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' } },
+  { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' } },
+  { name: 'list-shared-mailbox-folder-messages', params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' } },
+  { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' } },
+  { name: 'list-conversation-messages', params: { conversationId: 'AAQkAD-conv-1' } },
+  { name: 'list-focused-inbox-overrides', params: {} },
+  { name: 'list-outlook-categories', params: {} },
+  { name: 'list-shared-calendar-events', params: { userId: 'colleague@contoso.com' } },
+  { name: 'get-shared-calendar-view', params: { userId: 'colleague@contoso.com', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
+  { name: 'get-sharepoint-sites-delta', params: {} },
+  { name: 'list-sharepoint-site-items', params: { siteId: 's1' } },
+  { name: 'get-sharepoint-site-item', params: { siteId: 's1', itemId: '7' } },
+  { name: 'list-sharepoint-list-columns', params: { siteId: 's1', listId: 'l1' } },
+  { name: 'get-sharepoint-list-column', params: { siteId: 's1', listId: 'l1', columnId: 'Title' } },
+  { name: 'list-sharepoint-site-onenote-notebooks', params: { siteId: 's1' } },
+  { name: 'list-sharepoint-site-onenote-notebook-sections', params: { siteId: 's1', notebookId: 'nb1' } },
+  { name: 'list-sharepoint-site-onenote-section-pages', params: { siteId: 's1', onenoteSectionId: 'sec1' } },
+  { name: 'get-sharepoint-site-onenote-page-content', params: { siteId: 's1', onenotePageId: 'p1' } },
+  { name: 'list-drive-item-thumbnails', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'get-excel-used-range', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
+  { name: 'list-rooms', params: {} },
+  { name: 'list-room-lists', params: {} },
+  { name: 'list-trending-insights', params: {} },
   { name: 'next-page', params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' } },
 ];
 
@@ -1641,6 +1761,34 @@ describe('command schema rejection', () => {
     { name: 'list-incomplete-todo-tasks', params: {} },
     { name: 'next-page', params: {} },
     { name: 'next-page', params: { url: 'https://example.com/foo' } },
+    { name: 'get-chat', params: {} },
+    { name: 'list-user-direct-reports', params: {} },
+    { name: 'get-user-manager', params: {} },
+    { name: 'get-group', params: {} },
+    { name: 'list-group-members', params: {} },
+    { name: 'list-group-owners', params: {} },
+    { name: 'list-group-events', params: {} },
+    { name: 'get-group-calendar-view', params: {} },
+    { name: 'list-group-conversations', params: {} },
+    { name: 'list-group-threads', params: {} },
+    { name: 'get-mail-message-mime', params: {} },
+    { name: 'list-mail-folder-messages-delta', params: {} },
+    { name: 'list-shared-mailbox-messages', params: {} },
+    { name: 'list-shared-mailbox-folder-messages', params: {} },
+    { name: 'get-shared-mailbox-message', params: {} },
+    { name: 'list-conversation-messages', params: {} },
+    { name: 'list-shared-calendar-events', params: {} },
+    { name: 'get-shared-calendar-view', params: {} },
+    { name: 'list-sharepoint-site-items', params: {} },
+    { name: 'get-sharepoint-site-item', params: {} },
+    { name: 'list-sharepoint-list-columns', params: {} },
+    { name: 'get-sharepoint-list-column', params: {} },
+    { name: 'list-sharepoint-site-onenote-notebooks', params: {} },
+    { name: 'list-sharepoint-site-onenote-notebook-sections', params: {} },
+    { name: 'list-sharepoint-site-onenote-section-pages', params: {} },
+    { name: 'get-sharepoint-site-onenote-page-content', params: {} },
+    { name: 'list-drive-item-thumbnails', params: {} },
+    { name: 'get-excel-used-range', params: {} },
   ];
 
   it.each(rejectCases)('$name rejects missing required params as a validation_error Result', async ({ name, params }) => {
@@ -1781,6 +1929,62 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-team', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1' },
   { name: 'list-team-channels', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/channels' },
   { name: 'get-team-channel', params: { teamId: 'tm1', channelId: 'ch1' }, expectedPath: '/teams/tm1/channels/ch1' },
+  { name: 'list-chats', params: {}, expectedPath: '/me/chats' },
+  { name: 'get-chat', params: { chatId: 'ch1' }, expectedPath: '/chats/ch1' },
+  { name: 'list-my-direct-reports', params: {}, expectedPath: '/me/directReports' },
+  { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice@contoso.com/directReports' },
+  { name: 'list-my-memberships', params: {}, expectedPath: '/me/memberOf' },
+  { name: 'get-my-manager', params: {}, expectedPath: '/me/manager' },
+  { name: 'get-user-manager', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice@contoso.com/manager' },
+  { name: 'list-relevant-people', params: {}, expectedPath: '/me/people' },
+  { name: 'list-groups', params: {}, expectedPath: '/groups' },
+  { name: 'get-group', params: { groupId: 'g1' }, expectedPath: '/groups/g1' },
+  { name: 'list-group-members', params: { groupId: 'g1' }, expectedPath: '/groups/g1/members' },
+  { name: 'list-group-owners', params: { groupId: 'g1' }, expectedPath: '/groups/g1/owners' },
+  { name: 'list-group-events', params: { groupId: 'g1' }, expectedPath: '/groups/g1/events' },
+  {
+    name: 'get-group-calendar-view',
+    params: { groupId: 'g1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
+    expectedPath: '/groups/g1/calendarView?startDateTime=2026-04-01T00%3A00%3A00Z&endDateTime=2026-05-01T00%3A00%3A00Z',
+  },
+  { name: 'list-group-conversations', params: { groupId: 'g1' }, expectedPath: '/groups/g1/conversations' },
+  { name: 'list-group-threads', params: { groupId: 'g1' }, expectedPath: '/groups/g1/threads' },
+  { name: 'get-mail-message-mime', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1/$value' },
+  { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' }, expectedPath: '/me/mailFolders/inbox/messages/delta()' },
+  { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' }, expectedPath: '/users/shared@contoso.com/messages' },
+  {
+    name: 'list-shared-mailbox-folder-messages',
+    params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' },
+    expectedPath: '/users/shared@contoso.com/mailFolders/inbox/messages',
+  },
+  { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' }, expectedPath: '/users/shared@contoso.com/messages/m1' },
+  {
+    name: 'list-conversation-messages',
+    params: { conversationId: 'AAQkAD-conv-1' },
+    expectedPath: "/me/messages?$filter=conversationId eq 'AAQkAD-conv-1'&$orderby=receivedDateTime",
+  },
+  { name: 'list-focused-inbox-overrides', params: {}, expectedPath: '/me/inferenceClassification/overrides' },
+  { name: 'list-outlook-categories', params: {}, expectedPath: '/me/outlook/masterCategories' },
+  { name: 'list-shared-calendar-events', params: { userId: 'colleague@contoso.com' }, expectedPath: '/users/colleague@contoso.com/calendar/events' },
+  {
+    name: 'get-shared-calendar-view',
+    params: { userId: 'colleague@contoso.com', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
+    expectedPath: '/users/colleague@contoso.com/calendarView?startDateTime=2026-04-01T00%3A00%3A00Z&endDateTime=2026-05-01T00%3A00%3A00Z',
+  },
+  { name: 'get-sharepoint-sites-delta', params: {}, expectedPath: '/sites/delta()' },
+  { name: 'list-sharepoint-site-items', params: { siteId: 's1' }, expectedPath: '/sites/s1/items' },
+  { name: 'get-sharepoint-site-item', params: { siteId: 's1', itemId: '7' }, expectedPath: '/sites/s1/items/7' },
+  { name: 'list-sharepoint-list-columns', params: { siteId: 's1', listId: 'l1' }, expectedPath: '/sites/s1/lists/l1/columns' },
+  { name: 'get-sharepoint-list-column', params: { siteId: 's1', listId: 'l1', columnId: 'Title' }, expectedPath: '/sites/s1/lists/l1/columns/Title' },
+  { name: 'list-sharepoint-site-onenote-notebooks', params: { siteId: 's1' }, expectedPath: '/sites/s1/onenote/notebooks' },
+  { name: 'list-sharepoint-site-onenote-notebook-sections', params: { siteId: 's1', notebookId: 'nb1' }, expectedPath: '/sites/s1/onenote/notebooks/nb1/sections' },
+  { name: 'list-sharepoint-site-onenote-section-pages', params: { siteId: 's1', onenoteSectionId: 'sec1' }, expectedPath: '/sites/s1/onenote/sections/sec1/pages' },
+  { name: 'get-sharepoint-site-onenote-page-content', params: { siteId: 's1', onenotePageId: 'p1' }, expectedPath: '/sites/s1/onenote/pages/p1/content' },
+  { name: 'list-drive-item-thumbnails', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/thumbnails' },
+  { name: 'get-excel-used-range', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' }, expectedPath: '/drives/d1/items/i1/workbook/worksheets/Sheet1/usedRange()' },
+  { name: 'list-rooms', params: {}, expectedPath: '/places/microsoft.graph.room' },
+  { name: 'list-room-lists', params: {}, expectedPath: '/places/microsoft.graph.roomList' },
+  { name: 'list-trending-insights', params: {}, expectedPath: '/me/insights/trending' },
   {
     name: 'next-page',
     params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' },

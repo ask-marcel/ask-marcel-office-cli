@@ -29,9 +29,11 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `get-drive-item` | Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}` |
 | `get-drive-root-item` | Get the root folder (driveItem) of a OneDrive / SharePoint drive. | `--drive-id` | `GET /drives/{drive-id}/root` |
 | `list-drive-item-permissions` | List the sharing permissions on a OneDrive / SharePoint file or folder. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/permissions` |
+| `list-drive-item-thumbnails` | List thumbnail URLs (small / medium / large) for a OneDrive / SharePoint file. Each thumbnail set has pre-signed CDN URLs you can render in a UI without further auth. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/thumbnails` |
 | `list-drive-item-versions` | List the historical versions of a OneDrive / SharePoint file (each save creates a new version). | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/versions` |
 | `list-drives` | List all OneDrive / SharePoint drives the signed-in user has access to. | _(none)_ | `GET /me/drives` |
 | `list-folder-files` | List the children (files and subfolders) of a folder in OneDrive / SharePoint. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/children` |
+| `list-trending-insights` | List documents trending around the signed-in user — files popular in their working network (colleagues' recent edits, shares, opens). Microsoft's relevance ranking, useful for surfacing unfamiliar but related work. | _(none)_ | `GET /me/insights/trending` |
 | `search-my-documents` | Search the signed-in user’s default OneDrive for documents matching a free-text query (filename, content, metadata). | `--query` | `GET /me/drive/search(q='{query}')` |
 | `search-onedrive-files` | Search a single OneDrive / SharePoint drive for files and folders matching a free-text query. | `--drive-id`, `--query` | `GET /drives/{drive-id}/search(q='{query}')` |
 
@@ -41,6 +43,7 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 |---------|-------------|-----------------|----------------|
 | `get-excel-range` | Get the cell values, formulas, and formats of a specific Excel range (e.g. `A1:C10`). | `--drive-id`, `--item-id`, `--worksheet-id`, `--address` | `GET /drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/range(address='{address}')` |
 | `get-excel-table` | Get the metadata (style, header row, total row) of a single named Excel table. | `--drive-id`, `--item-id`, `--table-id` | `GET /drives/{drive-id}/items/{item-id}/workbook/tables/{table-id}` |
+| `get-excel-used-range` | Return the worksheet's used range — the bounding box of every non-empty cell — as a single Excel range. Avoids fetching the entire 1M × 16K-cell sheet when only a small data island is populated. | `--drive-id`, `--item-id`, `--worksheet-id` | `GET /drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/usedRange()` |
 | `list-excel-table-rows` | List the data rows of a named Excel table (excluding the header row). | `--drive-id`, `--item-id`, `--table-id` | `GET /drives/{drive-id}/items/{item-id}/workbook/tables/{table-id}/rows` |
 | `list-excel-tables` | List the named tables across every worksheet in an Excel workbook. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/workbook/tables` |
 | `list-excel-worksheets` | List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint. | `--drive-id`, `--item-id` | `GET /drives/{drive-id}/items/{item-id}/workbook/worksheets` |
@@ -49,12 +52,17 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
+| `get-sharepoint-list-column` | Return a single column definition from a SharePoint list. | `--site-id`, `--list-id`, `--column-id` | `GET /sites/{site-id}/lists/{list-id}/columns/{column-id}` |
 | `get-sharepoint-site` | Get the metadata of a single SharePoint site by its site ID. | `--site-id` | `GET /sites/{site-id}` |
 | `get-sharepoint-site-by-path` | Resolve a SharePoint site by its hostname + server-relative path. Use this when you have a SharePoint URL (e.g. `https://contoso.sharepoint.com/sites/Marketing`) but no site ID. | `--hostname`, `--path` | `GET /sites/{hostname}:{path}` |
 | `get-sharepoint-site-drive-by-id` | Get the metadata of a single document library (drive) on a SharePoint site by drive ID. | `--site-id`, `--drive-id` | `GET /sites/{site-id}/drives/{drive-id}` |
+| `get-sharepoint-site-item` | Return a single SharePoint baseItem from a site by ID. | `--site-id`, `--item-id` | `GET /sites/{site-id}/items/{item-id}` |
 | `get-sharepoint-site-list` | Get the metadata (display name, template, columns) of a single SharePoint list. | `--site-id`, `--list-id` | `GET /sites/{site-id}/lists/{list-id}` |
 | `get-sharepoint-site-list-item` | Get a single row (listItem) of a SharePoint list by ID. | `--site-id`, `--list-id`, `--list-item-id` | `GET /sites/{site-id}/lists/{list-id}/items/{list-item-id}` |
+| `get-sharepoint-sites-delta` | Track incremental changes to SharePoint sites the tenant exposes. First call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only sites added, modified, or deleted since. | _(none)_ | `GET /sites/delta()` |
+| `list-sharepoint-list-columns` | List the column definitions (schema) of a SharePoint list. Useful before reading list items so you know which fields exist and their types. | `--site-id`, `--list-id` | `GET /sites/{site-id}/lists/{list-id}/columns` |
 | `list-sharepoint-site-drives` | List the document libraries (drives) attached to a SharePoint site. | `--site-id` | `GET /sites/{site-id}/drives` |
+| `list-sharepoint-site-items` | List items at the root of a SharePoint site (across all lists / libraries combined). Useful as an entry point before drilling into a specific list with `list-sharepoint-site-list-items`. | `--site-id` | `GET /sites/{site-id}/items` |
 | `list-sharepoint-site-list-items` | List the rows (listItem resources) of a single SharePoint list. | `--site-id`, `--list-id` | `GET /sites/{site-id}/lists/{list-id}/items` |
 | `list-sharepoint-site-lists` | List all SharePoint lists (custom + built-in document libraries) on a site. | `--site-id` | `GET /sites/{site-id}/lists` |
 | `search-sharepoint-sites` | List the SharePoint sites the signed-in user has explicitly followed. Hits `GET /me/followedSites` (the unauthenticated `GET /sites` returns an empty collection in most tenants — for free-text discovery use `search-sharepoint-sites-by-name`). | _(none)_ | `GET /me/followedSites` |
@@ -89,13 +97,23 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `extract-sharepoint-links-in-mail` | Find every `*.sharepoint.com` URL in the body of a single Outlook email and resolve each one to its driveItem (driveId, itemId, name, webUrl) so the agent can feed those into `download-drive-item-as-pdf` / `-as-markdown` etc. Read-only — no conversion happens here. Capped at 25 unique URLs per call to bound fan-out (returns `truncated: true` and `skippedCount` when the body has more); duplicate URLs are deduplicated. Per-link errors are captured inside each entry instead of failing the whole call. | `--message-id` | `GET /me/messages/{message-id}` |
 | `get-mail-attachment` | Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). | `--message-id`, `--attachment-id` | `GET /me/messages/{message-id}/attachments/{attachment-id}` |
 | `get-mail-message` | Get a single Outlook message by ID, including subject, sender, body, and flags. | `--message-id` | `GET /me/messages/{message-id}` |
+| `get-mail-message-mime` | Return the raw RFC 5322 MIME source of a single Outlook message — full headers, every attachment encoded inline. Useful for archiving, full-fidelity forensic inspection, or feeding into a tool that reads MIME directly. For human-readable content prefer `get-mail-message` or `convert-mail-to-markdown`. | `--message-id` | `GET /me/messages/{message-id}/$value` |
 | `get-mailbox-settings` | Get the signed-in user’s Outlook mailbox settings (timezone, working hours, automatic replies). | _(none)_ | `GET /me/mailboxSettings` |
+| `get-shared-mailbox-message` | Return a single message from a shared / delegated mailbox. | `--user-id`, `--message-id` | `GET /users/{user-id}/messages/{message-id}` |
+| `list-conversation-messages` | List every message in a single Outlook conversation (thread) using `$filter=conversationId eq '...'`, sorted by receivedDateTime ascending. Reconstructs a complete thread regardless of which subject lines or folders the replies landed in. KQL `$search` does not index `conversationId`, so `$filter` is the documented Graph idiom for whole-thread retrieval. | `--conversation-id` | `GET /me/messages?$filter=conversationId eq '{conversation-id}'&$orderby=receivedDateTime` |
+| `list-focused-inbox-overrides` | List the signed-in user's Focused Inbox classification overrides — sender addresses they've manually moved to Focused or Other, which override Microsoft's automatic classifier. | _(none)_ | `GET /me/inferenceClassification/overrides` |
+| `list-group-conversations` | List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. | `--group-id` | `GET /groups/{group-id}/conversations` |
+| `list-group-threads` | List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. | `--group-id` | `GET /groups/{group-id}/threads` |
 | `list-mail-attachments` | List the attachments (file, item, reference) on a single Outlook message. | `--message-id` | `GET /me/messages/{message-id}/attachments` |
 | `list-mail-child-folders` | List the subfolders of a single Outlook mail folder (e.g. subfolders of Inbox). | `--mail-folder-id` | `GET /me/mailFolders/{mail-folder-id}/childFolders` |
 | `list-mail-folder-messages` | List the messages inside a specific Outlook mail folder (Inbox, custom folder, etc.). | `--mail-folder-id` | `GET /me/mailFolders/{mail-folder-id}/messages` |
+| `list-mail-folder-messages-delta` | Track incremental changes (added / updated / deleted messages) within a single mail folder using Microsoft Graph delta tokens. The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed since. | `--mail-folder-id` | `GET /me/mailFolders/{mail-folder-id}/messages/delta()` |
 | `list-mail-folders` | List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). | _(none)_ | `GET /me/mailFolders` |
 | `list-mail-messages` | List the most recent messages from across the signed-in user’s entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). Use `list-mail-folder-messages` to scope to a single folder such as Inbox. | _(none)_ | `GET /me/messages` |
 | `list-mail-rules` | List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns an `ErrorInvalidParameter` from Graph. | `--mail-folder-id` | `GET /me/mailFolders/{mail-folder-id}/messageRules` |
+| `list-outlook-categories` | List the signed-in user's Outlook color categories — the named tags that can be applied to mail, calendar items, and contacts. Each entry has `displayName` and a `color` from Outlook's preset palette. | _(none)_ | `GET /me/outlook/masterCategories` |
+| `list-shared-mailbox-folder-messages` | List messages in a single folder of a shared / delegated mailbox. | `--user-id`, `--mail-folder-id` | `GET /users/{user-id}/mailFolders/{mail-folder-id}/messages` |
+| `list-shared-mailbox-messages` | List messages from a shared or delegated mailbox the signed-in user has read access to. Same shape as `list-mail-messages` but scoped to a specific mailbox owner. 403 if the signed-in user does not have shared access to that mailbox. | `--user-id` | `GET /users/{user-id}/messages` |
 | `search-mail-messages` | Search the signed-in user’s entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. | `--query` | `GET /me/messages?$search="{query}"` |
 
 ### Notes (OneNote)
@@ -104,10 +122,14 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 |---------|-------------|-----------------|----------------|
 | `get-onenote-page-as-markdown` | Get the body of a single OneNote page as markdown. Graph already returns OneNote pages as HTML, so this command runs that HTML through turndown locally. Inline image references in the page survive as Graph resource URLs (they are NOT base64-embedded — that is future work). For the raw HTML use `get-onenote-page-content`. | `--onenote-page-id` | `GET /me/onenote/pages/{onenote-page-id}/content` |
 | `get-onenote-page-content` | Get the raw HTML body of a single OneNote page. Returned in a JSON envelope so the HTML survives transport. For markdown output use `get-onenote-page-as-markdown`. | `--onenote-page-id` | `GET /me/onenote/pages/{onenote-page-id}/content` |
+| `get-sharepoint-site-onenote-page-content` | Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). | `--site-id`, `--onenote-page-id` | `GET /sites/{site-id}/onenote/pages/{onenote-page-id}/content` |
 | `list-all-onenote-sections` | List every OneNote section the signed-in user can see, across all notebooks. | _(none)_ | `GET /me/onenote/sections` |
 | `list-onenote-notebook-sections` | List the top-level sections of a single OneNote notebook (flat — does NOT recurse into section groups; use `list-all-onenote-sections` to flatten every notebook the user has access to). | `--notebook-id` | `GET /me/onenote/notebooks/{notebook-id}/sections` |
 | `list-onenote-notebooks` | List the OneNote notebooks the signed-in user owns or has access to (sorted by `createdDateTime` desc by Graph; soft-deleted notebooks excluded). | _(none)_ | `GET /me/onenote/notebooks` |
 | `list-onenote-section-pages` | List the pages inside a single OneNote section. | `--onenote-section-id` | `GET /me/onenote/sections/{onenote-section-id}/pages` |
+| `list-sharepoint-site-onenote-notebook-sections` | List sections inside one OneNote notebook attached to a SharePoint site. | `--site-id`, `--notebook-id` | `GET /sites/{site-id}/onenote/notebooks/{notebook-id}/sections` |
+| `list-sharepoint-site-onenote-notebooks` | List OneNote notebooks attached to a SharePoint site (separate from the personal `list-onenote-notebooks` which targets `/me`). | `--site-id` | `GET /sites/{site-id}/onenote/notebooks` |
+| `list-sharepoint-site-onenote-section-pages` | List pages inside one section of a SharePoint-site OneNote notebook. | `--site-id`, `--onenote-section-id` | `GET /sites/{site-id}/onenote/sections/{onenote-section-id}/pages` |
 | `search-onenote-pages` | Find OneNote pages whose title contains a substring (case-sensitive — page content is NOT searched). Microsoft removed full-text OneNote `?search=` from v1.0 Graph; only $filter against `title` remains, which is what this command runs. | `--title-substring` | `GET /me/onenote/pages?$filter=contains(title,'{title-substring}')` |
 
 ### User
@@ -115,7 +137,17 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
 | `get-current-user` | Return the signed-in user’s Microsoft Graph profile (id, displayName, mail, jobTitle, etc.). | _(none)_ | `GET /me` |
+| `get-group` | Return metadata for a single Azure AD / Microsoft 365 group. | `--group-id` | `GET /groups/{group-id}` |
+| `get-my-manager` | Return the signed-in user's manager (a single `user` resource). Returns 404 `Request_ResourceNotFound` if no manager is set in the directory — that is data-empty, not a permission failure. | _(none)_ | `GET /me/manager` |
 | `get-my-profile-photo` | Download the signed-in user’s profile photo (largest available size). Returned as a base64 envelope so the binary survives JSON output. | _(none)_ | `GET /me/photo/$value` |
+| `get-user-manager` | Return a specific user's manager (a single `user` resource). 404 if no manager is set in the directory. | `--user-id` | `GET /users/{user-id}/manager` |
+| `list-group-members` | List members of an Azure AD / Microsoft 365 group. Returns users, groups, and other directoryObjects depending on the group's membership. | `--group-id` | `GET /groups/{group-id}/members` |
+| `list-group-owners` | List the owners of an Azure AD / Microsoft 365 group. | `--group-id` | `GET /groups/{group-id}/owners` |
+| `list-groups` | List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories. | _(none)_ | `GET /groups` |
+| `list-my-direct-reports` | List the signed-in user's direct reports (employees who report to them in the directory). | _(none)_ | `GET /me/directReports` |
+| `list-my-memberships` | List the groups, directory roles, and administrative units the signed-in user is a member of. Each entry's `@odata.type` distinguishes #microsoft.graph.group from #microsoft.graph.directoryRole, etc. | _(none)_ | `GET /me/memberOf` |
+| `list-relevant-people` | List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc. | _(none)_ | `GET /me/people` |
+| `list-user-direct-reports` | List a specific user's direct reports. | `--user-id` | `GET /users/{user-id}/directReports` |
 
 ### Calendar
 
@@ -123,6 +155,8 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 |---------|-------------|-----------------|----------------|
 | `get-calendar-event` | Fetch a single calendar event by ID from the signed-in user’s default calendar. | `--event-id` | `GET /me/events/{event-id}` |
 | `get-calendar-view` | List the signed-in user’s default-calendar events with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph. | `--start-date-time`, `--end-date-time` | `GET /me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}` |
+| `get-group-calendar-view` | Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window. | `--group-id`, `--start-date-time`, `--end-date-time` | `GET /groups/{group-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}` |
+| `get-shared-calendar-view` | Return a date-windowed calendar view from another user's primary calendar (shared / delegated access). Recurrences expanded into individual occurrences. | `--user-id`, `--start-date-time`, `--end-date-time` | `GET /users/{user-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}` |
 | `get-specific-calendar-event` | Fetch a single calendar event by ID from a specific (non-default) calendar. | `--calendar-id`, `--event-id` | `GET /me/calendars/{calendar-id}/events/{event-id}` |
 | `get-specific-calendar-view` | List the events in a specific (non-default) calendar with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph. | `--calendar-id`, `--start-date-time`, `--end-date-time` | `GET /me/calendars/{calendar-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}` |
 | `list-calendar-event-instances` | List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph. | `--calendar-id`, `--event-id`, `--start-date-time`, `--end-date-time` | `GET /me/calendars/{calendar-id}/events/{event-id}/instances?startDateTime={start-date-time}&endDateTime={end-date-time}` |
@@ -130,13 +164,19 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `list-calendar-events-delta` | Get the incremental change set (added / modified / deleted events) for the signed-in user’s default calendar. Use the `@odata.deltaLink` from a previous response to resume. | _(none)_ | `GET /me/events/delta()` |
 | `list-calendar-view-delta` | Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. | `--start-date-time`, `--end-date-time` | `GET /me/calendarView/delta()?startDateTime={start-date-time}&endDateTime={end-date-time}` |
 | `list-calendars` | List the calendars in the signed-in user’s mailbox (default + secondary calendars + shared calendars). | _(none)_ | `GET /me/calendars` |
+| `list-group-events` | List events from a unified (Microsoft 365) group's calendar. Only Microsoft 365 groups have a calendar — security and distribution groups return an empty `value[]` or 404. | `--group-id` | `GET /groups/{group-id}/events` |
+| `list-room-lists` | List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms. | _(none)_ | `GET /places/microsoft.graph.roomList` |
+| `list-rooms` | List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking. | _(none)_ | `GET /places/microsoft.graph.room` |
+| `list-shared-calendar-events` | List events from another user's primary calendar (shared / delegated access). 403 without `Calendars.Read.Shared`. | `--user-id` | `GET /users/{user-id}/calendar/events` |
 | `list-specific-calendar-events` | List the events in a specific (non-default) calendar (does not expand recurrences). | `--calendar-id` | `GET /me/calendars/{calendar-id}/events` |
 
 ### Chats
 
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
+| `get-chat` | Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages. Requires the elevated M365ChatClient token captured at login. | `--chat-id` | `GET /chats/{chat-id}` |
 | `list-chat-members` | List the members of a single Microsoft Teams chat. | `--chat-id` | `GET /chats/{chat-id}/members` |
+| `list-chats` | List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants. This command requires the elevated M365ChatClient token captured at login. | _(none)_ | `GET /me/chats` |
 
 ### Teams
 
@@ -258,6 +298,15 @@ src/
 - **Token cache**: `~/.ask-marcel/token-cache.json` (overridable via `BuildDepsConfig.cachePath`)
 - **Browser profile**: `~/.ask-marcel/browser-profile` (overridable via `ASKMARCEL_BROWSER_PROFILE`)
 - **Output**: Compact JSON via `JSON.stringify` — no indentation, optimised for LLM token efficiency
+
+### Elevated token (historical-version + chat commands)
+
+Five commands need a Graph token whose `appid` is on Microsoft's ODSP / Chat allow-list:
+
+- `download-drive-item-version-content` / `-as-markdown` / `-as-pdf` — historical-version bytes (the Teams web client token returns 403 with `logicalPermissionAccessDenied`)
+- `list-chats`, `get-chat` — Teams chat metadata (the Teams web client token has no `Chat.ReadBasic` scope)
+
+Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app that has both `Chat.ReadBasic` and ODSP allow-list status. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used only by the five commands above. Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed (e.g. IdP-fronted tenants), interactive sign-in completes inside the popup. If the elevated capture fails at login (slow tenant, missing cookies), the other 115+ commands still work.
 
 ## Configuration
 

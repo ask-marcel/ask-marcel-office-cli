@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "0.8.0",
-  "generatedAt": "2026-05-06T07:09:50.107Z",
+  "version": "0.9.0",
+  "generatedAt": "2026-05-06T08:28:59.488Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -292,6 +292,24 @@
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
+      "name": "get-chat",
+      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages. Requires the elevated M365ChatClient token captured at login.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/chats/{chat-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chat-get",
+      "options": [
+        {
+          "name": "chat-id",
+          "key": "chatId",
+          "required": true,
+          "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Returned by `list-chats`."
+        }
+      ],
+      "example": "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
+      "responseShape": "single Microsoft Graph `chat` resource"
+    },
+    {
       "name": "get-current-user",
       "summary": "Return the signed-in user’s Microsoft Graph profile (id, displayName, mail, jobTitle, etc.).",
       "category": "user",
@@ -436,6 +454,85 @@
       "responseShape": "single Microsoft Graph `workbookTable` resource"
     },
     {
+      "name": "get-excel-used-range",
+      "summary": "Return the worksheet's used range — the bounding box of every non-empty cell — as a single Excel range. Avoids fetching the entire 1M × 16K-cell sheet when only a small data island is populated.",
+      "category": "excel",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/usedRange()",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/worksheet-usedrange",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .xlsx file."
+        },
+        {
+          "name": "worksheet-id",
+          "key": "worksheetId",
+          "required": true,
+          "description": "Worksheet ID or name. Returned by `list-excel-worksheets`."
+        }
+      ],
+      "example": "ask-marcel get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
+      "responseShape": "single Microsoft Graph `workbookRange` resource (`address`, `rowCount`, `columnCount`, `values`, `formulas`, etc.)"
+    },
+    {
+      "name": "get-group",
+      "summary": "Return metadata for a single Azure AD / Microsoft 365 group.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-get",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID. Use `list-groups` to find one."
+        }
+      ],
+      "example": "ask-marcel get-group --group-id 'a1b2c3d4-...'",
+      "responseShape": "single Microsoft Graph `group` resource"
+    },
+    {
+      "name": "get-group-calendar-view",
+      "summary": "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-calendarview",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group."
+        },
+        {
+          "name": "start-date-time",
+          "key": "startDateTime",
+          "required": true,
+          "description": "ISO 8601 start (e.g. `2026-04-01T00:00:00Z`). Recurrences are expanded across the window."
+        },
+        {
+          "name": "end-date-time",
+          "key": "endDateTime",
+          "required": true,
+          "description": "ISO 8601 end (e.g. `2026-05-01T00:00:00Z`)."
+        }
+      ],
+      "example": "ask-marcel get-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "get-mail-attachment",
       "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments).",
       "category": "mail",
@@ -478,6 +575,24 @@
       "responseShape": "single Microsoft Graph `message` resource"
     },
     {
+      "name": "get-mail-message-mime",
+      "summary": "Return the raw RFC 5322 MIME source of a single Outlook message — full headers, every attachment encoded inline. Useful for archiving, full-fidelity forensic inspection, or feeding into a tool that reads MIME directly. For human-readable content prefer `get-mail-message` or `convert-mail-to-markdown`.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/messages/{message-id}/$value",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-get",
+      "options": [
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Outlook message ID. Returned by `list-mail-messages` or `search-mail-messages`."
+        }
+      ],
+      "example": "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
+      "responseShape": "raw MIME envelope (`{ contentType: \"message/rfc822\" or similar, size, text/base64 }`)"
+    },
+    {
       "name": "get-mailbox-settings",
       "summary": "Get the signed-in user’s Outlook mailbox settings (timezone, working hours, automatic replies).",
       "category": "mail",
@@ -487,6 +602,17 @@
       "options": [],
       "example": "ask-marcel get-mailbox-settings",
       "responseShape": "single Microsoft Graph `mailboxSettings` resource"
+    },
+    {
+      "name": "get-my-manager",
+      "summary": "Return the signed-in user's manager (a single `user` resource). Returns 404 `Request_ResourceNotFound` if no manager is set in the directory — that is data-empty, not a permission failure.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/manager",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-manager",
+      "options": [],
+      "example": "ask-marcel get-my-manager",
+      "responseShape": "single Microsoft Graph `user` resource"
     },
     {
       "name": "get-my-profile-photo",
@@ -644,6 +770,91 @@
       "responseShape": "single Microsoft Graph `plannerTaskDetails` resource"
     },
     {
+      "name": "get-shared-calendar-view",
+      "summary": "Return a date-windowed calendar view from another user's primary calendar (shared / delegated access). Recurrences expanded into individual occurrences.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-calendarview",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the calendar owner."
+        },
+        {
+          "name": "start-date-time",
+          "key": "startDateTime",
+          "required": true,
+          "description": "ISO 8601 start of the window."
+        },
+        {
+          "name": "end-date-time",
+          "key": "endDateTime",
+          "required": true,
+          "description": "ISO 8601 end of the window."
+        }
+      ],
+      "example": "ask-marcel get-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "get-shared-mailbox-message",
+      "summary": "Return a single message from a shared / delegated mailbox.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/messages/{message-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-get",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the shared mailbox."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Outlook message ID inside that mailbox."
+        }
+      ],
+      "example": "ask-marcel get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...'",
+      "responseShape": "single Microsoft Graph `message` resource"
+    },
+    {
+      "name": "get-sharepoint-list-column",
+      "summary": "Return a single column definition from a SharePoint list.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/lists/{list-id}/columns/{column-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/columndefinition-get",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        },
+        {
+          "name": "list-id",
+          "key": "listId",
+          "required": true,
+          "description": "List ID inside the site."
+        },
+        {
+          "name": "column-id",
+          "key": "columnId",
+          "required": true,
+          "description": "columnDefinition ID. Returned by `list-sharepoint-list-columns`."
+        }
+      ],
+      "example": "ask-marcel get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
+      "responseShape": "single Microsoft Graph `columnDefinition` resource"
+    },
+    {
       "name": "get-sharepoint-site",
       "summary": "Get the metadata of a single SharePoint site by its site ID.",
       "category": "sharepoint",
@@ -710,6 +921,30 @@
       "responseShape": "single Microsoft Graph `drive` resource"
     },
     {
+      "name": "get-sharepoint-site-item",
+      "summary": "Return a single SharePoint baseItem from a site by ID.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/items/{item-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/baseitem-get",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID. Returned by `search-sharepoint-sites`."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "baseItem ID inside the site. Returned by `list-sharepoint-site-items`."
+        }
+      ],
+      "example": "ask-marcel get-sharepoint-site-item --site-id 'contoso.sharepoint.com,abc...,def...' --item-id '7'",
+      "responseShape": "single Microsoft Graph `baseItem` resource"
+    },
+    {
       "name": "get-sharepoint-site-list",
       "summary": "Get the metadata (display name, template, columns) of a single SharePoint list.",
       "category": "sharepoint",
@@ -762,6 +997,42 @@
       ],
       "example": "ask-marcel get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
       "responseShape": "single Microsoft Graph `listItem` resource"
+    },
+    {
+      "name": "get-sharepoint-site-onenote-page-content",
+      "summary": "Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`).",
+      "category": "notes",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/onenote/pages/{onenote-page-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/page-get",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        },
+        {
+          "name": "onenote-page-id",
+          "key": "onenotePageId",
+          "required": true,
+          "description": "OneNote page ID inside the site."
+        }
+      ],
+      "example": "ask-marcel get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
+      "responseShape": "HTML envelope (`{ contentType: \"text/html\", size, text }`)"
+    },
+    {
+      "name": "get-sharepoint-sites-delta",
+      "summary": "Track incremental changes to SharePoint sites the tenant exposes. First call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only sites added, modified, or deleted since.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/delta()",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/site-delta",
+      "options": [],
+      "example": "ask-marcel get-sharepoint-sites-delta",
+      "responseShape": "collection of Microsoft Graph `site` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "pagination": true
     },
     {
       "name": "get-specific-calendar-event",
@@ -896,6 +1167,24 @@
       "responseShape": "single Microsoft Graph `todoTask` resource"
     },
     {
+      "name": "get-user-manager",
+      "summary": "Return a specific user's manager (a single `user` resource). 404 if no manager is set in the directory.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/manager",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-manager",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN. Use `list-users` to find one."
+        }
+      ],
+      "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com'",
+      "responseShape": "single Microsoft Graph `user` resource"
+    },
+    {
       "name": "list-all-onenote-sections",
       "summary": "List every OneNote section the signed-in user can see, across all notebooks.",
       "category": "notes",
@@ -1025,6 +1314,37 @@
       "pagination": true
     },
     {
+      "name": "list-chats",
+      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants. This command requires the elevated M365ChatClient token captured at login.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/chats",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chat-list",
+      "options": [],
+      "example": "ask-marcel list-chats",
+      "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-conversation-messages",
+      "summary": "List every message in a single Outlook conversation (thread) using `$filter=conversationId eq '...'`, sorted by receivedDateTime ascending. Reconstructs a complete thread regardless of which subject lines or folders the replies landed in. KQL `$search` does not index `conversationId`, so `$filter` is the documented Graph idiom for whole-thread retrieval.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/messages?$filter=conversationId eq '{conversation-id}'&$orderby=receivedDateTime",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-messages",
+      "options": [
+        {
+          "name": "conversation-id",
+          "key": "conversationId",
+          "required": true,
+          "description": "Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`)."
+        }
+      ],
+      "example": "ask-marcel list-conversation-messages --conversation-id 'AAQkAD...='",
+      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-drive-item-permissions",
       "summary": "List the sharing permissions on a OneDrive / SharePoint file or folder.",
       "category": "drive",
@@ -1047,6 +1367,31 @@
       ],
       "example": "ask-marcel list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `permission` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-drive-item-thumbnails",
+      "summary": "List thumbnail URLs (small / medium / large) for a OneDrive / SharePoint file. Each thumbnail set has pre-signed CDN URLs you can render in a UI without further auth.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/thumbnails",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-list-thumbnails",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID. Returned by `list-folder-files` or `search-onedrive-files`."
+        }
+      ],
+      "example": "ask-marcel list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "collection of Microsoft Graph `thumbnailSet` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1168,6 +1513,18 @@
       "pagination": true
     },
     {
+      "name": "list-focused-inbox-overrides",
+      "summary": "List the signed-in user's Focused Inbox classification overrides — sender addresses they've manually moved to Focused or Other, which override Microsoft's automatic classifier.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/inferenceClassification/overrides",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/inferenceclassification-list-overrides",
+      "options": [],
+      "example": "ask-marcel list-focused-inbox-overrides",
+      "responseShape": "collection of Microsoft Graph `inferenceClassificationOverride` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-folder-files",
       "summary": "List the children (files and subfolders) of a folder in OneDrive / SharePoint.",
       "category": "drive",
@@ -1190,6 +1547,113 @@
       ],
       "example": "ask-marcel list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-group-conversations",
+      "summary": "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/conversations",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-conversations",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group."
+        }
+      ],
+      "example": "ask-marcel list-group-conversations --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `conversation` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-group-events",
+      "summary": "List events from a unified (Microsoft 365) group's calendar. Only Microsoft 365 groups have a calendar — security and distribution groups return an empty `value[]` or 404.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/events",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-events",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group. Use `list-groups` to find one."
+        }
+      ],
+      "example": "ask-marcel list-group-events --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-group-members",
+      "summary": "List members of an Azure AD / Microsoft 365 group. Returns users, groups, and other directoryObjects depending on the group's membership.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/members",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-members",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID. Use `list-groups` to find one."
+        }
+      ],
+      "example": "ask-marcel list-group-members --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-group-owners",
+      "summary": "List the owners of an Azure AD / Microsoft 365 group.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/owners",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-owners",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID. Use `list-groups` to find one."
+        }
+      ],
+      "example": "ask-marcel list-group-owners --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-group-threads",
+      "summary": "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/threads",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-threads",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group."
+        }
+      ],
+      "example": "ask-marcel list-group-threads --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `conversationThread` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-groups",
+      "summary": "List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list",
+      "options": [],
+      "example": "ask-marcel list-groups",
+      "responseShape": "collection of Microsoft Graph `group` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1299,6 +1763,25 @@
       "pagination": true
     },
     {
+      "name": "list-mail-folder-messages-delta",
+      "summary": "Track incremental changes (added / updated / deleted messages) within a single mail folder using Microsoft Graph delta tokens. The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed since.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/mailFolders/{mail-folder-id}/messages/delta()",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-delta",
+      "options": [
+        {
+          "name": "mail-folder-id",
+          "key": "mailFolderId",
+          "required": true,
+          "description": "Mail folder ID or well-known name (`inbox`, `archive`, `sentitems`, `deleteditems`, `junkemail`, `drafts`). Returned by `list-mail-folders`."
+        }
+      ],
+      "example": "ask-marcel list-mail-folder-messages-delta --mail-folder-id 'inbox'",
+      "responseShape": "collection of Microsoft Graph `message` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "pagination": true
+    },
+    {
       "name": "list-mail-folders",
       "summary": "List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.).",
       "category": "mail",
@@ -1339,6 +1822,30 @@
       ],
       "example": "ask-marcel list-mail-rules --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-my-direct-reports",
+      "summary": "List the signed-in user's direct reports (employees who report to them in the directory).",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/directReports",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-directreports",
+      "options": [],
+      "example": "ask-marcel list-my-direct-reports",
+      "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-my-memberships",
+      "summary": "List the groups, directory roles, and administrative units the signed-in user is a member of. Each entry's `@odata.type` distinguishes #microsoft.graph.group from #microsoft.graph.directoryRole, etc.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/memberOf",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-memberof",
+      "options": [],
+      "example": "ask-marcel list-my-memberships",
+      "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1395,6 +1902,18 @@
       ],
       "example": "ask-marcel list-onenote-section-pages --onenote-section-id '1-abc...'",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-outlook-categories",
+      "summary": "List the signed-in user's Outlook color categories — the named tags that can be applied to mail, calendar items, and contacts. Each entry has `displayName` and a `color` from Outlook's preset palette.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/outlook/masterCategories",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories",
+      "options": [],
+      "example": "ask-marcel list-outlook-categories",
+      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1472,6 +1991,130 @@
       "pagination": true
     },
     {
+      "name": "list-relevant-people",
+      "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/people",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-people",
+      "options": [],
+      "example": "ask-marcel list-relevant-people",
+      "responseShape": "collection of Microsoft Graph `person` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-room-lists",
+      "summary": "List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/places/microsoft.graph.roomList",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/place-list",
+      "options": [],
+      "example": "ask-marcel list-room-lists",
+      "responseShape": "collection of Microsoft Graph `roomList` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-rooms",
+      "summary": "List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/places/microsoft.graph.room",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/place-list",
+      "options": [],
+      "example": "ask-marcel list-rooms",
+      "responseShape": "collection of Microsoft Graph `room` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-shared-calendar-events",
+      "summary": "List events from another user's primary calendar (shared / delegated access). 403 without `Calendars.Read.Shared`.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/calendar/events",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-events",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN whose calendar to read. Requires `Calendars.Read.Shared` access (granted by the calendar owner)."
+        }
+      ],
+      "example": "ask-marcel list-shared-calendar-events --user-id 'colleague@contoso.com'",
+      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-shared-mailbox-folder-messages",
+      "summary": "List messages in a single folder of a shared / delegated mailbox.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/mailFolders/{mail-folder-id}/messages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-list-messages",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the shared mailbox."
+        },
+        {
+          "name": "mail-folder-id",
+          "key": "mailFolderId",
+          "required": true,
+          "description": "Mail folder ID or well-known name (`inbox`, `sentitems`, etc.) inside that mailbox."
+        }
+      ],
+      "example": "ask-marcel list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
+      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-shared-mailbox-messages",
+      "summary": "List messages from a shared or delegated mailbox the signed-in user has read access to. Same shape as `list-mail-messages` but scoped to a specific mailbox owner. 403 if the signed-in user does not have shared access to that mailbox.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/messages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-messages",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner)."
+        }
+      ],
+      "example": "ask-marcel list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
+      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-sharepoint-list-columns",
+      "summary": "List the column definitions (schema) of a SharePoint list. Useful before reading list items so you know which fields exist and their types.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/lists/{list-id}/columns",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/list-list-columns",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        },
+        {
+          "name": "list-id",
+          "key": "listId",
+          "required": true,
+          "description": "List ID inside the site. Returned by `list-sharepoint-site-lists`."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid'",
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-sharepoint-site-drives",
       "summary": "List the document libraries (drives) attached to a SharePoint site.",
       "category": "sharepoint",
@@ -1488,6 +2131,25 @@
       ],
       "example": "ask-marcel list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-sharepoint-site-items",
+      "summary": "List items at the root of a SharePoint site (across all lists / libraries combined). Useful as an entry point before drilling into a specific list with `list-sharepoint-site-list-items`.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/items",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/site-list-items",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID. Returned by `search-sharepoint-sites` (composite `hostname,site,web` form)."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-site-items --site-id 'contoso.sharepoint.com,abc...,def...'",
+      "responseShape": "collection of Microsoft Graph `baseItem` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1532,6 +2194,75 @@
       ],
       "example": "ask-marcel list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `list` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-sharepoint-site-onenote-notebook-sections",
+      "summary": "List sections inside one OneNote notebook attached to a SharePoint site.",
+      "category": "notes",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/onenote/notebooks/{notebook-id}/sections",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/notebook-list-sections",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        },
+        {
+          "name": "notebook-id",
+          "key": "notebookId",
+          "required": true,
+          "description": "OneNote notebook ID inside the site."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
+      "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-sharepoint-site-onenote-notebooks",
+      "summary": "List OneNote notebooks attached to a SharePoint site (separate from the personal `list-onenote-notebooks` which targets `/me`).",
+      "category": "notes",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/onenote/notebooks",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/onenote-list-notebooks",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-site-onenote-notebooks --site-id 'contoso.sharepoint.com,...'",
+      "responseShape": "collection of Microsoft Graph `notebook` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-sharepoint-site-onenote-section-pages",
+      "summary": "List pages inside one section of a SharePoint-site OneNote notebook.",
+      "category": "notes",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/onenote/sections/{onenote-section-id}/pages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/section-list-pages",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        },
+        {
+          "name": "onenote-section-id",
+          "key": "onenoteSectionId",
+          "required": true,
+          "description": "OneNote section ID inside the site."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-site-onenote-section-pages --site-id 'contoso.sharepoint.com,...' --onenote-section-id 's1'",
+      "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1644,6 +2375,37 @@
       ],
       "example": "ask-marcel list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-trending-insights",
+      "summary": "List documents trending around the signed-in user — files popular in their working network (colleagues' recent edits, shares, opens). Microsoft's relevance ranking, useful for surfacing unfamiliar but related work.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/insights/trending",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/insights-list-trending",
+      "options": [],
+      "example": "ask-marcel list-trending-insights",
+      "responseShape": "collection of Microsoft Graph `trending` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-user-direct-reports",
+      "summary": "List a specific user's direct reports.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/directReports",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-directreports",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or userPrincipalName (UPN) — typically the user's email address. Use `list-users` to find one."
+        }
+      ],
+      "example": "ask-marcel list-user-direct-reports --user-id 'alice@contoso.com'",
+      "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
       "pagination": true
     },
     {

@@ -10,6 +10,14 @@ type GraphError =
 
 type GraphClient = {
   get: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * Same JSON-GET shape as `get`, but signs the request with the
+   * elevated Graph token (M365ChatClient). Used by commands the Teams
+   * web client token cannot reach — currently `list-chats` and
+   * `get-chat`, which need `Chat.ReadBasic` (only present on the
+   * elevated token).
+   */
+  getElevated: (path: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
@@ -138,6 +146,22 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       return err({ type: 'auth_failed', message: msg });
     }
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
+  };
+
+  const getElevated = async (path: string): Promise<Result<unknown, GraphError>> => {
+    const headers = await elevatedAuthHeaders();
+    if (!headers.ok) return headers;
+    try {
+      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+        method: 'GET',
+        headers: { ...headers.value, 'content-type': 'application/json' },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return err(await apiErrorFrom(res));
+      return ok(await res.json());
+    } catch (e: unknown) {
+      return err({ type: 'network_error', message: networkErrorMessage(e) });
+    }
   };
 
   const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
@@ -310,6 +334,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
 
   return {
     get: (path) => request('GET', path),
+    getElevated,
     post: (path, body) => request('POST', path, body),
     getBinary,
     getBinaryElevated,
