@@ -86,6 +86,25 @@ import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
+import * as listRecentFiles from './list-recent-files.ts';
+import * as listSharedWithMe from './list-shared-with-me.ts';
+import * as listRecentlyUsedInsights from './list-recently-used-insights.ts';
+import * as listSharedInsights from './list-shared-insights.ts';
+import * as getOrganization from './get-organization.ts';
+import * as listMailFoldersDelta from './list-mail-folders-delta.ts';
+import * as getChannelFilesFolder from './get-channel-files-folder.ts';
+import * as getDriveItemListItem from './get-drive-item-list-item.ts';
+import * as getDriveItemAnalytics from './get-drive-item-analytics.ts';
+import * as listTeamInstalledApps from './list-team-installed-apps.ts';
+import * as listCalendarGroups from './list-calendar-groups.ts';
+import * as listCalendarGroupCalendars from './list-calendar-group-calendars.ts';
+import * as getMyCalendar from './get-my-calendar.ts';
+import * as listSiteColumns from './list-site-columns.ts';
+import * as listSiteContentTypes from './list-site-content-types.ts';
+import * as listSharepointSitePages from './list-sharepoint-site-pages.ts';
+import * as listExcelDefinedNames from './list-excel-defined-names.ts';
+import * as listExcelWorksheetCharts from './list-excel-worksheet-charts.ts';
+import * as microsoftSearchQuery from './microsoft-search-query.ts';
 import * as listMyMemberships from './list-my-memberships.ts';
 import * as getMyManager from './get-my-manager.ts';
 import * as getUserManager from './get-user-manager.ts';
@@ -246,6 +265,25 @@ const commands: Record<string, Command> = {
   'list-rooms': listRooms,
   'list-room-lists': listRoomLists,
   'list-trending-insights': listTrendingInsights,
+  'list-recent-files': listRecentFiles,
+  'list-shared-with-me': listSharedWithMe,
+  'list-recently-used-insights': listRecentlyUsedInsights,
+  'list-shared-insights': listSharedInsights,
+  'get-organization': getOrganization,
+  'list-mail-folders-delta': listMailFoldersDelta,
+  'get-channel-files-folder': getChannelFilesFolder,
+  'get-drive-item-list-item': getDriveItemListItem,
+  'get-drive-item-analytics': getDriveItemAnalytics,
+  'list-team-installed-apps': listTeamInstalledApps,
+  'list-calendar-groups': listCalendarGroups,
+  'list-calendar-group-calendars': listCalendarGroupCalendars,
+  'get-my-calendar': getMyCalendar,
+  'list-site-columns': listSiteColumns,
+  'list-site-content-types': listSiteContentTypes,
+  'list-sharepoint-site-pages': listSharepointSitePages,
+  'list-excel-defined-names': listExcelDefinedNames,
+  'list-excel-worksheet-charts': listExcelWorksheetCharts,
+  'microsoft-search-query': microsoftSearchQuery,
   'next-page': nextPage,
 };
 

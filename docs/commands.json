@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "0.9.0",
-  "generatedAt": "2026-05-06T08:28:59.488Z",
+  "version": "0.10.0",
+  "generatedAt": "2026-05-06T08:47:34.432Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -292,6 +292,30 @@
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
+      "name": "get-channel-files-folder",
+      "summary": "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/filesFolder",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/channel-get-filesfolder",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID inside the team. Returned by `list-team-channels`."
+        }
+      ],
+      "example": "ask-marcel get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
+      "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
+    },
+    {
       "name": "get-chat",
       "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages. Requires the elevated M365ChatClient token captured at login.",
       "category": "chats",
@@ -368,6 +392,54 @@
       ],
       "example": "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "single Microsoft Graph `driveItem` resource"
+    },
+    {
+      "name": "get-drive-item-analytics",
+      "summary": "Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/analytics",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/itemanalytics-get",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID."
+        }
+      ],
+      "example": "ask-marcel get-drive-item-analytics --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "single Microsoft Graph `itemAnalytics` resource"
+    },
+    {
+      "name": "get-drive-item-list-item",
+      "summary": "Return the SharePoint listItem projection of a OneDrive / SharePoint file — exposes the file's library-defined column values (custom metadata: status, due-date, classification, taxonomy tags, etc.) which are NOT present on the plain `driveItem`. Combine with `list-sharepoint-list-columns` to interpret the column schema.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/listItem",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/listitem-get",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID. Returned by `list-folder-files` or `search-onedrive-files`."
+        }
+      ],
+      "example": "ask-marcel get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "single Microsoft Graph `listItem` resource"
     },
     {
       "name": "get-drive-root-item",
@@ -604,6 +676,17 @@
       "responseShape": "single Microsoft Graph `mailboxSettings` resource"
     },
     {
+      "name": "get-my-calendar",
+      "summary": "Return metadata for the signed-in user's *primary* calendar — `id`, `name`, `color`, `owner`, `canShare`, `canViewPrivateItems`, `canEdit`, `defaultOnlineMeetingProvider`. Sibling to `list-calendars` which returns every calendar (incl. shared / subscribed).",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/calendar",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-calendar",
+      "options": [],
+      "example": "ask-marcel get-my-calendar",
+      "responseShape": "single Microsoft Graph `calendar` resource"
+    },
+    {
       "name": "get-my-manager",
       "summary": "Return the signed-in user's manager (a single `user` resource). Returns 404 `Request_ResourceNotFound` if no manager is set in the directory — that is data-empty, not a permission failure.",
       "category": "user",
@@ -672,6 +755,17 @@
       ],
       "example": "ask-marcel get-onenote-page-content --onenote-page-id '1-abc...'",
       "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope"
+    },
+    {
+      "name": "get-organization",
+      "summary": "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. Useful for confirming which tenant the CLI is signed into and what subscriptions are active.",
+      "category": "user",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/organization",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/organization-list",
+      "options": [],
+      "example": "ask-marcel get-organization",
+      "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`"
     },
     {
       "name": "get-planner-bucket",
@@ -1258,6 +1352,37 @@
       "pagination": true
     },
     {
+      "name": "list-calendar-group-calendars",
+      "summary": "List the calendars inside one calendar group.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/calendarGroups/{calendar-group-id}/calendars",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/calendargroup-list-calendars",
+      "options": [
+        {
+          "name": "calendar-group-id",
+          "key": "calendarGroupId",
+          "required": true,
+          "description": "Calendar group ID. Returned by `list-calendar-groups`."
+        }
+      ],
+      "example": "ask-marcel list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
+      "responseShape": "collection of Microsoft Graph `calendar` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-calendar-groups",
+      "summary": "List the signed-in user's calendar groups — Outlook's organizational layer above individual calendars (e.g. \"My Calendars\", \"Other Calendars\", \"Birthdays\"). Use the returned `id` with `list-calendar-group-calendars` to drill in.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/calendarGroups",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-calendargroups",
+      "options": [],
+      "example": "ask-marcel list-calendar-groups",
+      "responseShape": "collection of Microsoft Graph `calendarGroup` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-calendar-view-delta",
       "summary": "Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`.",
       "category": "calendar",
@@ -1432,6 +1557,31 @@
       "pagination": true
     },
     {
+      "name": "list-excel-defined-names",
+      "summary": "List the workbook's defined names (named ranges, named formulas, named constants). Each `workbookNamedItem` has `name`, `value` (the formula or address), `comment`, and `scope` (workbook or worksheet). Useful for understanding workbook structure before reading ranges.",
+      "category": "excel",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/names",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/workbook-list-names",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .xlsx file."
+        }
+      ],
+      "example": "ask-marcel list-excel-defined-names --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "collection of Microsoft Graph `workbookNamedItem` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-excel-table-rows",
       "summary": "List the data rows of a named Excel table (excluding the header row).",
       "category": "excel",
@@ -1485,6 +1635,37 @@
       ],
       "example": "ask-marcel list-excel-tables --drive-id 'b!1234' --item-id '01XLSX'",
       "responseShape": "collection of Microsoft Graph `workbookTable` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-excel-worksheet-charts",
+      "summary": "List the charts on a worksheet. Each `workbookChart` has `id`, `name`, `height`, `width`, `top`, `left`. Use the chart's image endpoint (`.../charts/{id}/image()`) to render the chart as a base64 PNG.",
+      "category": "excel",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/charts",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/worksheet-list-charts",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .xlsx file."
+        },
+        {
+          "name": "worksheet-id",
+          "key": "worksheetId",
+          "required": true,
+          "description": "Worksheet ID or name."
+        }
+      ],
+      "example": "ask-marcel list-excel-worksheet-charts --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
+      "responseShape": "collection of Microsoft Graph `workbookChart` resources under `value[]`",
       "pagination": true
     },
     {
@@ -1794,6 +1975,18 @@
       "pagination": true
     },
     {
+      "name": "list-mail-folders-delta",
+      "summary": "Track incremental changes to the mail-folder tree itself (folders added / renamed / deleted). The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed. Companion to `list-mail-folder-messages-delta` which tracks message changes inside one folder.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/mailFolders/delta()",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-delta",
+      "options": [],
+      "example": "ask-marcel list-mail-folders-delta",
+      "responseShape": "collection of Microsoft Graph `mailFolder` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "pagination": true
+    },
+    {
       "name": "list-mail-messages",
       "summary": "List the most recent messages from across the signed-in user’s entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
       "category": "mail",
@@ -1991,6 +2184,30 @@
       "pagination": true
     },
     {
+      "name": "list-recent-files",
+      "summary": "List the signed-in user's most recently used / opened OneDrive and SharePoint files, ranked by Microsoft's recency signal. The strongest single answer to \"what is this user working on right now?\".",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/drive/recent",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-recent",
+      "options": [],
+      "example": "ask-marcel list-recent-files",
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-recently-used-insights",
+      "summary": "List documents the signed-in user has *personally* used recently (Microsoft's machine-learning recency signal — distinct from `list-recent-files` which is the OneDrive recency feed). Returns `usageDetails` with `lastAccessedDateTime` + `lastModifiedDateTime`.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/insights/used",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/insights-list-used",
+      "options": [],
+      "example": "ask-marcel list-recently-used-insights",
+      "responseShape": "collection of Microsoft Graph `usedInsight` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-relevant-people",
       "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc.",
       "category": "user",
@@ -2046,6 +2263,18 @@
       "pagination": true
     },
     {
+      "name": "list-shared-insights",
+      "summary": "List documents *shared with* the signed-in user, scored by Microsoft's relevance ranking — sibling to `list-shared-with-me` but with sharing-context details (`sharingHistory[]`, `lastShared.sharedBy`, `lastShared.sharingReference`).",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/insights/shared",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/insights-list-shared",
+      "options": [],
+      "example": "ask-marcel list-shared-insights",
+      "responseShape": "collection of Microsoft Graph `sharedInsight` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-shared-mailbox-folder-messages",
       "summary": "List messages in a single folder of a shared / delegated mailbox.",
       "category": "mail",
@@ -2087,6 +2316,18 @@
       ],
       "example": "ask-marcel list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-shared-with-me",
+      "summary": "List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/drive/sharedWithMe",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-sharedwithme",
+      "options": [],
+      "example": "ask-marcel list-shared-with-me",
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)",
       "pagination": true
     },
     {
@@ -2266,6 +2507,63 @@
       "pagination": true
     },
     {
+      "name": "list-sharepoint-site-pages",
+      "summary": "List modern SharePoint pages on a site (news posts, dashboards, landing pages). Each `sitePage` has `title`, `description`, `webUrl`, `publishingState`, `lastPublishedDateTime`. Returned items are the read-only listing — fetch the page body via the SharePoint REST API or by opening the `webUrl`.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/pages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/sitepage-list",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        }
+      ],
+      "example": "ask-marcel list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
+      "responseShape": "collection of Microsoft Graph `sitePage` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-site-columns",
+      "summary": "List the *site-level* column definitions — columns reusable across multiple lists in the site. Distinct from `list-sharepoint-list-columns` which returns one specific list's schema.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/columns",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/site-list-columns",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID. Returned by `search-sharepoint-sites`."
+        }
+      ],
+      "example": "ask-marcel list-site-columns --site-id 'contoso.sharepoint.com,...'",
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-site-content-types",
+      "summary": "List the content type definitions of a SharePoint site — typed schemas (Document, Page, Item, custom-defined) describing which columns + behaviors apply to items of each type. Useful for understanding a site's information architecture.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/contentTypes",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/contenttype-list",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID."
+        }
+      ],
+      "example": "ask-marcel list-site-content-types --site-id 'contoso.sharepoint.com,...'",
+      "responseShape": "collection of Microsoft Graph `contentType` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-specific-calendar-events",
       "summary": "List the events in a specific (non-default) calendar (does not expand recurrences).",
       "category": "calendar",
@@ -2301,6 +2599,25 @@
       ],
       "example": "ask-marcel list-team-channels --team-id 'abc-1234-...'",
       "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-team-installed-apps",
+      "summary": "List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/installedApps",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/team-list-installedapps",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID."
+        }
+      ],
+      "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
+      "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`",
       "pagination": true
     },
     {
@@ -2407,6 +2724,25 @@
       "example": "ask-marcel list-user-direct-reports --user-id 'alice@contoso.com'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
       "pagination": true
+    },
+    {
+      "name": "microsoft-search-query",
+      "summary": "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people in one round trip — Microsoft's unified search API, the same engine that powers the Microsoft 365 search box. Each `searchHits[]` entry has `_score`, `summary`, and a typed `resource`. Page size is fixed at 25 in this command; for larger pages or different entity types call the Graph endpoint directly via the library API. `chatMessage` is intentionally omitted from the default entity set since `Chat.Read*` is unavailable.",
+      "category": "meta",
+      "graphMethod": "POST",
+      "graphPathTemplate": "/search/query",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/search-query",
+      "options": [
+        {
+          "name": "query",
+          "key": "query",
+          "required": true,
+          "description": "KQL query string. Supports field operators where indexed by the corpus (e.g. `from:alice`, `subject:\"q3 budget\"`, `filetype:xlsx`). Free-text works everywhere."
+        }
+      ],
+      "example": "ask-marcel microsoft-search-query --query 'q3 budget'",
+      "responseShape": "Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }] }`",
+      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem','listItem','site','message','event','person'], query: { queryString: '{query}' }, size: 25 }] }"
     },
     {
       "name": "next-page",

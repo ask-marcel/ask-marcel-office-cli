@@ -93,6 +93,25 @@ import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
+import * as listRecentFiles from './list-recent-files.ts';
+import * as listSharedWithMe from './list-shared-with-me.ts';
+import * as listRecentlyUsedInsights from './list-recently-used-insights.ts';
+import * as listSharedInsights from './list-shared-insights.ts';
+import * as getOrganization from './get-organization.ts';
+import * as listMailFoldersDelta from './list-mail-folders-delta.ts';
+import * as getChannelFilesFolder from './get-channel-files-folder.ts';
+import * as getDriveItemListItem from './get-drive-item-list-item.ts';
+import * as getDriveItemAnalytics from './get-drive-item-analytics.ts';
+import * as listTeamInstalledApps from './list-team-installed-apps.ts';
+import * as listCalendarGroups from './list-calendar-groups.ts';
+import * as listCalendarGroupCalendars from './list-calendar-group-calendars.ts';
+import * as getMyCalendar from './get-my-calendar.ts';
+import * as listSiteColumns from './list-site-columns.ts';
+import * as listSiteContentTypes from './list-site-content-types.ts';
+import * as listSharepointSitePages from './list-sharepoint-site-pages.ts';
+import * as listExcelDefinedNames from './list-excel-defined-names.ts';
+import * as listExcelWorksheetCharts from './list-excel-worksheet-charts.ts';
+import * as microsoftSearchQuery from './microsoft-search-query.ts';
 import * as listMyMemberships from './list-my-memberships.ts';
 import * as getMyManager from './get-my-manager.ts';
 import * as getUserManager from './get-user-manager.ts';
@@ -253,6 +272,25 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-rooms': listRooms,
   'list-room-lists': listRoomLists,
   'list-trending-insights': listTrendingInsights,
+  'list-recent-files': listRecentFiles,
+  'list-shared-with-me': listSharedWithMe,
+  'list-recently-used-insights': listRecentlyUsedInsights,
+  'list-shared-insights': listSharedInsights,
+  'get-organization': getOrganization,
+  'list-mail-folders-delta': listMailFoldersDelta,
+  'get-channel-files-folder': getChannelFilesFolder,
+  'get-drive-item-list-item': getDriveItemListItem,
+  'get-drive-item-analytics': getDriveItemAnalytics,
+  'list-team-installed-apps': listTeamInstalledApps,
+  'list-calendar-groups': listCalendarGroups,
+  'list-calendar-group-calendars': listCalendarGroupCalendars,
+  'get-my-calendar': getMyCalendar,
+  'list-site-columns': listSiteColumns,
+  'list-site-content-types': listSiteContentTypes,
+  'list-sharepoint-site-pages': listSharepointSitePages,
+  'list-excel-defined-names': listExcelDefinedNames,
+  'list-excel-worksheet-charts': listExcelWorksheetCharts,
+  'microsoft-search-query': microsoftSearchQuery,
   'next-page': nextPage,
 };
 
@@ -1713,6 +1751,25 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-rooms', params: {} },
   { name: 'list-room-lists', params: {} },
   { name: 'list-trending-insights', params: {} },
+  { name: 'list-recent-files', params: {} },
+  { name: 'list-shared-with-me', params: {} },
+  { name: 'list-recently-used-insights', params: {} },
+  { name: 'list-shared-insights', params: {} },
+  { name: 'get-organization', params: {} },
+  { name: 'list-mail-folders-delta', params: {} },
+  { name: 'get-channel-files-folder', params: { teamId: 'tm1', channelId: 'ch1' } },
+  { name: 'get-drive-item-list-item', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'get-drive-item-analytics', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'list-team-installed-apps', params: { teamId: 'tm1' } },
+  { name: 'list-calendar-groups', params: {} },
+  { name: 'list-calendar-group-calendars', params: { calendarGroupId: 'cg1' } },
+  { name: 'get-my-calendar', params: {} },
+  { name: 'list-site-columns', params: { siteId: 's1' } },
+  { name: 'list-site-content-types', params: { siteId: 's1' } },
+  { name: 'list-sharepoint-site-pages', params: { siteId: 's1' } },
+  { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
+  { name: 'microsoft-search-query', params: { query: 'q3 budget' } },
   { name: 'next-page', params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' } },
 ];
 
@@ -1985,6 +2042,24 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-rooms', params: {}, expectedPath: '/places/microsoft.graph.room' },
   { name: 'list-room-lists', params: {}, expectedPath: '/places/microsoft.graph.roomList' },
   { name: 'list-trending-insights', params: {}, expectedPath: '/me/insights/trending' },
+  { name: 'list-recent-files', params: {}, expectedPath: '/me/drive/recent' },
+  { name: 'list-shared-with-me', params: {}, expectedPath: '/me/drive/sharedWithMe' },
+  { name: 'list-recently-used-insights', params: {}, expectedPath: '/me/insights/used' },
+  { name: 'list-shared-insights', params: {}, expectedPath: '/me/insights/shared' },
+  { name: 'get-organization', params: {}, expectedPath: '/organization' },
+  { name: 'list-mail-folders-delta', params: {}, expectedPath: '/me/mailFolders/delta()' },
+  { name: 'get-channel-files-folder', params: { teamId: 'tm1', channelId: 'ch1' }, expectedPath: '/teams/tm1/channels/ch1/filesFolder' },
+  { name: 'get-drive-item-list-item', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/listItem' },
+  { name: 'get-drive-item-analytics', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/analytics' },
+  { name: 'list-team-installed-apps', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/installedApps' },
+  { name: 'list-calendar-groups', params: {}, expectedPath: '/me/calendarGroups' },
+  { name: 'list-calendar-group-calendars', params: { calendarGroupId: 'cg1' }, expectedPath: '/me/calendarGroups/cg1/calendars' },
+  { name: 'get-my-calendar', params: {}, expectedPath: '/me/calendar' },
+  { name: 'list-site-columns', params: { siteId: 's1' }, expectedPath: '/sites/s1/columns' },
+  { name: 'list-site-content-types', params: { siteId: 's1' }, expectedPath: '/sites/s1/contentTypes' },
+  { name: 'list-sharepoint-site-pages', params: { siteId: 's1' }, expectedPath: '/sites/s1/pages' },
+  { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/workbook/names' },
+  { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' }, expectedPath: '/drives/d1/items/i1/workbook/worksheets/Sheet1/charts' },
   {
     name: 'next-page',
     params: { url: 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' },
