@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ query: z.string().min(1) });
-const { execute } = buildCommand((p) => `/sites?search=${p.query}`, schema);
+const baseSchema = z.object({ query: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/sites?search=${p.query}`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'Search the tenant for SharePoint sites whose display name or description matches a free-text query (returns up to 25).',
@@ -20,6 +21,7 @@ const meta: CommandMeta = {
         'Free-text query. Matches site display name and description across the tenant. ' +
         'Use `search-sharepoint-sites` (no query) to instead list the sites the signed-in user follows.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel search-sharepoint-sites-by-name --query 'marketing'",
   responseShape: 'collection of Microsoft Graph `site` resources under `value[]` (up to 25)',

@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/followedSites', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/followedSites', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/followedSites',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-followedsites',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel search-sharepoint-sites',
   responseShape: 'collection of Microsoft Graph `site` resources (the user’s followed sites) under `value[]`',
   pagination: true,
