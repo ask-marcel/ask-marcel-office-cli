@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T08:50:54.147Z",
+  "generatedAt": "2026-05-07T09:09:18.165Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -71,7 +71,7 @@
     },
     {
       "name": "download-drive-item-as-markdown",
-      "summary": "Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown, with inline images as data: URIs and tables as GFM pipe tables), xlsx (one markdown table per sheet via sheetjs), csv (rendered as a markdown table), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc. — raw bytes). Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/odt/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.",
+      "summary": "Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown, with inline images as data: URIs and tables as GFM pipe tables), xlsx (one markdown table per sheet via sheetjs), csv (rendered as a markdown table). Plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — Graph normally returns the bytes inline as `{ contentType, size, text }`, but for files large enough to be served via a CDN redirect Graph returns `{ \"@microsoft.graph.downloadUrl\": \"...\" }` instead and the LLM has to follow the URL. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/odt/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content?format=html",
@@ -91,7 +91,7 @@
         }
       ],
       "example": "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case, or `{ \"@microsoft.graph.downloadUrl\": \"...\" }` / `{ contentType, size, base64 }` raw envelope for plain-text source extensions."
+      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the locally-converted case (docx/xlsx/csv). For plain-text passthrough sources Graph decides the shape: typically `{ contentType, size, text }` (or `{ contentType, size, base64 }` for binary), but if the underlying file is large enough that Graph hands back a CDN redirect, the response is `{ \"@microsoft.graph.downloadUrl\": \"...\" }` and the caller must follow it."
     },
     {
       "name": "download-drive-item-as-pdf",
@@ -251,7 +251,7 @@
     },
     {
       "name": "get-calendar-event",
-      "summary": "Fetch a single calendar event by ID from the signed-in user’s default calendar.",
+      "summary": "Fetch a single calendar event by ID from the signed-in user’s default calendar. Pass `--select` to project only the fields you need (the full event body can be large with HTML body and attendee lists).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/{event-id}",
@@ -262,10 +262,22 @@
           "key": "eventId",
           "required": true,
           "description": "Microsoft Graph event ID. Returned by `ask-marcel list-calendar-events` in the `id` field of each event."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...'",
-      "responseShape": "single Microsoft Graph `event` resource"
+      "example": "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
+      "responseShape": "single Microsoft Graph `event` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-channel-files-folder",
@@ -311,14 +323,27 @@
     },
     {
       "name": "get-current-user",
-      "summary": "Return the signed-in user’s Microsoft Graph profile (id, displayName, mail, jobTitle, etc.).",
+      "summary": "Return the signed-in user’s Microsoft Graph profile (id, displayName, mail, jobTitle, etc.). Pass `--select id,displayName,mail` to slim the payload to just the fields you need.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
-      "options": [],
-      "example": "ask-marcel get-current-user",
-      "responseShape": "single Microsoft Graph `user` resource"
+      "options": [
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel get-current-user --select id,displayName,mail",
+      "responseShape": "single Microsoft Graph `user` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-drive-delta",
@@ -726,7 +751,7 @@
     },
     {
       "name": "get-mail-message",
-      "summary": "Get a single Outlook message by ID, including subject, sender, body, and flags.",
+      "summary": "Get a single Outlook message by ID, including subject, sender, body, and flags. Pass `--select id,subject,from,receivedDateTime` to fetch only the fields the LLM needs (a full message body can be 50+ KB; the audit found this swelling LLM context unnecessarily).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -737,10 +762,22 @@
           "key": "messageId",
           "required": true,
           "description": "Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-mail-message --message-id 'AAMkAGI2...'",
-      "responseShape": "single Microsoft Graph `message` resource"
+      "example": "ask-marcel get-mail-message --message-id 'AAMkAGI2...' --select id,subject,from,receivedDateTime",
+      "responseShape": "single Microsoft Graph `message` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-mail-message-mime",
@@ -1104,36 +1141,6 @@
       "responseShape": "single Microsoft Graph `drive` resource"
     },
     {
-      "name": "get-sharepoint-site-item",
-      "summary": "Return a single SharePoint baseItem from a site by ID.",
-      "category": "sharepoint",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/sites/{site-id}/items/{item-id}",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/baseitem-get",
-      "options": [
-        {
-          "name": "site-id",
-          "key": "siteId",
-          "required": true,
-          "description": "SharePoint site ID. Returned by `search-sharepoint-sites`."
-        },
-        {
-          "name": "item-id",
-          "key": "itemId",
-          "required": true,
-          "description": "baseItem ID inside the site. Microsoft Graph has no list-less site/items collection endpoint, so discover it via the two-step chain `list-sharepoint-site-lists` then `list-sharepoint-site-list-items --list-id <id>`; the returned `listItem.id` is also a valid `baseItem.id` here.",
-          "aliases": [
-            {
-              "name": "list-item-id",
-              "key": "listItemId"
-            }
-          ]
-        }
-      ],
-      "example": "ask-marcel get-sharepoint-site-item --site-id 'contoso.sharepoint.com,abc...,def...' --item-id '7'",
-      "responseShape": "single Microsoft Graph `baseItem` resource"
-    },
-    {
       "name": "get-sharepoint-site-list",
       "summary": "Get the metadata (display name, template, columns) of a single SharePoint list.",
       "category": "sharepoint",
@@ -1310,7 +1317,7 @@
     },
     {
       "name": "get-team",
-      "summary": "Get the metadata of a single Microsoft Team (display name, settings, member-settings, owner group).",
+      "summary": "Get the metadata of a single Microsoft Team (display name, settings, member-settings, owner group). Pass `--select displayName,description,visibility` to slim the response.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}",
@@ -1321,10 +1328,22 @@
           "key": "teamId",
           "required": true,
           "description": "Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-team --team-id 'abc-1234-...'",
-      "responseShape": "single Microsoft Graph `team` resource"
+      "example": "ask-marcel get-team --team-id 'abc-1234-...' --select displayName,description,visibility",
+      "responseShape": "single Microsoft Graph `team` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-team-channel",
@@ -1599,7 +1618,7 @@
     },
     {
       "name": "list-calendar-events-delta",
-      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user’s default calendar. Use the `@odata.deltaLink` from a previous response to resume.",
+      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user’s default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (Graph rejects the call with empty `UnknownError:` if neither `--top` nor a Prefer header caps the page size).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/delta()",
@@ -1642,7 +1661,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-calendar-events-delta",
+      "example": "ask-marcel list-calendar-events-delta --top 50",
       "responseShape": "collection of changed Microsoft Graph `event` resources under `value[]` plus an `@odata.deltaLink` token",
       "pagination": true
     },
@@ -3349,7 +3368,7 @@
           "name": "todo-task-list-id",
           "key": "todoTaskListId",
           "required": true,
-          "description": "todoTaskList ID. Returned by `ask-marcel list-todo-task-lists`. Well-known names also work, e.g. `tasks` for the default list. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.",
+          "description": "todoTaskList ID. Returned by `ask-marcel list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.",
           "aliases": [
             {
               "name": "task-list-id",
