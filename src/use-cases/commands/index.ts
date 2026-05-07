@@ -81,7 +81,6 @@ import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-m
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
-import * as searchSharepointSites from './search-sharepoint-sites.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
@@ -143,7 +142,6 @@ import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
 import * as listOutlookCategories from './list-outlook-categories.ts';
 import * as listSharedCalendarEvents from './list-shared-calendar-events.ts';
 import * as getSharedCalendarView from './get-shared-calendar-view.ts';
-import * as getSharepointSitesDelta from './get-sharepoint-sites-delta.ts';
 import * as listSharepointListColumns from './list-sharepoint-list-columns.ts';
 import * as getSharepointListColumn from './get-sharepoint-list-column.ts';
 import * as listSharepointSiteOnenoteNotebooks from './list-sharepoint-site-onenote-notebooks.ts';
@@ -177,7 +175,6 @@ const commands: Record<string, Command> = {
   'get-excel-table': getExcelTable,
   'list-excel-table-rows': listExcelTableRows,
   'get-drive-delta': getDriveDelta,
-  'search-sharepoint-sites': searchSharepointSites,
   'search-sharepoint-sites-by-name': searchSharepointSitesByName,
   'get-sharepoint-site': getSharepointSite,
   'list-sharepoint-site-drives': listSharepointSiteDrives,
@@ -265,7 +262,6 @@ const commands: Record<string, Command> = {
   'list-outlook-categories': listOutlookCategories,
   'list-shared-calendar-events': listSharedCalendarEvents,
   'list-shared-calendar-view': getSharedCalendarView,
-  'get-sharepoint-sites-delta': getSharepointSitesDelta,
   'list-sharepoint-list-columns': listSharepointListColumns,
   'get-sharepoint-list-column': getSharepointListColumn,
   'list-sharepoint-site-onenote-notebooks': listSharepointSiteOnenoteNotebooks,

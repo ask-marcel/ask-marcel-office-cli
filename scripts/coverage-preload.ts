@@ -45,7 +45,6 @@ import '../src/composition/cli.ts';
 
 import '../src/presenter/output.ts';
 
-import '../src/use-cases/commands/search-sharepoint-sites.ts';
 import '../src/use-cases/commands/get-sharepoint-site.ts';
 import '../src/use-cases/commands/list-sharepoint-site-drives.ts';
 import '../src/use-cases/commands/get-sharepoint-site-drive-by-id.ts';

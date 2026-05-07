@@ -88,7 +88,6 @@ import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mai
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
-import * as searchSharepointSites from './search-sharepoint-sites.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
@@ -148,7 +147,6 @@ import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
 import * as listOutlookCategories from './list-outlook-categories.ts';
 import * as listSharedCalendarEvents from './list-shared-calendar-events.ts';
 import * as getSharedCalendarView from './get-shared-calendar-view.ts';
-import * as getSharepointSitesDelta from './get-sharepoint-sites-delta.ts';
 import * as listSharepointListColumns from './list-sharepoint-list-columns.ts';
 import * as getSharepointListColumn from './get-sharepoint-list-column.ts';
 import * as listSharepointSiteOnenoteNotebooks from './list-sharepoint-site-onenote-notebooks.ts';
@@ -182,7 +180,6 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'get-excel-table': getExcelTable,
   'list-excel-table-rows': listExcelTableRows,
   'get-drive-delta': getDriveDelta,
-  'search-sharepoint-sites': searchSharepointSites,
   'search-sharepoint-sites-by-name': searchSharepointSitesByName,
   'get-sharepoint-site': getSharepointSite,
   'list-sharepoint-site-drives': listSharepointSiteDrives,
@@ -270,7 +267,6 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-outlook-categories': listOutlookCategories,
   'list-shared-calendar-events': listSharedCalendarEvents,
   'list-shared-calendar-view': getSharedCalendarView,
-  'get-sharepoint-sites-delta': getSharepointSitesDelta,
   'list-sharepoint-list-columns': listSharepointListColumns,
   'get-sharepoint-list-column': getSharepointListColumn,
   'list-sharepoint-site-onenote-notebooks': listSharepointSiteOnenoteNotebooks,
@@ -1690,7 +1686,6 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'get-excel-table', params: { driveId: 'd1', itemId: 'i1', tableId: 't1' } },
   { name: 'list-excel-table-rows', params: { driveId: 'd1', itemId: 'i1', tableId: 't1' } },
   { name: 'get-drive-delta', params: { driveId: 'd1', itemId: 'i1' } },
-  { name: 'search-sharepoint-sites', params: {} },
   { name: 'search-sharepoint-sites-by-name', params: { query: 'marketing' } },
   { name: 'get-sharepoint-site', params: { siteId: 's1' } },
   { name: 'list-sharepoint-site-drives', params: { siteId: 's1' } },
@@ -1775,7 +1770,6 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-outlook-categories', params: {} },
   { name: 'list-shared-calendar-events', params: { userId: 'colleague@contoso.com' } },
   { name: 'list-shared-calendar-view', params: { userId: 'colleague@contoso.com', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
-  { name: 'get-sharepoint-sites-delta', params: {} },
   { name: 'list-sharepoint-list-columns', params: { siteId: 's1', listId: 'l1' } },
   { name: 'get-sharepoint-list-column', params: { siteId: 's1', listId: 'l1', columnId: 'Title' } },
   { name: 'list-sharepoint-site-onenote-notebooks', params: { siteId: 's1' } },
@@ -1954,7 +1948,6 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-excel-table', params: { driveId: 'd1', itemId: 'i1', tableId: 't1' }, expectedPath: '/drives/d1/items/i1/workbook/tables/t1' },
   { name: 'list-excel-table-rows', params: { driveId: 'd1', itemId: 'i1', tableId: 't1' }, expectedPath: '/drives/d1/items/i1/workbook/tables/t1/rows' },
   { name: 'get-drive-delta', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/delta()' },
-  { name: 'search-sharepoint-sites', params: {}, expectedPath: '/me/followedSites' },
   { name: 'search-sharepoint-sites-by-name', params: { query: 'marketing' }, expectedPath: '/sites?search=marketing' },
   { name: 'get-sharepoint-site', params: { siteId: 's1' }, expectedPath: '/sites/s1' },
   { name: 'list-sharepoint-site-drives', params: { siteId: 's1' }, expectedPath: '/sites/s1/drives' },
@@ -2094,7 +2087,6 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     params: { userId: 'colleague@contoso.com', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
     expectedPath: '/users/colleague@contoso.com/calendarView?startDateTime=2026-04-01T00%3A00%3A00Z&endDateTime=2026-05-01T00%3A00%3A00Z',
   },
-  { name: 'get-sharepoint-sites-delta', params: {}, expectedPath: '/sites/delta()' },
   { name: 'list-sharepoint-list-columns', params: { siteId: 's1', listId: 'l1' }, expectedPath: '/sites/s1/lists/l1/columns' },
   { name: 'get-sharepoint-list-column', params: { siteId: 's1', listId: 'l1', columnId: 'Title' }, expectedPath: '/sites/s1/lists/l1/columns/Title' },
   { name: 'list-sharepoint-site-onenote-notebooks', params: { siteId: 's1' }, expectedPath: '/sites/s1/onenote/notebooks' },
