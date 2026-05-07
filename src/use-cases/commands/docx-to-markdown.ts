@@ -2,7 +2,7 @@ import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { mammothToHtml } from '../../infra/mammoth-adapter.ts';
-import { htmlToMarkdown } from './html-to-markdown.ts';
+import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 
 type MarkdownEnvelope = { readonly contentType: 'text/markdown'; readonly size: number; readonly text: string };
 
@@ -59,7 +59,8 @@ const docxToMarkdown = async (bytes: Uint8Array): Promise<Result<MarkdownEnvelop
   const html = await mammothToHtml(bytes);
   if (!html.ok) return html;
   const md = htmlToMarkdown(promoteFirstRowToThead(html.value));
-  return ok({ contentType: 'text/markdown', size: md.length, text: md });
+  if (!md.ok) return md;
+  return ok({ contentType: 'text/markdown', size: md.value.length, text: md.value });
 };
 
 export { docxToMarkdown, promoteFirstRowToThead };

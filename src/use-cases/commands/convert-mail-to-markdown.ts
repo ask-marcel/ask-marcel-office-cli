@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { htmlToMarkdown } from './html-to-markdown.ts';
+import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -93,7 +93,14 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const inlineImages = collectInlineImageAttachments(m.attachments);
   const rawHtml = m.body?.content ?? '';
   const inlined = inlineImages.length > 0 ? embedInlineImages(rawHtml, inlineImages) : rawHtml;
-  const bodyMd = m.body?.contentType === 'html' ? htmlToMarkdown(inlined) : inlined;
+  let bodyMd: string;
+  if (m.body?.contentType === 'html') {
+    const converted = htmlToMarkdown(inlined);
+    if (!converted.ok) return converted;
+    bodyMd = converted.value;
+  } else {
+    bodyMd = inlined;
+  }
   const text = [headers, bodyMd].filter((s) => s !== '').join('\n\n');
 
   return ok({ contentType: 'text/markdown', size: text.length, text });

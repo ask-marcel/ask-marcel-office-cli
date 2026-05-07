@@ -1,7 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { htmlToMarkdown } from './html-to-markdown.ts';
+import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 
 /**
@@ -67,7 +67,8 @@ const convertToMarkdown = async (
   if (!html.ok) return err(augmentSandboxError(html.error));
   const inlined = inlineAttachments.length > 0 ? embedInlineImages(html.value, inlineAttachments) : html.value;
   const md = htmlToMarkdown(inlined);
-  return ok({ contentType: 'text/markdown', size: md.length, text: md });
+  if (!md.ok) return md;
+  return ok({ contentType: 'text/markdown', size: md.value.length, text: md.value });
 };
 
 export { convertToMarkdown };

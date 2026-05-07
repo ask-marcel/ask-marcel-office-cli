@@ -1,4 +1,4 @@
-import { htmlToMarkdown } from './html-to-markdown.ts';
+import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 
 /**
  * Render an itemAttachment's inner resource (a `microsoft.graph.message`,
@@ -28,7 +28,9 @@ const formatRecipients = (rs: ReadonlyArray<Recipient> | undefined): string | un
 
 const renderBody = (body: Body | undefined): string => {
   if (!body?.content) return '';
-  return body.contentType === 'html' ? htmlToMarkdown(body.content) : body.content;
+  if (body.contentType !== 'html') return body.content;
+  const result = htmlToMarkdown(body.content);
+  return result.ok ? result.value : body.content;
 };
 
 const headerLine = (label: string, value: string | undefined): string | undefined => (value !== undefined ? `**${label}:** ${value}` : undefined);
