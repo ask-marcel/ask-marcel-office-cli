@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ query: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/drive/search(q='${p.query}')`, schema);
+const baseSchema = z.object({ query: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/drive/search(q='${p.query}')`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'Search the signed-in user’s default OneDrive for documents matching a free-text query (filename, content, metadata).',
@@ -20,6 +21,7 @@ const meta: CommandMeta = {
         'Free-text search query. Matches filename, content, and metadata across the user’s personal OneDrive. ' +
         'Use `search-onedrive-files --drive-id <id>` instead to target a specific shared SharePoint or OneDrive drive by ID.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel search-my-documents --query 'q1 budget'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
