@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'bun:test';
+import { appendOData, odataQuerySchema } from './odata-query.ts';
+
+describe('appendOData', () => {
+  it('returns the path unchanged when every OData param is omitted', () => {
+    expect(appendOData('/me/drives', {})).toBe('/me/drives');
+  });
+
+  it('appends $top with `?` when the path has no existing query string', () => {
+    expect(appendOData('/me/drives', { top: '5' })).toBe('/me/drives?$top=5');
+  });
+
+  it('appends $top with `&` when the path already contains a query string', () => {
+    expect(appendOData("/me/messages?$filter=conversationId eq 'x'", { top: '5' })).toBe("/me/messages?$filter=conversationId eq 'x'&$top=5");
+  });
+
+  it('emits params in the canonical order top, skip, select, filter, orderby, expand', () => {
+    const result = appendOData('/me/messages', {
+      expand: 'attachments',
+      orderby: 'receivedDateTime desc',
+      filter: 'isRead eq false',
+      select: 'id,subject',
+      skip: '10',
+      top: '25',
+    });
+    const queryStart = result.indexOf('?');
+    expect(queryStart).toBeGreaterThan(-1);
+    const keys = result
+      .slice(queryStart + 1)
+      .split('&')
+      .map((kv) => kv.split('=')[0]);
+    expect(keys).toEqual(['$top', '$skip', '$select', '$filter', '$orderby', '$expand']);
+  });
+
+  it('URL-encodes the `&` and `#` characters in param values so they cannot break the query string', () => {
+    const result = appendOData('/me/messages', { filter: "subject eq 'a&b#c'" });
+    expect(result).toBe("/me/messages?$filter=subject%20eq%20'a%26b%23c'");
+  });
+
+  it('skips params whose value is undefined', () => {
+    expect(appendOData('/me/drives', { top: '5', filter: undefined })).toBe('/me/drives?$top=5');
+  });
+});
+
+describe('odataQuerySchema', () => {
+  it('accepts every OData param being omitted', () => {
+    const parsed = odataQuerySchema.safeParse({});
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a non-negative integer string for $top', () => {
+    expect(odataQuerySchema.safeParse({ top: '0' }).success).toBe(true);
+    expect(odataQuerySchema.safeParse({ top: '999' }).success).toBe(true);
+  });
+
+  it('rejects a non-numeric $top', () => {
+    expect(odataQuerySchema.safeParse({ top: 'abc' }).success).toBe(false);
+  });
+
+  it('rejects a negative $top', () => {
+    expect(odataQuerySchema.safeParse({ top: '-1' }).success).toBe(false);
+  });
+
+  it('rejects an empty $filter to prevent users supplying a meaningless flag', () => {
+    expect(odataQuerySchema.safeParse({ filter: '' }).success).toBe(false);
+  });
+
+  it('accepts a non-empty $filter, $select, $orderby, $expand', () => {
+    const parsed = odataQuerySchema.safeParse({
+      filter: 'name eq foo',
+      select: 'id,name',
+      orderby: 'createdDateTime desc',
+      expand: 'children',
+    });
+    expect(parsed.success).toBe(true);
+  });
+});
