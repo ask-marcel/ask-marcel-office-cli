@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ onenoteSectionId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/onenote/sections/${p.onenoteSectionId}/pages`, schema);
+const baseSchema = z.object({ onenoteSectionId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/onenote/sections/${p.onenoteSectionId}/pages`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the pages inside a single OneNote section.',
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       description: 'OneNote section ID. Returned by `ask-marcel list-onenote-notebook-sections` or `list-all-onenote-sections`.',
       aliases: [{ name: 'section-id', key: 'sectionId' }],
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-onenote-section-pages --onenote-section-id '1-abc...'",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]`',

@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ siteId: z.string().min(1), notebookId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/sites/${p.siteId}/onenote/notebooks/${p.notebookId}/sections`, schema);
+const baseSchema = z.object({ siteId: z.string().min(1), notebookId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/sites/${p.siteId}/onenote/notebooks/${p.notebookId}/sections`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List sections inside one OneNote notebook attached to a SharePoint site.',
@@ -24,6 +25,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'OneNote notebook ID inside the site.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
