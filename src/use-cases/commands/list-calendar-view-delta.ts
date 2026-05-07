@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({
+const baseSchema = z.object({
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1),
 });
-const { execute } = buildCommand((p) => `/me/calendarView/delta()?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`, schema);
+const { execute, schema } = buildListCommand((p) => `/me/calendarView/delta()?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -28,6 +29,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'ISO 8601 upper bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
   responseShape: 'collection of changed Microsoft Graph `event` occurrences under `value[]` plus an `@odata.deltaLink` token',

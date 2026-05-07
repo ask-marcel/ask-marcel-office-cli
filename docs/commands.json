@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T00:53:11.037Z",
+  "generatedAt": "2026-05-07T00:55:41.022Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -286,6 +286,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-calendar-view --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -676,6 +712,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 end (e.g. `2026-05-01T00:00:00Z`)."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -990,6 +1062,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 end of the window."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -1297,6 +1405,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-specific-calendar-view --calendar-id 'AAMkAGI2THVS...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -1459,6 +1603,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -1686,6 +1866,42 @@
           "key": "endDateTime",
           "required": true,
           "description": "ISO 8601 upper bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
@@ -3254,6 +3470,42 @@
           "key": "userId",
           "required": true,
           "description": "Azure AD user ID or UPN whose calendar to read. Requires `Calendars.Read.Shared` access (granted by the calendar owner)."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-shared-calendar-events --user-id 'colleague@contoso.com'",
@@ -3658,6 +3910,42 @@
           "key": "calendarId",
           "required": true,
           "description": "Calendar ID. Returned by `ask-marcel list-calendars`."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-specific-calendar-events --calendar-id 'AAMkAGI2THVS...'",

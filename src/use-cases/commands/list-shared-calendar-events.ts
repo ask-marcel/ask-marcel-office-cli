@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ userId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/users/${p.userId}/calendar/events`, schema);
+const baseSchema = z.object({ userId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/users/${p.userId}/calendar/events`, baseSchema);
 
 const meta: CommandMeta = {
   summary: "List events from another user's primary calendar (shared / delegated access). 403 without `Calendars.Read.Shared`.",
@@ -18,6 +19,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Azure AD user ID or UPN whose calendar to read. Requires `Calendars.Read.Shared` access (granted by the calendar owner).',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-shared-calendar-events --user-id 'colleague@contoso.com'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
