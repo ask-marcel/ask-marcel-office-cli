@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQuerySchema, selectExpandSchema, type ODataQueryParams, type SelectExpandParams } from './odata-query.ts';
+import { appendOData, filterSelectSchema, odataQuerySchema, selectExpandSchema, type FilterSelectParams, type ODataQueryParams, type SelectExpandParams } from './odata-query.ts';
 
 const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
   const execute: Command['execute'] = async (graph, params) => {
@@ -77,4 +77,25 @@ const buildSelectableCommand = <Shape extends z.ZodRawShape>(
   return { schema: merged, execute };
 };
 
-export { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildListCommand, buildSelectableCommand };
+/**
+ * Collection GET that supports ONLY `$filter` and `$select` — for endpoints
+ * Microsoft documents as rejecting the other OData passthroughs (`/teams/{id}/channels`
+ * is the canonical case: Graph returns BadRequest on `$top`, `$skip`, `$orderby`,
+ * `$expand`). Advertising the unsupported flags would be a usability lie.
+ */
+const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
+  pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
+  schema: z.ZodObject<Shape>
+): Pick<Command, 'schema' | 'execute'> => {
+  const merged = schema.extend(filterSelectSchema.shape);
+  const execute: Command['execute'] = async (graph, params) => {
+    const parsed = merged.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const data = parsed.data as z.infer<z.ZodObject<Shape>> & FilterSelectParams;
+    const path = appendOData(pathFn(data), data);
+    return graph.get(path);
+  };
+  return { schema: merged, execute };
+};
+
+export { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildFilterSelectListCommand, buildListCommand, buildSelectableCommand };

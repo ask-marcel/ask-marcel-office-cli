@@ -2,26 +2,32 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
 const schema = z.object({}).extend(odataQuerySchema.shape);
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const path = appendOData('/me/events/delta()', parsed.data);
-  const result = await graph.get(path);
+  // Graph's calendar delta endpoint REJECTS `$top` as a query parameter
+  // (`ErrorInvalidUrlQuery`) but ACCEPTS the equivalent `Prefer: odata.maxpagesize=N`
+  // header. The CLI keeps `--top` as the user-facing flag and translates it
+  // to the header at the IO boundary so the cross-command contract stays
+  // uniform.
+  const headers: Record<string, string> = {};
+  if (parsed.data.top !== undefined) headers['Prefer'] = `odata.maxpagesize=${parsed.data.top}`;
+  const result = await graph.get('/me/events/delta()', headers);
   if (result.ok) return result;
-  // Graph's calendar delta endpoint returns `UnknownError: ` (empty message) when
-  // the call is made without a Prefer: odata.maxpagesize header AND without a
-  // resumption deltaLink. The CLI doesn't pass custom headers today, so the
-  // best we can do is augment the empty-message case with actionable guidance.
+  // Graph's calendar delta endpoint returns `UnknownError: ` (empty message)
+  // when called without a Prefer: odata.maxpagesize header AND without a
+  // resumption deltaLink. Augment the empty-message case with actionable
+  // guidance.
   if (result.error.type === 'api_error' && result.error.message.trim() === 'UnknownError:') {
     return err({
       type: 'api_error',
       status: result.error.status,
       message:
-        "UnknownError: (Graph returned an empty error message — this endpoint typically requires a Prefer: odata.maxpagesize=N header on the first call, OR pass --top to cap the page size. The CLI's --top is forwarded as $top, which Graph accepts as an alternative.)",
+        'UnknownError: (Graph returned an empty error message — this endpoint requires either `--top <N>` to cap the page size, or a resumption `@odata.deltaLink` from a previous call. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header that Graph actually accepts; `$top` as a URL query parameter is rejected.)',
     });
   }
   return result;
@@ -29,7 +35,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Get the incremental change set (added / modified / deleted events) for the signed-in user’s default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (Graph rejects the call with empty `UnknownError:` if neither `--top` nor a Prefer header caps the page size).',
+    "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (or any non-resumption call) to bound the page size — Graph requires it; without it the endpoint returns an empty `UnknownError:`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/events/delta()',

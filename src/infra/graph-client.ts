@@ -10,7 +10,14 @@ type GraphError =
   | { type: 'validation_error'; message: string };
 
 type GraphClient = {
-  get: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * `extraHeaders` lets a caller add request headers Graph requires on
+   * specific endpoints — currently the only documented use is
+   * `Prefer: odata.maxpagesize=N` on the calendar/mail delta endpoints,
+   * which reject `$top` as a query parameter. Auth + content-type are
+   * always set internally.
+   */
+  get: (path: string, extraHeaders?: Record<string, string>) => Promise<Result<unknown, GraphError>>;
   /**
    * Same JSON-GET shape as `get`, but signs the request with the
    * elevated Graph token (M365ChatClient). Used by commands the Teams
@@ -135,14 +142,14 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
 
-  const request = async (method: 'GET' | 'POST', path: string, body?: unknown): Promise<Result<unknown, GraphError>> => {
+  const request = async (method: 'GET' | 'POST', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
     if (!headers.ok) return headers;
 
     try {
       const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
         method,
-        headers: { ...headers.value, 'content-type': 'application/json' },
+        headers: { ...headers.value, 'content-type': 'application/json', ...(extraHeaders ?? {}) },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
@@ -363,7 +370,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
 
   return {
-    get: (path) => request('GET', path),
+    get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
     getElevated,
     post: (path, body) => request('POST', path, body),
     getBinary,

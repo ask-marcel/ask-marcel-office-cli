@@ -69,6 +69,22 @@ describe('odataQuerySchema', () => {
     if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('0 and negatives');
   });
 
+  it('accepts $top=1000 (the documented Graph cap — pinning the boundary so off-by-one mutations are caught)', () => {
+    expect(odataQuerySchema.safeParse({ top: '1000' }).success).toBe(true);
+  });
+
+  it('rejects $top=1001 with a "≤ 1000" message rather than letting Graph silently truncate (the audit-flagged "999999 returns 1000 with no warning" trap)', () => {
+    const parsed = odataQuerySchema.safeParse({ top: '1001' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('≤ 1000');
+  });
+
+  it('rejects $top=999999 with the same cap message (the headline LLM-trap value from the audit)', () => {
+    const parsed = odataQuerySchema.safeParse({ top: '999999' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('≤ 1000');
+  });
+
   it('still accepts $skip=0 (harmless on Graph) so paging code can pass the value unchanged', () => {
     expect(odataQuerySchema.safeParse({ skip: '0' }).success).toBe(true);
   });
