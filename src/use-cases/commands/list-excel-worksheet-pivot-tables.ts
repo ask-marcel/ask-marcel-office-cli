@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/pivotTables`, schema);
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/pivotTables`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -31,6 +32,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Worksheet ID or name.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
   responseShape: 'collection of Microsoft Graph `workbookPivotTable` resources under `value[]`',

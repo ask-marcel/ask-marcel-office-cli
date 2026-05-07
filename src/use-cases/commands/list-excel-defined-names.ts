@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/names`, schema);
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/names`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -25,6 +26,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID of the .xlsx file.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-excel-defined-names --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `workbookNamedItem` resources under `value[]`',
