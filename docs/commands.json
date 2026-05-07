@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T11:34:04.429Z",
+  "generatedAt": "2026-05-07T11:56:35.334Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -281,7 +281,7 @@
     },
     {
       "name": "get-channel-files-folder",
-      "summary": "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder.",
+      "summary": "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/filesFolder",
@@ -298,6 +298,18 @@
           "key": "channelId",
           "required": true,
           "description": "Channel ID inside the team. Returned by `list-team-channels`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
@@ -369,7 +381,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -538,7 +550,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -823,35 +835,74 @@
     },
     {
       "name": "get-mailbox-settings",
-      "summary": "Get the signed-in user’s Outlook mailbox settings (timezone, working hours, automatic replies).",
+      "summary": "Get the signed-in user's Outlook mailbox settings (timezone, working hours, automatic replies). Use `--select` to fetch only specific fields (e.g. `--select timeZone,workingHours`).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailboxSettings",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings",
-      "options": [],
+      "options": [
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
       "example": "ask-marcel get-mailbox-settings",
       "responseShape": "single Microsoft Graph `mailboxSettings` resource"
     },
     {
       "name": "get-my-calendar",
-      "summary": "Return metadata for the signed-in user's *primary* calendar — `id`, `name`, `color`, `owner`, `canShare`, `canViewPrivateItems`, `canEdit`, `defaultOnlineMeetingProvider`. Sibling to `list-calendars` which returns every calendar (incl. shared / subscribed).",
+      "summary": "Return metadata for the signed-in user's *primary* calendar — `id`, `name`, `color`, `owner`, `canShare`, `canViewPrivateItems`, `canEdit`, `defaultOnlineMeetingProvider`. Sibling to `list-calendars` which returns every calendar (incl. shared / subscribed). Use `--select` to fetch only the fields you need.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendar",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-calendar",
-      "options": [],
-      "example": "ask-marcel get-my-calendar",
+      "options": [
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel get-my-calendar --select 'id,name'",
       "responseShape": "single Microsoft Graph `calendar` resource"
     },
     {
       "name": "get-my-manager",
-      "summary": "Return the signed-in user's manager (a single `user` resource). When no manager is set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from a permission failure.",
+      "summary": "Return the signed-in user's manager (a single `user` resource). When no manager is set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from a permission failure. Use `--select` to slim the response (e.g. `--select id,displayName,mail`).",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/manager",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-manager",
-      "options": [],
-      "example": "ask-marcel get-my-manager",
+      "options": [
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel get-my-manager --select 'id,displayName,mail'",
       "responseShape": "single Microsoft Graph `user` resource, or `null` when no manager is set in the directory"
     },
     {
@@ -915,13 +966,26 @@
     },
     {
       "name": "get-organization",
-      "summary": "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. Useful for confirming which tenant the CLI is signed into and what subscriptions are active.",
+      "summary": "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. The full resource is ~57 KB; use `--select` to slim it (e.g. `--select id,displayName,verifiedDomains`).",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/organization",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/organization-list",
-      "options": [],
-      "example": "ask-marcel get-organization",
+      "options": [
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel get-organization --select 'id,displayName,verifiedDomains'",
       "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`"
     },
     {
@@ -984,13 +1048,7 @@
           "name": "planner-task-id",
           "key": "plannerTaskId",
           "required": true,
-          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`.",
-          "aliases": [
-            {
-              "name": "task-id",
-              "key": "taskId"
-            }
-          ]
+          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
         }
       ],
       "example": "ask-marcel get-planner-task --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
@@ -1008,13 +1066,7 @@
           "name": "planner-task-id",
           "key": "plannerTaskId",
           "required": true,
-          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`.",
-          "aliases": [
-            {
-              "name": "task-id",
-              "key": "taskId"
-            }
-          ]
+          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
         }
       ],
       "example": "ask-marcel get-planner-task-details --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
@@ -1022,7 +1074,7 @@
     },
     {
       "name": "get-shared-mailbox-message",
-      "summary": "Return a single message from a shared / delegated mailbox.",
+      "summary": "Return a single message from a shared / delegated mailbox. Use `--select` to fetch only specific fields (e.g. `--select id,subject,from,receivedDateTime`) — sibling to `get-mail-message` for /me.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/users/{user-id}/messages/{message-id}",
@@ -1039,9 +1091,21 @@
           "key": "messageId",
           "required": true,
           "description": "Outlook message ID inside that mailbox."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...'",
+      "example": "ask-marcel get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...' --select 'id,subject,from'",
       "responseShape": "single Microsoft Graph `message` resource"
     },
     {
@@ -1202,7 +1266,7 @@
     },
     {
       "name": "get-sharepoint-site-onenote-page-content",
-      "summary": "Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`).",
+      "summary": "Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response is wrapped in the standard text-content envelope so the HTML survives JSON transport.",
       "category": "notes",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/onenote/pages/{onenote-page-id}/content",
@@ -1222,7 +1286,7 @@
         }
       ],
       "example": "ask-marcel get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
-      "responseShape": "HTML envelope (`{ contentType: \"text/html\", size, text }`)"
+      "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk."
     },
     {
       "name": "get-site-analytics",
@@ -1333,6 +1397,18 @@
           "key": "teamId",
           "required": true,
           "description": "Microsoft Teams team ID. Returned by `list-joined-teams`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-team-primary-channel --team-id 'tm1'",
@@ -1366,13 +1442,7 @@
           "name": "todo-task-id",
           "key": "todoTaskId",
           "required": true,
-          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`.",
-          "aliases": [
-            {
-              "name": "task-id",
-              "key": "taskId"
-            }
-          ]
+          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
         }
       ],
       "example": "ask-marcel get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
@@ -1380,7 +1450,7 @@
     },
     {
       "name": "get-user-manager",
-      "summary": "Return a specific user's manager (a single `user` resource). 404 if no manager is set in the directory.",
+      "summary": "Return a specific user's manager (a single `user` resource). When the user has no manager set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from 'unknown user'. Use `--select` to slim the response.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/users/{user-id}/manager",
@@ -1391,10 +1461,22 @@
           "key": "userId",
           "required": true,
           "description": "Azure AD user ID or UPN — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory)."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com'",
-      "responseShape": "single Microsoft Graph `user` resource"
+      "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
+      "responseShape": "single Microsoft Graph `user` resource, or `null` when no manager is set in the directory"
     },
     {
       "name": "list-all-onenote-sections",
@@ -1408,7 +1490,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1481,7 +1563,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1530,7 +1612,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1569,7 +1651,7 @@
     },
     {
       "name": "list-calendar-events-delta",
-      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user’s default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (Graph rejects the call with empty `UnknownError:` if neither `--top` nor a Prefer header caps the page size).",
+      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (or any non-resumption call) to bound the page size — Graph requires it; without it the endpoint returns an empty `UnknownError:`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/delta()",
@@ -1579,7 +1661,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1634,7 +1716,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1683,7 +1765,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1744,7 +1826,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1782,7 +1864,7 @@
     },
     {
       "name": "list-calendar-view-delta",
-      "summary": "Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`.",
+      "summary": "Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally — `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendarView/delta()?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -1804,7 +1886,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1837,7 +1919,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
       "responseShape": "collection of changed Microsoft Graph `event` occurrences under `value[]` plus an `@odata.deltaLink` token",
       "pagination": true
     },
@@ -1853,7 +1935,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1908,7 +1990,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -1957,7 +2039,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2012,7 +2094,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2061,7 +2143,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2122,7 +2204,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2183,7 +2265,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2232,7 +2314,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2293,7 +2375,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2354,7 +2436,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2421,7 +2503,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2482,7 +2564,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2549,7 +2631,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2616,7 +2698,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2677,7 +2759,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2726,7 +2808,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2787,7 +2869,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2836,7 +2918,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2903,7 +2985,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2958,7 +3040,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3013,7 +3095,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3068,7 +3150,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3123,7 +3205,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3178,7 +3260,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3227,7 +3309,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3276,7 +3358,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3335,7 +3417,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3396,7 +3478,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3451,7 +3533,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3506,7 +3588,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3561,7 +3643,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3610,7 +3692,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3671,7 +3753,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3726,7 +3808,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3775,7 +3857,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3824,7 +3906,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3873,7 +3955,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3928,7 +4010,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -3977,7 +4059,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4038,7 +4120,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4087,7 +4169,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4148,7 +4230,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4222,7 +4304,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4271,7 +4353,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4320,7 +4402,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4369,7 +4451,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4418,7 +4500,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4467,7 +4549,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4516,7 +4598,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4565,7 +4647,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4620,7 +4702,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4687,7 +4769,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4736,7 +4818,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4797,7 +4879,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4852,7 +4934,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -4891,52 +4973,14 @@
     },
     {
       "name": "list-shared-with-me",
-      "summary": "List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc.",
+      "summary": "List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/select/filter/etc. are all silently ignored), so the CLI does not advertise them. The full collection (~500 items in a typical tenant) is always returned; slice client-side or pair with the global output-path flag to land the raw JSON on disk.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/sharedWithMe",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-sharedwithme",
-      "options": [
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
+      "options": [],
       "example": "ask-marcel list-shared-with-me",
-      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)",
-      "pagination": true
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)"
     },
     {
       "name": "list-sharepoint-list-columns",
@@ -4962,7 +5006,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5029,7 +5073,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5084,7 +5128,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5145,7 +5189,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5200,7 +5244,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5261,7 +5305,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5316,7 +5360,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5377,7 +5421,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5432,7 +5476,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5487,7 +5531,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5542,7 +5586,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5597,7 +5641,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5664,7 +5708,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5702,7 +5746,7 @@
     },
     {
       "name": "list-team-channels",
-      "summary": "List the channels (standard, private, shared) inside a single Microsoft Team.",
+      "summary": "List the channels (standard, private, shared) inside a single Microsoft Team. Microsoft documents this endpoint as supporting only `$filter` and `$select` — Graph returns `BadRequest` on `$top`, `$skip`, `$orderby`, `$expand`, so the CLI exposes only the two flags that actually work.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels",
@@ -5715,18 +5759,6 @@
           "description": "Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`."
         },
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
@@ -5737,23 +5769,10 @@
           "key": "filter",
           "required": false,
           "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-team-channels --team-id 'abc-1234-...'",
-      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`",
-      "pagination": true
+      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`"
     },
     {
       "name": "list-team-installed-apps",
@@ -5802,19 +5821,13 @@
           "name": "todo-task-id",
           "key": "todoTaskId",
           "required": true,
-          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`.",
-          "aliases": [
-            {
-              "name": "task-id",
-              "key": "taskId"
-            }
-          ]
+          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
         },
         {
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5863,7 +5876,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -5928,7 +5941,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6006,7 +6019,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6061,7 +6074,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6175,7 +6188,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6230,7 +6243,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6291,7 +6304,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -6330,7 +6343,7 @@
     },
     {
       "name": "search-onenote-pages",
-      "summary": "Find OneNote pages whose title contains a substring (case-sensitive — page content is NOT searched). Microsoft removed full-text OneNote `?search=` from v1.0 Graph; only $filter against `title` remains, which is what this command runs.",
+      "summary": "Find OneNote pages whose title contains a substring (case-sensitive — page content is NOT searched). Microsoft removed full-text OneNote `?search=` from v1.0 Graph; only $filter against `title` remains, which is what this command runs. Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the title-contains predicate, and Graph rejects two `$filter` query params.",
       "category": "notes",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/onenote/pages?$filter=contains(title,'{title-substring}')",
@@ -6347,9 +6360,39 @@
               "key": "query"
             }
           ]
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel search-onenote-pages --title-substring 'meeting notes'",
+      "example": "ask-marcel search-onenote-pages --title-substring 'meeting notes' --top 25",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]` whose title contains the substring",
       "pagination": true
     },
@@ -6371,7 +6414,7 @@
           "name": "top",
           "key": "top",
           "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
