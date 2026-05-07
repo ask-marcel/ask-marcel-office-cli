@@ -166,7 +166,7 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `get-user-manager` | Return a specific user's manager (a single `user` resource). 404 if no manager is set in the directory. | `--user-id` | `GET /users/{user-id}/manager` |
 | `list-group-members` | List members of an Azure AD / Microsoft 365 group. Returns users, groups, and other directoryObjects depending on the group's membership. | `--group-id` | `GET /groups/{group-id}/members` |
 | `list-group-owners` | List the owners of an Azure AD / Microsoft 365 group. | `--group-id` | `GET /groups/{group-id}/owners` |
-| `list-groups` | List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories. | _(none)_ | `GET /groups` |
+| `list-groups` | List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `next-page` to paginate over very large directories. | _(none)_ | `GET /groups` |
 | `list-my-direct-reports` | List the signed-in user's direct reports (employees who report to them in the directory). | _(none)_ | `GET /me/directReports` |
 | `list-my-memberships` | List the groups, directory roles, and administrative units the signed-in user is a member of. Each entry's `@odata.type` distinguishes #microsoft.graph.group from #microsoft.graph.directoryRole, etc. | _(none)_ | `GET /me/memberOf` |
 | `list-my-transitive-memberships` | List all groups, directory roles, and administrative units the signed-in user is a member of *transitively* — including memberships inherited via nested groups. Sibling to `list-my-memberships` (`/me/memberOf`) which only returns direct memberships. | _(none)_ | `GET /me/transitiveMemberOf` |

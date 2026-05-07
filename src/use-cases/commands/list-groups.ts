@@ -6,7 +6,7 @@ const schema = z.object({}).strict();
 const { execute } = buildCommand(() => '/groups', schema);
 
 const meta: CommandMeta = {
-  summary: 'List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories.',
+  summary: 'List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `next-page` to paginate over very large directories.',
   category: 'user',
   graphMethod: 'GET',
   graphPathTemplate: '/groups',

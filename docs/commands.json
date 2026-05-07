@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T00:32:51.286Z",
+  "generatedAt": "2026-05-07T00:34:37.934Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -2033,7 +2033,7 @@
     },
     {
       "name": "list-groups",
-      "summary": "List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories.",
+      "summary": "List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `next-page` to paginate over very large directories.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups",

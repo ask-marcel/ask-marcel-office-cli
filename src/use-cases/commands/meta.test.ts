@@ -55,6 +55,17 @@ describe('command meta — invariants on every registered command', () => {
       it('provides a runnable example beginning with `ask-marcel`', () => {
         expect(cmd.meta.example).toMatch(/^ask-marcel /);
       });
+
+      it('summary references only flags that are actually registered as options or aliases on this command', () => {
+        const flagsInSummary = Array.from(cmd.meta.summary.matchAll(/--([a-z][a-z0-9-]*)/g), (m) => m[1] ?? '');
+        if (flagsInSummary.length === 0) return;
+        const declared = new Set<string>();
+        for (const opt of cmd.meta.options) {
+          declared.add(opt.name);
+          for (const alias of opt.aliases ?? []) declared.add(alias.name);
+        }
+        for (const flag of flagsInSummary) expect(declared).toContain(flag);
+      });
     });
   }
 });
