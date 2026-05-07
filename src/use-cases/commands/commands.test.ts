@@ -2060,7 +2060,12 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   {
     name: 'list-conversation-messages',
     params: { conversationId: 'AAQkAD-conv-1' },
-    expectedPath: "/me/messages?$filter=conversationId eq 'AAQkAD-conv-1'&$orderby=receivedDateTime",
+    expectedPath: "/me/messages?$filter=conversationId eq 'AAQkAD-conv-1'",
+  },
+  {
+    name: 'list-conversation-messages',
+    params: { conversationId: "AAQk'AD-conv-2" },
+    expectedPath: "/me/messages?$filter=conversationId eq 'AAQk''AD-conv-2'",
   },
   { name: 'list-focused-inbox-overrides', params: {}, expectedPath: '/me/inferenceClassification/overrides' },
   { name: 'list-outlook-categories', params: {}, expectedPath: '/me/outlook/masterCategories' },
