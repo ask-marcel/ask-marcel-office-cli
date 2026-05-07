@@ -13,12 +13,7 @@ describe('commands index', () => {
     expect(Object.keys(commands)).not.toContain('list-sharepoint-site-items');
   });
 
-  it('points `get-sharepoint-site-item --item-id` at the two-step discovery chain via `list-sharepoint-site-lists` and `list-sharepoint-site-list-items`', () => {
-    const cmd = commands['get-sharepoint-site-item'];
-    if (cmd === undefined) throw new Error('get-sharepoint-site-item is missing from the registry');
-    const itemIdOption = cmd.meta.options.find((o) => o.key === 'itemId');
-    if (itemIdOption === undefined) throw new Error('itemId option is missing from get-sharepoint-site-item');
-    expect(itemIdOption.description).toContain('list-sharepoint-site-lists');
-    expect(itemIdOption.description).toContain('list-sharepoint-site-list-items');
+  it("does not register `get-sharepoint-site-item` — Graph's /sites/{site-id}/items/{item-id} expects a SharePoint UNIQUEID that no other manifest command produces, so the chain dead-ended", () => {
+    expect(Object.keys(commands)).not.toContain('get-sharepoint-site-item');
   });
 });
