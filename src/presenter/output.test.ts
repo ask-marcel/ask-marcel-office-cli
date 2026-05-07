@@ -27,10 +27,15 @@ describe('presenter output', () => {
     expect(logger.calls.some((c) => c.event === 'output_rendered')).toBe(true);
   });
 
-  it('renders an error envelope to stderr as exactly one line', async () => {
-    const out = await captureStream('stderr', () => renderError('Authentication cancelled'));
+  it('renders an error envelope to stdout (not stderr) as exactly one line so jq can parse it from a single stream', async () => {
+    const out = await captureStream('stdout', () => renderError('Authentication cancelled'));
     expect(out.trim()).toBe(JSON.stringify({ error: 'Authentication cancelled' }));
     expect(out.split('\n').filter((line) => line.length > 0)).toHaveLength(1);
+  });
+
+  it('writes nothing to stderr when an error is rendered (errors live on stdout in v1)', async () => {
+    const out = await captureStream('stderr', () => renderError('Boom'));
+    expect(out).toBe('');
   });
 
   it('escapes every U+0000..U+001F control character in string leaves so the output round-trips through JSON.parse', async () => {

@@ -6,7 +6,7 @@ const render = (data: unknown, logger: Logger): void => {
 };
 
 const renderError = (message: string): void => {
-  process.stderr.write(`${JSON.stringify({ error: message })}\n`);
+  process.stdout.write(`${JSON.stringify({ error: message })}\n`);
 };
 
 export { render, renderError };

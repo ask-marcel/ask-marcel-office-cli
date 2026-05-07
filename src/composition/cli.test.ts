@@ -74,7 +74,7 @@ describe('buildCli command surface', () => {
   it('renders an Authentication cancelled error when the user closes the browser', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
     expect(out).toContain('Authentication cancelled');
   });
 
@@ -90,7 +90,7 @@ describe('buildCli command surface', () => {
         errorReports += 1;
       },
     });
-    await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
     expect(errorReports).toBe(1);
   });
 
@@ -113,7 +113,7 @@ describe('buildCli command surface', () => {
   it('renders the underlying message when login fails for a non-cancellation reason', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
     expect(out).toContain('browser launch failed');
   });
 
@@ -127,7 +127,7 @@ describe('buildCli command surface', () => {
   it('renders the underlying message when logout fails', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'logout']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'logout']));
     expect(out).toContain('rm denied');
   });
 
@@ -188,7 +188,7 @@ describe('buildCli command surface', () => {
       logger,
       processRunner: createProcessRunnerFake(),
     });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
     expect(out).toContain('not found');
   });
 
@@ -215,7 +215,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake({ resultPerCall: [{ exitCode: 7 }] });
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm' });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
     expect(out).toContain('exited with code 7');
   });
 
@@ -223,7 +223,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake({ throwOn: [0] });
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm' });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
     expect(out).toContain('update failed');
   });
 
@@ -252,7 +252,7 @@ describe('buildCli command surface', () => {
   it('renders an unknown-command message when the user runs `docs` with a name that does not exist', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'this-is-not-a-real-command']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'this-is-not-a-real-command']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('this-is-not-a-real-command');
   });
@@ -260,7 +260,7 @@ describe('buildCli command surface', () => {
   it('points users at --help when `docs <lifecycle-command>` is invoked (login/logout/update/docs/help are not in the registry)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
-    const out = await captureStream('stderr', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'login']));
     expect(out).toContain('lifecycle command');
     expect(out).toContain('ask-marcel login --help');
   });
