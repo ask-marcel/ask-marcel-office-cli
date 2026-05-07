@@ -261,11 +261,13 @@ describe('buildCli command surface', () => {
     expect(out).toContain('this-is-not-a-real-command');
   });
 
-  it("prints the lifecycle command's --help text when `docs <lifecycle-command>` is invoked, instead of erroring", async () => {
+  it('prints rich Markdown docs when `docs <lifecycle-command>` is invoked, since lifecycle commands now have manifest entries', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'login']));
-    expect(out).toContain('Usage: ask-marcel login');
+    expect(out).toContain('# `login`');
+    expect(out).toContain('**Category:** Lifecycle');
+    expect(out).toContain('Authenticate against Microsoft Graph');
   });
 
   it('falls back to the unknown-command error when `docs help` is invoked (commander does not register `help` as a regular subcommand)', async () => {
@@ -285,5 +287,54 @@ describe('buildCli command surface', () => {
     expect(parsed.version).toBe('1.0.0');
     expect(parsed.commands.length).toBeGreaterThan(100);
     expect(parsed.commands.some((c) => c.name === 'list-drives')).toBe(true);
+  });
+
+  it('routes commander parser errors (unknown option) to the JSON envelope on stdout, not stderr plain text', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
+    const stderrOut = await captureStream('stderr', async () => {
+      const stdoutOut = await captureStream('stdout', async () => {
+        try {
+          await cli.parseAsync(['node', 'ask-marcel', 'list-drives', '--no-such-flag']);
+        } catch {
+          /* expected — commander throws on parser error after exitOverride */
+        }
+      });
+      const parsed = JSON.parse(stdoutOut.trim()) as { ok: boolean; error: string };
+      expect(parsed.ok).toBe(false);
+      expect(parsed.error).toContain('unknown option');
+      expect(parsed.error).toContain('--no-such-flag');
+    });
+    expect(stderrOut).toBe('');
+  });
+
+  it('routes commander parser errors (unknown subcommand) to the JSON envelope on stdout', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', 'this-command-does-not-exist']);
+      } catch {
+        /* expected */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('this-command-does-not-exist');
+  });
+
+  it('routes commander parser errors (missing required option) to the JSON envelope on stdout', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', 'get-mail-message']);
+      } catch {
+        /* expected */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.toLowerCase()).toContain('required');
   });
 });

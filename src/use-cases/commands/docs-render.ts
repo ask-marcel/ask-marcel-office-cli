@@ -38,9 +38,24 @@ const CATEGORY_LABELS: Readonly<Record<CommandCategory, string>> = {
   chats: 'Chats',
   teams: 'Teams',
   meta: 'Meta / Pagination',
+  lifecycle: 'Lifecycle',
 };
 
-const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = ['drive', 'excel', 'sharepoint', 'tasks', 'mail', 'notes', 'user', 'calendar', 'contacts', 'chats', 'teams', 'meta'];
+const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
+  'lifecycle',
+  'drive',
+  'excel',
+  'sharepoint',
+  'tasks',
+  'mail',
+  'notes',
+  'user',
+  'calendar',
+  'contacts',
+  'chats',
+  'teams',
+  'meta',
+];
 
 const sortByName = (a: CommandManifestEntry, b: CommandManifestEntry): number => a.name.localeCompare(b.name);
 

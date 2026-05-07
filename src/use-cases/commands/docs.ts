@@ -20,10 +20,80 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => ({
   ...(cmd.meta.pagination ? { pagination: cmd.meta.pagination } : {}),
 });
 
+/**
+ * Lifecycle commands aren't backed by a Graph endpoint and aren't in the
+ * `commands` registry — they live inline in `cli.ts`. But an LLM that consumes
+ * `help-json` (the recommended token-efficient surface) needs to see them too,
+ * otherwise it can't authenticate, log out, or fetch per-command docs. These
+ * stub entries surface them under category 'lifecycle' with no graphMethod /
+ * options (the path template is a `(meta) ...` description so the JSON shape
+ * stays uniform with regular commands).
+ */
+const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
+  {
+    name: 'login',
+    summary:
+      'Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). Run before any Graph command.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) browser-OAuth via Teams web client; not a Graph endpoint',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
+    options: [],
+    example: 'ask-marcel login',
+    responseShape: '{ status: "authenticated" } on success; envelope error on cancel/failure.',
+  },
+  {
+    name: 'logout',
+    summary:
+      'Clear the cached Microsoft Graph token so the next command forces a fresh sign-in. Removes ~/.ask-marcel/token-cache.json; leaves the Playwright browser profile alone.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) deletes ~/.ask-marcel/token-cache.json; not a Graph endpoint',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
+    options: [],
+    example: 'ask-marcel logout',
+    responseShape: '{ status: "logged_out" } on success.',
+  },
+  {
+    name: 'update',
+    summary:
+      'Re-install the latest published ask-marcel from npm, in place. Auto-detects whether you originally installed via npm or bun based on the bin path. Token cache is preserved. Do NOT use from a local clone — pull and re-run `bun install` instead.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) shells out to `npm i -g` or `bun add -g`; not a Graph endpoint',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
+    options: [],
+    example: 'ask-marcel update',
+    responseShape: '{ status: "updated", via: "npm" | "bun" } on success.',
+  },
+  {
+    name: 'docs',
+    summary:
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass any registered command name as the positional argument. For lifecycle commands (login/logout/update/docs) prints the same --help that command would.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
+    options: [{ name: 'command', key: 'command', required: true, description: 'Command name to show docs for. Run `ask-marcel --help` for the full list.' }],
+    example: 'ask-marcel docs list-mail-messages',
+    responseShape: 'Markdown text on stdout (NOT JSON-wrapped — this is the one command whose stdout is plain text).',
+  },
+  {
+    name: 'help-json',
+    summary:
+      'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `ask-marcel --help`, which is ~40 KB. Includes lifecycle commands (login/logout/update/docs/help-json) under category `lifecycle`.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) renders the in-process command manifest',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
+    options: [],
+    example: 'ask-marcel help-json',
+    responseShape: '{ package, version, generatedAt, commands: [{ name, summary, category, ... }, ...] }',
+  },
+];
+
 const buildEntries = (registry: Readonly<Record<string, Command>>): ReadonlyArray<CommandManifestEntry> =>
-  Object.entries(registry)
-    .map(([name, cmd]) => toEntry(name, cmd))
-    .toSorted((a, b) => a.name.localeCompare(b.name));
+  [...Object.entries(registry).map(([name, cmd]) => toEntry(name, cmd)), ...LIFECYCLE_ENTRIES].toSorted((a, b) => a.name.localeCompare(b.name));
 
 export const buildManifest = (registry: Readonly<Record<string, Command>>, packageName: string, version: string, now: () => Date = () => new Date()): CommandManifest => ({
   package: packageName,
@@ -32,8 +102,12 @@ export const buildManifest = (registry: Readonly<Record<string, Command>>, packa
   commands: buildEntries(registry),
 });
 
+const findLifecycleEntry = (name: string): CommandManifestEntry | undefined => LIFECYCLE_ENTRIES.find((entry) => entry.name === name);
+
 export const renderSingleCommand = (registry: Readonly<Record<string, Command>>, name: string): Result<string, DocsError> => {
   const cmd = registry[name];
-  if (!cmd) return err({ type: 'unknown_command', name, available: Object.keys(registry).toSorted((a, b) => a.localeCompare(b)) });
-  return ok(renderCommandMarkdown(toEntry(name, cmd)));
+  if (cmd) return ok(renderCommandMarkdown(toEntry(name, cmd)));
+  const lifecycle = findLifecycleEntry(name);
+  if (lifecycle) return ok(renderCommandMarkdown(lifecycle));
+  return err({ type: 'unknown_command', name, available: [...Object.keys(registry), ...LIFECYCLE_ENTRIES.map((e) => e.name)].toSorted((a, b) => a.localeCompare(b)) });
 };

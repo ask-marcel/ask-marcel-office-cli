@@ -17,26 +17,37 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   },
 });
 
+const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'update'] as const;
+
 describe('buildManifest', () => {
-  it('builds a manifest with package name, version, generatedAt, and sorted commands', () => {
+  it('builds a manifest with package name, version, generatedAt, and registry+lifecycle commands sorted alphabetically', () => {
     const registry: Readonly<Record<string, Command>> = { 'list-zebra': fakeCmd(), 'list-apple': fakeCmd() };
     const manifest = buildManifest(registry, 'fake-pkg', '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
     expect(manifest.package).toBe('fake-pkg');
     expect(manifest.version).toBe('0.0.1');
     expect(manifest.generatedAt).toBe('2026-04-30T12:00:00.000Z');
-    expect(manifest.commands.map((c) => c.name)).toEqual(['list-apple', 'list-zebra']);
+    expect(manifest.commands.map((c) => c.name)).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'update']);
   });
 
-  it('omits responseShape when the source meta does not provide one', () => {
-    const registry: Readonly<Record<string, Command>> = { foo: fakeCmd() };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
-    expect(manifest.commands[0]).not.toHaveProperty('responseShape');
+  it('marks every lifecycle entry with category `lifecycle` so consumers can filter them', () => {
+    const manifest = buildManifest({}, 'fake-pkg', '0.0.1');
+    const lifecycle = manifest.commands.filter((c) => LIFECYCLE_NAMES.includes(c.name as (typeof LIFECYCLE_NAMES)[number]));
+    expect(lifecycle).toHaveLength(LIFECYCLE_NAMES.length);
+    for (const entry of lifecycle) expect(entry.category).toBe('lifecycle');
   });
 
-  it('keeps responseShape when the source meta provides one', () => {
-    const registry: Readonly<Record<string, Command>> = { foo: fakeCmd({ responseShape: 'single thing' }) };
+  it('omits responseShape when the source registry meta does not provide one', () => {
+    const registry: Readonly<Record<string, Command>> = { 'aaa-foo': fakeCmd() };
     const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
-    expect(manifest.commands[0]?.responseShape).toBe('single thing');
+    const fooEntry = manifest.commands.find((c) => c.name === 'aaa-foo');
+    expect(fooEntry).not.toHaveProperty('responseShape');
+  });
+
+  it('keeps responseShape when the source registry meta provides one', () => {
+    const registry: Readonly<Record<string, Command>> = { 'aaa-foo': fakeCmd({ responseShape: 'single thing' }) };
+    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const fooEntry = manifest.commands.find((c) => c.name === 'aaa-foo');
+    expect(fooEntry?.responseShape).toBe('single thing');
   });
 
   it('uses the real `new Date()` when no clock injector is given', () => {
@@ -50,7 +61,7 @@ describe('buildManifest', () => {
 });
 
 describe('renderSingleCommand', () => {
-  it('returns Markdown for an existing command', () => {
+  it('returns Markdown for an existing registry command', () => {
     const registry: Readonly<Record<string, Command>> = { 'get-current-user': fakeCmd({ summary: 'returns the user' }) };
     const result = renderSingleCommand(registry, 'get-current-user');
     expect(result.ok).toBe(true);
@@ -60,13 +71,22 @@ describe('renderSingleCommand', () => {
     }
   });
 
-  it('returns unknown_command with the alphabetically sorted available list when the command is missing', () => {
+  it('returns Markdown for a lifecycle command (login/logout/update/docs/help-json) even when the registry is empty', () => {
+    const result = renderSingleCommand({}, 'login');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('# `login`');
+      expect(result.value).toContain('Authenticate against Microsoft Graph');
+    }
+  });
+
+  it('returns unknown_command with the alphabetically merged registry+lifecycle list when the command is missing', () => {
     const registry: Readonly<Record<string, Command>> = { 'list-zebra': fakeCmd(), 'list-apple': fakeCmd() };
     const result = renderSingleCommand(registry, 'list-banana');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'unknown_command') {
       expect(result.error.name).toBe('list-banana');
-      expect(result.error.available).toEqual(['list-apple', 'list-zebra']);
+      expect(result.error.available).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'update']);
     }
   });
 });

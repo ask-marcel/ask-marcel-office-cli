@@ -22,9 +22,20 @@ const main = async (): Promise<void> => {
   await cli.parseAsync();
 };
 
+const isCommanderError = (e: unknown): boolean =>
+  e !== null && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string' && (e as { code: string }).code.startsWith('commander.');
+
 try {
   await main();
 } catch (e) {
+  // Commander parser errors (unknown option, missing required, etc.) are
+  // already rendered as a JSON envelope on stdout by exitOverride in
+  // buildCli. Don't double-print them to stderr — that would re-introduce
+  // the two-channel error contract the audit flagged. Truly uncaught errors
+  // (assertion failures, OOM, etc.) still hit the [crash] line.
+  if (isCommanderError(e)) {
+    process.exit(1);
+  }
   process.stderr.write(`[crash] ${formatError(e)}\n`);
   process.exit(1);
 }

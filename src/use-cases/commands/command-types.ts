@@ -5,7 +5,7 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 type CommandSchema = z.ZodType;
 type CommandExecute = (graph: GraphClient, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
 
-type CommandCategory = 'auth' | 'drive' | 'excel' | 'sharepoint' | 'tasks' | 'mail' | 'notes' | 'user' | 'calendar' | 'contacts' | 'chats' | 'teams' | 'meta';
+type CommandCategory = 'auth' | 'drive' | 'excel' | 'sharepoint' | 'tasks' | 'mail' | 'notes' | 'user' | 'calendar' | 'contacts' | 'chats' | 'teams' | 'meta' | 'lifecycle';
 
 type CommandHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 

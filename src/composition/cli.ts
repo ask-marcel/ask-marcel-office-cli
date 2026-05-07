@@ -31,6 +31,21 @@ const buildCli = (deps: BuildCliDeps): Command => {
     deps.onCommandError?.();
   };
 
+  // Single-stream JSON contract: commander's parser errors (unknown option,
+  // missing required, unknown command, etc.) used to land on stderr as plain
+  // text, while validation and Graph errors landed on stdout as JSON. An LLM
+  // capturing only stdout silently lost the parser cases. Suppress commander's
+  // stderr writer and intercept its CommanderError in exitOverride so we can
+  // render the same JSON envelope every other path uses.
+  program.configureOutput({
+    writeErr: () => undefined,
+  });
+  program.exitOverride((err) => {
+    if (err.code === 'commander.helpDisplayed' || err.code === 'commander.version' || err.code === 'commander.help') return;
+    fail(err.message);
+    throw err;
+  });
+
   program
     .name('ask-marcel')
     .description('Microsoft Graph CLI')
@@ -111,24 +126,17 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
-  const LIFECYCLE_COMMANDS: ReadonlySet<string> = new Set(['login', 'logout', 'update', 'docs', 'help', 'help-json']);
-
   const docsCmd = program
     .command('docs')
-    .description('Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`).')
+    .description(
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/update/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
+    )
     .argument('<command>', 'Command name to show docs for (run `ask-marcel --help` to list every command).')
     .action((commandName: string) => {
       const result = renderSingleCommand(cmdRegistry, commandName);
       if (result.ok) {
         process.stdout.write(`${result.value}\n`);
         return;
-      }
-      if (LIFECYCLE_COMMANDS.has(commandName)) {
-        const lifecycleCmd = program.commands.find((c) => c.name() === commandName);
-        if (lifecycleCmd) {
-          process.stdout.write(lifecycleCmd.helpInformation());
-          return;
-        }
       }
       fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
     });
