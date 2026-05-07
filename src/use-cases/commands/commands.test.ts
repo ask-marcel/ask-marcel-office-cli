@@ -1490,6 +1490,20 @@ describe('commands', () => {
     if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('unsupported attachment type');
   });
 
+  it('convert-mail-attachment-to-markdown rejects an image attachment with a hint pointing at get-mail-attachment, not the PDF converter', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'logo.png', contentBytes: 'AAAA' });
+    const cmd = cmdMap['convert-mail-attachment-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aImg' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('image');
+      expect(result.error.message).toContain('get-mail-attachment');
+    }
+  });
+
   it('convert-mail-attachment-to-pdf rejects a referenceAttachment with no sourceUrl', async () => {
     const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment' });
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];

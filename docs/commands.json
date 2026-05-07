@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T01:52:25.533Z",
+  "generatedAt": "2026-05-07T01:54:29.663Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",

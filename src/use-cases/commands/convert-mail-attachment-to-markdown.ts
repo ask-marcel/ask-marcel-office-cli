@@ -33,6 +33,11 @@ const decodeBase64 = (b64: string): Uint8Array => {
 const PPTX_HINT =
   'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets.';
 
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
+
+const imageHint = (ext: string): string =>
+  `${ext} attachment is an image and cannot be converted to markdown. Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded). Sending it through \`convert-mail-attachment-to-pdf\` is not useful — Graph would just wrap the same image in a PDF container.`;
+
 const genericHint = (ext: string): string =>
   `${ext} attachment not supported by \`convert-mail-attachment-to-markdown\`. Use \`convert-mail-attachment-to-pdf\` — Graph \`?format=pdf\` accepts 38 input extensions.`;
 
@@ -60,6 +65,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   if (ext === 'docx') return docxToMarkdown(bytes);
   if (ext === 'xlsx') return xlsxToMarkdown(bytes);
   if (ext === 'pptx') return err({ type: 'api_error', status: 415, message: PPTX_HINT });
+  if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
   return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
 };
 
