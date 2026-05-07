@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({
@@ -14,15 +15,14 @@ const schema = z.object({
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  // Use the elevated token so the embedded tempauth in the returned
-  // streamContent URL is signed by an ODSP-elevated identity (M365ChatClient)
-  // and actually fetches when followed downstream — instead of 403ing.
-  return graph.getBinaryElevated(`/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/versions/${parsed.data.versionId}/content`);
+  // M365ChatClient elevation for both the Graph call and the CDN-redirect
+  // follow — Teams web client tempauth gets 403d by SharePoint streamContent.
+  return inlineBinary(graph, `/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/versions/${parsed.data.versionId}/content`, { elevated: true });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Return the SharePoint streamContent URL for a *non-current* historical version of a OneDrive / SharePoint file. Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version" — for the current version use `download-onedrive-file-content`. The returned URL embeds an ODSP-elevated tempauth (signed via the M365ChatClient identity captured at login) so that fetching it downstream returns the bytes rather than the 403 the Teams web client token would produce.',
+    'Download the bytes of a *non-current* historical version of a OneDrive / SharePoint file, inlined. Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version" — for the current version use `download-onedrive-file-content`. The CLI follows the SharePoint streamContent redirect internally using an M365ChatClient-elevated token (captured at login) so the LLM never has to fetch an external URL.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content',
@@ -47,7 +47,8 @@ const meta: CommandMeta = {
     },
   ],
   example: "ask-marcel download-drive-item-version-content --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-  responseShape: '`{ "@microsoft.graph.downloadUrl": "..." }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly',
+  responseShape:
+    '`{ contentType, size, base64 }` — the historical-version bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB versions.',
 };
 
 export { execute, meta, schema };

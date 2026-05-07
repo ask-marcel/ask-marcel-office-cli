@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({ messageId: z.string().min(1) });
@@ -8,7 +9,7 @@ const schema = z.object({ messageId: z.string().min(1) });
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  return graph.getBinary(`/me/messages/${parsed.data.messageId}/$value`);
+  return inlineBinary(graph, `/me/messages/${parsed.data.messageId}/$value`);
 };
 
 const meta: CommandMeta = {
@@ -27,7 +28,8 @@ const meta: CommandMeta = {
     },
   ],
   example: "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
-  responseShape: 'raw MIME envelope (`{ contentType: "message/rfc822" or similar, size, text/base64 }`)',
+  responseShape:
+    '`{ contentType: "message/rfc822" or similar, size, base64 }` — the raw MIME envelope, inlined. Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.',
 };
 
 export { execute, meta, schema };

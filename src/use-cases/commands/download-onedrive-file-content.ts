@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
@@ -10,12 +11,12 @@ const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  return graph.getBinary(`/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/content`);
+  return inlineBinary(graph, `/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/content`);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Download the binary content of a file stored in OneDrive / SharePoint. Graph normally returns a 302 redirect to a pre-signed CDN URL, surfaced as `@microsoft.graph.downloadUrl`; if it returns bytes directly they are base64-encoded for safe JSON output.',
+    'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',
@@ -25,7 +26,8 @@ const meta: CommandMeta = {
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` or `search-onedrive-files`.' },
   ],
   example: "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-  responseShape: '`{ "@microsoft.graph.downloadUrl": "..." }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly',
+  responseShape:
+    '`{ contentType, size, base64 }` — the file bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB files.',
 };
 
 export { execute, meta, schema };

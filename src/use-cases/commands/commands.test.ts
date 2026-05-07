@@ -535,20 +535,40 @@ describe('commands', () => {
     if (result.ok) expect(result.value).toEqual({ value: [{ id: 'v1' }] });
   });
 
-  it('download-onedrive-file-content returns content info', async () => {
-    const result = await callCommand('download-onedrive-file-content', { driveId: 'd1', itemId: 'i1' }, { '@microsoft.graph.downloadUrl': 'https://...' });
+  it('download-onedrive-file-content inlines the bytes (no longer returns the bare downloadUrl envelope)', async () => {
+    const result = await callCommand('download-onedrive-file-content', { driveId: 'd1', itemId: 'i1' }, { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://...' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/octet-stream');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
-  it('download-drive-item-version-content returns content for a historical version', async () => {
-    const result = await callCommand(
-      'download-drive-item-version-content',
-      { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
-      { '@microsoft.graph.downloadUrl': 'https://cdn.example/v3' }
-    );
+  it('download-drive-item-version-content inlines the historical-version bytes via the M365ChatClient-elevated path', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/versions/3.0/content',
+        method: 'GET',
+        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/v3.bin' }),
+      },
+      {
+        urlPrefix: 'https://contoso.sharepoint.com/cdn/v3.bin',
+        method: 'GET',
+        response: () =>
+          new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['download-drive-item-version-content'];
+    if (!cmd) throw new Error('download-drive-item-version-content not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v3' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/octet-stream');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
   it('download-drive-item-as-pdf converts an Office source via Graph ?format=pdf and inlines the PDF bytes (CDN redirect followed internally)', async () => {
@@ -1729,11 +1749,15 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-drives', params: {} },
   { name: 'get-drive-root-item', params: { driveId: 'd1' } },
   { name: 'list-folder-files', params: { driveId: 'd1', itemId: 'i1' } },
-  { name: 'download-onedrive-file-content', params: { driveId: 'd1', itemId: 'i1' } },
+  { name: 'download-onedrive-file-content', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' } },
   { name: 'get-drive-item', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' } },
-  { name: 'download-drive-item-version-content', params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' } },
+  {
+    name: 'download-drive-item-version-content',
+    params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
+    responseBody: { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' },
+  },
   { name: 'download-drive-item-as-pdf', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } },
   {
     name: 'download-drive-item-version-as-pdf',
@@ -1790,7 +1814,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'get-onenote-page-content', params: { onenotePageId: 'p1' } },
   { name: 'search-onenote-pages', params: { titleSubstring: 'meeting' } },
   { name: 'get-current-user', params: {} },
-  { name: 'get-my-profile-photo', params: {} },
+  { name: 'get-my-profile-photo', params: {}, responseBody: { contentType: 'image/jpeg', size: 5, base64: 'JVBERi0=' } },
   { name: 'list-calendar-events', params: {} },
   { name: 'get-calendar-event', params: { eventId: 'e1' } },
   { name: 'list-specific-calendar-events', params: { calendarId: 'c1' } },
@@ -1822,7 +1846,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-group-calendar-view', params: { groupId: 'g1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
   { name: 'list-group-conversations', params: { groupId: 'g1' } },
   { name: 'list-group-threads', params: { groupId: 'g1' } },
-  { name: 'get-mail-message-mime', params: { messageId: 'm1' } },
+  { name: 'get-mail-message-mime', params: { messageId: 'm1' }, responseBody: { contentType: 'message/rfc822', size: 5, base64: 'JVBERi0=' } },
   { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' } },
   { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' } },
   { name: 'list-shared-mailbox-folder-messages', params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' } },
