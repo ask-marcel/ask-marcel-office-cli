@@ -13,25 +13,37 @@ import type { GraphError } from './graph-client.ts';
  * class-free per atelier rule 1. Each call constructs a fresh service
  * (turndown is cheap to instantiate; no mutable shared state).
  *
- * GFM plugin enabled so HTML tables render as pipe-delimited markdown
- * tables instead of flat paragraphs (needed for docx → markdown to
- * preserve table structure that mammoth emits as <table><tr><td>).
+ * GFM plugin enabled by default so HTML tables render as pipe-delimited
+ * markdown tables instead of flat paragraphs (needed for docx → markdown
+ * to preserve table structure that mammoth emits as <table><tr><td>).
  *
  * Turndown's default HTML parser drops comment nodes during parsing,
  * so we don't need a custom comment-stripping rule. <script> and
  * <style> aren't dropped by default — those need explicit removal so
  * their text content doesn't leak into the markdown output.
  *
- * Lives in `src/infra/` because turndown can throw on malformed DOM
- * (e.g. Outlook MSO HTML that produces a `<td>` whose parent is undefined
- * during traversal — surfaced as `Cannot read properties of undefined
- * (reading 'parentNode')`). When that happens the adapter falls back to
- * a stripped-text representation prefixed with a markdown blockquote
- * note, so the LLM still receives readable content instead of an error
- * envelope. The Result return type is preserved (always ok in practice)
- * so callers don't need a separate degraded path.
+ * Lives in `src/infra/` because turndown can throw on malformed DOM. The
+ * dominant culprit is the GFM table plugin's `cellInternals` walker,
+ * which assumes every `<td>` has an ancestor `<tr>` reachable via
+ * `parentNode` — Outlook MSO HTML routinely violates this with floating
+ * `<td>` cells, nested misnested tables, or `<table>` wrappers with no
+ * `<tbody>`. The walker then dereferences `undefined.parentNode` and
+ * throws `Cannot read properties of undefined (reading 'parentNode')`.
+ *
+ * Three-tier graceful degradation when that happens:
+ *
+ *   1. turndown WITH GFM (clean markdown tables)
+ *   2. turndown WITHOUT GFM (core markdown; tables become flat paragraphs
+ *      but the rest of the document converts cleanly)
+ *   3. stripped-text fallback (state-machine HTML walker; preserves text,
+ *      basic entities, and newlines on block boundaries)
+ *
+ * Tier 2 covers the vast majority of Outlook MSO bodies; tier 3 only
+ * fires when even the core walker chokes. Each downgrade prepends a
+ * markdown blockquote note naming the underlying error so observability
+ * survives the degradation.
  */
-const buildService = (): TurndownService => {
+const buildService = (options: { readonly gfm: boolean }): TurndownService => {
   const td = new TurndownService({
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
@@ -39,10 +51,12 @@ const buildService = (): TurndownService => {
     emDelimiter: '_',
     strongDelimiter: '**',
   });
-  td.use(gfm);
+  if (options.gfm) td.use(gfm);
   td.remove(['script', 'style']);
   return td;
 };
+
+const errorMessageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const decodeBasicEntities = (s: string): string =>
   s
@@ -106,12 +120,17 @@ const stripHtmlToText = (html: string): string => {
 
 const htmlToMarkdown = (html: string): Result<string, GraphError> => {
   try {
-    return ok(buildService().turndown(html));
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e);
-    const fallback = stripHtmlToText(html);
-    const note = `> _markdown conversion failed: ${message}; showing stripped HTML body_`;
-    return ok(fallback.length > 0 ? `${note}\n\n${fallback}` : note);
+    return ok(buildService({ gfm: true }).turndown(html));
+  } catch (gfmError: unknown) {
+    try {
+      const md = buildService({ gfm: false }).turndown(html);
+      const note = `> _GFM table conversion failed: ${errorMessageOf(gfmError)}; tables flattened to paragraphs_`;
+      return ok(`${note}\n\n${md}`);
+    } catch (coreError: unknown) {
+      const fallback = stripHtmlToText(html);
+      const note = `> _markdown conversion failed: ${errorMessageOf(coreError)}; showing stripped HTML body_`;
+      return ok(fallback.length > 0 ? `${note}\n\n${fallback}` : note);
+    }
   }
 };
 

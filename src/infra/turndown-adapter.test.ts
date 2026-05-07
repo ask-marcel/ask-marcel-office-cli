@@ -72,7 +72,31 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
     }
   });
 
-  it('falls back to stripped-text body (with a markdown note prefix) when turndown blows up on a malformed DOM, so the LLM still gets readable content', () => {
+  it('retries turndown WITHOUT GFM when the first pass throws, so most Outlook MSO bodies still convert to clean markdown (tier 2)', () => {
+    const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
+    const original = proto.turndown;
+    let callCount = 0;
+    proto.turndown = function (this: TurndownService, input: string): string {
+      callCount += 1;
+      if (callCount === 1) throw new TypeError("Cannot read properties of undefined (reading 'parentNode')");
+      return original.call(this, input);
+    } as typeof original;
+    try {
+      const result = htmlToMarkdown('<p>Hello <b>world</b>.</p>');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toContain('GFM table conversion failed');
+        expect(result.value).toContain('parentNode');
+        expect(result.value).toContain('tables flattened to paragraphs');
+        expect(result.value).toContain('Hello **world**.');
+        expect(callCount).toBe(2);
+      }
+    } finally {
+      proto.turndown = original;
+    }
+  });
+
+  it('falls back to stripped-text body (with a markdown note prefix) when BOTH turndown passes throw, so the LLM still gets readable content (tier 3)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
     proto.turndown = (() => {
