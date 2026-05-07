@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/mailFolders', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/mailFolders', baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.).',
@@ -11,7 +12,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailFolders',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-mailfolders',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-mail-folders',
   responseShape: 'collection of Microsoft Graph `mailFolder` resources under `value[]`',
   pagination: true,

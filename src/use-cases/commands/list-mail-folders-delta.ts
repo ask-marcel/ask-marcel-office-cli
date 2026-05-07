@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/mailFolders/delta()', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/mailFolders/delta()', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailFolders/delta()',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/mailfolder-delta',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-mail-folders-delta',
   responseShape: 'collection of Microsoft Graph `mailFolder` resources plus `@odata.deltaLink` / `@odata.nextLink`',
   pagination: true,

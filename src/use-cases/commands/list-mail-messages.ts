@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/messages', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/messages', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-messages',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-mail-messages',
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',
   pagination: true,

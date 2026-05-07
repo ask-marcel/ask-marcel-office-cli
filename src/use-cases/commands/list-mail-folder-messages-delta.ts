@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ mailFolderId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/mailFolders/${p.mailFolderId}/messages/delta()`, schema);
+const baseSchema = z.object({ mailFolderId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/mailFolders/${p.mailFolderId}/messages/delta()`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Mail folder ID or well-known name (`inbox`, `archive`, `sentitems`, `deleteditems`, `junkemail`, `drafts`). Returned by `list-mail-folders`.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-folder-messages-delta --mail-folder-id 'inbox'",
   responseShape: 'collection of Microsoft Graph `message` resources plus `@odata.deltaLink` / `@odata.nextLink`',

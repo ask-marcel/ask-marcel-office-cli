@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ messageId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/messages/${p.messageId}/attachments`, schema);
+const baseSchema = z.object({ messageId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/messages/${p.messageId}/attachments`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the attachments (file, item, reference) on a single Outlook message.',
@@ -13,6 +14,7 @@ const meta: CommandMeta = {
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-list-attachments',
   options: [
     { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`.' },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",
   responseShape: 'collection of Microsoft Graph `attachment` resources under `value[]`',
