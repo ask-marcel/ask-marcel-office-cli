@@ -142,7 +142,6 @@ import * as listOutlookCategories from './list-outlook-categories.ts';
 import * as listSharedCalendarEvents from './list-shared-calendar-events.ts';
 import * as getSharedCalendarView from './get-shared-calendar-view.ts';
 import * as getSharepointSitesDelta from './get-sharepoint-sites-delta.ts';
-import * as listSharepointSiteItems from './list-sharepoint-site-items.ts';
 import * as getSharepointSiteItem from './get-sharepoint-site-item.ts';
 import * as listSharepointListColumns from './list-sharepoint-list-columns.ts';
 import * as getSharepointListColumn from './get-sharepoint-list-column.ts';
@@ -266,7 +265,6 @@ const commands: Record<string, Command> = {
   'list-shared-calendar-events': listSharedCalendarEvents,
   'get-shared-calendar-view': getSharedCalendarView,
   'get-sharepoint-sites-delta': getSharepointSitesDelta,
-  'list-sharepoint-site-items': listSharepointSiteItems,
   'get-sharepoint-site-item': getSharepointSiteItem,
   'list-sharepoint-list-columns': listSharepointListColumns,
   'get-sharepoint-list-column': getSharepointListColumn,

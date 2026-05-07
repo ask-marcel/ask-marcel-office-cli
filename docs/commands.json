@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T00:31:02.343Z",
+  "generatedAt": "2026-05-07T00:32:51.286Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1134,7 +1134,7 @@
           "name": "item-id",
           "key": "itemId",
           "required": true,
-          "description": "baseItem ID inside the site. Returned by `list-sharepoint-site-items`."
+          "description": "baseItem ID inside the site. Microsoft Graph has no list-less site/items collection endpoint, so discover it via the two-step chain `list-sharepoint-site-lists` then `list-sharepoint-site-list-items --list-id <id>`; the returned `listItem.id` is also a valid `baseItem.id` here."
         }
       ],
       "example": "ask-marcel get-sharepoint-site-item --site-id 'contoso.sharepoint.com,abc...,def...' --item-id '7'",
@@ -2633,25 +2633,6 @@
       ],
       "example": "ask-marcel list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
-      "pagination": true
-    },
-    {
-      "name": "list-sharepoint-site-items",
-      "summary": "List items at the root of a SharePoint site (across all lists / libraries combined). Useful as an entry point before drilling into a specific list with `list-sharepoint-site-list-items`.",
-      "category": "sharepoint",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/sites/{site-id}/items",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/site-list-items",
-      "options": [
-        {
-          "name": "site-id",
-          "key": "siteId",
-          "required": true,
-          "description": "SharePoint site ID. Returned by `search-sharepoint-sites` (composite `hostname,site,web` form)."
-        }
-      ],
-      "example": "ask-marcel list-sharepoint-site-items --site-id 'contoso.sharepoint.com,abc...,def...'",
-      "responseShape": "collection of Microsoft Graph `baseItem` resources under `value[]`",
       "pagination": true
     },
     {

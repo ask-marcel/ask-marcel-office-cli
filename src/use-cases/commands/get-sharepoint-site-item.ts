@@ -22,7 +22,8 @@ const meta: CommandMeta = {
       name: 'item-id',
       key: 'itemId',
       required: true,
-      description: 'baseItem ID inside the site. Returned by `list-sharepoint-site-items`.',
+      description:
+        'baseItem ID inside the site. Microsoft Graph has no list-less site/items collection endpoint, so discover it via the two-step chain `list-sharepoint-site-lists` then `list-sharepoint-site-list-items --list-id <id>`; the returned `listItem.id` is also a valid `baseItem.id` here.',
     },
   ],
   example: "ask-marcel get-sharepoint-site-item --site-id 'contoso.sharepoint.com,abc...,def...' --item-id '7'",
