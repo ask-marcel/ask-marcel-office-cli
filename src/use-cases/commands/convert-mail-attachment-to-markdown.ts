@@ -36,7 +36,7 @@ const PPTX_HINT =
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
 
 const imageHint = (ext: string): string =>
-  `${ext} attachment is an image and cannot be converted to markdown. Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded). Sending it through \`convert-mail-attachment-to-pdf\` is not useful — Graph would just wrap the same image in a PDF container.`;
+  `${ext} attachment is an image and cannot be converted to markdown. Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded). \`convert-mail-attachment-to-pdf\` will also succeed and wrap the same image in a PDF container, but that is rarely useful — feed the raw bytes into a vision-capable model instead.`;
 
 const genericHint = (ext: string): string =>
   `${ext} attachment not supported by \`convert-mail-attachment-to-markdown\`. Use \`convert-mail-attachment-to-pdf\` — Graph \`?format=pdf\` accepts 38 input extensions.`;

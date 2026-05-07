@@ -4,7 +4,7 @@ import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({
-  calendarId: z.string().min(1),
+  calendarId: z.string().min(1).default('primary'),
   eventId: z.string().min(1),
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1),
@@ -24,7 +24,8 @@ const { execute, schema } = buildListCommand(
 );
 
 const meta: CommandMeta = {
-  summary: 'List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph.',
+  summary:
+    'List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph. `--calendar-id` is optional and defaults to `primary` (the signed-in user’s default calendar) — most callers know the event-id but not which calendar it lives in. Pass an explicit `--calendar-id` only when targeting a non-default calendar.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/calendars/{calendar-id}/events/{event-id}/instances?startDateTime={start-date-time}&endDateTime={end-date-time}',
@@ -33,8 +34,8 @@ const meta: CommandMeta = {
     {
       name: 'calendar-id',
       key: 'calendarId',
-      required: true,
-      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
+      required: false,
+      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`.',
     },
     { name: 'event-id', key: 'eventId', required: true, description: 'Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
     {
