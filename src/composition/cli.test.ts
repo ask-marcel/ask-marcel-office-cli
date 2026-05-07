@@ -257,11 +257,18 @@ describe('buildCli command surface', () => {
     expect(out).toContain('this-is-not-a-real-command');
   });
 
-  it('points users at --help when `docs <lifecycle-command>` is invoked (login/logout/update/docs/help are not in the registry)', async () => {
+  it("prints the lifecycle command's --help text when `docs <lifecycle-command>` is invoked, instead of erroring", async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'login']));
-    expect(out).toContain('lifecycle command');
-    expect(out).toContain('ask-marcel login --help');
+    expect(out).toContain('Usage: ask-marcel login');
+  });
+
+  it('falls back to the unknown-command error when `docs help` is invoked (commander does not register `help` as a regular subcommand)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'help']));
+    expect(out).toContain('Unknown command');
+    expect(out).toContain('help');
   });
 });

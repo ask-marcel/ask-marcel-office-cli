@@ -107,12 +107,18 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .argument('<command>', 'Command name to show docs for (run `ask-marcel --help` to list every command).')
     .action((commandName: string) => {
       const result = renderSingleCommand(cmdRegistry, commandName);
-      if (result.ok) process.stdout.write(`${result.value}\n`);
-      else if (LIFECYCLE_COMMANDS.has(commandName))
-        fail(
-          `"${commandName}" is a CLI lifecycle command — it has no Graph endpoint and is not in docs/commands.json. Run \`ask-marcel ${commandName} --help\` for its help text.`
-        );
-      else fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
+      if (result.ok) {
+        process.stdout.write(`${result.value}\n`);
+        return;
+      }
+      if (LIFECYCLE_COMMANDS.has(commandName)) {
+        const lifecycleCmd = program.commands.find((c) => c.name() === commandName);
+        if (lifecycleCmd) {
+          process.stdout.write(lifecycleCmd.helpInformation());
+          return;
+        }
+      }
+      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
     });
 
   for (const category of CATEGORY_ORDER) {
