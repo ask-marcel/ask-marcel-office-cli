@@ -20,7 +20,7 @@ export type BuildDepsConfig = {
   readonly processRunner?: ProcessRunner;
 };
 
-export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner }>;
+export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem }>;
 
 const defaultCachePath = (home: string): string => join(home, '.ask-marcel', 'token-cache.json');
 
@@ -37,5 +37,5 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const logger = createWinstonLogger({ logLevel });
   const auth = createAuthManager({ cachePath, logger, fs });
   const graph = createGraphClient(auth);
-  return { logger, auth, graph, processRunner };
+  return { logger, auth, graph, processRunner, fs };
 };

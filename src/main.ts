@@ -14,6 +14,7 @@ const main = async (): Promise<void> => {
     graph: deps.graph,
     logger: deps.logger,
     processRunner: deps.processRunner,
+    fs: deps.fs,
     version: pkg.version,
     onCommandError: () => {
       process.exitCode = 1;
