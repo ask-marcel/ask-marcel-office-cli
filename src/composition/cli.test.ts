@@ -50,6 +50,7 @@ const okGraph = (value: unknown): GraphClient => ({
   fetchUrl: async () => ({ ok: true, value }),
   put: async () => ({ ok: true, value }),
   delete: async () => ({ ok: true, value }),
+  getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
 });
 
 const errGraph = (error: GraphError): GraphClient => ({
@@ -61,6 +62,7 @@ const errGraph = (error: GraphError): GraphClient => ({
   fetchUrl: async () => ({ ok: false, error }),
   put: async () => ({ ok: false, error }),
   delete: async () => ({ ok: false, error }),
+  getCachedTokenInfo: async () => ({ ok: false, error }),
 });
 
 describe('buildCli command surface', () => {
@@ -152,6 +154,7 @@ describe('buildCli command surface', () => {
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
       delete: async () => ({ ok: true, value: {} }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake() });
@@ -173,6 +176,7 @@ describe('buildCli command surface', () => {
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
       delete: async () => ({ ok: true, value: {} }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake() });

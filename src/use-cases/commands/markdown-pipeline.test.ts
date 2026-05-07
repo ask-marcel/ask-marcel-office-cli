@@ -12,6 +12,7 @@ const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
   fetchUrl: async () => ok({}),
   put: async () => ok({}),
   delete: async () => ok({}),
+  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
   ...overrides,
 });
 

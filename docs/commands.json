@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T01:42:38.322Z",
+  "generatedAt": "2026-05-07T01:52:25.533Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6272,6 +6272,17 @@
       ],
       "example": "ask-marcel next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
       "responseShape": "same shape as the originating endpoint (typically `{ value: [...], \"@odata.nextLink\": \"...\" }`)"
+    },
+    {
+      "name": "scopes-check",
+      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config.",
+      "category": "meta",
+      "graphMethod": "GET",
+      "graphPathTemplate": "(meta) cached-token introspection — no Graph endpoint",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "options": [],
+      "example": "ask-marcel scopes-check",
+      "responseShape": "{ scopes: string[], audience: string, expiresAt: string (ISO 8601) }"
     },
     {
       "name": "search-mail-messages",

@@ -746,4 +746,65 @@ describe('graph client', () => {
       expect(result.error.message).toContain('socket reset');
     }
   });
+
+  it('getCachedTokenInfo decodes scp/aud/exp claims from the cached token without making a Graph call', async () => {
+    const payload = { scp: 'Mail.Read Files.Read User.Read', aud: 'https://graph.microsoft.com', exp: 1893456000 };
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment(JSON.stringify(payload))}.sig`;
+    const tokenAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(tokenAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual(['Mail.Read', 'Files.Read', 'User.Read']);
+      expect(result.value.audience).toBe('https://graph.microsoft.com');
+      expect(result.value.expiresAt).toBe(new Date(1893456000 * 1000).toISOString());
+    }
+  });
+
+  it('getCachedTokenInfo returns empty scopes / undefined audience+expiry when the token has none of those claims', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"sub":"me"}')}.sig`;
+    const tokenAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(tokenAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual([]);
+      expect(result.value.audience).toBeUndefined();
+      expect(result.value.expiresAt).toBeUndefined();
+    }
+  });
+
+  it('getCachedTokenInfo returns auth_failed when the auth manager has no token', async () => {
+    const cancelledAuth: AuthManager = {
+      getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(cancelledAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('Auth cancelled');
+  });
+
+  it('getCachedTokenInfo surfaces the auth-manager error message when the failure is not a cancellation', async () => {
+    const failedAuth: AuthManager = {
+      getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'token store unreadable' } }),
+      getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      logout: async () => ok(undefined),
+    };
+    const client = createGraphClient(failedAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('token store unreadable');
+  });
 });

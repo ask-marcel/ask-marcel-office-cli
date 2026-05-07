@@ -20,6 +20,7 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
     fetchUrl: async () => ok({}),
     put: async () => ok({}),
     delete: async () => ok({}),
+    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
   };
   return { graph, calls };
 };

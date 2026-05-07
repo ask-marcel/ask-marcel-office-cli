@@ -1,6 +1,7 @@
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
+import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 
 type GraphError =
   | { type: 'api_error'; status: number; message: string }
@@ -45,6 +46,19 @@ type GraphClient = {
    */
   put: (basePath: string, body: Uint8Array, contentType?: string) => Promise<Result<unknown, GraphError>>;
   delete: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * Decode the cached basic Teams token's JWT and return its scopes /
+   * audience / expiry. Used by the `scopes-check` self-test command so the
+   * LLM can predict `accessDenied` instead of discovering it on the next
+   * Graph call. No network IO — operates on the cached token only.
+   */
+  getCachedTokenInfo: () => Promise<Result<TokenInfo, GraphError>>;
+};
+
+type TokenInfo = {
+  readonly scopes: ReadonlyArray<string>;
+  readonly audience: string | undefined;
+  readonly expiresAt: string | undefined;
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -332,6 +346,22 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     }
   };
 
+  const getCachedTokenInfo = async (): Promise<Result<TokenInfo, GraphError>> => {
+    const tokenResult = await auth.getAccessToken();
+    if (!tokenResult.ok) {
+      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
+      return err({ type: 'auth_failed', message: msg });
+    }
+    const claims = decodeJwtPayload(tokenResult.value);
+    const scpRaw = claims['scp'];
+    const scopes = typeof scpRaw === 'string' ? scpRaw.split(' ').filter((s) => s.length > 0) : [];
+    const audRaw = claims['aud'];
+    const audience = typeof audRaw === 'string' ? audRaw : undefined;
+    const expRaw = claims['exp'];
+    const expiresAt = typeof expRaw === 'number' ? new Date(expRaw * 1000).toISOString() : undefined;
+    return ok({ scopes, audience, expiresAt });
+  };
+
   return {
     get: (path) => request('GET', path),
     getElevated,
@@ -341,8 +371,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     fetchUrl,
     put,
     delete: deleteResource,
+    getCachedTokenInfo,
   };
 };
 
 export { createGraphClient };
-export type { FetchFn, GraphClient, GraphError };
+export type { FetchFn, GraphClient, GraphError, TokenInfo };
