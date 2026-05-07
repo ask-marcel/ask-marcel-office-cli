@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { wrapExcelExecute } from './excel-error.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1), address: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/range(address='${p.address}')`, schema);
+const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/range(address='${p.address}')`, schema);
+const execute = wrapExcelExecute(inner.execute);
 
 const meta: CommandMeta = {
   summary: 'Get the cell values, formulas, and formats of a specific Excel range (e.g. `A1:C10`).',

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { wrapExcelExecute } from './excel-error.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/usedRange()`, schema);
+const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/usedRange()`, schema);
+const execute = wrapExcelExecute(inner.execute);
 
 const meta: CommandMeta = {
   summary:
