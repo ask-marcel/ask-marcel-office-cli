@@ -14,7 +14,13 @@ const meta: CommandMeta = {
   options: [
     { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`.' },
     { name: 'list-id', key: 'listId', required: true, description: 'SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.' },
-    { name: 'list-item-id', key: 'listItemId', required: true, description: 'listItem ID (typically a small integer). Returned by `ask-marcel list-sharepoint-site-list-items`.' },
+    {
+      name: 'list-item-id',
+      key: 'listItemId',
+      required: true,
+      description: 'listItem ID (typically a small integer). Returned by `ask-marcel list-sharepoint-site-list-items`.',
+      aliases: [{ name: 'item-id', key: 'itemId' }],
+    },
   ],
   example: "ask-marcel get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
   responseShape: 'single Microsoft Graph `listItem` resource',

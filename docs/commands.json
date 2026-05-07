@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T01:32:42.203Z",
+  "generatedAt": "2026-05-07T01:35:38.198Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1315,7 +1315,13 @@
           "name": "item-id",
           "key": "itemId",
           "required": true,
-          "description": "baseItem ID inside the site. Microsoft Graph has no list-less site/items collection endpoint, so discover it via the two-step chain `list-sharepoint-site-lists` then `list-sharepoint-site-list-items --list-id <id>`; the returned `listItem.id` is also a valid `baseItem.id` here."
+          "description": "baseItem ID inside the site. Microsoft Graph has no list-less site/items collection endpoint, so discover it via the two-step chain `list-sharepoint-site-lists` then `list-sharepoint-site-list-items --list-id <id>`; the returned `listItem.id` is also a valid `baseItem.id` here.",
+          "aliases": [
+            {
+              "name": "list-item-id",
+              "key": "listItemId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-sharepoint-site-item --site-id 'contoso.sharepoint.com,abc...,def...' --item-id '7'",
@@ -1369,7 +1375,13 @@
           "name": "list-item-id",
           "key": "listItemId",
           "required": true,
-          "description": "listItem ID (typically a small integer). Returned by `ask-marcel list-sharepoint-site-list-items`."
+          "description": "listItem ID (typically a small integer). Returned by `ask-marcel list-sharepoint-site-list-items`.",
+          "aliases": [
+            {
+              "name": "item-id",
+              "key": "itemId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
@@ -1633,6 +1645,10 @@
             {
               "name": "task-list-id",
               "key": "taskListId"
+            },
+            {
+              "name": "todo-list-id",
+              "key": "todoListId"
             }
           ]
         },
@@ -3416,6 +3432,10 @@
             {
               "name": "task-list-id",
               "key": "taskListId"
+            },
+            {
+              "name": "todo-list-id",
+              "key": "todoListId"
             }
           ]
         }
@@ -5862,6 +5882,10 @@
             {
               "name": "task-list-id",
               "key": "taskListId"
+            },
+            {
+              "name": "todo-list-id",
+              "key": "todoListId"
             }
           ]
         },
@@ -5984,6 +6008,10 @@
             {
               "name": "task-list-id",
               "key": "taskListId"
+            },
+            {
+              "name": "todo-list-id",
+              "key": "todoListId"
             }
           ]
         },
@@ -6040,7 +6068,17 @@
           "name": "todo-task-list-id",
           "key": "todoTaskListId",
           "required": true,
-          "description": "Microsoft To Do task list ID. Returned by `list-todo-task-lists`."
+          "description": "Microsoft To Do task list ID. Returned by `list-todo-task-lists`.",
+          "aliases": [
+            {
+              "name": "task-list-id",
+              "key": "taskListId"
+            },
+            {
+              "name": "todo-list-id",
+              "key": "todoListId"
+            }
+          ]
         },
         {
           "name": "top",
