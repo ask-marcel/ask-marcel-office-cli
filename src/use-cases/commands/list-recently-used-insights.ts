@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/insights/used', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/insights/used', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/insights/used',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-used',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-recently-used-insights',
   responseShape: 'collection of Microsoft Graph `usedInsight` resources under `value[]`',
   pagination: true,
