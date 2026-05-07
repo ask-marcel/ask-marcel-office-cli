@@ -2010,7 +2010,10 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-calendar-events', params: {}, expectedPath: '/me/events' },
   { name: 'get-calendar-event', params: { eventId: 'e1' }, expectedPath: '/me/events/e1' },
   { name: 'list-specific-calendar-events', params: { calendarId: 'c1' }, expectedPath: '/me/calendars/c1/events' },
+  { name: 'list-specific-calendar-events', params: { calendarId: 'primary' }, expectedPath: '/me/calendar/events' },
+  { name: 'list-specific-calendar-events', params: { calendarId: 'DEFAULT' }, expectedPath: '/me/calendar/events' },
   { name: 'get-specific-calendar-event', params: { calendarId: 'c1', eventId: 'e1' }, expectedPath: '/me/calendars/c1/events/e1' },
+  { name: 'get-specific-calendar-event', params: { calendarId: 'primary', eventId: 'e1' }, expectedPath: '/me/calendar/events/e1' },
   {
     name: 'get-calendar-view',
     params: { startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
@@ -2022,9 +2025,19 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     expectedPath: '/me/calendars/c1/calendarView?startDateTime=2026-04-01T00:00:00Z&endDateTime=2026-05-01T00:00:00Z',
   },
   {
+    name: 'get-specific-calendar-view',
+    params: { calendarId: 'primary', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
+    expectedPath: '/me/calendar/calendarView?startDateTime=2026-04-01T00:00:00Z&endDateTime=2026-05-01T00:00:00Z',
+  },
+  {
     name: 'list-calendar-event-instances',
     params: { calendarId: 'c1', eventId: 'e1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
     expectedPath: '/me/calendars/c1/events/e1/instances?startDateTime=2026-04-01T00:00:00Z&endDateTime=2026-05-01T00:00:00Z',
+  },
+  {
+    name: 'list-calendar-event-instances',
+    params: { calendarId: 'primary', eventId: 'e1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
+    expectedPath: '/me/calendar/events/e1/instances?startDateTime=2026-04-01T00:00:00Z&endDateTime=2026-05-01T00:00:00Z',
   },
   { name: 'list-calendars', params: {}, expectedPath: '/me/calendars' },
   { name: 'list-calendar-events-delta', params: {}, expectedPath: '/me/events/delta()' },

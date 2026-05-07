@@ -9,8 +9,17 @@ const baseSchema = z.object({
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1),
 });
+
+const isWellKnownDefault = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return lower === 'primary' || lower === 'default';
+};
+
 const { execute, schema } = buildListCommand(
-  (p) => `/me/calendars/${p.calendarId}/events/${p.eventId}/instances?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`,
+  (p) =>
+    isWellKnownDefault(p.calendarId)
+      ? `/me/calendar/events/${p.eventId}/instances?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`
+      : `/me/calendars/${p.calendarId}/events/${p.eventId}/instances?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`,
   baseSchema
 );
 
@@ -21,7 +30,12 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/calendars/{calendar-id}/events/{event-id}/instances?startDateTime={start-date-time}&endDateTime={end-date-time}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/event-list-instances',
   options: [
-    { name: 'calendar-id', key: 'calendarId', required: true, description: 'Calendar ID. Returned by `ask-marcel list-calendars`.' },
+    {
+      name: 'calendar-id',
+      key: 'calendarId',
+      required: true,
+      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
+    },
     { name: 'event-id', key: 'eventId', required: true, description: 'Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
     {
       name: 'start-date-time',

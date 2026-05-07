@@ -3,19 +3,30 @@ import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 
 const schema = z.object({ calendarId: z.string().min(1), eventId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/calendars/${p.calendarId}/events/${p.eventId}`, schema);
+
+const isWellKnownDefault = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return lower === 'primary' || lower === 'default';
+};
+
+const { execute } = buildCommand((p) => (isWellKnownDefault(p.calendarId) ? `/me/calendar/events/${p.eventId}` : `/me/calendars/${p.calendarId}/events/${p.eventId}`), schema);
 
 const meta: CommandMeta = {
-  summary: 'Fetch a single calendar event by ID from a specific (non-default) calendar.',
+  summary: 'Fetch a single calendar event by ID from a specific calendar. `--calendar-id primary` (or `default`) targets the signed-in user’s default calendar.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/calendars/{calendar-id}/events/{event-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/event-get',
   options: [
-    { name: 'calendar-id', key: 'calendarId', required: true, description: 'Calendar ID. Returned by `ask-marcel list-calendars`.' },
+    {
+      name: 'calendar-id',
+      key: 'calendarId',
+      required: true,
+      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
+    },
     { name: 'event-id', key: 'eventId', required: true, description: 'Event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
   ],
-  example: "ask-marcel get-specific-calendar-event --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...'",
+  example: "ask-marcel get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...'",
   responseShape: 'single Microsoft Graph `event` resource',
 };
 

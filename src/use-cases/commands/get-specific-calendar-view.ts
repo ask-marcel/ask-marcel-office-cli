@@ -8,17 +8,34 @@ const baseSchema = z.object({
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1),
 });
-const { execute, schema } = buildListCommand((p) => `/me/calendars/${p.calendarId}/calendarView?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`, baseSchema);
+
+const isWellKnownDefault = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return lower === 'primary' || lower === 'default';
+};
+
+const { execute, schema } = buildListCommand(
+  (p) =>
+    isWellKnownDefault(p.calendarId)
+      ? `/me/calendar/calendarView?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`
+      : `/me/calendars/${p.calendarId}/calendarView?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`,
+  baseSchema
+);
 
 const meta: CommandMeta = {
   summary:
-    'List the events in a specific (non-default) calendar with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph.',
+    'List the events in a specific calendar with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph. `--calendar-id primary` (or `default`) routes to the signed-in user’s default calendar.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/calendars/{calendar-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview',
   options: [
-    { name: 'calendar-id', key: 'calendarId', required: true, description: 'Calendar ID. Returned by `ask-marcel list-calendars`.' },
+    {
+      name: 'calendar-id',
+      key: 'calendarId',
+      required: true,
+      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
+    },
     {
       name: 'start-date-time',
       key: 'startDateTime',
@@ -33,7 +50,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel get-specific-calendar-view --calendar-id 'AAMkAGI2THVS...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+  example: "ask-marcel get-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
 };
 
