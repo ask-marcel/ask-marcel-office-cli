@@ -48,9 +48,13 @@ describe('odataQuerySchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('accepts a non-negative integer string for $top', () => {
-    expect(odataQuerySchema.safeParse({ top: '0' }).success).toBe(true);
+  it('accepts a positive integer string for $top', () => {
+    expect(odataQuerySchema.safeParse({ top: '1' }).success).toBe(true);
     expect(odataQuerySchema.safeParse({ top: '999' }).success).toBe(true);
+  });
+
+  it('rejects $top=0 client-side because Graph itself returns badArgument on it', () => {
+    expect(odataQuerySchema.safeParse({ top: '0' }).success).toBe(false);
   });
 
   it('rejects a non-numeric $top', () => {
@@ -59,6 +63,10 @@ describe('odataQuerySchema', () => {
 
   it('rejects a negative $top', () => {
     expect(odataQuerySchema.safeParse({ top: '-1' }).success).toBe(false);
+  });
+
+  it('still accepts $skip=0 (harmless on Graph) so paging code can pass the value unchanged', () => {
+    expect(odataQuerySchema.safeParse({ skip: '0' }).success).toBe(true);
   });
 
   it('rejects an empty $filter to prevent users supplying a meaningless flag', () => {

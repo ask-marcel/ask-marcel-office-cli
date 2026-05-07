@@ -34,7 +34,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the URL. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. Graph refuses to serve the *current* version through this endpoint — for the current version use `download-drive-item-as-pdf`. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes URL. Returned URLs embed an ODSP-elevated tempauth (M365ChatClient identity captured at login) so they actually fetch when followed downstream.',
+    "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the URL. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes URL. Note: Graph's `?format=pdf` does serve the *current* version through this endpoint even though the as-markdown and stream-content siblings reject it — that's an undocumented Graph quirk. For the current version always use `download-drive-item-as-pdf` so you don't depend on it. Returned URLs embed an ODSP-elevated tempauth (M365ChatClient identity captured at login) so they actually fetch when followed downstream.",
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=pdf',

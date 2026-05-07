@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T01:58:23.844Z",
+  "generatedAt": "2026-05-07T02:45:17.995Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -149,7 +149,7 @@
     },
     {
       "name": "download-drive-item-version-as-pdf",
-      "summary": "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the URL. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. Graph refuses to serve the *current* version through this endpoint — for the current version use `download-drive-item-as-pdf`. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes URL. Returned URLs embed an ODSP-elevated tempauth (M365ChatClient identity captured at login) so they actually fetch when followed downstream.",
+      "summary": "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the URL. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes URL. Note: Graph's `?format=pdf` does serve the *current* version through this endpoint even though the as-markdown and stream-content siblings reject it — that's an undocumented Graph quirk. For the current version always use `download-drive-item-as-pdf` so you don't depend on it. Returned URLs embed an ODSP-elevated tempauth (M365ChatClient identity captured at login) so they actually fetch when followed downstream.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=pdf",
@@ -3862,7 +3862,7 @@
     },
     {
       "name": "list-mail-rules",
-      "summary": "List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns an `ErrorInvalidParameter` from Graph.",
+      "summary": "List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns an `ErrorInvalidParameter` from Graph. `--mail-folder-id` defaults to `inbox` because that is the only value Graph accepts; the flag is kept (optional) for callers that want to pass a resolved Inbox ID explicitly.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders/{mail-folder-id}/messageRules",
@@ -3871,8 +3871,8 @@
         {
           "name": "mail-folder-id",
           "key": "mailFolderId",
-          "required": true,
-          "description": "mailFolder ID. In practice only `inbox` (the well-known name) or the resolved ID of the Inbox folder works — Graph rejects every other folder for messageRules."
+          "required": false,
+          "description": "mailFolder ID. Optional; defaults to `inbox`. In practice only `inbox` (or its resolved ID) works — Graph rejects every other folder for messageRules."
         },
         {
           "name": "top",
@@ -3911,7 +3911,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-mail-rules --mail-folder-id 'inbox'",
+      "example": "ask-marcel list-mail-rules",
       "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`",
       "pagination": true
     },
