@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T03:15:36.459Z",
+  "generatedAt": "2026-05-07T08:50:54.147Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -266,66 +266,6 @@
       ],
       "example": "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...'",
       "responseShape": "single Microsoft Graph `event` resource"
-    },
-    {
-      "name": "get-calendar-view",
-      "summary": "List the signed-in user’s default-calendar events with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph.",
-      "category": "calendar",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-calendarview",
-      "options": [
-        {
-          "name": "start-date-time",
-          "key": "startDateTime",
-          "required": true,
-          "description": "ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it."
-        },
-        {
-          "name": "end-date-time",
-          "key": "endDateTime",
-          "required": true,
-          "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel get-calendar-view --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
-      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
       "name": "get-channel-files-folder",
@@ -761,73 +701,6 @@
       "responseShape": "single Microsoft Graph `group` resource"
     },
     {
-      "name": "get-group-calendar-view",
-      "summary": "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window. Only Microsoft 365 groups have a calendar — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
-      "category": "calendar",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/groups/{group-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/group-list-calendarview",
-      "options": [
-        {
-          "name": "group-id",
-          "key": "groupId",
-          "required": true,
-          "description": "Azure AD group object ID for a unified (Microsoft 365) group."
-        },
-        {
-          "name": "start-date-time",
-          "key": "startDateTime",
-          "required": true,
-          "description": "ISO 8601 start (e.g. `2026-04-01T00:00:00Z`). Recurrences are expanded across the window."
-        },
-        {
-          "name": "end-date-time",
-          "key": "endDateTime",
-          "required": true,
-          "description": "ISO 8601 end (e.g. `2026-05-01T00:00:00Z`)."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel get-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
-      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
-    },
-    {
       "name": "get-mail-attachment",
       "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments).",
       "category": "mail",
@@ -889,7 +762,7 @@
     },
     {
       "name": "get-mail-rule",
-      "summary": "Return a single Outlook message rule by ID, including its conditions and actions. Sibling to `list-mail-rules`.",
+      "summary": "Return a single Outlook message rule by ID, including its conditions and actions. Sibling to `list-mail-rules`. `--mail-folder-id` defaults to `inbox` (the only folder where rules actually live in Graph); the flag is preserved for callers that want to pass a resolved Inbox ID explicitly.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders/{mail-folder-id}/messageRules/{message-rule-id}",
@@ -898,8 +771,8 @@
         {
           "name": "mail-folder-id",
           "key": "mailFolderId",
-          "required": true,
-          "description": "Mail folder ID or well-known name (`inbox`, `sentitems`, etc.). Rules live per-folder."
+          "required": false,
+          "description": "Mail folder ID or well-known name. Optional; defaults to `inbox` because that is the only folder Graph supports for message rules."
         },
         {
           "name": "message-rule-id",
@@ -908,7 +781,7 @@
           "description": "Message rule ID. Returned by `list-mail-rules`."
         }
       ],
-      "example": "ask-marcel get-mail-rule --mail-folder-id 'inbox' --message-rule-id 'AQAAANC...'",
+      "example": "ask-marcel get-mail-rule --message-rule-id 'AQAAANC...'",
       "responseShape": "single Microsoft Graph `messageRule` resource"
     },
     {
@@ -1109,73 +982,6 @@
       ],
       "example": "ask-marcel get-planner-task-details --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
       "responseShape": "single Microsoft Graph `plannerTaskDetails` resource"
-    },
-    {
-      "name": "get-shared-calendar-view",
-      "summary": "Return a date-windowed calendar view from another user's primary calendar (shared / delegated access). Recurrences expanded into individual occurrences.",
-      "category": "calendar",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/users/{user-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-calendarview",
-      "options": [
-        {
-          "name": "user-id",
-          "key": "userId",
-          "required": true,
-          "description": "Azure AD user ID or UPN of the calendar owner."
-        },
-        {
-          "name": "start-date-time",
-          "key": "startDateTime",
-          "required": true,
-          "description": "ISO 8601 start of the window."
-        },
-        {
-          "name": "end-date-time",
-          "key": "endDateTime",
-          "required": true,
-          "description": "ISO 8601 end of the window."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel get-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
-      "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
     },
     {
       "name": "get-shared-mailbox-message",
@@ -1503,72 +1309,6 @@
       "responseShape": "single Microsoft Graph `event` resource"
     },
     {
-      "name": "get-specific-calendar-view",
-      "summary": "List the events in a specific calendar with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph. `--calendar-id primary` (or `default`) routes to the signed-in user’s default calendar.",
-      "category": "calendar",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/me/calendars/{calendar-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview",
-      "options": [
-        {
-          "name": "calendar-id",
-          "key": "calendarId",
-          "required": true,
-          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`."
-        },
-        {
-          "name": "start-date-time",
-          "key": "startDateTime",
-          "required": true,
-          "description": "ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it."
-        },
-        {
-          "name": "end-date-time",
-          "key": "endDateTime",
-          "required": true,
-          "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel get-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
-      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
-    },
-    {
       "name": "get-team",
       "summary": "Get the metadata of a single Microsoft Team (display name, settings, member-settings, owner group).",
       "category": "teams",
@@ -1680,7 +1420,7 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
-          "description": "Azure AD user ID or UPN. Use `list-users` to find one."
+          "description": "Azure AD user ID or UPN — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory)."
         }
       ],
       "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com'",
@@ -1737,7 +1477,7 @@
     },
     {
       "name": "list-calendar-event-instances",
-      "summary": "List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph.",
+      "summary": "List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph. `--calendar-id` is optional and defaults to `primary` (the signed-in user’s default calendar) — most callers know the event-id but not which calendar it lives in. Pass an explicit `--calendar-id` only when targeting a non-default calendar.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendars/{calendar-id}/events/{event-id}/instances?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -1746,8 +1486,8 @@
         {
           "name": "calendar-id",
           "key": "calendarId",
-          "required": true,
-          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`."
+          "required": false,
+          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`."
         },
         {
           "name": "event-id",
@@ -2286,7 +2026,7 @@
     },
     {
       "name": "list-conversation-messages",
-      "summary": "List every message in a single Outlook conversation (thread) using `$filter=conversationId eq '...'`. Reconstructs a complete thread regardless of which subject lines or folders the replies landed in. Graph rejects combining this filter with `$orderby` (`InefficientFilter` — `conversationId` is not a sortable index), so this command does not order results; the caller can sort by `receivedDateTime` client-side. KQL `$search` does not index `conversationId`, so `$filter` is the only documented Graph idiom for whole-thread retrieval.",
+      "summary": "List every message in a single Outlook conversation (thread) using `$filter=conversationId eq '...'`. Reconstructs a complete thread regardless of which subject lines or folders the replies landed in. Accepts the OData passthrough flags top/skip/select/expand — the filter and orderby passthroughs are intentionally omitted (the path already pins a `$filter`, and Graph rejects this filter combined with `$orderby` as `InefficientFilter` since `conversationId` is not a sortable index). The caller can sort by `receivedDateTime` client-side. KQL `$search` does not index `conversationId`, so `$filter` is the only documented Graph idiom for whole-thread retrieval.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages?$filter=conversationId eq '{conversation-id}'",
@@ -2297,9 +2037,33 @@
           "key": "conversationId",
           "required": true,
           "description": "Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`)."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-conversation-messages --conversation-id 'AAQkAD...='",
+      "example": "ask-marcel list-conversation-messages --conversation-id 'AAQkAD...=' --top 5 --select id,subject,receivedDateTime",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]` (unordered)",
       "pagination": true
     },
@@ -3532,19 +3296,50 @@
     },
     {
       "name": "list-incomplete-planner-tasks",
-      "summary": "List every incomplete Microsoft Planner task assigned to or owned by the signed-in user, across every plan.",
+      "summary": "List every incomplete Microsoft Planner task assigned to or owned by the signed-in user, across every plan. Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-percent predicate, and Graph rejects two `$filter` query params.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/planner/tasks?$filter=percentComplete ne 100",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/planneruser-list-tasks",
-      "options": [],
-      "example": "ask-marcel list-incomplete-planner-tasks",
+      "options": [
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel list-incomplete-planner-tasks --top 25",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`",
       "pagination": true
     },
     {
       "name": "list-incomplete-todo-tasks",
-      "summary": "List every incomplete Microsoft To Do task in a given list (status not equal to `completed`).",
+      "summary": "List every incomplete Microsoft To Do task in a given list (status not equal to `completed`). Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-status predicate, and Graph rejects two `$filter` query params.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists/{todo-task-list-id}/tasks?$filter=status ne 'completed'",
@@ -3565,9 +3360,39 @@
               "key": "todoListId"
             }
           ]
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-incomplete-todo-tasks --todo-task-list-id 'tasks'",
+      "example": "ask-marcel list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]` where `status != \"completed\"`",
       "pagination": true
     },
@@ -3854,49 +3679,12 @@
     },
     {
       "name": "list-mail-folders-delta",
-      "summary": "Track incremental changes to the mail-folder tree itself (folders added / renamed / deleted). The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed. Companion to `list-mail-folder-messages-delta` which tracks message changes inside one folder.",
+      "summary": "Track incremental changes to the mail-folder tree itself (folders added / renamed / deleted). The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed. Companion to `list-mail-folder-messages-delta` which tracks message changes inside one folder. Note: Graph explicitly rejects `$top`, `$filter`, `$orderby`, and `$search` on this delta endpoint (`ErrorInvalidUrlQuery: not supported with change tracking over the 'Folders' resource`), so the OData passthrough is intentionally NOT exposed here.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders/delta()",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-delta",
-      "options": [
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
+      "options": [],
       "example": "ask-marcel list-mail-folders-delta",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources plus `@odata.deltaLink` / `@odata.nextLink`",
       "pagination": true
@@ -4429,7 +4217,7 @@
     },
     {
       "name": "list-plan-tasks",
-      "summary": "List every task within a Microsoft Planner plan, regardless of completion status (Graph orders by `orderHint`). Use `list-incomplete-planner-tasks` for the across-plans incomplete view.",
+      "summary": "List every task within a Microsoft Planner plan, regardless of completion status (Graph orders by `orderHint`). Use `list-incomplete-planner-tasks` for the across-plans incomplete view. Note: Graph silently ignores standard OData query parameters on `/planner/plans/{id}/tasks` (`$top` returns the full set anyway), so the OData passthrough is intentionally NOT exposed — pipe the response through `jq` to slice client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/planner/plans/{planner-plan-id}/tasks",
@@ -4446,42 +4234,6 @@
               "key": "planId"
             }
           ]
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-plan-tasks --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
@@ -6035,7 +5787,7 @@
     },
     {
       "name": "list-team-installed-apps",
-      "summary": "List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team.",
+      "summary": "List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team. Note: Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/installedApps",
@@ -6046,42 +5798,6 @@
           "key": "teamId",
           "required": true,
           "description": "Microsoft Teams team ID."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
@@ -6281,7 +5997,7 @@
     },
     {
       "name": "list-todo-tasks-delta",
-      "summary": "Track incremental task changes (added / updated / completed / deleted) within a single Microsoft To Do list. The first call returns the current snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since.",
+      "summary": "Track incremental task changes (added / updated / completed / deleted) within a single Microsoft To Do list. The first call returns the current snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since. Note: Graph rejects standard OData query parameters on this delta endpoint (the page-cap flag throws `Skip token is not provided`), so the OData passthrough is intentionally NOT exposed here. Use `next-page` with the returned `@odata.nextLink` to walk pages.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists/{todo-task-list-id}/tasks/delta()",
@@ -6302,42 +6018,6 @@
               "key": "todoListId"
             }
           ]
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
@@ -6405,7 +6085,7 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
-          "description": "Azure AD user ID or userPrincipalName (UPN) — typically the user's email address. Use `list-users` to find one."
+          "description": "Azure AD user ID or userPrincipalName (UPN) — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory)."
         },
         {
           "name": "top",
