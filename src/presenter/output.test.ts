@@ -32,4 +32,29 @@ describe('presenter output', () => {
     expect(out.trim()).toBe(JSON.stringify({ error: 'Authentication cancelled' }));
     expect(out.split('\n').filter((line) => line.length > 0)).toHaveLength(1);
   });
+
+  it('escapes every U+0000..U+001F control character in string leaves so the output round-trips through JSON.parse', async () => {
+    const logger = createLoggerFake();
+    let payload = '';
+    for (let cp = 0; cp <= 0x1f; cp += 1) payload += String.fromCharCode(cp);
+    const data = { value: [{ summary: payload, nested: { description: payload } }] };
+    const out = await captureStream('stdout', () => render(data, logger));
+    const trimmed = out.replace(/\n$/, '');
+    expect(trimmed.includes('\n')).toBe(false);
+    expect(trimmed.includes('\t')).toBe(false);
+    expect(trimmed.includes('\r')).toBe(false);
+    const reparsed = JSON.parse(trimmed) as { value: ReadonlyArray<{ summary: string; nested: { description: string } }> };
+    expect(reparsed.value[0]?.summary).toBe(payload);
+    expect(reparsed.value[0]?.nested.description).toBe(payload);
+  });
+
+  it('escapes U+2028 and U+2029 line/paragraph separators so the output round-trips through JSON.parse', async () => {
+    const logger = createLoggerFake();
+    const data = { line: 'a b', paragraph: 'c d' };
+    const out = await captureStream('stdout', () => render(data, logger));
+    const trimmed = out.replace(/\n$/, '');
+    const reparsed = JSON.parse(trimmed) as { line: string; paragraph: string };
+    expect(reparsed.line).toBe('a b');
+    expect(reparsed.paragraph).toBe('c d');
+  });
 });
