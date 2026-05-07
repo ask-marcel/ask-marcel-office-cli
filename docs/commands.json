@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T01:29:17.223Z",
+  "generatedAt": "2026-05-07T01:31:39.814Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6205,6 +6205,17 @@
       "example": "ask-marcel microsoft-search-query --query 'q3 budget'",
       "responseShape": "Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …] }`. `value[0]` = files/mail/events, `value[1]` = people.",
       "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem','listItem','site','message','event'], query: { queryString: '{query}' }, size: 25 }, { entityTypes: ['person'], query: { queryString: '{query}' }, size: 25 }] }"
+    },
+    {
+      "name": "my-quick-context",
+      "summary": "One-shot discovery for the IDs every other command needs. Issues five Graph calls in parallel (`/me`, `/me/drive`, `/me/mailFolders/inbox`, `/me/todo/lists`, `/me/calendar`) and returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }`. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, etc.",
+      "category": "meta",
+      "graphMethod": "GET",
+      "graphPathTemplate": "(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
+      "options": [],
+      "example": "ask-marcel my-quick-context",
+      "responseShape": "{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId, inboxId, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId }"
     },
     {
       "name": "next-page",
