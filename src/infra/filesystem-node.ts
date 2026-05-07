@@ -45,6 +45,15 @@ export const createNodeFileSystem = (): FileSystem => ({
       return err({ type: 'io_failed', message: formatError(e) });
     }
   },
+  writeBytes: async (path, bytes) => {
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, bytes);
+      return ok(undefined);
+    } catch (e) {
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
   deleteIfExists: async (path) => {
     try {
       await unlink(path);

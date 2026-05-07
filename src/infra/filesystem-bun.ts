@@ -22,6 +22,14 @@ export const createBunFileSystem = (): FileSystem => ({
       return err({ type: 'io_failed', message: formatError(e) });
     }
   },
+  writeBytes: async (path, bytes) => {
+    try {
+      await Bun.write(path, bytes);
+      return ok(undefined);
+    } catch (e) {
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
   deleteIfExists: async (path) => {
     try {
       await Bun.file(path).delete();

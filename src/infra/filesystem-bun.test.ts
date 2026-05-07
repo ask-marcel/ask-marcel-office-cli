@@ -82,4 +82,23 @@ describe('Bun filesystem adapter', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
+
+  it('writes raw bytes to a new file (round-trips a 5-byte PDF magic header)', async () => {
+    const path = join(tmp, 'nested', 'doc.pdf');
+    const fs = createBunFileSystem();
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
+    const result = await fs.writeBytes(path, bytes);
+    expect(result.ok).toBe(true);
+    const roundtrip = new Uint8Array(await Bun.file(path).arrayBuffer());
+    expect(Array.from(roundtrip)).toEqual([0x25, 0x50, 0x44, 0x46, 0x2d]);
+  });
+
+  it('returns io_failed when writeBytes cannot create the destination file', async () => {
+    const fs = createBunFileSystem();
+    const blocker = join(tmp, 'blocker-bytes');
+    writeFileSync(blocker, 'not a directory');
+    const result = await fs.writeBytes(join(blocker, 'sub.bin'), new Uint8Array([1, 2, 3]));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
 });

@@ -5,5 +5,6 @@ export type FileSystemError = { type: 'not_found' } | { type: 'parse_failed'; me
 export type FileSystem = {
   readonly readJson: <T>(path: string) => Promise<Result<T, FileSystemError>>;
   readonly writeText: (path: string, content: string) => Promise<Result<void, FileSystemError>>;
+  readonly writeBytes: (path: string, bytes: Uint8Array) => Promise<Result<void, FileSystemError>>;
   readonly deleteIfExists: (path: string) => Promise<Result<void, FileSystemError>>;
 };
