@@ -106,6 +106,7 @@ import * as listExcelDefinedNames from './list-excel-defined-names.ts';
 import * as listExcelWorksheetCharts from './list-excel-worksheet-charts.ts';
 import * as microsoftSearchQuery from './microsoft-search-query.ts';
 import * as myQuickContext from './my-quick-context.ts';
+import * as scopesCheck from './scopes-check.ts';
 import * as getDriveSpecialFolder from './get-drive-special-folder.ts';
 import * as getDriveRootDelta from './get-drive-root-delta.ts';
 import * as listFollowedDriveItems from './list-followed-drive-items.ts';
@@ -298,6 +299,7 @@ const commands: Record<string, Command> = {
   'list-excel-worksheet-charts': listExcelWorksheetCharts,
   'microsoft-search-query': microsoftSearchQuery,
   'my-quick-context': myQuickContext,
+  'scopes-check': scopesCheck,
   'get-drive-special-folder': getDriveSpecialFolder,
   'get-drive-root-delta': getDriveRootDelta,
   'list-followed-drive-items': listFollowedDriveItems,
