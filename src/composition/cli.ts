@@ -7,7 +7,9 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/c
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
+import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import * as update from '../use-cases/commands/update.ts';
+import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
 import { detectPackageManager } from './package-manager.ts';
@@ -17,13 +19,14 @@ type BuildCliDeps = {
   readonly graph: GraphClient;
   readonly logger: Logger;
   readonly processRunner: ProcessRunner;
+  readonly fs: FileSystem;
   readonly version?: string;
   readonly packageManager?: 'npm' | 'bun';
   readonly onCommandError?: () => void;
 };
 
 const buildCli = (deps: BuildCliDeps): Command => {
-  const { auth, graph, logger, processRunner, version } = deps;
+  const { auth, graph, logger, processRunner, fs, version } = deps;
   const program = new Command();
 
   const fail = (message: string): void => {
@@ -53,7 +56,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .name('ask-marcel')
     .description('Microsoft Graph CLI')
-    .version(version ?? '0.0.0');
+    .version(version ?? '0.0.0')
+    .option(
+      '--output-path <path>',
+      'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), write them to <path> and replace the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. No effect on commands whose response is plain JSON.'
+    );
 
   program
     .command('help-json')
@@ -194,8 +201,21 @@ const buildCli = (deps: BuildCliDeps): Command => {
           }
         }
         const result = await cmd.execute(graph, normalized);
-        if (result.ok) render(result.value, logger);
-        else fail(result.error.message);
+        if (!result.ok) {
+          fail(result.error.message);
+          return;
+        }
+        const outputPath = program.opts<{ outputPath?: string }>().outputPath;
+        const persisted = await persistIfRequested(fs, outputPath, result.value);
+        if (persisted.ok) {
+          render(persisted.value, logger);
+          return;
+        }
+        fail(
+          persisted.error.type === 'no_inlined_bytes'
+            ? `--output-path: ${name} did not return inlined bytes (no base64 or text field in response — use this flag only with download/convert commands)`
+            : `--output-path: write failed: ${persisted.error.message}`
+        );
       });
     }
   }
