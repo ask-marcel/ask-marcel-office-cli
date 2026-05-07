@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets`, baseSchema);
+const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets`, baseSchema);
+const execute = wrapExcelExecute(inner.execute);
+const { schema } = inner;
 
 const meta: CommandMeta = {
-  summary: 'List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint.',
+  summary:
+    'List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint. Returns a clear "not an accessible Excel workbook" error if the item is a folder, non-.xlsx file, or sensitivity-label-blocked.',
   category: 'excel',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/workbook/worksheets',

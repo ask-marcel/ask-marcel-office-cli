@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/names`, baseSchema);
+const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/names`, baseSchema);
+const execute = wrapExcelExecute(inner.execute);
+const { schema } = inner;
 
 const meta: CommandMeta = {
   summary:

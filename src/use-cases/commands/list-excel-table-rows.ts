@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), tableId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables/${p.tableId}/rows`, baseSchema);
+const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables/${p.tableId}/rows`, baseSchema);
+const execute = wrapExcelExecute(inner.execute);
+const { schema } = inner;
 
 const meta: CommandMeta = {
   summary: 'List the data rows of a named Excel table (excluding the header row).',
