@@ -275,4 +275,15 @@ describe('buildCli command surface', () => {
     expect(out).toContain('Unknown command');
     expect(out).toContain('help');
   });
+
+  it("'help-json' subcommand prints the full machine-readable manifest (same shape as docs/commands.json) to stdout", async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), version: '1.0.0' });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help-json']));
+    const parsed = JSON.parse(out.trim()) as { package: string; version: string; commands: ReadonlyArray<{ name: string }> };
+    expect(parsed.package).toBe('ask-marcel-office-cli');
+    expect(parsed.version).toBe('1.0.0');
+    expect(parsed.commands.length).toBeGreaterThan(100);
+    expect(parsed.commands.some((c) => c.name === 'list-drives')).toBe(true);
+  });
 });

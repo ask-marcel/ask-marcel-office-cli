@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { render, renderError } from '../presenter/output.ts';
-import { renderSingleCommand } from '../use-cases/commands/docs.ts';
+import { buildManifest, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
@@ -35,6 +35,15 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .name('ask-marcel')
     .description('Microsoft Graph CLI')
     .version(version ?? '0.0.0');
+
+  program
+    .command('help-json')
+    .description(
+      'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers.'
+    )
+    .action(() => {
+      process.stdout.write(`${JSON.stringify(buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0'))}\n`);
+    });
 
   program.commandsGroup('Lifecycle:');
 
@@ -102,7 +111,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
-  const LIFECYCLE_COMMANDS: ReadonlySet<string> = new Set(['login', 'logout', 'update', 'docs', 'help']);
+  const LIFECYCLE_COMMANDS: ReadonlySet<string> = new Set(['login', 'logout', 'update', 'docs', 'help', 'help-json']);
 
   const docsCmd = program
     .command('docs')

@@ -5,8 +5,8 @@ const POSITIVE_INTEGER = /^[1-9]\d*$/;
 const NON_NEGATIVE_INTEGER = /^\d+$/;
 
 const odataQuerySchema = z.object({
-  top: z.string().regex(POSITIVE_INTEGER, '$top must be a positive integer (Graph rejects $top=0)').optional(),
-  skip: z.string().regex(NON_NEGATIVE_INTEGER, '$skip must be a non-negative integer').optional(),
+  top: z.string().regex(POSITIVE_INTEGER, 'must be a positive integer (Graph rejects 0)').optional(),
+  skip: z.string().regex(NON_NEGATIVE_INTEGER, 'must be a non-negative integer').optional(),
   select: z.string().min(1).optional(),
   filter: z.string().min(1).optional(),
   orderby: z.string().min(1).optional(),
