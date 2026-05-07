@@ -223,7 +223,7 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
-| `microsoft-search-query` | Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people in one round trip — Microsoft's unified search API, the same engine that powers the Microsoft 365 search box. Each `searchHits[]` entry has `_score`, `summary`, and a typed `resource`. Page size is fixed at 25 in this command; for larger pages or different entity types call the Graph endpoint directly via the library API. `chatMessage` is intentionally omitted from the default entity set since `Chat.Read*` is unavailable. | `--query` | `POST /search/query` |
+| `microsoft-search-query` | Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph rejects mixing `person` with file/mail/event types in a single request, so this command sends two `requests[]` entries in one search body — one for files/mail/events, one for people — and returns Graph's response unchanged. `value[0]` holds files/mail/events hits; `value[1]` holds people hits. Each `searchHits[]` entry has `_score`, `summary`, and a typed `resource`. Page size is fixed at 25 per sub-request. `chatMessage` is intentionally omitted from the entity set since `Chat.Read*` is unavailable. | `--query` | `POST /search/query` |
 | `next-page` | Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself. | `--url` | `GET {url}` |
 
 <!-- AUTO-GENERATED-COMMANDS:END -->

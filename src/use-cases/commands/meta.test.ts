@@ -41,10 +41,10 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
-      it('references each option exactly once across graphPathTemplate + bodyTemplate (and references nothing else)', () => {
-        const expected = cmd.meta.options.map((o) => o.name).toSorted((a, b) => a.localeCompare(b));
+      it('references each option at least once across graphPathTemplate + bodyTemplate, and references nothing else', () => {
+        const expected = Array.from(new Set(cmd.meta.options.map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         const combined = `${cmd.meta.graphPathTemplate} ${cmd.meta.bodyTemplate ?? ''}`;
-        const found = placeholders(combined).toSorted((a, b) => a.localeCompare(b));
+        const found = Array.from(new Set(placeholders(combined))).toSorted((a, b) => a.localeCompare(b));
         expect(found).toEqual(expected);
       });
 

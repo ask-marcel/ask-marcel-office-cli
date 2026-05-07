@@ -3,20 +3,20 @@ import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
-const DEFAULT_ENTITY_TYPES = ['driveItem', 'listItem', 'site', 'message', 'event', 'person'] as const;
+const FILE_MAIL_EVENT_TYPES = ['driveItem', 'listItem', 'site', 'message', 'event'] as const;
+const PEOPLE_TYPES = ['person'] as const;
+const PAGE_SIZE = 25;
 
 const schema = z.object({ query: z.string().min(1) });
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const queryString = parsed.data.query;
   const body = {
     requests: [
-      {
-        entityTypes: DEFAULT_ENTITY_TYPES,
-        query: { queryString: parsed.data.query },
-        size: 25,
-      },
+      { entityTypes: FILE_MAIL_EVENT_TYPES, query: { queryString }, size: PAGE_SIZE },
+      { entityTypes: PEOPLE_TYPES, query: { queryString }, size: PAGE_SIZE },
     ],
   };
   return graph.post('/search/query', body);
@@ -24,7 +24,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people in one round trip — Microsoft's unified search API, the same engine that powers the Microsoft 365 search box. Each `searchHits[]` entry has `_score`, `summary`, and a typed `resource`. Page size is fixed at 25 in this command; for larger pages or different entity types call the Graph endpoint directly via the library API. `chatMessage` is intentionally omitted from the default entity set since `Chat.Read*` is unavailable.",
+    "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph rejects mixing `person` with file/mail/event types in a single request, so this command sends two `requests[]` entries in one search body — one for files/mail/events, one for people — and returns Graph's response unchanged. `value[0]` holds files/mail/events hits; `value[1]` holds people hits. Each `searchHits[]` entry has `_score`, `summary`, and a typed `resource`. Page size is fixed at 25 per sub-request. `chatMessage` is intentionally omitted from the entity set since `Chat.Read*` is unavailable.",
   category: 'meta',
   graphMethod: 'POST',
   graphPathTemplate: '/search/query',
@@ -39,8 +39,10 @@ const meta: CommandMeta = {
     },
   ],
   example: "ask-marcel microsoft-search-query --query 'q3 budget'",
-  bodyTemplate: "{ requests: [{ entityTypes: ['driveItem','listItem','site','message','event','person'], query: { queryString: '{query}' }, size: 25 }] }",
-  responseShape: 'Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }] }`',
+  bodyTemplate:
+    "{ requests: [{ entityTypes: ['driveItem','listItem','site','message','event'], query: { queryString: '{query}' }, size: 25 }, { entityTypes: ['person'], query: { queryString: '{query}' }, size: 25 }] }",
+  responseShape:
+    'Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …] }`. `value[0]` = files/mail/events, `value[1]` = people.',
 };
 
 export { execute, meta, schema };
