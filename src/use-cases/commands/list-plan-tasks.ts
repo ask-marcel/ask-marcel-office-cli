@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ plannerPlanId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/planner/plans/${p.plannerPlanId}/tasks`, schema);
+const baseSchema = z.object({ plannerPlanId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/planner/plans/${p.plannerPlanId}/tasks`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -20,6 +21,7 @@ const meta: CommandMeta = {
       description: 'Planner plan ID. Returned in the `planId` field of any task from `ask-marcel list-planner-tasks`.',
       aliases: [{ name: 'plan-id', key: 'planId' }],
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-plan-tasks --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
   responseShape: 'collection of Microsoft Graph `plannerTask` resources under `value[]`',

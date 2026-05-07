@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ todoTaskListId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/delta()`, schema);
+const baseSchema = z.object({ todoTaskListId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/delta()`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft To Do task list ID. Returned by `list-todo-task-lists`.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
   responseShape: 'collection of Microsoft Graph `todoTask` resources plus `@odata.deltaLink` / `@odata.nextLink`',

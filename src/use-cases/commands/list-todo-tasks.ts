@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ todoTaskListId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks`, schema);
+const baseSchema = z.object({ todoTaskListId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List every task in a single Microsoft To Do task list, regardless of completion status. Use `list-incomplete-todo-tasks` if you only want the open ones.',
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       description: 'To Do task list ID. Returned by `ask-marcel list-todo-task-lists`.',
       aliases: [{ name: 'task-list-id', key: 'taskListId' }],
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
   responseShape: 'collection of Microsoft Graph `todoTask` resources under `value[]`',

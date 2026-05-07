@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/planner/plans', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/planner/plans', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/planner/plans',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-plans',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-planner-plans',
   responseShape: 'collection of Microsoft Graph `plannerPlan` resources under `value[]`',
   pagination: true,
