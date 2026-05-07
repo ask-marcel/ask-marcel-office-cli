@@ -81,7 +81,15 @@ const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, Grap
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: FetchOptions = {}): Promise<Result<unknown, GraphError>> => {
   if (isPlainTextFilename(filename)) {
-    return opts.elevated ? graph.getBinaryElevated(contentPath) : graph.getBinary(contentPath);
+    // Plain-text passthrough: follow the CDN redirect (just like csv/docx/xlsx
+    // do) and return the bytes inline as `{ contentType: "text/plain", size,
+    // text }` instead of the raw `{ "@microsoft.graph.downloadUrl": "..." }`
+    // envelope. Audit §1.11: an LLM consuming the JSON shouldn't need a
+    // separate fetch tool to actually read a txt/md/html body.
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    const text = new TextDecoder().decode(bytes.value);
+    return ok({ contentType: 'text/plain', size: bytes.value.byteLength, text });
   }
   const ext = extensionOf(filename);
 

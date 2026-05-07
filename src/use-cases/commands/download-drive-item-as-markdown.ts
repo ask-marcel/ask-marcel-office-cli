@@ -22,7 +22,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown, with inline images as data: URIs and tables as GFM pipe tables), xlsx (one markdown table per sheet via sheetjs), csv (rendered as a markdown table). Plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — Graph normally returns the bytes inline as `{ contentType, size, text }`, but for files large enough to be served via a CDN redirect Graph returns `{ "@microsoft.graph.downloadUrl": "..." }` instead and the LLM has to follow the URL. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/odt/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.',
+    'Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown, with inline images as data: URIs and tables as GFM pipe tables), xlsx (one markdown table per sheet via sheetjs), csv (rendered as a markdown table), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — the bytes are followed through any CDN redirect and returned inline as `{ contentType: "text/plain", size, text }` so the LLM never needs a separate fetch step. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/odt/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content?format=html',
@@ -40,7 +40,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
-    '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the locally-converted case (docx/xlsx/csv). For plain-text passthrough sources Graph decides the shape: typically `{ contentType, size, text }` (or `{ contentType, size, base64 }` for binary), but if the underlying file is large enough that Graph hands back a CDN redirect, the response is `{ "@microsoft.graph.downloadUrl": "..." }` and the caller must follow it.',
+    '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the locally-converted case (docx/xlsx/csv); `{ contentType: "text/plain", size, text }` for plain-text passthrough sources (txt/md/html/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.',
 };
 
 export { execute, meta, schema };

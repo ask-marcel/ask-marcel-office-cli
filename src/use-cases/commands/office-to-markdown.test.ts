@@ -24,7 +24,7 @@ const toBase64 = (bytes: Uint8Array): string => {
 };
 
 describe('officeToMarkdown — extension dispatch', () => {
-  it('returns the raw getBinary envelope for plain-text source extensions (txt/md/json/etc.) without converting', async () => {
+  it('inlines plain-text source bytes (txt/md/json/etc.) as { contentType: "text/plain", size, text } when Graph returns them directly', async () => {
     const graph = noopGraph({
       getBinary: async (path) => {
         expect(path).toBe('/drives/d1/items/i1/content');
@@ -34,7 +34,22 @@ describe('officeToMarkdown — extension dispatch', () => {
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.txt');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect((result.value as { text: string }).text).toBe('hello');
+      expect(result.value).toEqual({ contentType: 'text/plain', size: 5, text: 'hello' });
+    }
+  });
+
+  it('inlines plain-text source bytes by following a CDN downloadUrl redirect (the common large-file case the audit flagged as still URL-only)', async () => {
+    const graph = noopGraph({
+      getBinary: async () => ok({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/notes.txt' }),
+      fetchUrl: async (url) => {
+        expect(url).toBe('https://contoso.sharepoint.com/cdn/notes.txt');
+        return ok({ contentType: 'text/plain', size: 13, text: 'hello via CDN' });
+      },
+    });
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.txt');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({ contentType: 'text/plain', size: 13, text: 'hello via CDN' });
     }
   });
 
