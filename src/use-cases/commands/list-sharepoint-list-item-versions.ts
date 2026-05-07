@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ siteId: z.string().min(1), listId: z.string().min(1), listItemId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/sites/${p.siteId}/lists/${p.listId}/items/${p.listItemId}/versions`, schema);
+const baseSchema = z.object({ siteId: z.string().min(1), listId: z.string().min(1), listItemId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/sites/${p.siteId}/lists/${p.listId}/items/${p.listItemId}/versions`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -31,6 +32,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'List item ID inside the list. Returned by `list-sharepoint-site-list-items`.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-sharepoint-list-item-versions --site-id 'contoso.sharepoint.com,...' --list-id 'list-guid' --list-item-id '12'",
   responseShape: 'collection of Microsoft Graph `listItemVersion` resources under `value[]`',

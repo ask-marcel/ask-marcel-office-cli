@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ siteId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/sites/${p.siteId}/pages`, schema);
+const baseSchema = z.object({ siteId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/sites/${p.siteId}/pages`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'SharePoint site ID.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `sitePage` resources under `value[]`',
