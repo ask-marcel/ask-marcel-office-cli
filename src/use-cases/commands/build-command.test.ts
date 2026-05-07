@@ -23,7 +23,7 @@ describe('buildCommand', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
-      if (result.error.type === 'validation_error') expect(result.error.message).toBe('id: Invalid input: expected string, received undefined');
+      if (result.error.type === 'validation_error') expect(result.error.message).toBe('--id is missing');
     }
   });
 
@@ -57,7 +57,7 @@ describe('buildElevatedCommand', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
-      if (result.error.type === 'validation_error') expect(result.error.message).toBe('id: Invalid input: expected string, received undefined');
+      if (result.error.type === 'validation_error') expect(result.error.message).toBe('--id is missing');
     }
   });
 
