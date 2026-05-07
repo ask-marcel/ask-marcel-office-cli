@@ -167,12 +167,12 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `list-group-members` | List members of an Azure AD / Microsoft 365 group. Returns users, groups, and other directoryObjects depending on the group's membership. | `--group-id` | `GET /groups/{group-id}/members` |
 | `list-group-owners` | List the owners of an Azure AD / Microsoft 365 group. | `--group-id` | `GET /groups/{group-id}/owners` |
 | `list-groups` | List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `next-page` to paginate over very large directories. | _(none)_ | `GET /groups` |
-| `list-my-direct-reports` | List the signed-in user's direct reports (employees who report to them in the directory). | _(none)_ | `GET /me/directReports` |
+| `list-my-direct-reports` | List the signed-in user's direct reports (employees who report to them in the directory). | `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /me/directReports` |
 | `list-my-memberships` | List the groups, directory roles, and administrative units the signed-in user is a member of. Each entry's `@odata.type` distinguishes #microsoft.graph.group from #microsoft.graph.directoryRole, etc. | _(none)_ | `GET /me/memberOf` |
 | `list-my-transitive-memberships` | List all groups, directory roles, and administrative units the signed-in user is a member of *transitively* — including memberships inherited via nested groups. Sibling to `list-my-memberships` (`/me/memberOf`) which only returns direct memberships. | _(none)_ | `GET /me/transitiveMemberOf` |
-| `list-relevant-people` | List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc. | _(none)_ | `GET /me/people` |
+| `list-relevant-people` | List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc. | `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /me/people` |
 | `list-sensitivity-labels` | List the Microsoft Information Protection sensitivity labels available to the signed-in user — the labels Outlook / Word / SharePoint surfaces in the "Sensitivity" picker (e.g. Public / Internal / Confidential / Highly Confidential). Each label has `id`, `displayName`, `priority`, `isAppliable`, `tooltip`. | _(none)_ | `GET /me/informationProtection/sensitivityLabels` |
-| `list-user-direct-reports` | List a specific user's direct reports. | `--user-id` | `GET /users/{user-id}/directReports` |
+| `list-user-direct-reports` | List a specific user's direct reports. | `--user-id`, `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /users/{user-id}/directReports` |
 
 ### Calendar
 
@@ -203,8 +203,8 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | Command | Description | Required params | Graph endpoint |
 |---------|-------------|-----------------|----------------|
 | `get-chat` | Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages. Requires the elevated M365ChatClient token captured at login. | `--chat-id` | `GET /chats/{chat-id}` |
-| `list-chat-members` | List the members of a single Microsoft Teams chat. | `--chat-id` | `GET /chats/{chat-id}/members` |
-| `list-chats` | List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants. This command requires the elevated M365ChatClient token captured at login. | _(none)_ | `GET /me/chats` |
+| `list-chat-members` | List the members of a single Microsoft Teams chat. | `--chat-id`, `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /chats/{chat-id}/members` |
+| `list-chats` | List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants. This command requires the elevated M365ChatClient token captured at login. | `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /me/chats` |
 
 ### Teams
 
@@ -214,9 +214,9 @@ Microsoft Graph CLI — designed for LLM consumption via skills. Explicit comman
 | `get-team` | Get the metadata of a single Microsoft Team (display name, settings, member-settings, owner group). | `--team-id` | `GET /teams/{team-id}` |
 | `get-team-channel` | Get the metadata of a single channel inside a Microsoft Team. | `--team-id`, `--channel-id` | `GET /teams/{team-id}/channels/{channel-id}` |
 | `get-team-primary-channel` | Return the team's primary (General) channel directly without having to list-then-pick. The returned `channel` has `id`, `displayName`, `webUrl`, `email` — feed `id` into `list-team-channels` siblings or `get-channel-files-folder`. | `--team-id` | `GET /teams/{team-id}/primaryChannel` |
-| `list-joined-teams` | List the Microsoft Teams the signed-in user is a member of. | _(none)_ | `GET /me/joinedTeams` |
-| `list-team-channels` | List the channels (standard, private, shared) inside a single Microsoft Team. | `--team-id` | `GET /teams/{team-id}/channels` |
-| `list-team-installed-apps` | List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team. | `--team-id` | `GET /teams/{team-id}/installedApps` |
+| `list-joined-teams` | List the Microsoft Teams the signed-in user is a member of. | `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /me/joinedTeams` |
+| `list-team-channels` | List the channels (standard, private, shared) inside a single Microsoft Team. | `--team-id`, `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /teams/{team-id}/channels` |
+| `list-team-installed-apps` | List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team. | `--team-id`, `--top`, `--skip`, `--select`, `--filter`, `--orderby`, `--expand` | `GET /teams/{team-id}/installedApps` |
 
 ### Meta / Pagination
 

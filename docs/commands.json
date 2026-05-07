@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T01:04:20.869Z",
+  "generatedAt": "2026-05-07T01:07:59.332Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -2080,6 +2080,42 @@
           "key": "chatId",
           "required": true,
           "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. This CLI does not list chats (the Teams web client token has no `Chat.Read*` scope), so the chat ID has to come from outside. Easiest source from inside this CLI: pick any Teams meeting from `list-calendar-events` and URL-decode the `19%3ameeting_...%40thread.v2` segment of its `onlineMeeting.joinUrl`. Other sources: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or Power Automate."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
@@ -2093,7 +2129,44 @@
       "graphMethod": "GET",
       "graphPathTemplate": "/me/chats",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chat-list",
-      "options": [],
+      "options": [
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
       "example": "ask-marcel list-chats",
       "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`",
       "pagination": true
@@ -2960,7 +3033,44 @@
       "graphMethod": "GET",
       "graphPathTemplate": "/me/joinedTeams",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams",
-      "options": [],
+      "options": [
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
       "example": "ask-marcel list-joined-teams",
       "responseShape": "collection of Microsoft Graph `team` resources under `value[]`",
       "pagination": true
@@ -3394,7 +3504,44 @@
       "graphMethod": "GET",
       "graphPathTemplate": "/me/directReports",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-directreports",
-      "options": [],
+      "options": [
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
       "example": "ask-marcel list-my-direct-reports",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
       "pagination": true
@@ -3707,7 +3854,44 @@
       "graphMethod": "GET",
       "graphPathTemplate": "/me/people",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-people",
-      "options": [],
+      "options": [
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
       "example": "ask-marcel list-relevant-people",
       "responseShape": "collection of Microsoft Graph `person` resources under `value[]`",
       "pagination": true
@@ -4692,6 +4876,42 @@
           "key": "teamId",
           "required": true,
           "description": "Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-team-channels --team-id 'abc-1234-...'",
@@ -4711,6 +4931,42 @@
           "key": "teamId",
           "required": true,
           "description": "Microsoft Teams team ID."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
@@ -4872,6 +5128,42 @@
           "key": "userId",
           "required": true,
           "description": "Azure AD user ID or userPrincipalName (UPN) — typically the user's email address. Use `list-users` to find one."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-user-direct-reports --user-id 'alice@contoso.com'",

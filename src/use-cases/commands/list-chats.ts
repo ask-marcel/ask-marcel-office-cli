@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildElevatedCommand } from './build-command.ts';
+import { buildElevatedListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildElevatedCommand(() => '/me/chats', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildElevatedListCommand(() => '/me/chats', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/chats',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chat-list',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-chats',
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`',
   pagination: true,

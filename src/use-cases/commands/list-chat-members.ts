@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ chatId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/chats/${p.chatId}/members`, schema);
+const baseSchema = z.object({ chatId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the members of a single Microsoft Teams chat.',
@@ -23,6 +24,7 @@ const meta: CommandMeta = {
         '`19%3ameeting_...%40thread.v2` segment of its `onlineMeeting.joinUrl`. ' +
         'Other sources: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or Power Automate.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',

@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ teamId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/teams/${p.teamId}/installedApps`, schema);
+const baseSchema = z.object({ teamId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/teams/${p.teamId}/installedApps`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft Teams team ID.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-team-installed-apps --team-id 'tm1'",
   responseShape: 'collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`',
