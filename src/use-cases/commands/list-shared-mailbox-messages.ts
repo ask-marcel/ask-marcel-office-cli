@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ userId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/users/${p.userId}/messages`, schema);
+const baseSchema = z.object({ userId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/users/${p.userId}/messages`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner).',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',

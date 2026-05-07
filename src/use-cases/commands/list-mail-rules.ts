@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ mailFolderId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/mailFolders/${p.mailFolderId}/messageRules`, schema);
+const baseSchema = z.object({ mailFolderId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/me/mailFolders/${p.mailFolderId}/messageRules`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -20,6 +21,7 @@ const meta: CommandMeta = {
       description:
         'mailFolder ID. In practice only `inbox` (the well-known name) or the resolved ID of the Inbox folder works — Graph rejects every other folder for messageRules.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-rules --mail-folder-id 'inbox'",
   responseShape: 'collection of Microsoft Graph `messageRule` resources under `value[]`',
