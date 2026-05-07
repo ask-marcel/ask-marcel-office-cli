@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/informationProtection/sensitivityLabels', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/informationProtection/sensitivityLabels', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/informationProtection/sensitivityLabels',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/security-informationprotection-list-sensitivitylabels',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-sensitivity-labels',
   responseShape: 'collection of Microsoft Graph `sensitivityLabel` resources under `value[]`',
   pagination: true,
