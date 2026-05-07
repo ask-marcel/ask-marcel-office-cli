@@ -1,8 +1,13 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import { err } from '../../domain/result.ts';
+import type { Command, CommandMeta } from './command-types.ts';
+import { formatZodError } from './format-zod-error.ts';
 
 const PREFIX = 'https://graph.microsoft.com/v1.0';
+
+const ELEVATED_PATH_PREFIXES: ReadonlyArray<string> = ['/me/chats', '/chats/'];
+
+const requiresElevated = (path: string): boolean => ELEVATED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
 
 const schema = z.object({
   url: z
@@ -11,10 +16,16 @@ const schema = z.object({
     .refine((v) => v.startsWith(`${PREFIX}/`), { message: `must be a Microsoft Graph v1.0 URL starting with ${PREFIX}/` }),
 });
 
-const { execute } = buildCommand((p) => p.url.slice(PREFIX.length), schema);
+const execute: Command['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const path = parsed.data.url.slice(PREFIX.length);
+  return requiresElevated(path) ? graph.getElevated(path) : graph.get(path);
+};
 
 const meta: CommandMeta = {
-  summary: 'Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself.',
+  summary:
+    'Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.',
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '{url}',

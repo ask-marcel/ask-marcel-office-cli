@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T01:26:55.018Z",
+  "generatedAt": "2026-05-07T01:29:17.223Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6208,7 +6208,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",
