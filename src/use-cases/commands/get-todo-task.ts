@@ -26,8 +26,8 @@ const meta: CommandMeta = {
       name: 'todo-task-id',
       key: 'todoTaskId',
       required: true,
-      description: 'To Do task ID. Returned by `ask-marcel list-todo-tasks`.',
-      aliases: [{ name: 'task-id', key: 'taskId' }],
+      description:
+        'To Do task ID. Returned by `ask-marcel list-todo-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)',
     },
   ],
   example: "ask-marcel get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
