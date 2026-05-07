@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 
@@ -27,14 +28,14 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const name = (meta.value as { name?: string }).name ?? '';
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return graph.getBinaryElevated(`/drives/${driveId}/items/${itemId}/versions/${versionId}/content`);
+    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
   }
-  return graph.getBinaryElevated(`/drives/${driveId}/items/${itemId}/versions/${versionId}/content?format=pdf`);
+  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content?format=pdf`, { elevated: true });
 };
 
 const meta: CommandMeta = {
   summary:
-    "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the URL. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes URL. Note: Graph's `?format=pdf` does serve the *current* version through this endpoint even though the as-markdown and stream-content siblings reject it — that's an undocumented Graph quirk. For the current version always use `download-drive-item-as-pdf` so you don't depend on it. Returned URLs embed an ODSP-elevated tempauth (M365ChatClient identity captured at login) so they actually fetch when followed downstream.",
+    "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the bytes inline. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. The CLI uses an ODSP-elevated token (M365ChatClient identity captured at login) for both the Graph call and the CDN-redirect follow, so the LLM never has to fetch an external URL. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes return. Note: Graph's `?format=pdf` does serve the *current* version through this endpoint even though the as-markdown and stream-content siblings reject it — that's an undocumented Graph quirk. For the current version always use `download-drive-item-as-pdf` so you don't depend on it.",
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=pdf',
@@ -60,7 +61,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-drive-item-version-as-pdf --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
   responseShape:
-    '`{ "@microsoft.graph.downloadUrl": "..." }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly. Raw-bytes envelope for plain-text source extensions.',
+    '`{ contentType: "application/pdf", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
 };
 
 export { execute, meta, schema };

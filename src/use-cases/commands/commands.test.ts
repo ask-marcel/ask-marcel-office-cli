@@ -551,13 +551,18 @@ describe('commands', () => {
     if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v3' });
   });
 
-  it('download-drive-item-as-pdf converts an Office source via Graph ?format=pdf after the metadata pre-check', async () => {
+  it('download-drive-item-as-pdf converts an Office source via Graph ?format=pdf and inlines the PDF bytes (CDN redirect followed internally)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1', method: 'GET', response: Response.json({ name: 'q3.docx', size: 9 }) },
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/content?format=pdf',
         method: 'GET',
-        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/q3.pdf' }),
+        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/q3.pdf' }),
+      },
+      {
+        urlPrefix: 'https://contoso.sharepoint.com/cdn/q3.pdf',
+        method: 'GET',
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-as-pdf'];
@@ -565,10 +570,14 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/q3.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; size: number; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
-  it('download-drive-item-as-pdf short-circuits to a raw bytes download for plain-text source extensions', async () => {
+  it('download-drive-item-as-pdf short-circuits to a raw bytes download for plain-text source extensions (re-encodes the text body as base64 for a uniform binary envelope)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 4 }) },
       {
@@ -583,9 +592,9 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText' });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as { contentType: string; text: string };
+      const v = result.value as { contentType: string; base64: string };
       expect(v.contentType).toBe('text/markdown');
-      expect(v.text).toBe('hi');
+      expect(atob(v.base64)).toBe('hi');
     }
   });
 
@@ -649,13 +658,18 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf converts a non-current version through Graph ?format=pdf', async () => {
+  it('download-drive-item-version-as-pdf converts a non-current version through Graph ?format=pdf and inlines the PDF bytes (CDN redirect followed via the M365ChatClient-elevated path)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1', method: 'GET', response: Response.json({ name: 'budget.xlsx' }) },
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/versions/3.0/content?format=pdf',
         method: 'GET',
-        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v3.pdf' }),
+        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/v3.pdf' }),
+      },
+      {
+        urlPrefix: 'https://contoso.sharepoint.com/cdn/v3.pdf',
+        method: 'GET',
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-version-as-pdf'];
@@ -663,7 +677,11 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v3.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
   it('download-drive-item-version-as-markdown converts a non-current xlsx version via the local sheetjs pipeline', async () => {
@@ -707,7 +725,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf short-circuits to raw download for plain-text source extensions', async () => {
+  it('download-drive-item-version-as-pdf short-circuits to a raw bytes download for plain-text source extensions (re-encodes text body as base64)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'log.log' }) },
       {
@@ -722,18 +740,24 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText', versionId: '2.0' });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as { text: string };
-      expect(v.text).toBe('line');
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(atob(v.base64)).toBe('line');
     }
   });
 
-  it('download-drive-item-as-pdf short-circuits to raw download when the source itself is already a pdf (avoids the format=pdf 406 InputFormatNotSupported)', async () => {
+  it('download-drive-item-as-pdf short-circuits to raw download when the source itself is already a pdf (avoids the format=pdf 406 InputFormatNotSupported) and inlines the bytes', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'report.pdf' }) },
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf/content',
         method: 'GET',
-        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/report.pdf' }),
+        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/report.pdf' }),
+      },
+      {
+        urlPrefix: 'https://contoso.sharepoint.com/cdn/report.pdf',
+        method: 'GET',
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-as-pdf'];
@@ -741,16 +765,25 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/report.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
-  it('download-drive-item-version-as-pdf short-circuits to raw download for a pdf source (same reason as the non-versioned variant)', async () => {
+  it('download-drive-item-version-as-pdf short-circuits to raw download for a pdf source (same reason as the non-versioned variant) and inlines the bytes', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'archive.pdf' }) },
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf/versions/2.0/content',
         method: 'GET',
-        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v2.pdf' }),
+        response: () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/v2.pdf' }),
+      },
+      {
+        urlPrefix: 'https://contoso.sharepoint.com/cdn/v2.pdf',
+        method: 'GET',
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-version-as-pdf'];
@@ -758,7 +791,11 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf', versionId: '2.0' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/v2.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
   it('download-drive-item-version-as-pdf propagates an err from the metadata pre-fetch unchanged', async () => {
@@ -1111,7 +1148,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-pdf uploads a fileAttachment, converts via ?format=pdf, then deletes the temp item', async () => {
+  it('convert-mail-attachment-to-pdf uploads a fileAttachment, converts via ?format=pdf, follows the CDN redirect internally to inline the PDF bytes, then deletes the temp item', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
       calls.push({ url, method: init?.method });
@@ -1122,7 +1159,10 @@ describe('commands', () => {
         return Response.json({ id: 'temp-i1', name: 'plan-temp' });
       }
       if (url.endsWith('/content?format=pdf')) {
-        return Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/plan.pdf' });
+        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/plan.pdf' });
+      }
+      if (url === 'https://contoso.sharepoint.com/cdn/plan.pdf') {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') {
         return new Response(null, { status: 204 });
@@ -1134,7 +1174,11 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'a1' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/plan.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
     expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
     expect(calls.some((c) => c.url.endsWith('/content?format=pdf'))).toBe(true);
   });
@@ -1183,7 +1227,7 @@ describe('commands', () => {
     expect(calls.some((c) => c.url.includes('format=pdf'))).toBe(false);
   });
 
-  it('convert-mail-attachment-to-pdf short-circuits a pdf referenceAttachment to its raw bytes via /content (no format=pdf)', async () => {
+  it('convert-mail-attachment-to-pdf short-circuits a pdf referenceAttachment to its raw bytes via /content (no format=pdf), follows the CDN redirect internally', async () => {
     let formatPdfCalled = false;
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aRefPdf')) {
@@ -1193,7 +1237,10 @@ describe('commands', () => {
         return Response.json({ id: 'i-pdf', name: 'report.pdf', parentReference: { driveId: 'd1' } });
       }
       if (url.endsWith('/drives/d1/items/i-pdf/content')) {
-        return Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/report.pdf' });
+        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/report.pdf' });
+      }
+      if (url === 'https://contoso.sharepoint.com/cdn/report.pdf') {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       if (url.includes('format=pdf')) {
         formatPdfCalled = true;
@@ -1206,11 +1253,15 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefPdf' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/report.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
     expect(formatPdfCalled).toBe(false);
   });
 
-  it('convert-mail-attachment-to-pdf resolves a referenceAttachment via /shares/{token}/driveItem and converts in place', async () => {
+  it('convert-mail-attachment-to-pdf resolves a referenceAttachment via /shares/{token}/driveItem, converts in place, and inlines the PDF bytes (CDN redirect followed internally)', async () => {
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aRef')) {
         return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/q3.docx' });
@@ -1219,7 +1270,10 @@ describe('commands', () => {
         return Response.json({ id: 'i-q3', name: 'q3.docx', parentReference: { driveId: 'd1' } });
       }
       if (url.endsWith('/drives/d1/items/i-q3/content?format=pdf')) {
-        return Response.json({ '@microsoft.graph.downloadUrl': 'https://cdn.example/q3.pdf' });
+        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/q3.pdf' });
+      }
+      if (url === 'https://contoso.sharepoint.com/cdn/q3.pdf') {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       throw new Error(`unexpected fetch ${url}`);
     };
@@ -1228,7 +1282,11 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRef' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ '@microsoft.graph.downloadUrl': 'https://cdn.example/q3.pdf' });
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
   });
 
   it('convert-mail-attachment-to-pdf rejects itemAttachment with a clear unsupported error pointing at the markdown variant', async () => {
@@ -1665,7 +1723,7 @@ describe('commands', () => {
   });
 });
 
-type CommandFixture = { readonly name: string; readonly params: Record<string, string> };
+type CommandFixture = { readonly name: string; readonly params: Record<string, string>; readonly responseBody?: unknown };
 
 const allCommandFixtures: CommandFixture[] = [
   { name: 'list-drives', params: {} },
@@ -1676,8 +1734,12 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'download-drive-item-version-content', params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' } },
-  { name: 'download-drive-item-as-pdf', params: { driveId: 'd1', itemId: 'i1' } },
-  { name: 'download-drive-item-version-as-pdf', params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' } },
+  { name: 'download-drive-item-as-pdf', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } },
+  {
+    name: 'download-drive-item-version-as-pdf',
+    params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
+    responseBody: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' },
+  },
   { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'report' } },
   { name: 'search-my-documents', params: { query: 'budget' } },
   { name: 'get-excel-range', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1' } },
@@ -1818,8 +1880,8 @@ const allCommandFixtures: CommandFixture[] = [
 ];
 
 describe('all commands schema acceptance', () => {
-  it.each(allCommandFixtures)('$name accepts valid params', async ({ name, params }) => {
-    const result = await callCommand(name, params, { ok: true });
+  it.each(allCommandFixtures)('$name accepts valid params', async ({ name, params, responseBody }) => {
+    const result = await callCommand(name, params, responseBody ?? { ok: true });
     expect(result.ok).toBe(true);
   });
 });

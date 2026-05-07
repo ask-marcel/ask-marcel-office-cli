@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 
@@ -28,9 +29,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const name = (meta.value as { name?: string }).name ?? '';
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return graph.getBinary(`/drives/${driveId}/items/${itemId}/content`);
+    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
   }
-  return graph.getBinary(`/drives/${driveId}/items/${itemId}/content?format=pdf`);
+  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
 };
 
 const meta: CommandMeta = {
@@ -53,7 +54,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
-    '`{ "@microsoft.graph.downloadUrl": "..." }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly. For unsupported source extensions, returns the raw file bytes (same envelope) without the PDF conversion step.',
+    '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
 };
 
 export { execute, meta, schema };

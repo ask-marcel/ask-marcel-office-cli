@@ -2,6 +2,8 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
+import type { FetchOptions } from './fetch-raw-bytes.ts';
+import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { isPlainTextFilename } from './text-passthrough.ts';
 import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
@@ -34,49 +36,6 @@ const extensionOf = (filename: string): string => {
   const dot = filename.lastIndexOf('.');
   if (dot === -1 || dot === filename.length - 1) return '';
   return filename.slice(dot + 1).toLowerCase();
-};
-
-type FetchOptions = { readonly elevated?: boolean };
-
-/**
- * Real Graph responses for `/drives/{id}/items/{id}/content` are 302
- * redirects to a CDN URL. `getBinary` captures that and returns
- * `{ '@microsoft.graph.downloadUrl': '...' }` — NOT inline bytes.
- * To actually get the bytes we have to follow the URL via `fetchUrl`.
- *
- * The historical-version commands pass `elevated: true` so that the
- * initial Graph call is signed with an M365ChatClient token (on the
- * ODSP `logicalPermissions` allow-list); without that, Graph's 302
- * redirects to a streamContent URL whose embedded tempauth is signed
- * by Teams web client identity and rejected by SharePoint with 403.
- */
-const fetchRawBytes = async (graph: GraphClient, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
-  const initial = opts.elevated ? await graph.getBinaryElevated(contentPath) : await graph.getBinary(contentPath);
-  if (!initial.ok) return initial;
-  const value = initial.value as Record<string, unknown>;
-
-  const downloadUrl = value['@microsoft.graph.downloadUrl'];
-  if (typeof downloadUrl === 'string') {
-    const followed = await graph.fetchUrl(downloadUrl);
-    if (!followed.ok) return followed;
-    return decodeBlobBytes(followed.value as Record<string, unknown>);
-  }
-  return decodeBlobBytes(value);
-};
-
-const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, GraphError> => {
-  const b64 = blob['base64'];
-  if (typeof b64 === 'string') {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return ok(bytes);
-  }
-  const text = blob['text'];
-  if (typeof text === 'string') {
-    return ok(new TextEncoder().encode(text));
-  }
-  return err({ type: 'api_error', status: 500, message: 'unexpected envelope: response had no @microsoft.graph.downloadUrl, no base64 bytes, and no text body' });
 };
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: FetchOptions = {}): Promise<Result<unknown, GraphError>> => {

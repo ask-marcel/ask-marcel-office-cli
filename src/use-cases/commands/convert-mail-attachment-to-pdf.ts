@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { inlineBinary } from './fetch-raw-bytes.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
@@ -57,7 +58,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
     return err({ type: 'api_error', status: 500, message: 'upload returned no driveItem id' });
   }
 
-  const converted = await graph.getBinary(`/me/drive/items/${itemId}/content?format=pdf`);
+  const converted = await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
   return converted;
@@ -78,9 +79,9 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
     return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
   }
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return graph.getBinary(`/drives/${driveId}/items/${itemId}/content`);
+    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
   }
-  return graph.getBinary(`/drives/${driveId}/items/${itemId}/content?format=pdf`);
+  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -127,7 +128,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
-    '`{ "@microsoft.graph.downloadUrl": "..." }` for the typical converted-file 302 case, or `{ contentType, size, base64, note }` envelope for plain-text source extensions; itemAttachment returns an api_error with status 400.',
+    '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
 };
 
 export { execute, meta, schema };
