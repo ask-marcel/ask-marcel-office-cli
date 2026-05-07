@@ -274,23 +274,60 @@ ask-marcel --help
 
 During development from a clone you can keep using `bun run src/main.ts <command>`.
 
+### Output envelope (v1)
+
+Every command writes a single JSON line to **stdout** (success or error — there is no stderr output). `process.exitCode` is `0` on success and `1` on any failure.
+
+```jsonc
+// Success
+{
+  "ok": true,
+  "data": { /* the Graph payload, or whatever the use-case returned */ },
+  "nextLink": "https://graph.microsoft.com/v1.0/me/messages?$skip=10",  // only on paginated responses
+  "count": 42                                                            // only when @odata.count is present
+}
+
+// Error
+{ "ok": false, "error": "Authentication cancelled" }
+```
+
+`@odata.nextLink` and `@odata.count` from the Graph payload are lifted to the envelope's top level and removed from `data`, so consumers don't have to know the OData spelling.
+
+### OData query passthrough
+
+Every `list-*`, `search-*`, and `*-delta` command accepts the six standard OData query parameters as optional flags. Use them to shrink large responses on the fly — particularly important for context-window-bound LLM consumers:
+
+```bash
+ask-marcel list-mail-messages --top 5 --select id,subject,from,receivedDateTime
+ask-marcel list-recent-files --filter "name eq 'budget.xlsx'" --orderby lastModifiedDateTime desc
+ask-marcel list-shared-with-me --select id,name,webUrl --top 10
+```
+
+Available on every paginated list/search command: `--top <n>`, `--skip <n>`, `--select <csv>`, `--filter <kql>`, `--orderby <kql>`, `--expand <nav>`. Four commands omit OData passthrough because their hard-coded `$filter` would collide (`list-conversation-messages`, `list-incomplete-todo-tasks`, `list-incomplete-planner-tasks`, `search-onenote-pages`).
+
 ### Pagination
 
-Microsoft Graph paginates every `list-*`, `search-*`, and delta endpoint (default page size 10 for most resources). When the response contains an `@odata.nextLink`, feed that URL back through `next-page` and repeat until the field is absent:
+When a response contains a top-level `nextLink`, feed that URL back through `next-page` and repeat until the field is absent:
 
 ```bash
 # page 1
 ask-marcel list-mail-folders > p1.json
 
-# page 2..N — loop until @odata.nextLink is gone
-next=$(jq -r '."@odata.nextLink" // empty' p1.json)
+# page 2..N — loop until nextLink is gone
+next=$(jq -r '.nextLink // empty' p1.json)
 while [ -n "$next" ]; do
   ask-marcel next-page --url "$next" > pN.json
-  next=$(jq -r '."@odata.nextLink" // empty' pN.json)
+  next=$(jq -r '.nextLink // empty' pN.json)
 done
 ```
 
+`next-page` automatically uses the elevated M365ChatClient token when the URL points at `/me/chats` or `/chats/...`, so chat pagination follows the original auth context end-to-end.
+
 Every paginated command advertises this in three places: `ask-marcel <cmd> --help` prints a `Pagination:` line, `ask-marcel docs <cmd>` adds a `**Pagination:**` field, and [`docs/commands.json`](docs/commands.json) ships `"pagination": true` on each entry so agents can detect it programmatically.
+
+### Quick context
+
+`ask-marcel my-quick-context` returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }` in a single round trip — five Graph calls in parallel. Use it as the first call in any LLM session that needs per-user IDs to feed into other commands.
 
 ## Usage (library)
 
