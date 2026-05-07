@@ -3,10 +3,29 @@ import type { CommandOptionMeta } from './command-types.ts';
 
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 const NON_NEGATIVE_INTEGER = /^\d+$/;
+const SIGNED_INTEGER = /^-?\d+$/;
+
+const positiveIntegerSchema = (label: string): z.ZodString =>
+  z.string().superRefine((value, ctx) => {
+    if (POSITIVE_INTEGER.test(value)) return;
+    const reason = SIGNED_INTEGER.test(value)
+      ? `must be a positive integer (Graph rejects ${label}=0 and negatives)`
+      : `must be a positive integer (got "${value}", which is not a number)`;
+    ctx.addIssue({ code: 'custom', message: reason });
+  }) as unknown as z.ZodString;
+
+const nonNegativeIntegerSchema = (label: string): z.ZodString =>
+  z.string().superRefine((value, ctx) => {
+    if (NON_NEGATIVE_INTEGER.test(value)) return;
+    const reason = SIGNED_INTEGER.test(value)
+      ? `must be a non-negative integer (Graph rejects ${label}=negatives)`
+      : `must be a non-negative integer (got "${value}", which is not a number)`;
+    ctx.addIssue({ code: 'custom', message: reason });
+  }) as unknown as z.ZodString;
 
 const odataQuerySchema = z.object({
-  top: z.string().regex(POSITIVE_INTEGER, 'must be a positive integer (Graph rejects 0)').optional(),
-  skip: z.string().regex(NON_NEGATIVE_INTEGER, 'must be a non-negative integer').optional(),
+  top: positiveIntegerSchema('top').optional(),
+  skip: nonNegativeIntegerSchema('skip').optional(),
   select: z.string().min(1).optional(),
   filter: z.string().min(1).optional(),
   orderby: z.string().min(1).optional(),

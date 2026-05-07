@@ -57,16 +57,32 @@ describe('odataQuerySchema', () => {
     expect(odataQuerySchema.safeParse({ top: '0' }).success).toBe(false);
   });
 
-  it('rejects a non-numeric $top', () => {
-    expect(odataQuerySchema.safeParse({ top: 'abc' }).success).toBe(false);
+  it('rejects a non-numeric $top with a "not a number" message that names the offending value', () => {
+    const parsed = odataQuerySchema.safeParse({ top: 'abc' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('not a number');
   });
 
-  it('rejects a negative $top', () => {
-    expect(odataQuerySchema.safeParse({ top: '-1' }).success).toBe(false);
+  it('rejects a negative $top with a "0 and negatives" message (distinct from the non-numeric path)', () => {
+    const parsed = odataQuerySchema.safeParse({ top: '-1' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('0 and negatives');
   });
 
   it('still accepts $skip=0 (harmless on Graph) so paging code can pass the value unchanged', () => {
     expect(odataQuerySchema.safeParse({ skip: '0' }).success).toBe(true);
+  });
+
+  it('rejects a non-numeric $skip with a "not a number" message', () => {
+    const parsed = odataQuerySchema.safeParse({ skip: 'lots' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('not a number');
+  });
+
+  it('rejects a negative $skip with a "negatives" message', () => {
+    const parsed = odataQuerySchema.safeParse({ skip: '-1' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('negatives');
   });
 
   it('rejects an empty $filter to prevent users supplying a meaningless flag', () => {

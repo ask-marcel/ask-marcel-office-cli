@@ -1,14 +1,13 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
 
-const baseSchema = z.object({ teamId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/teams/${p.teamId}/installedApps`, baseSchema);
+const schema = z.object({ teamId: z.string().min(1) });
+const { execute } = buildCommand((p) => `/teams/${p.teamId}/installedApps`, schema);
 
 const meta: CommandMeta = {
   summary:
-    'List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team.',
+    "List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team. Note: Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
   category: 'teams',
   graphMethod: 'GET',
   graphPathTemplate: '/teams/{team-id}/installedApps',
@@ -20,7 +19,6 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft Teams team ID.',
     },
-    ...odataQueryOptions,
   ],
   example: "ask-marcel list-team-installed-apps --team-id 'tm1'",
   responseShape: 'collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`',
