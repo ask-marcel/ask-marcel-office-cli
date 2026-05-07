@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "0.11.0",
-  "generatedAt": "2026-05-07T01:31:39.814Z",
+  "generatedAt": "2026-05-07T01:32:42.203Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6418,7 +6418,13 @@
           "name": "title-substring",
           "key": "titleSubstring",
           "required": true,
-          "description": "Substring to look for inside OneNote page titles (case-sensitive, exact substring). This is title-only — full-text body search is not available on OneNote pages in v1.0 Graph. Use `list-onenote-section-pages` if you already know the section."
+          "description": "Substring to look for inside OneNote page titles (case-sensitive, exact substring). This is title-only — full-text body search is not available on OneNote pages in v1.0 Graph. Use `list-onenote-section-pages` if you already know the section.",
+          "aliases": [
+            {
+              "name": "query",
+              "key": "query"
+            }
+          ]
         }
       ],
       "example": "ask-marcel search-onenote-pages --title-substring 'meeting notes'",

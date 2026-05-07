@@ -21,6 +21,7 @@ const meta: CommandMeta = {
         'Substring to look for inside OneNote page titles (case-sensitive, exact substring). ' +
         'This is title-only — full-text body search is not available on OneNote pages in v1.0 Graph. ' +
         'Use `list-onenote-section-pages` if you already know the section.',
+      aliases: [{ name: 'query', key: 'query' }],
     },
   ],
   example: "ask-marcel search-onenote-pages --title-substring 'meeting notes'",
