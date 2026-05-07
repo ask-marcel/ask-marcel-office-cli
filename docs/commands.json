@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T09:26:02.835Z",
+  "generatedAt": "2026-05-07T09:45:04.153Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1086,7 +1086,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites`, or the literal `root` to refer to the tenant root site."
+          "description": "SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site."
         }
       ],
       "example": "ask-marcel get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
@@ -1128,7 +1128,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "drive-id",
@@ -1152,7 +1152,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "list-id",
@@ -1176,7 +1176,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "list-id",
@@ -1223,55 +1223,6 @@
       ],
       "example": "ask-marcel get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
       "responseShape": "HTML envelope (`{ contentType: \"text/html\", size, text }`)"
-    },
-    {
-      "name": "get-sharepoint-sites-delta",
-      "summary": "Track incremental changes to SharePoint sites the tenant exposes. First call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only sites added, modified, or deleted since.",
-      "category": "sharepoint",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/sites/delta()",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/site-delta",
-      "options": [
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel get-sharepoint-sites-delta",
-      "responseShape": "collection of Microsoft Graph `site` resources plus `@odata.deltaLink` / `@odata.nextLink`",
-      "pagination": true
     },
     {
       "name": "get-site-analytics",
@@ -5127,7 +5078,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "top",
@@ -5182,7 +5133,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "list-id",
@@ -5243,7 +5194,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
           "name": "top",
@@ -5530,7 +5481,7 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
-          "description": "SharePoint site ID. Returned by `search-sharepoint-sites`."
+          "description": "SharePoint site ID. Returned by `search-sharepoint-sites-by-name`."
         },
         {
           "name": "top",
@@ -6403,55 +6354,6 @@
       "pagination": true
     },
     {
-      "name": "search-sharepoint-sites",
-      "summary": "List the SharePoint sites the signed-in user has explicitly followed. Hits `GET /me/followedSites` (the unauthenticated `GET /sites` returns an empty collection in most tenants — for free-text discovery use `search-sharepoint-sites-by-name`).",
-      "category": "sharepoint",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/me/followedSites",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-followedsites",
-      "options": [
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (non-negative integer). Combine with `next-page` to paginate."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
-      "example": "ask-marcel search-sharepoint-sites",
-      "responseShape": "collection of Microsoft Graph `site` resources (the user’s followed sites) under `value[]`",
-      "pagination": true
-    },
-    {
       "name": "search-sharepoint-sites-by-name",
       "summary": "Search the tenant for SharePoint sites whose display name or description matches a free-text query (returns up to 25).",
       "category": "sharepoint",
@@ -6463,7 +6365,7 @@
           "name": "query",
           "key": "query",
           "required": true,
-          "description": "Free-text query. Matches site display name and description across the tenant. Use `search-sharepoint-sites` (no query) to instead list the sites the signed-in user follows."
+          "description": "Free-text query. Matches site display name and description across the tenant."
         },
         {
           "name": "top",
