@@ -42,7 +42,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
   });
   program.exitOverride((err) => {
     if (err.code === 'commander.helpDisplayed' || err.code === 'commander.version' || err.code === 'commander.help') return;
-    fail(err.message);
+    // Commander prefixes its messages with `error: ` (e.g. "error: unknown option '--foo'"),
+    // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
+    // redundant prefix so consumers don't see `{"ok":false,"error":"error: ..."}`.
+    const stripped = err.message.startsWith('error: ') ? err.message.slice('error: '.length) : err.message;
+    fail(stripped);
     throw err;
   });
 
