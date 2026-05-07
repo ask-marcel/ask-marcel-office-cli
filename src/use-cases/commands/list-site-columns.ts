@@ -18,7 +18,7 @@ const meta: CommandMeta = {
       name: 'site-id',
       key: 'siteId',
       required: true,
-      description: 'SharePoint site ID. Returned by `search-sharepoint-sites`.',
+      description: 'SharePoint site ID. Returned by `search-sharepoint-sites-by-name`.',
     },
     ...odataQueryOptions,
   ],

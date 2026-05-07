@@ -17,9 +17,7 @@ const meta: CommandMeta = {
       name: 'query',
       key: 'query',
       required: true,
-      description:
-        'Free-text query. Matches site display name and description across the tenant. ' +
-        'Use `search-sharepoint-sites` (no query) to instead list the sites the signed-in user follows.',
+      description: 'Free-text query. Matches site display name and description across the tenant.',
     },
     ...odataQueryOptions,
   ],

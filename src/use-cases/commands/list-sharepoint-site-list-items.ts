@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/sites/{site-id}/lists/{list-id}/items',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/listitem-list',
   options: [
-    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites`.' },
+    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.' },
     { name: 'list-id', key: 'listId', required: true, description: 'SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.' },
     ...odataQueryOptions,
   ],
