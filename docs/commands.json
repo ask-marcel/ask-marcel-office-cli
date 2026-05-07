@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T11:11:54.733Z",
+  "generatedAt": "2026-05-07T11:34:04.429Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -179,7 +179,7 @@
     },
     {
       "name": "download-drive-item-version-content",
-      "summary": "Return the SharePoint streamContent URL for a *non-current* historical version of a OneDrive / SharePoint file. Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\" — for the current version use `download-onedrive-file-content`. The returned URL embeds an ODSP-elevated tempauth (signed via the M365ChatClient identity captured at login) so that fetching it downstream returns the bytes rather than the 403 the Teams web client token would produce.",
+      "summary": "Download the bytes of a *non-current* historical version of a OneDrive / SharePoint file, inlined. Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\" — for the current version use `download-onedrive-file-content`. The CLI follows the SharePoint streamContent redirect internally using an M365ChatClient-elevated token (captured at login) so the LLM never has to fetch an external URL.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content",
@@ -205,11 +205,11 @@
         }
       ],
       "example": "ask-marcel download-drive-item-version-content --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-      "responseShape": "`{ \"@microsoft.graph.downloadUrl\": \"...\" }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly"
+      "responseShape": "`{ contentType, size, base64 }` — the historical-version bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB versions."
     },
     {
       "name": "download-onedrive-file-content",
-      "summary": "Download the binary content of a file stored in OneDrive / SharePoint. Graph normally returns a 302 redirect to a pre-signed CDN URL, surfaced as `@microsoft.graph.downloadUrl`; if it returns bytes directly they are base64-encoded for safe JSON output.",
+      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
@@ -229,7 +229,7 @@
         }
       ],
       "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ \"@microsoft.graph.downloadUrl\": \"...\" }` for the typical 302 case, or `{ contentType, size, base64 }` when Graph streams bytes directly"
+      "responseShape": "`{ contentType, size, base64 }` — the file bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB files."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -795,7 +795,7 @@
         }
       ],
       "example": "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
-      "responseShape": "raw MIME envelope (`{ contentType: \"message/rfc822\" or similar, size, text/base64 }`)"
+      "responseShape": "`{ contentType: \"message/rfc822\" or similar, size, base64 }` — the raw MIME envelope, inlined. Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments."
     },
     {
       "name": "get-mail-rule",
@@ -856,14 +856,14 @@
     },
     {
       "name": "get-my-profile-photo",
-      "summary": "Download the signed-in user’s profile photo (largest available size). Returned as a base64 envelope so the binary survives JSON output.",
+      "summary": "Download the signed-in user's profile photo (largest available size), inlined. The CLI follows the Graph 302 → CDN redirect internally so the LLM never has to fetch an external URL.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/photo/$value",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/profilephoto-get",
       "options": [],
       "example": "ask-marcel get-my-profile-photo",
-      "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` (or `{ \"@microsoft.graph.downloadUrl\": \"...\" }` when Graph returns a 302 redirect to a CDN URL)"
+      "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`."
     },
     {
       "name": "get-onenote-page-as-markdown",
