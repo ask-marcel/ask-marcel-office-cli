@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/places/microsoft.graph.roomList', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/places/microsoft.graph.roomList', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -12,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/places/microsoft.graph.roomList',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/place-list',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-room-lists',
   responseShape: 'collection of Microsoft Graph `roomList` resources under `value[]`',
   pagination: true,

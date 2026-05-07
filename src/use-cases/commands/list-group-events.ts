@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({ groupId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/groups/${p.groupId}/events`, schema);
+const baseSchema = z.object({ groupId: z.string().min(1) });
+const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/events`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Azure AD group object ID for a unified (Microsoft 365) group. Use `list-groups` to find one.',
     },
+    ...odataQueryOptions,
   ],
   example: "ask-marcel list-group-events --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
