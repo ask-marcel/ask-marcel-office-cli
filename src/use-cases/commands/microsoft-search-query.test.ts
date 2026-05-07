@@ -16,12 +16,10 @@ const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => ({
   ...overrides,
 });
 
-type CapturedSearchBody = {
-  readonly requests: ReadonlyArray<{
-    readonly entityTypes: ReadonlyArray<string>;
-    readonly query: { readonly queryString: string };
-    readonly size: number;
-  }>;
+type CapturedRequest = {
+  readonly entityTypes: ReadonlyArray<string>;
+  readonly query: { readonly queryString: string };
+  readonly size: number;
 };
 
 describe('microsoft-search-query', () => {
@@ -37,60 +35,79 @@ describe('microsoft-search-query', () => {
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
 
-  it('sends two requests[] entries in a single /search/query POST — file/mail/event types in the first, people in the second', async () => {
-    let capturedPath = '';
-    let capturedBody: unknown = null;
+  it('sends six parallel /search/query POSTs — one per entityType — to sidestep tenant rejection of multi-entity v1.0 search', async () => {
+    const captured: CapturedRequest[] = [];
     const graph = fakeGraph({
       post: async (path, body) => {
-        capturedPath = path;
-        capturedBody = body;
+        expect(path).toBe('/search/query');
+        const r = (body as { requests: ReadonlyArray<CapturedRequest> }).requests[0];
+        if (r !== undefined) captured.push(r);
         return ok({});
       },
     });
 
     await execute(graph, { query: 'marcel' });
 
-    expect(capturedPath).toBe('/search/query');
-    const body = capturedBody as CapturedSearchBody;
-    expect(body.requests).toHaveLength(2);
-    expect(body.requests[0].entityTypes).toEqual(['driveItem', 'listItem', 'site', 'message', 'event']);
-    expect(body.requests[1].entityTypes).toEqual(['person']);
-    expect(body.requests[0].query.queryString).toBe('marcel');
-    expect(body.requests[1].query.queryString).toBe('marcel');
-    expect(body.requests[0].size).toBe(25);
-    expect(body.requests[1].size).toBe(25);
+    expect(captured).toHaveLength(6);
+    expect(captured.map((r) => r.entityTypes[0]).toSorted()).toEqual(['driveItem', 'event', 'listItem', 'message', 'person', 'site']);
+    for (const r of captured) {
+      expect(r.query.queryString).toBe('marcel');
+      expect(r.size).toBe(25);
+      expect(r.entityTypes).toHaveLength(1);
+    }
   });
 
-  it('forwards the Graph response payload unchanged when both sub-requests succeed', async () => {
-    const graphResponse = {
-      value: [
-        { searchTerms: ['marcel'], hitsContainers: [{ total: 0, hits: [] }] },
-        { searchTerms: ['marcel'], hitsContainers: [{ total: 0, hits: [] }] },
-      ],
-    };
-    const graph = fakeGraph({ post: async () => ok(graphResponse) });
+  it('merges the per-entity hitsContainers into one value[] when every sub-request succeeds', async () => {
+    const responsePerType = (label: string): unknown => ({ value: [{ searchTerms: ['marcel'], hitsContainers: [{ total: 1, hits: [{ summary: label }] }] }] });
+    const graph = fakeGraph({
+      post: async (_path, body) => ok(responsePerType((body as { requests: ReadonlyArray<{ entityTypes: ReadonlyArray<string> }> }).requests[0]?.entityTypes[0] ?? 'unknown')),
+    });
 
     const result = await execute(graph, { query: 'marcel' });
 
-    expect(result).toEqual(ok(graphResponse));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const value = (result.value as { value: ReadonlyArray<unknown> }).value;
+      expect(value).toHaveLength(6);
+      expect(result.value).not.toHaveProperty('partialErrors');
+    }
   });
 
-  it('returns the Graph error verbatim when the search call fails', async () => {
-    const apiError: GraphError = { type: 'api_error', status: 400, message: 'BadRequest: SearchRequest Invalid' };
+  it('returns the partial-success envelope when at least one sub-request fails but at least one succeeds', async () => {
+    const graph = fakeGraph({
+      post: async (_path, body) => {
+        const entityType = (body as { requests: ReadonlyArray<{ entityTypes: ReadonlyArray<string> }> }).requests[0]?.entityTypes[0];
+        if (entityType === 'person') return err({ type: 'api_error' as const, status: 403, message: 'people scope missing' });
+        return ok({ value: [{ searchTerms: ['x'], hitsContainers: [{ total: 0, hits: [] }] }] });
+      },
+    });
+
+    const result = await execute(graph, { query: 'x' });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { value: ReadonlyArray<unknown>; partialErrors: ReadonlyArray<{ entityType: string }> };
+      expect(v.value).toHaveLength(5);
+      expect(v.partialErrors).toHaveLength(1);
+      expect(v.partialErrors[0]?.entityType).toBe('person');
+    }
+  });
+
+  it('returns the first sub-request error when EVERY entityType failed (no merged hits to return)', async () => {
+    const apiError: GraphError = { type: 'api_error', status: 400, message: 'Multiple entity search is not supported in v1.0' };
     const graph = fakeGraph({ post: async () => err(apiError) });
 
-    const result = await execute(graph, { query: 'q' });
+    const result = await execute(graph, { query: 'x' });
 
     expect(result).toEqual(err(apiError));
-  });
-
-  it('documents the two-request split in meta.bodyTemplate', () => {
-    expect(meta.bodyTemplate).toContain("['driveItem','listItem','site','message','event']");
-    expect(meta.bodyTemplate).toContain("['person']");
   });
 
   it('rejects a non-string query value at the schema level', () => {
     const parsed = schema.safeParse({ query: 42 });
     expect(parsed.success).toBe(false);
+  });
+
+  it('documents the per-entity-type split in meta.bodyTemplate', () => {
+    expect(meta.bodyTemplate).toContain('one-of-driveItem-listItem-site-message-event-person');
   });
 });
