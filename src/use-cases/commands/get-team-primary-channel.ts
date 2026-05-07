@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({ teamId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/teams/${p.teamId}/primaryChannel`, schema);
+const baseSchema = z.object({ teamId: z.string().min(1) });
+const { execute, schema } = buildSelectableCommand((p) => `/teams/${p.teamId}/primaryChannel`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -19,6 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft Teams team ID. Returned by `list-joined-teams`.',
     },
+    ...selectExpandOptions,
   ],
   example: "ask-marcel get-team-primary-channel --team-id 'tm1'",
   responseShape: 'single Microsoft Graph `channel` resource',

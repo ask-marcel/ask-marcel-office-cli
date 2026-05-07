@@ -1,19 +1,20 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/organization', schema);
+const baseSchema = z.object({});
+const { execute, schema } = buildSelectableCommand(() => '/organization', baseSchema);
 
 const meta: CommandMeta = {
   summary:
-    "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. Useful for confirming which tenant the CLI is signed into and what subscriptions are active.",
+    "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. The full resource is ~57 KB; use `--select` to slim it (e.g. `--select id,displayName,verifiedDomains`).",
   category: 'user',
   graphMethod: 'GET',
   graphPathTemplate: '/organization',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/organization-list',
-  options: [],
-  example: 'ask-marcel get-organization',
+  options: [...selectExpandOptions],
+  example: "ask-marcel get-organization --select 'id,displayName,verifiedDomains'",
   responseShape: 'collection of one Microsoft Graph `organization` resource under `value[]`',
 };
 

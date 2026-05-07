@@ -40,9 +40,16 @@ describe('get-my-manager', () => {
     expect(result).toEqual(err(apiError));
   });
 
-  it('rejects unknown CLI flags via Zod (the schema is z.object({}).strict())', async () => {
-    const result = await execute(fakeGraphReturning(ok({})), { unexpected: 'flag' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  it('forwards a --select value through to the Graph URL so an LLM can slim the response (e.g. --select id,displayName,mail)', async () => {
+    let captured = '';
+    const captureGraph: GraphClient = {
+      ...fakeGraphReturning(ok({ id: 'u2', displayName: 'Alice' })),
+      get: async (path: string) => {
+        captured = path;
+        return ok({ id: 'u2', displayName: 'Alice' });
+      },
+    };
+    await execute(captureGraph, { select: 'id,displayName,mail' });
+    expect(captured).toBe('/me/manager?$select=id%2CdisplayName%2Cmail');
   });
 });
