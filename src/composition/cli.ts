@@ -131,8 +131,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
           for (const alias of opt.aliases) {
             commandDef.option(`--${alias.name} <value>`, `(alias for --${opt.name})`);
           }
-        } else {
+        } else if (opt.required) {
           commandDef.requiredOption(`--${opt.name} <value>`, opt.description);
+        } else {
+          commandDef.option(`--${opt.name} <value>`, opt.description);
         }
       }
       const helpLines = [

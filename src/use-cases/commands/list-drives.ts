@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { odataQueryOptions } from './odata-query.ts';
 
-const schema = z.object({}).strict();
-const { execute } = buildCommand(() => '/me/drives', schema);
+const baseSchema = z.object({}).strict();
+const { execute, schema } = buildListCommand(() => '/me/drives', baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List all OneDrive / SharePoint drives the signed-in user has access to.',
@@ -11,7 +12,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
-  options: [],
+  options: [...odataQueryOptions],
   example: 'ask-marcel list-drives',
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,

@@ -18,7 +18,13 @@ type CommandOptionMeta = {
   readonly name: string;
   readonly key: string;
   readonly description: string;
-  readonly required: true;
+  /**
+   * `true` for required flags (the historical default; commander rejects the
+   * invocation if the flag is missing). `false` for optional flags such as the
+   * OData passthrough query parameters (`--top`, `--filter`, …) which
+   * commands accept but do not demand.
+   */
+  readonly required: boolean;
   /**
    * Optional secondary spellings of the same flag. Both the canonical
    * `name` and every alias name are accepted on the command line; values
