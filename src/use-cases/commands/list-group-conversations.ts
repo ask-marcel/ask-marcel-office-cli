@@ -7,7 +7,8 @@ const baseSchema = z.object({ groupId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/conversations`, baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads.',
+  summary:
+    'List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/conversations',

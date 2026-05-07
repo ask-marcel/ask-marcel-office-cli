@@ -50,11 +50,12 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
+      'Example:       ask-marcel login',
       'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
       'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
-      '               this CLI cannot request additional scopes. To inspect the granted set:',
-      '               bun run scripts/print-token-scopes.ts',
+      '               this CLI cannot request additional scopes. To inspect the granted set,',
+      '               run `ask-marcel scopes-check`.',
       'Stuck flow:    `ask-marcel logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
     ].join('\n  ')
   );
@@ -71,6 +72,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
+      'Example:       ask-marcel logout',
       'Removes:       ~/.ask-marcel/token-cache.json (access + refresh tokens).',
       'Leaves alone:  ~/.ask-marcel/browser-profile/ (delete it manually if you want a clean Playwright session too).',
       'Verify clean:  ls ~/.ask-marcel/  (token-cache.json should be gone).',
@@ -91,6 +93,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
+      'Example:      ask-marcel update',
       'Detection:    based on the bin path of the running CLI.',
       '              `/usr/local/lib/node_modules/...` -> npm, `~/.bun/install/...` -> bun.',
       'Side effect:  shells out to `npm i -g ask-marcel-office-cli@latest` or `bun add -g ...`.',
@@ -101,7 +104,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const LIFECYCLE_COMMANDS: ReadonlySet<string> = new Set(['login', 'logout', 'update', 'docs', 'help']);
 
-  program
+  const docsCmd = program
     .command('docs')
     .description('Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`).')
     .argument('<command>', 'Command name to show docs for (run `ask-marcel --help` to list every command).')
@@ -120,6 +123,14 @@ const buildCli = (deps: BuildCliDeps): Command => {
       }
       fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
     });
+  docsCmd.addHelpText(
+    'after',
+    [
+      '',
+      'Example:       ask-marcel docs list-mail-messages',
+      'Lifecycle:     `ask-marcel docs login` (or logout / update / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
+    ].join('\n  ')
+  );
 
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(cmdRegistry).filter(([, c]) => c.meta.category === category);

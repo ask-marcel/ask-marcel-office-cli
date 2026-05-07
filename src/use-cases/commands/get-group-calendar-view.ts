@@ -10,7 +10,8 @@ const { execute, schema } = buildListCommand(
 );
 
 const meta: CommandMeta = {
-  summary: "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window.",
+  summary:
+    "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window. Only Microsoft 365 groups have a calendar — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}',

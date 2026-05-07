@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T01:54:29.663Z",
+  "generatedAt": "2026-05-07T01:58:23.844Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -630,7 +630,7 @@
     },
     {
       "name": "get-drive-special-folder",
-      "summary": "Resolve a OneDrive well-known folder by name (`documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-onedrive-file-content`.",
+      "summary": "Resolve a OneDrive well-known folder via `--folder-name` (one of `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-onedrive-file-content`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/special/{folder-name}",
@@ -762,7 +762,7 @@
     },
     {
       "name": "get-group-calendar-view",
-      "summary": "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window.",
+      "summary": "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window. Only Microsoft 365 groups have a calendar — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -3081,7 +3081,7 @@
     },
     {
       "name": "list-group-conversations",
-      "summary": "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads.",
+      "summary": "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/conversations",
@@ -3301,7 +3301,7 @@
     },
     {
       "name": "list-group-threads",
-      "summary": "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed.",
+      "summary": "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads",

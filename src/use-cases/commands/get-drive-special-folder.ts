@@ -7,7 +7,7 @@ const { execute } = buildCommand((p) => `/me/drive/special/${p.folderName}`, sch
 
 const meta: CommandMeta = {
   summary:
-    "Resolve a OneDrive well-known folder by name (`documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-onedrive-file-content`.",
+    "Resolve a OneDrive well-known folder via `--folder-name` (one of `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-onedrive-file-content`.",
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/me/drive/special/{folder-name}',
