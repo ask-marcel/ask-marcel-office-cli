@@ -30,6 +30,7 @@
   "files": [
     "dist/",
     "docs/commands.json",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE"
   ],
