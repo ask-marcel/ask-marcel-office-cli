@@ -88,5 +88,20 @@ const odataQueryOptions: ReadonlyArray<CommandOptionMeta> = [
   },
 ];
 
-export { appendOData, odataQueryOptions, odataQuerySchema };
-export type { ODataQueryParams };
+/**
+ * Subset for single-resource GETs that support `$select` and `$expand` but
+ * have no collection to slice (`$top`/`$skip`/`$filter`/`$orderby` make no
+ * sense). Keeping this as a separate Zod fragment lets `buildSelectableCommand`
+ * advertise only the two relevant flags in `--help`.
+ */
+const selectExpandSchema = z.object({
+  select: z.string().min(1).optional(),
+  expand: z.string().min(1).optional(),
+});
+
+type SelectExpandParams = z.infer<typeof selectExpandSchema>;
+
+const selectExpandOptions: ReadonlyArray<CommandOptionMeta> = odataQueryOptions.filter((o) => o.name === 'select' || o.name === 'expand');
+
+export { appendOData, odataQueryOptions, odataQuerySchema, selectExpandOptions, selectExpandSchema };
+export type { ODataQueryParams, SelectExpandParams };

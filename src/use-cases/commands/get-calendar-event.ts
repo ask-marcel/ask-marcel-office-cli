@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({ eventId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/events/${p.eventId}`, schema);
+const baseSchema = z.object({ eventId: z.string().min(1) });
+const { execute, schema } = buildSelectableCommand((p) => `/me/events/${p.eventId}`, baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'Fetch a single calendar event by ID from the signed-in user’s default calendar.',
+  summary:
+    'Fetch a single calendar event by ID from the signed-in user’s default calendar. Pass `--select` to project only the fields you need (the full event body can be large with HTML body and attendee lists).',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/events/{event-id}',
@@ -18,9 +20,10 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft Graph event ID. Returned by `ask-marcel list-calendar-events` in the `id` field of each event.',
     },
+    ...selectExpandOptions,
   ],
-  example: "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...'",
-  responseShape: 'single Microsoft Graph `event` resource',
+  example: "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
+  responseShape: 'single Microsoft Graph `event` resource (or projection of the requested `--select` fields)',
 };
 
 export { execute, meta, schema };
