@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-08T04:12:57.737Z",
+  "generatedAt": "2026-05-08T08:37:52.305Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -115,7 +115,7 @@
         }
       ],
       "example": "ask-marcel download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs."
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs."
     },
     {
       "name": "download-drive-item-version-as-markdown",
@@ -209,7 +209,7 @@
     },
     {
       "name": "download-onedrive-file-content",
-      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL.",
+      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Pre-checks the filename: if it matches the plain-text set (txt/md/html/json/yaml/log/xml/etc.), decodes the bytes as UTF-8 and returns `{contentType: \"text/plain\", size, text}` instead of base64 — avoids ~33% bloat on text payloads.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
@@ -229,7 +229,7 @@
         }
       ],
       "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType, size, base64 }` — the file bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB files."
+      "responseShape": "`{ contentType: \"text/plain\", size, text }` for plain-text source extensions; `{ contentType, size, base64 }` for everything else. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -415,7 +415,7 @@
         }
       ],
       "example": "ask-marcel get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
-      "responseShape": "collection of changed Microsoft Graph `driveItem` resources under `value[]` plus an `@odata.deltaLink` token",
+      "responseShape": "collection of changed Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -584,7 +584,7 @@
         }
       ],
       "example": "ask-marcel get-drive-root-delta",
-      "responseShape": "collection of Microsoft Graph `driveItem` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -1725,7 +1725,7 @@
         }
       ],
       "example": "ask-marcel list-calendar-events-delta --top 50",
-      "responseShape": "collection of changed Microsoft Graph `event` resources under `value[]` plus an `@odata.deltaLink` token",
+      "responseShape": "collection of changed Microsoft Graph `event` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -1950,7 +1950,7 @@
         }
       ],
       "example": "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
-      "responseShape": "collection of changed Microsoft Graph `event` occurrences under `value[]` plus an `@odata.deltaLink` token",
+      "responseShape": "collection of changed Microsoft Graph `event` occurrences under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -2893,7 +2893,13 @@
           "name": "item-id",
           "key": "itemId",
           "required": true,
-          "description": "driveItem ID of the folder. Use the root folder ID from `ask-marcel get-drive-root-item` to list the top of a drive."
+          "description": "driveItem ID of the folder (Graph identifies folders as driveItems too — there is no separate folder type). Use the root folder ID from `ask-marcel get-drive-root-item` to list the top of a drive. Accepts `--folder-id` as an alias since the command name implies \"folder\".",
+          "aliases": [
+            {
+              "name": "folder-id",
+              "key": "folderId"
+            }
+          ]
         },
         {
           "name": "top",
@@ -3707,7 +3713,7 @@
         }
       ],
       "example": "ask-marcel list-mail-folder-messages-delta --mail-folder-id 'inbox'",
-      "responseShape": "collection of Microsoft Graph `message` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "responseShape": "collection of Microsoft Graph `message` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page (CLI strips the original `@odata.*` keys from `data`).",
       "pagination": true
     },
     {
@@ -3768,7 +3774,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-delta",
       "options": [],
       "example": "ask-marcel list-mail-folders-delta",
-      "responseShape": "collection of Microsoft Graph `mailFolder` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "responseShape": "collection of Microsoft Graph `mailFolder` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -5990,7 +5996,7 @@
         }
       ],
       "example": "ask-marcel list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
-      "responseShape": "collection of Microsoft Graph `todoTask` resources plus `@odata.deltaLink` / `@odata.nextLink`",
+      "responseShape": "collection of Microsoft Graph `todoTask` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {
@@ -6129,7 +6135,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the `@odata.nextLink` value returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the top-level `nextLink` value (NOT `data[\"@odata.nextLink\"]` — the CLI promotes that field to envelope-level and strips it from data) returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",
@@ -6139,11 +6145,11 @@
           "name": "url",
           "key": "url",
           "required": true,
-          "description": "Full Graph v1.0 URL — copy the `@odata.nextLink` field from the previous response. Example: `https://graph.microsoft.com/v1.0/me/messages?$skiptoken=AKDsfg...`. Loop: keep calling until the response no longer contains `@odata.nextLink`. Also handles `@odata.deltaLink` if you want to resume a delta query."
+          "description": "Full Graph v1.0 URL — copy the top-level `nextLink` field from the previous response (the CLI hoists Graph's `@odata.nextLink` out of `data` to envelope level). Example: `https://graph.microsoft.com/v1.0/me/messages?$skiptoken=AKDsfg...`. Loop: keep calling until the response no longer contains `nextLink`. Also handles `deltaLink` (also hoisted) if you want to resume a delta query."
         }
       ],
       "example": "ask-marcel next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
-      "responseShape": "same shape as the originating endpoint (typically `{ value: [...], \"@odata.nextLink\": \"...\" }`)"
+      "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level."
     },
     {
       "name": "scopes-check",
