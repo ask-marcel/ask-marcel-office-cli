@@ -86,6 +86,17 @@ type BrowserAuthConfig = {
   readonly pollIntervalMs?: number;
   readonly pollDeadlineMs?: number;
   readonly navigationTimeoutMs?: number;
+  /**
+   * Deadline for the SILENT elevated-token recapture flow (no user
+   * interaction expected — persistent profile cookies do the SSO).
+   * Defaults to 20s. The audit (v1.0.0 §1.1) flagged that reusing the
+   * 5-minute interactive `pollDeadlineMs` for this silent path made
+   * `list-chats` etc. hang for minutes when cookies were stale, blowing
+   * the LLM tool-call window. With a tight cap, the flow either yields
+   * a token quickly or fails with `auth_failed: elevated token capture
+   * timed out — run `ask-marcel login` to refresh.`
+   */
+  readonly elevatedRecaptureTimeoutMs?: number;
 };
 
 const TOKEN_HOSTS = ['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com'];
@@ -147,6 +158,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const pollIntervalMs = config.pollIntervalMs ?? 2000;
   const pollDeadlineMs = config.pollDeadlineMs ?? 5 * 60 * 1000;
   const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
+  const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
 
   let context: ContextLike | null = null;
   let page: PageLike | null = null;
@@ -342,11 +354,15 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     // Settle: silent SSO capture happens within 3-8s when cookies are warm.
-    // Cold profile or expired federated-IdP session (e.g. IdP-fronted tenants
-    // where the ThirdPartyIdP session has lapsed) requires interactive sign-in inside
-    // the popup, which can take a minute or two. Use the full login deadline
-    // (default 5min) so the user has time to complete federated auth.
-    const elevatedDeadline = Date.now() + pollDeadlineMs;
+    // The elevated path is non-interactive — the popup is opened with the
+    // persistent profile and either silent SSO completes (token captured) or
+    // the cookies are stale and silent SSO can't proceed without UI prompts
+    // we don't drive. Use a SHORT deadline (default 20s) and fail fast with
+    // a clear error pointing at `ask-marcel login` if no token comes back —
+    // audit v1.0.0 §1.1 flagged that reusing the 5-min interactive deadline
+    // here hangs the chat commands for minutes and blows the LLM tool-call
+    // window.
+    const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < elevatedDeadline) {
       if (captured) {
         trace('[DEBUG] elevated capture: token found, closing\n');

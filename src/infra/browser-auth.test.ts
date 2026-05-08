@@ -625,7 +625,7 @@ describe('browser auth — production wiring', () => {
     const { api } = makeFakeApi({
       pageOpts: { requestsPerGoto: [[wrongAppRequest]] },
     });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20 }));
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
     const token = await browser.acquireElevatedToken();
     expect(token).toBeNull();
   });
@@ -643,7 +643,7 @@ describe('browser auth — production wiring', () => {
     const { api } = makeFakeApi({
       pageOpts: { requestsPerGoto: [[wrongAudRequest]] },
     });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20 }));
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
     const token = await browser.acquireElevatedToken();
     expect(token).toBeNull();
   });
@@ -656,14 +656,14 @@ describe('browser auth — production wiring', () => {
     const { api } = makeFakeApi({
       pageOpts: { requestsPerGoto: [[noAuthRequest]] },
     });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20 }));
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
     const token = await browser.acquireElevatedToken();
     expect(token).toBeNull();
   });
 
   it('acquireElevatedToken returns null on poll-deadline timeout when no elevated request fires', async () => {
     const { api } = makeFakeApi({ pageOpts: {} });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20 }));
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
     const token = await browser.acquireElevatedToken();
     expect(token).toBeNull();
   });

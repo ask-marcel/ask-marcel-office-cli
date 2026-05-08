@@ -164,7 +164,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, l
         return err({
           type: 'auth_failed',
           message:
-            'elevated token capture failed (no token returned from m365.cloud.microsoft). The historical-version commands need an elevated Graph token; try `ask-marcel logout && ask-marcel login` to refresh the persistent profile cookies.',
+            'elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within the deadline. Most likely the persistent browser-profile cookies have expired. Run `ask-marcel login` to refresh them, then retry. (Commands that need this token: list-chats, get-chat, list-chat-members, the historical-version download/convert commands.)',
         });
       }
       await persistElevated(captured);

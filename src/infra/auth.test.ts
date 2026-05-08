@@ -347,7 +347,7 @@ describe('auth manager elevated token', () => {
     expect(result).toEqual(ok(captured));
   });
 
-  it('returns auth_failed with actionable guidance when re-capture returns null', async () => {
+  it('returns auth_failed with actionable guidance when re-capture returns null (audit v1.0.0 §1.1: must mention `ask-marcel login` and the affected commands so the LLM tool-call window can fail fast)', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
@@ -356,8 +356,9 @@ describe('auth manager elevated token', () => {
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
-      expect(result.error.message).toContain('elevated token capture failed');
-      expect(result.error.message).toContain('ask-marcel logout');
+      expect(result.error.message).toContain('elevated token capture timed out');
+      expect(result.error.message).toContain('ask-marcel login');
+      expect(result.error.message).toContain('list-chats');
     }
   });
 
