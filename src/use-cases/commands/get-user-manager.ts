@@ -13,18 +13,20 @@ const execute: Command['execute'] = async (graph, params) => {
   const result = await graph.get(path);
   if (result.ok) return result;
   // Disambiguate two distinct 404 cases — both are `Request_ResourceNotFound`
-  // but the inner message differs:
-  //   - "Resource not found."                                               → user exists, no manager set → ok(null)
-  //   - "Resource '<id>' does not exist or one of its queried reference-…"  → user does NOT exist        → pass through err
-  // The audit (v1.0.0 §1.3) caught us collapsing both to ok(null), which
-  // violated the documented contract. The discriminator is the absence of
-  // "does not exist" in the inner message — that phrase only appears in the
-  // unknown-user case.
+  // and both say "does not exist", but they differ in WHICH resource is
+  // reported as missing in the quotes:
+  //   - "Resource 'manager' does not exist …"          → user exists, no manager set     → ok(null)
+  //   - "Resource '<userId>' does not exist …"         → user does NOT exist              → pass through err
+  // (The first audit pass v1.0.0 §1.3 caught us collapsing both to ok(null);
+  // the round-2 audit then caught the over-corrected version that mapped
+  // NEITHER to ok(null). The right discriminator is the literal `'manager'`
+  // quoted name — it's the navigation-property name Graph reports as
+  // missing when the user record exists but has no manager link.)
   if (
     result.error.type === 'api_error' &&
     result.error.status === 404 &&
     result.error.message.includes('Request_ResourceNotFound') &&
-    !result.error.message.includes('does not exist')
+    result.error.message.includes("Resource 'manager'")
   ) {
     return ok(null);
   }

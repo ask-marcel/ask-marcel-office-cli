@@ -27,6 +27,22 @@ const safeExtension = (name: string): string => {
   return /^[a-z0-9]{1,8}$/.test(raw) ? raw : 'bin';
 };
 
+// Graph's `?format=pdf` rejects image inputs with `InputFormatNotSupported`.
+// Audit v1.0.0 §2.4 caught the raw error leaking through. Mirror the markdown
+// sibling's friendly guard and point the LLM at `get-mail-attachment` for the
+// raw bytes — feeding those into a vision-capable model is the right shape
+// for image content anyway.
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico', 'heic', 'heif']);
+
+const imageHint = (ext: string): string =>
+  `${ext} attachment is an image — Graph's format=pdf does not accept image inputs (InputFormatNotSupported). Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded) and feed them into a vision-capable model directly; that's the right shape for image content.`;
+
+const extensionOf = (name: string): string => {
+  const dot = name.lastIndexOf('.');
+  if (dot === -1 || dot === name.length - 1) return '';
+  return name.slice(dot + 1).toLowerCase();
+};
+
 const convertFileAttachment = async (graph: GraphClient, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
   const name = attachment.name ?? 'unnamed';
   const contentBytes = attachment.contentBytes ?? '';
@@ -44,6 +60,9 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
       note: `pre-checked source (${name}); raw bytes returned without Graph conversion`,
     });
   }
+
+  const lowerExt = extensionOf(name);
+  if (IMAGE_EXTENSIONS.has(lowerExt)) return err({ type: 'api_error', status: 415, message: imageHint(lowerExt) });
 
   // Hardening #2: UUID-only temp file name; never the attacker filename.
   const ext = safeExtension(name);
@@ -81,6 +100,8 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
   }
+  const refExt = extensionOf(name);
+  if (IMAGE_EXTENSIONS.has(refExt)) return err({ type: 'api_error', status: 415, message: imageHint(refExt) });
   return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
 };
 

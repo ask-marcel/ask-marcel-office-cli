@@ -23,19 +23,13 @@ describe('get-user-manager', () => {
     expect(result).toEqual(ok(manager));
   });
 
-  it('maps the 404 Request_ResourceNotFound to ok(null) so an LLM can distinguish "no manager set" from "unknown user" (mirrors get-my-manager)', async () => {
-    const noMgr: GraphError = { type: 'api_error', status: 404, message: 'Request_ResourceNotFound: Resource not found.' };
-    const result = await execute(fakeGraphReturning(err(noMgr)), { userId: 'orphan@contoso.com' });
-    expect(result).toEqual(ok(null));
-  });
-
   it('passes through 404s with a different error code (e.g. unknown userId surfaces with a distinct message)', async () => {
     const apiError: GraphError = { type: 'api_error', status: 404, message: "Resource 'unknown@contoso.com' does not exist." };
     const result = await execute(fakeGraphReturning(err(apiError)), { userId: 'unknown@contoso.com' });
     expect(result).toEqual(err(apiError));
   });
 
-  it('passes through the unknown-user 404 unchanged (Request_ResourceNotFound + "does not exist" → genuine error, NOT mapped to null)', async () => {
+  it('passes through the unknown-user 404 unchanged (Resource quotes the userId, NOT `manager`, so it is NOT mapped to null)', async () => {
     const unknownUser: GraphError = {
       type: 'api_error',
       status: 404,
@@ -43,6 +37,16 @@ describe('get-user-manager', () => {
     };
     const result = await execute(fakeGraphReturning(err(unknownUser)), { userId: '00000000-0000-0000-0000-000000000000' });
     expect(result).toEqual(err(unknownUser));
+  });
+
+  it("maps the no-manager-set 404 to ok(null) — Graph quotes `Resource 'manager'` (the navigation property) when the user exists but has no manager link", async () => {
+    const noMgr: GraphError = {
+      type: 'api_error',
+      status: 404,
+      message: "Request_ResourceNotFound: Resource 'manager' does not exist or one of its queried reference-property objects are not present.",
+    };
+    const result = await execute(fakeGraphReturning(err(noMgr)), { userId: 'alice@contoso.com' });
+    expect(result).toEqual(ok(null));
   });
 
   it('passes through non-404 errors unchanged (auth_failed, network_error, validation_error, 401/500 api_error)', async () => {

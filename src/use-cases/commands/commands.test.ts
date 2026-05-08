@@ -1309,6 +1309,47 @@ describe('commands', () => {
     }
   });
 
+  it('convert-mail-attachment-to-pdf rejects an image fileAttachment with a friendly hint pointing at get-mail-attachment + a vision-capable model (audit v1.0.0 §2.4)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aPng')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'screenshot.png', contentBytes: btoa('fake-png-bytes') });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPng' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('png attachment is an image');
+      expect(result.error.message).toContain('get-mail-attachment');
+      expect(result.error.message).toContain('vision-capable model');
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf rejects an image referenceAttachment with the same friendly hint (no upload-then-fail dance)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefImg')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/diagram.svg' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-svg', name: 'diagram.svg', parentReference: { driveId: 'd1' } });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefImg' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('svg attachment is an image');
+    }
+  });
+
   it('convert-mail-attachment-to-pdf rejects itemAttachment with a clear unsupported error pointing at the markdown variant', async () => {
     const fetchFn: FetchFn = async () =>
       Response.json({ '@odata.type': '#microsoft.graph.itemAttachment', item: { '@odata.type': '#microsoft.graph.message', subject: 'embedded' } });
