@@ -135,5 +135,16 @@ type FilterSelectParams = z.infer<typeof filterSelectSchema>;
 
 const filterSelectOptions: ReadonlyArray<CommandOptionMeta> = odataQueryOptions.filter((o) => o.name === 'filter' || o.name === 'select');
 
-export { appendOData, filterSelectOptions, filterSelectSchema, odataQueryOptions, odataQuerySchema, selectExpandOptions, selectExpandSchema };
+/**
+ * Subset for collection endpoints that REJECT `$skip` with
+ * `invalidRequest: $skip is not supported on this API. Only URLs returned
+ * by the API can be used to page.` (e.g. `/sites/{id}/lists`). Drop --skip
+ * from the advertised flags; pagination still works via `nextLink` →
+ * `next-page`.
+ */
+const noSkipShape = Object.fromEntries(Object.entries(odataQuerySchema.shape).filter(([key]) => key !== 'skip')) as Omit<typeof odataQuerySchema.shape, 'skip'>;
+
+const noSkipOptions: ReadonlyArray<CommandOptionMeta> = odataQueryOptions.filter((o) => o.name !== 'skip');
+
+export { appendOData, filterSelectOptions, filterSelectSchema, noSkipOptions, noSkipShape, odataQueryOptions, odataQuerySchema, selectExpandOptions, selectExpandSchema };
 export type { FilterSelectParams, ODataQueryParams, SelectExpandParams };

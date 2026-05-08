@@ -35,7 +35,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (or any non-resumption call) to bound the page size — Graph requires it; without it the endpoint returns an empty `UnknownError:`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
+    "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Most tenants accept the call without `--top` and return a sane page (~200 events); pass `--top` only when you want a smaller bound. If Graph returns an empty `UnknownError:` (rare), the CLI rewrites it to a hint pointing at the `--top` workaround.",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/events/delta()',
