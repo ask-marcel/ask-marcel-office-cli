@@ -62,6 +62,26 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), write them to <path> and replace the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. No effect on commands whose response is plain JSON.'
     );
 
+  // Override Commander's built-in `help <command>` (which silently exits 1 on
+  // unknown subcommands — audit v1.0.0 §1.2). Disable the built-in first, then
+  // register our own with the same JSON-envelope contract every other path uses.
+  program.helpCommand(false);
+  program
+    .command('help [command]', { hidden: true })
+    .description('Show docs for a command (alias of `docs <command>`). Without an argument, prints the global `--help` text.')
+    .action((commandName?: string) => {
+      if (commandName === undefined) {
+        program.outputHelp();
+        return;
+      }
+      const result = renderSingleCommand(cmdRegistry, commandName);
+      if (result.ok) {
+        process.stdout.write(`${result.value}\n`);
+        return;
+      }
+      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
+    });
+
   program
     .command('help-json')
     .description(

@@ -424,6 +424,29 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('EACCES');
   });
 
+  it('`help <unknown>` returns a JSON-envelope error rather than silently exiting (the audit-flagged v1.0.0 §1.2 inconsistency vs `<unknown>` and `docs <unknown>`)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help', 'no-such-command']));
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('no-such-command');
+  });
+
+  it('`help <known>` prints the markdown docs (alias of `docs <known>`)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help', 'list-drives']));
+    expect(out).toContain('list-drives');
+  });
+
+  it('`help` with no argument prints the global --help text', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
+    expect(out).toContain('Usage: ask-marcel');
+  });
+
   it('omitting --output-path leaves the envelope unchanged (existing consumers still get base64 in JSON)', async () => {
     const logger = createLoggerFake();
     const fs = createFileSystemFake();
