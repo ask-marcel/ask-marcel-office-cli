@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-08T02:41:09.367Z",
+  "generatedAt": "2026-05-08T04:12:57.737Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6099,7 +6099,7 @@
     },
     {
       "name": "microsoft-search-query",
-      "summary": "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph v1.0 rejects multi-entity search bodies on most tenants (`Multiple entity search is not supported in v1.0`), so this command issues SIX parallel POSTs — one per entityType — and merges the per-entity `searchHits` containers into a single `value[]`. Each container is identifiable by the resource type inside `hits[].resource`. If a sub-request fails (e.g. tenant lacks the scope for one entity), the others still return; failures show up in `partialErrors[]`. Page size is fixed at 25 per sub-request. `chatMessage` is excluded since `Chat.Read*` is unavailable.",
+      "summary": "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph v1.0 rejects multi-entity search bodies on most tenants (`Multiple entity search is not supported in v1.0`), so this command issues SIX parallel POSTs — one per entityType — and merges the per-entity `searchHits` containers into a single `value[]`. Each container is identifiable by the resource type inside `hits[].resource`. If a sub-request fails (e.g. tenant lacks the scope for one entity), the others still return; failures show up in `partialErrors[]`. Page size is fixed at 25 per sub-request and `top` is NOT exposed (Graph rejects $top in /search/query bodies). `chatMessage` is excluded since `Chat.Read*` is unavailable.",
       "category": "meta",
       "graphMethod": "POST",
       "graphPathTemplate": "/search/query",
