@@ -100,12 +100,22 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const networkErrorMessage = (e: unknown): string => {
-  if (e instanceof Error && e.name === 'TimeoutError') return 'request timed out after 60s';
-  if (e instanceof Error && e.name === 'AbortError') return 'request aborted';
-  if (e instanceof Error) return e.message;
-  if (typeof e === 'string') return e;
-  return 'network request failed';
+// Audit v1.0.0 §2.5: bare `fetch failed` / `request timed out after 60s` had
+// zero context about which Graph URL or method failed — an LLM caller cannot
+// decide whether to retry without that. Prepend the request label
+// (`GET /me/messages`) so the error envelope always names the call site.
+// Transient transport flakiness (single `fetch failed` on parallel
+// invocations that succeed sequentially) is also called out so the LLM
+// knows to retry.
+const networkErrorMessage = (e: unknown, label: string): string => {
+  const base = (() => {
+    if (e instanceof Error && e.name === 'TimeoutError') return 'request timed out after 60s';
+    if (e instanceof Error && e.name === 'AbortError') return 'request aborted';
+    if (e instanceof Error) return e.message;
+    if (typeof e === 'string') return e;
+    return 'network request failed';
+  })();
+  return `${base} (${label}) — transient; retry once before treating as permanent`;
 };
 
 type GraphErrorBody = {
@@ -161,7 +171,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `${method} ${path}`) });
     }
   };
 
@@ -186,7 +196,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (elevated)`) });
     }
   };
 
@@ -217,7 +227,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (binary)`) });
     }
   };
 
@@ -265,7 +275,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${url} (CDN follow)`) });
     }
   };
 
@@ -282,7 +292,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `PUT ${path}`) });
     }
   };
 
@@ -339,7 +349,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         } catch {
           /* ignore */
         }
-        return err({ type: 'network_error', message: networkErrorMessage(e) });
+        return err({ type: 'network_error', message: networkErrorMessage(e, `PUT chunk @ byte ${start}`) });
       }
     }
     return err({ type: 'api_error', status: 500, message: 'chunked upload completed without final response' });
@@ -364,7 +374,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(undefined);
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `DELETE ${path}`) });
     }
   };
 

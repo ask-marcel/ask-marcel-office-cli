@@ -62,6 +62,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
     );
 
+  // Audit v1.0.0 §2.3: bare `ask-marcel` (no subcommand) used to silently
+  // exit 1 with zero output. We intercept that case BEFORE Commander parses
+  // so we don't break the existing `unknown subcommand` error path. Hooked on
+  // `preAction` of every subcommand would be wrong (it never fires for the
+  // bare case); instead we override `parseAsync` itself.
+  const originalParseAsync = program.parseAsync.bind(program);
+  program.parseAsync = (async (argv?: readonly string[], options?: { readonly from?: 'node' | 'electron' | 'user' }) => {
+    const args = argv ?? process.argv;
+    const from = options?.from ?? 'node';
+    const userArgsStart = from === 'node' || from === 'electron' ? 2 : 0;
+    if (args.length <= userArgsStart) {
+      program.outputHelp();
+      return program;
+    }
+    const fixedOptions = options === undefined ? undefined : ({ from } as { from: 'node' | 'electron' | 'user' });
+    return originalParseAsync(args as string[], fixedOptions);
+  }) as typeof program.parseAsync;
+
   // Override Commander's built-in `help <command>` (which silently exits 1 on
   // unknown subcommands — audit v1.0.0 §1.2). Disable the built-in first, then
   // register our own with the same JSON-envelope contract every other path uses.

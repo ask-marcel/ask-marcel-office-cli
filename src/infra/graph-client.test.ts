@@ -59,7 +59,9 @@ describe('graph client', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('network_error');
-      expect(result.error.message).toBe('fetch failed');
+      expect(result.error.message).toContain('fetch failed');
+      expect(result.error.message).toContain('GET /me/drives');
+      expect(result.error.message).toContain('retry');
     }
   });
 
@@ -96,7 +98,7 @@ describe('graph client', () => {
     const result = await client.get('/me');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('string thrown');
+      expect(result.error.message).toContain('string thrown');
     }
   });
 
@@ -108,7 +110,7 @@ describe('graph client', () => {
     const result = await client.get('/me');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('network request failed');
+      expect(result.error.message).toContain('network request failed');
     }
   });
 
@@ -122,7 +124,7 @@ describe('graph client', () => {
     const result = await client.get('/me');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('request timed out after 60s');
+      expect(result.error.message).toContain('request timed out after 60s');
     }
   });
 
@@ -136,7 +138,7 @@ describe('graph client', () => {
     const result = await client.get('/me');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('request aborted');
+      expect(result.error.message).toContain('request aborted');
     }
   });
 
@@ -289,7 +291,7 @@ describe('graph client', () => {
     }
   });
 
-  it('fetchUrl wraps network errors via the same networkErrorMessage helper', async () => {
+  it('fetchUrl wraps network errors via the same networkErrorMessage helper, with the CDN URL labeled', async () => {
     const throwing: FetchFn = async () => {
       throw new Error('socket reset');
     };
@@ -297,7 +299,8 @@ describe('graph client', () => {
     const result = await client.fetchUrl('https://contoso.sharepoint.com/sites/x/page.html');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('socket reset');
+      expect(result.error.message).toContain('socket reset');
+      expect(result.error.message).toContain('CDN follow');
     }
   });
 
@@ -382,7 +385,7 @@ describe('graph client', () => {
     if (!result.ok) expect(result.error.type).toBe('auth_failed');
   });
 
-  it('getBinary surfaces network_error when fetch throws', async () => {
+  it('getBinary surfaces network_error when fetch throws, labeled with the binary path', async () => {
     const throwing: FetchFn = async () => {
       throw new Error('socket');
     };
@@ -390,7 +393,8 @@ describe('graph client', () => {
     const result = await client.getBinary('/me/photo/$value');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('socket');
+      expect(result.error.message).toContain('socket');
+      expect(result.error.message).toContain('/me/photo/$value');
     }
   });
 
@@ -552,7 +556,7 @@ describe('graph client', () => {
     const result = await client.put('/me/drive/root:/.ask-marcel-temp/x', new Uint8Array(total));
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('disconnected');
+      expect(result.error.message).toContain('disconnected');
     }
     expect(cleanupCalled).toBe(true);
   });
@@ -576,7 +580,7 @@ describe('graph client', () => {
     const result = await client.put('/me/drive/root:/.ask-marcel-temp/x', new Uint8Array(100));
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('boom');
+      expect(result.error.message).toContain('boom');
     }
   });
 
@@ -610,7 +614,7 @@ describe('graph client', () => {
     }
   });
 
-  it('delete wraps thrown fetch errors as network_error', async () => {
+  it('delete wraps thrown fetch errors as network_error, labeled DELETE <path>', async () => {
     const fetchFn: FetchFn = async () => {
       throw new Error('reset');
     };
@@ -618,7 +622,8 @@ describe('graph client', () => {
     const result = await client.delete('/me/drive/items/i1');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
-      expect(result.error.message).toBe('reset');
+      expect(result.error.message).toContain('reset');
+      expect(result.error.message).toContain('DELETE /me/drive/items/i1');
     }
   });
 

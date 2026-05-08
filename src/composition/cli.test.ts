@@ -424,6 +424,15 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('EACCES');
   });
 
+  it('`ask-marcel` with NO subcommand prints --help to stdout instead of silently exiting 1 (audit v1.0.0 §2.3)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel']));
+    expect(out).toContain('Usage: ask-marcel');
+    expect(out).toContain('login');
+    expect(out).toContain('list-drives');
+  });
+
   it('`help <unknown>` returns a JSON-envelope error rather than silently exiting (the audit-flagged v1.0.0 §1.2 inconsistency vs `<unknown>` and `docs <unknown>`)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
