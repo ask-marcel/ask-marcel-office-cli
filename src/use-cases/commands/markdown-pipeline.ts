@@ -68,7 +68,8 @@ const convertToMarkdown = async (
   const inlined = inlineAttachments.length > 0 ? embedInlineImages(html.value, inlineAttachments) : html.value;
   const md = htmlToMarkdown(inlined);
   if (!md.ok) return md;
-  return ok({ contentType: 'text/markdown', size: md.value.length, text: md.value });
+  // size = UTF-8 byte count (audit §2.1); `.length` is UTF-16 code units.
+  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md.value).byteLength, text: md.value });
 };
 
 export { convertToMarkdown };

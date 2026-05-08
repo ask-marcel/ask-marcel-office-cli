@@ -51,7 +51,8 @@ const xlsxToMarkdown = (bytes: Uint8Array): Result<MarkdownEnvelope, GraphError>
     return table.length === 0 ? `## ${name}` : `## ${name}\n\n${table}`;
   });
   const md = sections.join('\n\n');
-  return ok({ contentType: 'text/markdown', size: md.length, text: md });
+  // size = UTF-8 byte count (audit §2.1); `md.length` is UTF-16 code units.
+  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 
 export { csvToMarkdownTable, xlsxToMarkdown };

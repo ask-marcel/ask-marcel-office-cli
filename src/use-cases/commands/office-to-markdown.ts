@@ -91,7 +91,10 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     if (!bytes.ok) return bytes;
     const csv = new TextDecoder().decode(bytes.value);
     const md = csvToMarkdownTable(csv);
-    return ok({ contentType: 'text/markdown', size: md.length, text: md });
+    // size = UTF-8 byte count of the markdown output (matches what
+    // --output-path would write to disk). `md.length` is UTF-16 code units
+    // and undercounts files with non-ASCII content (audit §2.1).
+    return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
   }
 
   if (ext === 'docx') {

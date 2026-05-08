@@ -103,7 +103,8 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   }
   const text = [headers, bodyMd].filter((s) => s !== '').join('\n\n');
 
-  return ok({ contentType: 'text/markdown', size: text.length, text });
+  // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
+  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 
 const meta: CommandMeta = {

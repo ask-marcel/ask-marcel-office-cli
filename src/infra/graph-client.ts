@@ -207,7 +207,12 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (isJson(contentType)) return ok(await res.json());
       if (isText(contentType)) {
         const text = await res.text();
-        return ok({ contentType: contentType ?? 'text/plain', size: text.length, text });
+        // `size` is documented as the byte count of the source. JS strings are
+        // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
+        // with multi-byte chars (any non-ASCII) reported a `size` smaller than
+        // the actual byte count an `--output-path` write produced (audit §2.1).
+        // Use the encoded byte length so envelope `size` matches the disk size.
+        return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
       }
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
@@ -250,7 +255,12 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (isJson(contentType)) return ok(await res.json());
       if (isText(contentType)) {
         const text = await res.text();
-        return ok({ contentType: contentType ?? 'text/plain', size: text.length, text });
+        // `size` is documented as the byte count of the source. JS strings are
+        // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
+        // with multi-byte chars (any non-ASCII) reported a `size` smaller than
+        // the actual byte count an `--output-path` write produced (audit §2.1).
+        // Use the encoded byte length so envelope `size` matches the disk size.
+        return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
       }
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });

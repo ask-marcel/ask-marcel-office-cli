@@ -96,9 +96,10 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
     return err({ type: 'api_error', status: 400, message: 'itemAttachment.item missing @odata.type discriminator' });
   }
 
+  // size = UTF-8 byte count (audit §2.1); `md.length` is UTF-16 code units.
   const renderToEnvelope = (md: string): { contentType: 'text/markdown'; size: number; text: string } => ({
     contentType: 'text/markdown',
-    size: md.length,
+    size: new TextEncoder().encode(md).byteLength,
     text: md,
   });
 
