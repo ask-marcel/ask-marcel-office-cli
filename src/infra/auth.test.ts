@@ -564,3 +564,87 @@ describe('auth manager elevated token', () => {
     }
   });
 });
+
+describe('auth manager concurrent-call serialization (audit round-5 #3)', () => {
+  it('two concurrent getAccessToken calls during first-time auth share ONE browser acquire (no race / no auth_cancelled on the loser)', async () => {
+    const fs = createFileSystemFake();
+    let acquireCallCount = 0;
+    let resolveLogin: ((value: BrowserTokenResult) => void) | null = null;
+    const slowBrowser: BrowserAuth = {
+      acquireToken: async () => {
+        acquireCallCount += 1;
+        return new Promise<BrowserTokenResult>((resolve) => {
+          resolveLogin = resolve;
+        });
+      },
+      acquireElevatedToken: async () => null,
+      close: async () => {},
+    };
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, createLoggerFake(), fs);
+
+    const a = auth.getAccessToken();
+    const b = auth.getAccessToken();
+    // Let the microtasks settle so both calls have entered acquireViaBrowserShared.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(acquireCallCount).toBe(1);
+
+    if (resolveLogin) resolveLogin(futureToken());
+    const [resA, resB] = await Promise.all([a, b]);
+    expect(resA.ok).toBe(true);
+    expect(resB.ok).toBe(true);
+    expect(acquireCallCount).toBe(1);
+  });
+
+  it('after one shared login completes, a follow-up call hits the cache (the in-flight slot was cleared on settle)', async () => {
+    const fs = createFileSystemFake();
+    let acquireCallCount = 0;
+    const browser: BrowserAuth = {
+      acquireToken: async () => {
+        acquireCallCount += 1;
+        return futureToken();
+      },
+      acquireElevatedToken: async () => null,
+      close: async () => {},
+    };
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, createLoggerFake(), fs);
+
+    const first = await auth.getAccessToken();
+    expect(first.ok).toBe(true);
+    expect(acquireCallCount).toBe(1);
+
+    // Second call: cache is now warm — should not invoke the browser again.
+    const second = await auth.getAccessToken();
+    expect(second.ok).toBe(true);
+    expect(acquireCallCount).toBe(1);
+  });
+
+  it('two concurrent getElevatedAccessToken calls share ONE elevated recapture (same serialization for the elevated path)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
+    let elevatedCallCount = 0;
+    let resolveElevated: ((value: AccessToken) => void) | null = null;
+    const slowBrowser: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => {
+        elevatedCallCount += 1;
+        return new Promise<AccessToken | null>((resolve) => {
+          resolveElevated = (v) => resolve(v);
+        });
+      },
+      close: async () => {},
+    };
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, createLoggerFake(), fs);
+
+    const a = auth.getElevatedAccessToken();
+    const b = auth.getElevatedAccessToken();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(elevatedCallCount).toBe(1);
+
+    if (resolveElevated) resolveElevated(futureElevated());
+    const [resA, resB] = await Promise.all([a, b]);
+    expect(resA.ok).toBe(true);
+    expect(resB.ok).toBe(true);
+    expect(elevatedCallCount).toBe(1);
+  });
+});

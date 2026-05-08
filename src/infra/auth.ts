@@ -127,6 +127,25 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, l
     }
   };
 
+  // Audit round-5 #3: concurrent first-time auth was racing — two parallel
+  // commands would both fall through to acquireViaBrowser, one would win and
+  // one would return `auth_cancelled` from the lost Playwright context. Cache
+  // the in-flight browser-acquire promise so concurrent callers share one
+  // login attempt. Cleared on settle (success or failure) so the next call
+  // re-checks the cache instead of returning a stale failure.
+  let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
+  const acquireViaBrowserShared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightBrowserAcquire !== null) {
+      logger.info('auth.ladder.rung', { rung: 'browser_shared_in_flight' });
+      return inFlightBrowserAcquire;
+    }
+    const launched = acquireViaBrowser();
+    inFlightBrowserAcquire = launched.finally(() => {
+      inFlightBrowserAcquire = null;
+    });
+    return inFlightBrowserAcquire;
+  };
+
   const getAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
     const cached = await readCache();
     if (cached) {
@@ -140,7 +159,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, l
       const refreshed = await refreshToken(cached);
       if (refreshed.ok) return refreshed;
     }
-    return acquireViaBrowser();
+    return acquireViaBrowserShared();
   };
 
   const ELEVATED_BUFFER_SECONDS = 300;
@@ -176,6 +195,21 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, l
     }
   };
 
+  // Same in-flight serialization for the elevated path — concurrent callers
+  // share one Playwright instance instead of racing.
+  let inFlightElevatedRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureElevatedShared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightElevatedRecapture !== null) {
+      logger.info('auth.elevated.shared_in_flight');
+      return inFlightElevatedRecapture;
+    }
+    const launched = recaptureElevated();
+    inFlightElevatedRecapture = launched.finally(() => {
+      inFlightElevatedRecapture = null;
+    });
+    return inFlightElevatedRecapture;
+  };
+
   const getElevatedAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
     const fresh = freshElevatedToken(await readCache());
     const validated = fresh !== undefined ? accessToken(fresh) : null;
@@ -185,7 +219,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, l
     }
     // Elevated absent, expired, or malformed; need to re-capture. The
     // persistent profile cookies do the silent SSO, no UI prompt.
-    return recaptureElevated();
+    return recaptureElevatedShared();
   };
 
   const logout = async (): Promise<Result<void, AuthError>> => {
