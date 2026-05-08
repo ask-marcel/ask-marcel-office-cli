@@ -24,6 +24,7 @@ const meta: CommandMeta = {
       key: 'messageRuleId',
       required: true,
       description: 'Message rule ID. Returned by `list-mail-rules`.',
+      aliases: [{ name: 'rule-id', key: 'ruleId' }],
     },
   ],
   example: "ask-marcel get-mail-rule --message-rule-id 'AQAAANC...'",

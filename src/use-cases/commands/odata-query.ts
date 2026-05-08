@@ -88,7 +88,8 @@ const odataQueryOptions: ReadonlyArray<CommandOptionMeta> = [
     name: 'filter',
     key: 'filter',
     required: false,
-    description: 'OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type.',
+    description:
+      "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type.",
   },
   {
     name: 'orderby',
