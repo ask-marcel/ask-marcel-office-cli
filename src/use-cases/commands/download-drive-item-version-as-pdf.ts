@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { inlineBinary } from './fetch-raw-bytes.ts';
+import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 
@@ -28,9 +28,20 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const name = (meta.value as { name?: string }).name ?? '';
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
+    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
+    if (!raw.ok) return raw;
+    return ok({
+      ...raw.value,
+      passthrough: true,
+      note: isPdfSource(name)
+        ? `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`
+        : `source is plain-text (${name}); raw bytes returned without Graph format=pdf conversion`,
+    });
   }
-  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content?format=pdf`, { elevated: true });
+  return tagPdfPassthrough(
+    await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content?format=pdf`, { elevated: true }),
+    `version ${versionId} of ${name}`
+  );
 };
 
 const meta: CommandMeta = {
@@ -61,7 +72,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-drive-item-version-as-pdf --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
   responseShape:
-    '`{ contentType: "application/pdf", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
+    '`{ contentType: "application/pdf", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape with `passthrough: true` + a `note` so the caller can tell conversion was deliberately skipped. **If Graph silently falls back to raw bytes** (some historical versions of pptx/docx — verified live), the response also carries `passthrough: true` + a sharp note saying the bytes are the source, NOT a PDF — save them with the source extension, not `.pdf`. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
 };
 
 export { execute, meta, schema };

@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { inlineBinary } from './fetch-raw-bytes.ts';
+import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
@@ -77,7 +77,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
     return err({ type: 'api_error', status: 500, message: 'upload returned no driveItem id' });
   }
 
-  const converted = await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`);
+  const converted = tagPdfPassthrough(await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
   return converted;
@@ -102,7 +102,7 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   }
   const refExt = extensionOf(name);
   if (IMAGE_EXTENSIONS.has(refExt)) return err({ type: 'api_error', status: 415, message: imageHint(refExt) });
-  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
+  return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {

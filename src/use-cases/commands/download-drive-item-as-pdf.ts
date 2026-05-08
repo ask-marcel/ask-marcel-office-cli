@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { inlineBinary } from './fetch-raw-bytes.ts';
+import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 
@@ -42,7 +42,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
         : `source is plain-text (${name}); raw bytes returned without Graph format=pdf conversion`,
     });
   }
-  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
+  return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
 };
 
 const meta: CommandMeta = {

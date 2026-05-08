@@ -184,3 +184,50 @@ describe('inlineBinary', () => {
     if (result.ok) expect(result.value.size).toBe(6); // floor(8 * 3 / 4)
   });
 });
+
+describe('tagPdfPassthrough', () => {
+  it('passes through unchanged when the response IS application/pdf (the conversion succeeded — no warning needed)', async () => {
+    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const inner = ok({ contentType: 'application/pdf', size: 100, base64: 'JVBERi0=' });
+    const tagged = tagPdfPassthrough(inner, 'deck.pptx');
+    expect(tagged).toEqual(inner);
+  });
+
+  it('passes through err results unchanged (no point tagging a failure)', async () => {
+    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const inner = err({ type: 'api_error' as const, status: 500, message: 'boom' });
+    const tagged = tagPdfPassthrough(inner, 'deck.pptx');
+    expect(tagged).toEqual(inner);
+  });
+
+  it('attaches passthrough:true and a "save with source extension" note when the response is NOT application/pdf despite a format=pdf request (audit round-5 #2 — the silent raw-bytes fallback)', async () => {
+    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const inner = ok({ contentType: 'application/octet-stream', size: 980167, base64: 'rawpptx' });
+    const tagged = tagPdfPassthrough(inner, 'roadmap26.pptx');
+    expect(tagged.ok).toBe(true);
+    if (tagged.ok) {
+      const v = tagged.value as { contentType: string; passthrough: true; note: string };
+      expect(v.contentType).toBe('application/octet-stream');
+      expect(v.passthrough).toBe(true);
+      expect(v.note).toContain('roadmap26.pptx');
+      expect(v.note).toContain('format=pdf conversion was NOT applied');
+      expect(v.note).toContain('save with the source extension');
+    }
+  });
+
+  it('also tags when the response carries a non-pdf MIME like vnd.openxmlformats-officedocument.presentationml.presentation', async () => {
+    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const inner = ok({
+      contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      size: 980167,
+      base64: 'rawpptx',
+    });
+    const tagged = tagPdfPassthrough(inner, 'deck.pptx');
+    expect(tagged.ok).toBe(true);
+    if (tagged.ok) {
+      const v = tagged.value as { passthrough: boolean; note: string };
+      expect(v.passthrough).toBe(true);
+      expect(v.note).toContain('vnd.openxmlformats-officedocument.presentationml.presentation');
+    }
+  });
+});

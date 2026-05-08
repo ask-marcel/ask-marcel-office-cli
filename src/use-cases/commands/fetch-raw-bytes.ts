@@ -104,3 +104,31 @@ export const inlineBinary = async (graph: GraphClient, contentPath: string, opts
   }
   return toInlineBinary(value);
 };
+
+/**
+ * Detect Graph's silent-raw-bytes fallback on `?format=pdf` requests.
+ *
+ * When `format=pdf` succeeds, the response contentType is `application/pdf`.
+ * For some inputs (notably historical-version pptx on certain tenants, or
+ * reference-attachment edge cases) Graph silently falls back to returning
+ * the raw source bytes — same envelope shape, but contentType is the
+ * source MIME (or `application/octet-stream`). The audit (round-5 #2)
+ * caught this happening on `download-drive-item-version-as-pdf` for v79
+ * of a pptx: the response said `contentType: "application/octet-stream"`
+ * with the exact source byte size, and an LLM that saved it as `.pdf`
+ * would have had a corrupt file.
+ *
+ * Tag the result with `passthrough: true` and a sharp note so the LLM
+ * knows the conversion didn't run and saves the bytes with the source
+ * extension instead of `.pdf`.
+ */
+export const tagPdfPassthrough = (result: Result<InlineBinary, GraphError>, sourceLabel: string): Result<unknown, GraphError> => {
+  if (!result.ok) return result;
+  const ct = result.value.contentType;
+  if (ct.startsWith('application/pdf')) return result;
+  return ok({
+    ...result.value,
+    passthrough: true,
+    note: `Graph returned \`${ct}\` for ${sourceLabel} — format=pdf conversion was NOT applied (likely no Office Online runtime for this version/format on this tenant). The bytes are the raw source; save with the source extension, not .pdf.`,
+  });
+};
