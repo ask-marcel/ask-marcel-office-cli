@@ -15,7 +15,7 @@ export type CommandManifestEntry = {
 };
 
 export const PAGINATION_HINT =
-  'Paginated by Microsoft Graph. The response may include `@odata.nextLink`; pass that URL to `next-page --url <link>` and repeat until the field is absent.';
+  'Paginated by Microsoft Graph. The CLI hoists `@odata.nextLink` out of `data` to the **top-level `nextLink`** field of the response envelope (and `@odata.deltaLink` to top-level `deltaLink` for delta commands). Pass that URL to `next-page --url <link>` and repeat until the field is absent. Do NOT look for `data["@odata.nextLink"]` — the presenter strips it from `data` so the cursor is always at envelope level.';
 
 export type CommandManifest = {
   readonly package: string;

@@ -23,7 +23,8 @@ const meta: CommandMeta = {
     ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-folder-messages-delta --mail-folder-id 'inbox'",
-  responseShape: 'collection of Microsoft Graph `message` resources plus `@odata.deltaLink` / `@odata.nextLink`',
+  responseShape:
+    'collection of Microsoft Graph `message` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page (CLI strips the original `@odata.*` keys from `data`).',
   pagination: true,
 };
 

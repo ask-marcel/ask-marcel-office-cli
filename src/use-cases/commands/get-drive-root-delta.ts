@@ -15,7 +15,8 @@ const meta: CommandMeta = {
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-delta',
   options: [...odataQueryOptions],
   example: 'ask-marcel get-drive-root-delta',
-  responseShape: 'collection of Microsoft Graph `driveItem` resources plus `@odata.deltaLink` / `@odata.nextLink`',
+  responseShape:
+    'collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,
 };
 
