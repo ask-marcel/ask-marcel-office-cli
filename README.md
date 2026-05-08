@@ -252,8 +252,8 @@ ask-marcel search-onedrive-files --drive-id abc123 --query "report"
 # get Excel table data
 ask-marcel list-excel-table-rows --drive-id abc123 --item-id xyz789 --table-id table1
 
-# search SharePoint sites
-ask-marcel search-sharepoint-sites
+# search SharePoint sites by name (free-text)
+ask-marcel search-sharepoint-sites-by-name --query "marketing"
 
 # list SharePoint site lists
 ask-marcel list-sharepoint-site-lists --site-id contoso.sharepoint.com,1234-5678
@@ -281,15 +281,16 @@ Every command writes a single JSON line to **stdout** (success or error — ther
 {
   "ok": true,
   "data": { /* the Graph payload, or whatever the use-case returned */ },
-  "nextLink": "https://graph.microsoft.com/v1.0/me/messages?$skip=10",  // only on paginated responses
-  "count": 42                                                            // only when @odata.count is present
+  "nextLink": "https://graph.microsoft.com/v1.0/me/messages?$skip=10",   // paginated responses
+  "deltaLink": "https://graph.microsoft.com/v1.0/me/events/delta?$deltatoken=ABC", // delta-resumption responses
+  "count": 42                                                             // when @odata.count is present
 }
 
 // Error
 { "ok": false, "error": "Authentication cancelled" }
 ```
 
-`@odata.nextLink` and `@odata.count` from the Graph payload are lifted to the envelope's top level and removed from `data`, so consumers don't have to know the OData spelling.
+`@odata.nextLink`, `@odata.deltaLink`, and `@odata.count` from the Graph payload are lifted to the envelope's top level and removed from `data`, so consumers don't have to know the OData spelling. **Always check the top-level `nextLink` (and `deltaLink` for `*-delta` commands) — never reach into `data["@odata.nextLink"]`; it's been moved.** This applies uniformly across every paginated `list-*` / `search-*` / `*-delta` command.
 
 ### OData query passthrough
 
@@ -298,10 +299,23 @@ Every `list-*`, `search-*`, and `*-delta` command accepts the six standard OData
 ```bash
 ask-marcel list-mail-messages --top 5 --select id,subject,from,receivedDateTime
 ask-marcel list-recent-files --filter "name eq 'budget.xlsx'" --orderby lastModifiedDateTime desc
-ask-marcel list-shared-with-me --select id,name,webUrl --top 10
+ask-marcel list-folder-files --drive-id b!abc --item-id 01DEF --select id,name --top 10
 ```
 
-Available on every paginated list/search command: `--top <n>`, `--skip <n>`, `--select <csv>`, `--filter <kql>`, `--orderby <kql>`, `--expand <nav>`. Four commands omit OData passthrough because their hard-coded `$filter` would collide (`list-conversation-messages`, `list-incomplete-todo-tasks`, `list-incomplete-planner-tasks`, `search-onenote-pages`).
+Available on every paginated list/search command: `--top <n>`, `--skip <n>`, `--select <csv>`, `--filter <kql>`, `--orderby <kql>`, `--expand <nav>`. `--top` is capped at 1000 with a clear validation error (Graph silently truncates beyond that on every endpoint). A few commands narrow this set when Graph rejects specific params: `list-team-channels` (only `--filter` and `--select` are honored); `list-conversation-messages`, `list-incomplete-todo-tasks`, `list-incomplete-planner-tasks`, `search-onenote-pages` (omit `--filter` because the path pins one); `list-shared-with-me`, `list-calendar-events-delta`, `list-calendar-view-delta` (Graph honors no query params here — `--top` on the delta endpoints is translated to a `Prefer: odata.maxpagesize` header internally).
+
+### Writing bytes to disk (`--output-path`)
+
+Every download / convert command (PDF, image, raw bytes, MIME, OneNote HTML, the markdown converters) inlines its bytes into the JSON envelope as `{ contentType, size, base64 }` (binary) or `{ contentType, size, text }` (text). For multi-MB payloads — a 5 MB PDF round-tripped through stdout would blow most LLM context windows — pass the **global** `--output-path <path>` flag and the CLI lands the bytes locally:
+
+```bash
+ask-marcel convert-mail-attachment-to-pdf \
+  --message-id "AAMkAD..." --attachment-id "AAMkAD...attach1" \
+  --output-path /tmp/deck.pdf
+# {"ok":true,"data":{"contentType":"application/pdf","size":4837291,"savedTo":"/tmp/deck.pdf"}}
+```
+
+`--output-path` decodes `base64` (or writes `text`) to the path and replaces the inline field with `savedTo: <path>` in the response. Parent directories are created on demand. Applying the flag to a command that returns plain JSON (no `base64` / no `text` field — e.g. `get-current-user`) returns a clear `{ok:false, error: "--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake. The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 
 ### Pagination
 

@@ -47,6 +47,19 @@ describe('presenter output (v1 envelope)', () => {
     expect(parsed.data).toEqual({ value: [{ id: 'm1' }, { id: 'm2' }] });
   });
 
+  it('lifts @odata.deltaLink to the top level alongside nextLink so resumption tokens sit at the envelope level (audit v1.0.0 §4)', async () => {
+    const logger = createLoggerFake();
+    const data = {
+      value: [{ id: 'e1', subject: 'standup' }],
+      '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/events/delta()?$deltatoken=ABC',
+    };
+    const out = await captureStream('stdout', () => render(data, logger));
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; data: Record<string, unknown>; deltaLink?: string };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.deltaLink).toBe('https://graph.microsoft.com/v1.0/me/events/delta()?$deltatoken=ABC');
+    expect(parsed.data).toEqual({ value: [{ id: 'e1', subject: 'standup' }] });
+  });
+
   it('omits nextLink and count when neither @odata field is present', async () => {
     const logger = createLoggerFake();
     const out = await captureStream('stdout', () => render({ id: 'me' }, logger));

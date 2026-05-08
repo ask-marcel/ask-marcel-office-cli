@@ -24,6 +24,7 @@ const meta: CommandMeta = {
       key: 'onenoteSectionId',
       required: true,
       description: 'OneNote section ID inside the site.',
+      aliases: [{ name: 'section-id', key: 'sectionId' }],
     },
     ...odataQueryOptions,
   ],
