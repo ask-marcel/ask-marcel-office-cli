@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-08T10:59:28.679Z",
+  "generatedAt": "2026-05-08T13:52:54.899Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -175,7 +175,7 @@
         }
       ],
       "example": "ask-marcel download-drive-item-version-as-pdf --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`."
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape with `passthrough: true` + a `note` so the caller can tell conversion was deliberately skipped. **If Graph silently falls back to raw bytes** (some historical versions of pptx/docx — verified live), the response also carries `passthrough: true` + a sharp note saying the bytes are the source, NOT a PDF — save them with the source extension, not `.pdf`. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`."
     },
     {
       "name": "download-drive-item-version-content",
@@ -2279,7 +2279,7 @@
     },
     {
       "name": "list-drive-item-versions",
-      "summary": "List the historical versions of a OneDrive / SharePoint file (each save creates a new version).",
+      "summary": "List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version's `id` is a stringified float like `\"79.0\"` (NOT an integer like `79`) — pass it literally to sibling commands such as `download-drive-item-version-content` / `-as-pdf` / `-as-markdown`; numeric coercion silently fails because Graph rejects `79` against a path templated as `{version-id}`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions",
@@ -4434,7 +4434,7 @@
     },
     {
       "name": "list-recent-files",
-      "summary": "List the signed-in user's most recently used / opened OneDrive and SharePoint files, ranked by Microsoft's recency signal. The strongest single answer to \"what is this user working on right now?\".",
+      "summary": "List the signed-in user's most recently used / opened OneDrive and SharePoint files, ranked by Microsoft's recency signal. The strongest single answer to \"what is this user working on right now?\". Note: Graph's recent-files feed is signal-driven and can lag the underlying drive by 24-48 hours — `lastModifiedDateTime` here may be older than the file's true mtime. For \"what is the actual latest version?\" call `list-drive-item-versions` on a specific item.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/recent",
