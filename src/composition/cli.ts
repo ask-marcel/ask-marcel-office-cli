@@ -251,7 +251,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         }
         const failMessage = ((): string => {
           if (persisted.error.type === 'no_inlined_bytes')
-            return `--output-path: ${name} did not return inlined bytes (no base64 or text field in response — use this flag only with download/convert commands)`;
+            return `--output-path: ${name} did not return inlined bytes — this flag works with the families that produce a body to write: download-drive-item-as-pdf / -as-markdown, download-drive-item-version-as-pdf / -as-markdown / -content, download-onedrive-file-content, convert-mail-attachment-to-pdf / -to-markdown, convert-mail-to-markdown, get-mail-message-mime, get-my-profile-photo, get-onenote-page-content, get-sharepoint-site-onenote-page-content. Plain JSON commands (list-*, get-*-user, get-organization, list-recent-files, etc.) don't have a body to write — drop the flag for those.`;
           if (persisted.error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
           return `--output-path: write failed: ${persisted.error.message}`;
         })();

@@ -7,7 +7,8 @@ const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min
 const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/versions`, baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'List the historical versions of a OneDrive / SharePoint file (each save creates a new version).',
+  summary:
+    'List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version\'s `id` is a stringified float like `"79.0"` (NOT an integer like `79`) — pass it literally to sibling commands such as `download-drive-item-version-content` / `-as-pdf` / `-as-markdown`; numeric coercion silently fails because Graph rejects `79` against a path templated as `{version-id}`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions',
