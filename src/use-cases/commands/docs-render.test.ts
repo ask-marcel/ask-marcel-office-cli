@@ -97,4 +97,30 @@ describe('renderCommandMarkdown', () => {
     const md = renderCommandMarkdown(listDrives);
     expect(md).not.toContain('**Pagination:**');
   });
+
+  it('appends an _(aliases: ...)_ suffix on options with aliases so the markdown surface matches the manifest (audit v1.0.0 §3.2)', () => {
+    const aliased: CommandManifestEntry = {
+      ...calendarEvent,
+      options: [
+        {
+          name: 'event-id',
+          key: 'eventId',
+          required: true,
+          description: 'The Graph event ID.',
+          aliases: [
+            { name: 'id', key: 'id' },
+            { name: 'evt-id', key: 'evtId' },
+          ],
+        },
+      ],
+    };
+    const md = renderCommandMarkdown(aliased);
+    expect(md).toContain('_(aliases: `--id`, `--evt-id`)_');
+  });
+
+  it('still renders options without aliases unchanged (no suffix) so the format is unambiguous', () => {
+    const md = renderCommandMarkdown(calendarEvent);
+    expect(md).toContain('| `--event-id` | The Graph event ID. |');
+    expect(md).not.toContain('aliases:');
+  });
 });

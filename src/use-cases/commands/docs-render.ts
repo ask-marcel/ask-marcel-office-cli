@@ -59,6 +59,12 @@ const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
 
 const sortByName = (a: CommandManifestEntry, b: CommandManifestEntry): number => a.name.localeCompare(b.name);
 
+const renderAliasSuffix = (aliases: CommandManifestEntry['options'][number]['aliases']): string => {
+  if (!aliases || aliases.length === 0) return '';
+  const names = aliases.map((a) => `\`--${a.name}\``).join(', ');
+  return ` _(aliases: ${names})_`;
+};
+
 const renderRequiredParams = (entry: CommandManifestEntry): string => {
   if (entry.options.length === 0) return '_(none)_';
   return entry.options.map((o) => `\`--${o.name}\``).join(', ');
@@ -94,7 +100,7 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.options.length > 0) {
     lines.push('', '## Options', '');
     lines.push('| Flag | Description |', '|------|-------------|');
-    for (const o of entry.options) lines.push(`| \`--${o.name}\` | ${o.description} |`);
+    for (const o of entry.options) lines.push(`| \`--${o.name}\` | ${o.description}${renderAliasSuffix(o.aliases)} |`);
   }
   if (entry.bodyTemplate) lines.push('', '## Request body', '', '```json', entry.bodyTemplate, '```');
   lines.push('', '## Example', '', '```bash', entry.example, '```');
