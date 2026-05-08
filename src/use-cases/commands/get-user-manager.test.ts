@@ -35,6 +35,16 @@ describe('get-user-manager', () => {
     expect(result).toEqual(err(apiError));
   });
 
+  it('passes through the unknown-user 404 unchanged (Request_ResourceNotFound + "does not exist" → genuine error, NOT mapped to null)', async () => {
+    const unknownUser: GraphError = {
+      type: 'api_error',
+      status: 404,
+      message: "Request_ResourceNotFound: Resource '00000000-0000-0000-0000-000000000000' does not exist or one of its queried reference-property objects are not present.",
+    };
+    const result = await execute(fakeGraphReturning(err(unknownUser)), { userId: '00000000-0000-0000-0000-000000000000' });
+    expect(result).toEqual(err(unknownUser));
+  });
+
   it('passes through non-404 errors unchanged (auth_failed, network_error, validation_error, 401/500 api_error)', async () => {
     const apiError: GraphError = { type: 'api_error', status: 401, message: 'Unauthorized' };
     const result = await execute(fakeGraphReturning(err(apiError)), { userId: 'bob@contoso.com' });

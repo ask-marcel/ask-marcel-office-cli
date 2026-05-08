@@ -29,8 +29,42 @@ const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx'
 const PPTX_HINT =
   'pptx not supported by `*-as-markdown`. Use the corresponding `*-as-pdf` command — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets.';
 
-const GENERIC_HINT = (ext: string): string =>
-  `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`;
+// Extensions Graph's `?format=pdf` does NOT accept — pointing the user at
+// `*-as-pdf` for these would trade one InputFormatNotSupported error for
+// another. Surfaced here as a no-conversion-path-exists hint so the user
+// can fetch raw bytes via `get-mail-attachment` / `download-onedrive-file-content`
+// and process locally.
+const PDF_UNSUPPORTED: ReadonlySet<string> = new Set([
+  'zip',
+  'rar',
+  '7z',
+  'tar',
+  'gz',
+  'tgz',
+  'mp3',
+  'mp4',
+  'mov',
+  'wav',
+  'avi',
+  'mkv',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'exe',
+  'dmg',
+  'iso',
+]);
+
+const GENERIC_HINT = (ext: string): string => {
+  if (PDF_UNSUPPORTED.has(ext)) {
+    return `${ext} cannot be converted to markdown OR pdf — Graph rejects this extension on both paths. Fetch the raw bytes via \`get-mail-attachment\` (mail context) or \`download-onedrive-file-content\` (drive context) and process locally; pair with \`--output-path\` to land them on disk.`;
+  }
+  return `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`;
+};
 
 const extensionOf = (filename: string): string => {
   const dot = filename.lastIndexOf('.');

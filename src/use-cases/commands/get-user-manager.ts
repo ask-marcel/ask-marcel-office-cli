@@ -12,12 +12,20 @@ const execute: Command['execute'] = async (graph, params) => {
   const path = appendOData(`/users/${parsed.data.userId}/manager`, parsed.data);
   const result = await graph.get(path);
   if (result.ok) return result;
-  // Mirror `get-my-manager`: when no manager is set in the directory Graph
-  // returns 404 `Request_ResourceNotFound`. Map that one specific case to
-  // `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from a
-  // genuine 404 (e.g. unknown userId, which surfaces as
-  // `Resource '<id>' does not exist`).
-  if (result.error.type === 'api_error' && result.error.status === 404 && result.error.message.includes('Request_ResourceNotFound')) {
+  // Disambiguate two distinct 404 cases — both are `Request_ResourceNotFound`
+  // but the inner message differs:
+  //   - "Resource not found."                                               → user exists, no manager set → ok(null)
+  //   - "Resource '<id>' does not exist or one of its queried reference-…"  → user does NOT exist        → pass through err
+  // The audit (v1.0.0 §1.3) caught us collapsing both to ok(null), which
+  // violated the documented contract. The discriminator is the absence of
+  // "does not exist" in the inner message — that phrase only appears in the
+  // unknown-user case.
+  if (
+    result.error.type === 'api_error' &&
+    result.error.status === 404 &&
+    result.error.message.includes('Request_ResourceNotFound') &&
+    !result.error.message.includes('does not exist')
+  ) {
     return ok(null);
   }
   return result;

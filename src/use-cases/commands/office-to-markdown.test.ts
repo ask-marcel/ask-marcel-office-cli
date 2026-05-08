@@ -118,6 +118,18 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
+  it('errs with a "fetch raw bytes" hint for archive / image / binary extensions Graph rejects on BOTH `*-as-markdown` AND `*-as-pdf` (zip is the canonical case — audit v1.0.0 §2.8)', async () => {
+    const graph = noopGraph({});
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'sources.zip');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('zip cannot be converted to markdown OR pdf');
+      expect(result.error.message).toContain('get-mail-attachment');
+      expect(result.error.message).toContain('download-onedrive-file-content');
+    }
+  });
+
   it('errs with `<no-extension>` placeholder when the filename has no dot', async () => {
     const graph = noopGraph({});
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'README');

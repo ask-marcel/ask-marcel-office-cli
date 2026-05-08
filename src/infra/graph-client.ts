@@ -126,7 +126,12 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
-  if (typeof tag === 'string' && typeof message === 'string') {
+  // Some Graph endpoints (Planner is the canonical case) return a non-empty
+  // outer error block but with `code: ""`. The previous code would format
+  // that as `: <message>` — leading colon, no prefix — which the v1.0.0 audit
+  // §2.7 flagged as malformed. Only prepend the tag if it's actually a
+  // non-empty string.
+  if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
     return { type: 'api_error', status: res.status, message: `${tag}: ${message}` };
   }
   return { type: 'api_error', status: res.status, message: message ?? res.statusText };

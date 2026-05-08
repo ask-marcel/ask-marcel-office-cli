@@ -259,6 +259,18 @@ describe('graph client', () => {
     }
   });
 
+  it('drops the empty-string `code` prefix Graph Planner returns on bogus IDs (was rendering as `": message"` — audit v1.0.0 §2.7)', async () => {
+    const body = JSON.stringify({ error: { code: '', message: 'The requested item is not found.' } });
+    const fetchFn: FetchFn = async () => new Response(body, { status: 404, statusText: 'Not Found', headers: { 'content-type': 'application/json' } });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/planner/tasks/BOGUS');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toBe('The requested item is not found.');
+      expect(result.error.message.startsWith(':')).toBe(false);
+    }
+  });
+
   it('fetchUrl also extracts the camelCase innerError.code (SharePoint streamContent uses camelCase, Graph uses lowercase)', async () => {
     const body = JSON.stringify({
       error: {
