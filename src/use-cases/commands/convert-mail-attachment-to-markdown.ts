@@ -33,6 +33,14 @@ const decodeBase64 = (b64: string): Uint8Array => {
 const PPTX_HINT =
   'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets.';
 
+// Audit v1.0.0 §bug-6: there is no PDF→markdown path in this CLI (no bundled
+// PDF parser). The previous fallback pointed users at convert-…-to-pdf which
+// just returns the PDF bytes unchanged — circular. Surface a hint explaining
+// the actual workflow: get the bytes, then feed them to a vision-capable
+// model OR run an external PDF→text tool locally.
+const PDF_NO_MARKDOWN_HINT =
+  'pdf attachment cannot be converted to markdown — this CLI does not bundle a PDF parser, and `convert-mail-attachment-to-pdf` would just return the same PDF bytes unchanged. Use `get-mail-attachment --message-id <id> --attachment-id <id>` to fetch the bytes (base64) or pair `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land them on disk, then feed the PDF into a vision-capable model directly (recommended) or run an external PDF→text tool (pdftotext, pdf-parse, etc.).';
+
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
 
 const imageHint = (ext: string): string =>
@@ -65,6 +73,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   if (ext === 'docx') return docxToMarkdown(bytes);
   if (ext === 'xlsx') return xlsxToMarkdown(bytes);
   if (ext === 'pptx') return err({ type: 'api_error', status: 415, message: PPTX_HINT });
+  if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
   return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
 };

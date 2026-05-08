@@ -249,11 +249,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
           render(persisted.value, logger);
           return;
         }
-        fail(
-          persisted.error.type === 'no_inlined_bytes'
-            ? `--output-path: ${name} did not return inlined bytes (no base64 or text field in response — use this flag only with download/convert commands)`
-            : `--output-path: write failed: ${persisted.error.message}`
-        );
+        const failMessage = ((): string => {
+          if (persisted.error.type === 'no_inlined_bytes')
+            return `--output-path: ${name} did not return inlined bytes (no base64 or text field in response — use this flag only with download/convert commands)`;
+          if (persisted.error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
+          return `--output-path: write failed: ${persisted.error.message}`;
+        })();
+        fail(failMessage);
       });
     }
   }

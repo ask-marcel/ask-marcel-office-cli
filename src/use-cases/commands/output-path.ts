@@ -23,7 +23,7 @@ import type { FileSystem } from '../ports/filesystem.ts';
  * silently no-op'ing.
  */
 
-export type OutputPathError = { readonly type: 'no_inlined_bytes' } | { readonly type: 'write_failed'; readonly message: string };
+export type OutputPathError = { readonly type: 'no_inlined_bytes' } | { readonly type: 'write_failed'; readonly message: string } | { readonly type: 'empty_path' };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -35,7 +35,11 @@ const decodeBase64 = (b64: string): Uint8Array => {
 };
 
 export const persistIfRequested = async (fs: FileSystem, outputPath: string | undefined, data: unknown): Promise<Result<unknown, OutputPathError>> => {
-  if (outputPath === undefined || outputPath === '') return ok(data);
+  if (outputPath === undefined) return ok(data);
+  // Audit v1.0.0 §bug-5: `--output-path ""` was silently treated as
+  // "no flag", which masked shell-quoting mistakes (`--output-path "$VAR"`
+  // where VAR is empty). Reject with a clear error instead.
+  if (outputPath === '') return err({ type: 'empty_path' });
   if (!isPlainRecord(data)) return err({ type: 'no_inlined_bytes' });
 
   const base64 = data['base64'];

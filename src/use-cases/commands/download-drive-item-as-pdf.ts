@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { inlineBinary } from './fetch-raw-bytes.ts';
@@ -23,13 +23,24 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // short-circuit on (a) plain-text source extensions and (b) `pdf`
   // sources, returning the raw bytes via /content with no `?format`
   // query — the user wants a PDF, the source IS a PDF, no conversion
-  // needed.
+  // needed. Audit v1.0.0 §bug-4: tag the short-circuit case with
+  // `passthrough: true` + `note` so the caller can tell whether
+  // conversion actually ran.
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+    if (!raw.ok) return raw;
+    const payload = raw.value as { contentType: string; size: number; base64: string };
+    return ok({
+      ...payload,
+      passthrough: true,
+      note: isPdfSource(name)
+        ? `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`
+        : `source is plain-text (${name}); raw bytes returned without Graph format=pdf conversion`,
+    });
   }
   return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`);
 };
@@ -54,7 +65,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
-    '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType). Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
+    '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
 };
 
 export { execute, meta, schema };

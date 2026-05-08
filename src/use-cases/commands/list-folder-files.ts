@@ -18,7 +18,9 @@ const meta: CommandMeta = {
       name: 'item-id',
       key: 'itemId',
       required: true,
-      description: 'driveItem ID of the folder. Use the root folder ID from `ask-marcel get-drive-root-item` to list the top of a drive.',
+      description:
+        'driveItem ID of the folder (Graph identifies folders as driveItems too — there is no separate folder type). Use the root folder ID from `ask-marcel get-drive-root-item` to list the top of a drive. Accepts `--folder-id` as an alias since the command name implies "folder".',
+      aliases: [{ name: 'folder-id', key: 'folderId' }],
     },
     ...odataQueryOptions,
   ],

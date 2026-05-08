@@ -545,6 +545,28 @@ describe('commands', () => {
     }
   });
 
+  it('download-onedrive-file-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — audit v1.0.0 §bug-3)', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 5 }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText/content',
+        method: 'GET',
+        response: () => new Response(new TextEncoder().encode('# hi') as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['download-onedrive-file-content'];
+    if (!cmd) throw new Error('download-onedrive-file-content not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string; base64?: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.text).toBe('# hi');
+      expect(v.base64).toBeUndefined();
+    }
+  });
+
   it('download-drive-item-version-content inlines the historical-version bytes via the M365ChatClient-elevated path', async () => {
     const fetchFn = stagedFetch([
       {
@@ -1728,7 +1750,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-markdown errs with the generic PDF hint for non-Office fileAttachments', async () => {
+  it('convert-mail-attachment-to-markdown errs on a PDF fileAttachment with a no-PDF→markdown-path hint pointing at vision models or external tools (audit v1.0.0 §bug-6 — the convert-…-to-pdf fallback is circular for PDF inputs)', async () => {
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aPdf')) {
         return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: btoa('zzz') });
@@ -1741,8 +1763,9 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPdf' });
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('pdf attachment');
-      expect(result.error.message).toContain('38 input extensions');
+      expect(result.error.message).toContain('pdf attachment cannot be converted to markdown');
+      expect(result.error.message).toContain('vision-capable model');
+      expect(result.error.message).toContain('external PDF→text tool');
     }
   });
 

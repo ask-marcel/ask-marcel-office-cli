@@ -14,12 +14,12 @@ describe('persistIfRequested', () => {
     expect(fs.has('/work/test-output/should-not-write.pdf')).toBe(false);
   });
 
-  it('returns the data unchanged when --output-path is the empty string (defensive against shell-blank invocations)', async () => {
+  it('rejects an empty `--output-path ""` explicitly so a shell-quoting mistake (`--output-path "$VAR"` with VAR unset) is caught instead of silently being a no-op', async () => {
     const fs = createFileSystemFake();
     const data = { contentType: 'application/pdf', base64: 'JVBERi0=' };
     const result = await persistIfRequested(fs, '', data);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual(data);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('empty_path');
   });
 
   it('writes base64-decoded bytes to the path and replaces base64 with savedTo when --output-path is set', async () => {
