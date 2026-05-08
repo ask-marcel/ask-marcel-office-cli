@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-07T11:56:35.334Z",
+  "generatedAt": "2026-05-08T02:41:09.367Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1282,7 +1282,13 @@
           "name": "onenote-page-id",
           "key": "onenotePageId",
           "required": true,
-          "description": "OneNote page ID inside the site."
+          "description": "OneNote page ID inside the site.",
+          "aliases": [
+            {
+              "name": "page-id",
+              "key": "pageId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
@@ -1308,7 +1314,7 @@
     },
     {
       "name": "get-specific-calendar-event",
-      "summary": "Fetch a single calendar event by ID from a specific calendar. `--calendar-id primary` (or `default`) targets the signed-in user’s default calendar.",
+      "summary": "Fetch a single calendar event by ID from a specific calendar. `--calendar-id primary` (or `default`) targets the signed-in user's default calendar. Use `--select` to slim large event payloads (a typical event with body+attendees runs >50 KB).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendars/{calendar-id}/events/{event-id}",
@@ -1318,16 +1324,28 @@
           "name": "calendar-id",
           "key": "calendarId",
           "required": true,
-          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`."
+          "description": "Calendar ID, or `primary` / `default` for the signed-in user's default calendar. Returned by `ask-marcel list-calendars`."
         },
         {
           "name": "event-id",
           "key": "eventId",
           "required": true,
           "description": "Event ID. Returned by `ask-marcel list-specific-calendar-events`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...'",
+      "example": "ask-marcel get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...' --select 'id,subject,start,end'",
       "responseShape": "single Microsoft Graph `event` resource"
     },
     {
@@ -1362,7 +1380,7 @@
     },
     {
       "name": "get-team-channel",
-      "summary": "Get the metadata of a single channel inside a Microsoft Team.",
+      "summary": "Get the metadata of a single channel inside a Microsoft Team. Use `--select` to slim the response (e.g. `--select id,displayName,webUrl`) — sibling to `get-team` and `get-team-primary-channel` which both expose the same flag.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}",
@@ -1379,9 +1397,21 @@
           "key": "channelId",
           "required": true,
           "description": "Channel ID. Returned by `ask-marcel list-team-channels`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-team-channel --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
+      "example": "ask-marcel get-team-channel --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --select 'id,displayName'",
       "responseShape": "single Microsoft Graph `channel` resource"
     },
     {
@@ -1651,7 +1681,7 @@
     },
     {
       "name": "list-calendar-events-delta",
-      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. Pass `--top` on the FIRST call (or any non-resumption call) to bound the page size — Graph requires it; without it the endpoint returns an empty `UnknownError:`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
+      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Most tenants accept the call without `--top` and return a sane page (~200 events); pass `--top` only when you want a smaller bound. If Graph returns an empty `UnknownError:` (rare), the CLI rewrites it to a hint pointing at the `--top` workaround.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/delta()",
@@ -4984,7 +5014,7 @@
     },
     {
       "name": "list-sharepoint-list-columns",
-      "summary": "List the column definitions (schema) of a SharePoint list. Useful before reading list items so you know which fields exist and their types.",
+      "summary": "List the column definitions (schema) of a SharePoint list. Useful before reading list items so you know which fields exist and their types. Note: Graph silently ignores `$top` and `$skip` on this endpoint, so the CLI exposes only `--select` and `--expand`.",
       "category": "sharepoint",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/lists/{list-id}/columns",
@@ -5003,34 +5033,10 @@
           "description": "List ID inside the site. Returned by `list-sharepoint-site-lists`."
         },
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
           "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
         },
         {
           "name": "expand",
@@ -5039,9 +5045,8 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
-      "pagination": true
+      "example": "ask-marcel list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
     },
     {
       "name": "list-sharepoint-list-item-versions",
@@ -5067,7 +5072,13 @@
           "name": "list-item-id",
           "key": "listItemId",
           "required": true,
-          "description": "List item ID inside the list. Returned by `list-sharepoint-site-list-items`."
+          "description": "List item ID inside the list. Returned by `list-sharepoint-site-list-items`.",
+          "aliases": [
+            {
+              "name": "item-id",
+              "key": "itemId"
+            }
+          ]
         },
         {
           "name": "top",
@@ -5228,7 +5239,7 @@
     },
     {
       "name": "list-sharepoint-site-lists",
-      "summary": "List all SharePoint lists (custom + built-in document libraries) on a site.",
+      "summary": "List all SharePoint lists (custom + built-in document libraries) on a site. Note: the skip flag is intentionally omitted — Graph rejects $skip on this endpoint with invalidRequest. Paginate via the top-level `nextLink` → `next-page`. Heads-up: when `top` is small, the FIRST page may legitimately be empty (`value: []`) while still carrying a `nextLink` — Graph filters server-side after slicing. Always check `nextLink` before concluding \"no lists\".",
       "category": "sharepoint",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/lists",
@@ -5245,12 +5256,6 @@
           "key": "top",
           "required": false,
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
         },
         {
           "name": "select",
@@ -5415,7 +5420,13 @@
           "name": "onenote-section-id",
           "key": "onenoteSectionId",
           "required": true,
-          "description": "OneNote section ID inside the site."
+          "description": "OneNote section ID inside the site.",
+          "aliases": [
+            {
+              "name": "section-id",
+              "key": "sectionId"
+            }
+          ]
         },
         {
           "name": "top",
@@ -5515,7 +5526,7 @@
     },
     {
       "name": "list-site-columns",
-      "summary": "List the *site-level* column definitions — columns reusable across multiple lists in the site. Distinct from `list-sharepoint-list-columns` which returns one specific list's schema.",
+      "summary": "List the *site-level* column definitions — columns reusable across multiple lists in the site. Distinct from `list-sharepoint-list-columns` which returns one specific list's schema. Note: Graph silently ignores `$top` and `$skip` on this endpoint (verified live — passing them returns the full collection regardless), so the CLI exposes only `--select` and `--expand`.",
       "category": "sharepoint",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/columns",
@@ -5528,34 +5539,10 @@
           "description": "SharePoint site ID. Returned by `search-sharepoint-sites-by-name`."
         },
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
           "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: KQL-style predicate to narrow results server-side (e.g. `isRead eq false`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
         },
         {
           "name": "expand",
@@ -5564,9 +5551,8 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-site-columns --site-id 'contoso.sharepoint.com,...'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
-      "pagination": true
+      "example": "ask-marcel list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
     },
     {
       "name": "list-site-content-types",
