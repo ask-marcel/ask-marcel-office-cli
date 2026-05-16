@@ -28,7 +28,19 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // conversion actually ran.
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
-  const name = (meta.value as { name?: string }).name ?? '';
+  const item = meta.value as { name?: string; folder?: unknown };
+  const name = item.name ?? '';
+
+  // Audit round-6 §1.1: a folder --item-id used to produce
+  // `{ok:false, error:""}` — surface a clear hint pointing at the right
+  // command for enumeration.
+  if (item.folder !== undefined && item.folder !== null) {
+    return err({
+      type: 'api_error',
+      status: 400,
+      message: `item '${name}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a file to convert.`,
+    });
+  }
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);

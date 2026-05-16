@@ -132,10 +132,26 @@ type GraphErrorBody = {
 
 const emptyOnJsonFailure = (): GraphErrorBody => ({});
 
+// Audit round-6 §1.2: Graph occasionally returns `{error: {code: "UnknownError",
+// message: ""}}` as a transient backend glitch. Without context the LLM sees
+// "UnknownError: " (or just "UnknownError") and has nothing to act on. Detect
+// the empty-message case and rewrite to a clear "retry / capture" hint.
+const looksEmpty = (s: string | undefined): boolean => s === undefined || s.trim() === '';
+
 const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
+
+  if (typeof tag === 'string' && tag === 'UnknownError' && looksEmpty(message)) {
+    return {
+      type: 'api_error',
+      status: res.status,
+      message:
+        'UnknownError: (Graph returned an empty error body — likely a transient backend glitch; retry once. If persistent, capture the failing request URL + body and report.)',
+    };
+  }
+
   // Some Graph endpoints (Planner is the canonical case) return a non-empty
   // outer error block but with `code: ""`. The previous code would format
   // that as `: <message>` — leading colon, no prefix — which the v1.0.0 audit

@@ -545,6 +545,128 @@ describe('commands', () => {
     }
   });
 
+  it('download-onedrive-file-content rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint instead of empty error (audit round-6 §1.1)', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'Reports', folder: { childCount: 12 } }) },
+    ]);
+    const cmd = cmdMap['download-onedrive-file-content'];
+    if (!cmd) throw new Error('download-onedrive-file-content not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iFolder' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(400);
+      expect(result.error.message).toContain("item 'Reports' is a folder");
+      expect(result.error.message).toContain('list-folder-files');
+    }
+  });
+
+  it('download-drive-item-as-pdf rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint (audit round-6 §1.1)', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'Reports', folder: { childCount: 12 } }) },
+    ]);
+    const cmd = cmdMap['download-drive-item-as-pdf'];
+    if (!cmd) throw new Error('download-drive-item-as-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iFolder' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(400);
+      expect(result.error.message).toContain("item 'Reports' is a folder");
+      expect(result.error.message).toContain('list-folder-files');
+    }
+  });
+
+  it('get-mail-attachment surfaces `base64` mirror of `contentBytes` for fileAttachments so --output-path can land on disk (audit round-6 §6)', async () => {
+    const result = await callCommand(
+      'get-mail-attachment',
+      { messageId: 'm1', attachmentId: 'a1' },
+      { '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: 'JVBERi0=' }
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentBytes: string; base64: string };
+      expect(v.contentBytes).toBe('JVBERi0=');
+      expect(v.base64).toBe('JVBERi0=');
+    }
+  });
+
+  it('get-mail-attachment does NOT add a base64 mirror to itemAttachment / referenceAttachment (no raw bytes there)', async () => {
+    const result = await callCommand(
+      'get-mail-attachment',
+      { messageId: 'm1', attachmentId: 'a1' },
+      { '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://example.com/x' }
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { base64?: string };
+      expect(v.base64).toBeUndefined();
+    }
+  });
+
+  it('list-todo-tasks passes through a NON-ParseUri error unchanged (only the known opaque case is rewritten)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks',
+        method: 'GET',
+        response: () => new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'bad token' } }), { status: 401, headers: { 'content-type': 'application/json' } }),
+      },
+    ]);
+    const cmd = cmdMap['list-todo-tasks'];
+    if (!cmd) throw new Error('list-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toBe('Unauthorized: bad token');
+    }
+  });
+
+  it('list-todo-tasks rewrites the opaque RequestBroker--ParseUri error to a hint that names the workaround (audit round-6 §1.5)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$select=id%2Ctitle',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-todo-tasks'];
+    if (!cmd) throw new Error('list-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', select: 'id,title' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('Graph rejected --select=id,title');
+      expect(r.error.message).toContain('Drop `title` from --select');
+    }
+  });
+
+  it('list-incomplete-todo-tasks rejects --filter with a pointer at list-todo-tasks (audit round-6 §2.7)', async () => {
+    const cmd = cmdMap['list-incomplete-todo-tasks'];
+    if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { todoTaskListId: 'tasks', filter: "subject eq 'x'" });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.message).toContain('--filter is not supported on list-incomplete-todo-tasks');
+      expect(r.error.message).toContain('list-todo-tasks');
+    }
+  });
+
+  it('list-incomplete-planner-tasks rejects --filter with a pointer at list-planner-tasks (audit round-6 §2.7)', async () => {
+    const cmd = cmdMap['list-incomplete-planner-tasks'];
+    if (!cmd) throw new Error('list-incomplete-planner-tasks not registered');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { filter: 'priority eq 1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.message).toContain('--filter is not supported on list-incomplete-planner-tasks');
+      expect(r.error.message).toContain('list-planner-tasks');
+    }
+  });
+
   it('download-onedrive-file-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — audit v1.0.0 §bug-3)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 5 }) },
@@ -2130,7 +2252,11 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-mail-child-folders', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/childFolders' },
   { name: 'list-mail-folder-messages', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messages' },
   { name: 'get-mail-message', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
-  { name: 'list-mail-attachments', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1/attachments' },
+  {
+    name: 'list-mail-attachments',
+    params: { messageId: 'm1' },
+    expectedPath: '/me/messages/m1/attachments?$select=id%2Cname%2CcontentType%2Csize%2CisInline%2C%40odata.type',
+  },
   { name: 'get-mail-attachment', params: { messageId: 'm1', attachmentId: 'a1' }, expectedPath: '/me/messages/m1/attachments/a1' },
   { name: 'list-mail-rules', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messageRules' },
   { name: 'get-mailbox-settings', params: {}, expectedPath: '/me/mailboxSettings' },

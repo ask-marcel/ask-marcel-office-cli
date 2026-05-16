@@ -22,7 +22,20 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // envelope instead of base64-bloating a 33% larger payload.
   const metaResult = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!metaResult.ok) return metaResult;
-  const name = (metaResult.value as { name?: string }).name ?? '';
+  const item = metaResult.value as { name?: string; folder?: unknown };
+  const name = item.name ?? '';
+
+  // Audit round-6 §1.1: when --item-id resolves to a folder, Graph's /content
+  // endpoint returns 200 with empty bytes → we'd then return
+  // `{ok:false, error:""}` (empty). Surface a clear hint pointing at
+  // list-folder-files so the LLM can enumerate the children.
+  if (item.folder !== undefined && item.folder !== null) {
+    return err({
+      type: 'api_error',
+      status: 400,
+      message: `item '${name}' is a folder, not a file — use \`list-folder-files --drive-id ${driveId} --item-id ${itemId}\` to enumerate its children, then pick a file from inside it.`,
+    });
+  }
 
   if (isPlainTextFilename(name)) {
     const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);

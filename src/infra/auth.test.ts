@@ -569,12 +569,12 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
   it('two concurrent getAccessToken calls during first-time auth share ONE browser acquire (no race / no auth_cancelled on the loser)', async () => {
     const fs = createFileSystemFake();
     let acquireCallCount = 0;
-    let resolveLogin: ((value: BrowserTokenResult) => void) | null = null;
+    const resolveLoginRef: { current: ((value: BrowserTokenResult) => void) | null } = { current: null };
     const slowBrowser: BrowserAuth = {
       acquireToken: async () => {
         acquireCallCount += 1;
         return new Promise<BrowserTokenResult>((resolve) => {
-          resolveLogin = resolve;
+          resolveLoginRef.current = resolve;
         });
       },
       acquireElevatedToken: async () => null,
@@ -588,7 +588,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     await new Promise((r) => setTimeout(r, 0));
     expect(acquireCallCount).toBe(1);
 
-    if (resolveLogin) resolveLogin(futureToken());
+    if (resolveLoginRef.current) resolveLoginRef.current(futureToken());
     const [resA, resB] = await Promise.all([a, b]);
     expect(resA.ok).toBe(true);
     expect(resB.ok).toBe(true);
@@ -623,13 +623,13 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
     let elevatedCallCount = 0;
-    let resolveElevated: ((value: AccessToken) => void) | null = null;
+    const resolveElevatedRef: { current: ((value: AccessToken) => void) | null } = { current: null };
     const slowBrowser: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => {
         elevatedCallCount += 1;
         return new Promise<AccessToken | null>((resolve) => {
-          resolveElevated = (v) => resolve(v);
+          resolveElevatedRef.current = (v) => resolve(v);
         });
       },
       close: async () => {},
@@ -641,7 +641,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     await new Promise((r) => setTimeout(r, 0));
     expect(elevatedCallCount).toBe(1);
 
-    if (resolveElevated) resolveElevated(futureElevated());
+    if (resolveElevatedRef.current) resolveElevatedRef.current(futureElevated());
     const [resA, resB] = await Promise.all([a, b]);
     expect(resA.ok).toBe(true);
     expect(resB.ok).toBe(true);

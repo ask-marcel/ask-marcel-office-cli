@@ -1,13 +1,29 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { err } from '../../domain/result.ts';
+import type { Command, CommandMeta } from './command-types.ts';
+import { formatZodError } from './format-zod-error.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
-const baseSchema = z.object({ messageId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/me/messages/${p.messageId}/attachments`, baseSchema);
+const schema = z.object({ messageId: z.string().min(1) }).extend(odataQuerySchema.shape);
+
+// Audit round-6 §1.3: `list-mail-attachments` previously returned the full
+// `contentBytes` inline for every attachment (a single 1.5 MB image inflates
+// `--top 1` to 1.5 MB even when the LLM just wanted to enumerate
+// attachments). Default `--select` to a slim metadata set so the LLM never
+// accidentally pulls megabytes. User-supplied `--select` overrides.
+const DEFAULT_SELECT = 'id,name,contentType,size,isInline,@odata.type';
+
+const execute: Command['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const dataWithSelect = parsed.data.select === undefined ? { ...parsed.data, select: DEFAULT_SELECT } : parsed.data;
+  const path = appendOData(`/me/messages/${parsed.data.messageId}/attachments`, dataWithSelect);
+  return graph.get(path);
+};
 
 const meta: CommandMeta = {
-  summary: 'List the attachments (file, item, reference) on a single Outlook message.',
+  summary:
+    "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline,@odata.type` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments',
@@ -17,7 +33,7 @@ const meta: CommandMeta = {
     ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",
-  responseShape: 'collection of Microsoft Graph `attachment` resources under `value[]`',
+  responseShape: 'collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary)',
   pagination: true,
 };
 

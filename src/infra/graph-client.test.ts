@@ -273,6 +273,41 @@ describe('graph client', () => {
     }
   });
 
+  it('rewrites an empty `UnknownError:` Graph body into an actionable retry hint (audit round-6 §1.2 — was leaking to the LLM with no recovery info)', async () => {
+    const body = JSON.stringify({ error: { code: 'UnknownError', message: '' } });
+    const fetchFn: FetchFn = async () => new Response(body, { status: 500, statusText: 'Internal Server Error', headers: { 'content-type': 'application/json' } });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/messages/whatever');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain('UnknownError:');
+      expect(result.error.message).toContain('transient backend glitch');
+      expect(result.error.message).toContain('retry once');
+    }
+  });
+
+  it('also rewrites the whitespace-only `UnknownError: ` case (the form list-calendar-events-delta originally caught)', async () => {
+    const body = JSON.stringify({ error: { code: 'UnknownError', message: ' ' } });
+    const fetchFn: FetchFn = async () => new Response(body, { status: 500, headers: { 'content-type': 'application/json' } });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/messages/whatever');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain('transient backend glitch');
+    }
+  });
+
+  it('leaves a NON-empty UnknownError body unchanged (only the empty/whitespace case is rewritten)', async () => {
+    const body = JSON.stringify({ error: { code: 'UnknownError', message: 'specific Graph diagnostic' } });
+    const fetchFn: FetchFn = async () => new Response(body, { status: 500, headers: { 'content-type': 'application/json' } });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/messages/whatever');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toBe('UnknownError: specific Graph diagnostic');
+    }
+  });
+
   it('fetchUrl also extracts the camelCase innerError.code (SharePoint streamContent uses camelCase, Graph uses lowercase)', async () => {
     const body = JSON.stringify({
       error: {
