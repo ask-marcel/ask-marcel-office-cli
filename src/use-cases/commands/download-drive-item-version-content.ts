@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { normalizeVersionId } from './version-id.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -17,7 +18,8 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // M365ChatClient elevation for both the Graph call and the CDN-redirect
   // follow — Teams web client tempauth gets 403d by SharePoint streamContent.
-  return inlineBinary(graph, `/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/versions/${parsed.data.versionId}/content`, { elevated: true });
+  const versionId = normalizeVersionId(parsed.data.versionId);
+  return inlineBinary(graph, `/drives/${parsed.data.driveId}/items/${parsed.data.itemId}/versions/${versionId}/content`, { elevated: true });
 };
 
 const meta: CommandMeta = {

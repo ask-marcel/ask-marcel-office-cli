@@ -6,6 +6,7 @@ import type { CommandMeta } from './command-types.ts';
 import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
+import { normalizeVersionId } from './version-id.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -16,7 +17,8 @@ const schema = z.object({
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, versionId } = parsed.data;
+  const { driveId, itemId } = parsed.data;
+  const versionId = normalizeVersionId(parsed.data.versionId);
 
   // Pre-fetch the driveItem for its filename. Same pre-check as the
   // non-versioned variant: short-circuit to raw-bytes download for

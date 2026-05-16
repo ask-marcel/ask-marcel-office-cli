@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
+import { normalizeVersionId } from './version-id.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -15,7 +16,8 @@ const schema = z.object({
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, versionId } = parsed.data;
+  const { driveId, itemId } = parsed.data;
+  const versionId = normalizeVersionId(parsed.data.versionId);
 
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
