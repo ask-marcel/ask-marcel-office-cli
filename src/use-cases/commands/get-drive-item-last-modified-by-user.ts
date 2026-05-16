@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/lastModifiedByUser`, schema);
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/lastModifiedByUser`, baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'Return the full `user` resource for whoever last modified a OneDrive / SharePoint file — sibling to `get-drive-item-created-by-user`.',
+  summary:
+    'Return the full `user` resource for whoever last modified a OneDrive / SharePoint file — sibling to `get-drive-item-created-by-user`. Use `--select` to fetch only specific fields.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/lastModifiedByUser',
@@ -24,8 +26,9 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID.',
     },
+    ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
   responseShape: 'single Microsoft Graph `user` resource',
 };
 

@@ -18,7 +18,9 @@ const meta: CommandMeta = {
       name: 'item-id',
       key: 'itemId',
       required: true,
-      description: 'driveItem ID of the folder whose subtree to track. Use the root folder ID from `get-drive-root-item` to track the entire drive.',
+      description:
+        'driveItem ID of the folder whose subtree to track. Use the root folder ID from `get-drive-root-item` to track the entire drive. Accepts `--folder-id` as an alias for parity with `list-folder-files` (same concept, same flag name).',
+      aliases: [{ name: 'folder-id', key: 'folderId' }],
     },
     ...odataQueryOptions,
   ],

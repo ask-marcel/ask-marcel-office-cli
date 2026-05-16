@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}`, schema);
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}`, baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint.',
+  summary:
+    'Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint. Use `--select` to slim the response — a full driveItem can run >10 KB with all the optional facets.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}',
@@ -14,8 +16,9 @@ const meta: CommandMeta = {
   options: [
     { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID. Returned by `ask-marcel list-drives`.' },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-root-item`.' },
+    ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
   responseShape: 'single Microsoft Graph `driveItem` resource',
 };
 
