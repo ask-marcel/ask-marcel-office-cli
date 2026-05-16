@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-08T13:52:54.899Z",
+  "generatedAt": "2026-05-16T06:32:52.877Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -375,7 +375,13 @@
           "name": "item-id",
           "key": "itemId",
           "required": true,
-          "description": "driveItem ID of the folder whose subtree to track. Use the root folder ID from `get-drive-root-item` to track the entire drive."
+          "description": "driveItem ID of the folder whose subtree to track. Use the root folder ID from `get-drive-root-item` to track the entire drive. Accepts `--folder-id` as an alias for parity with `list-folder-files` (same concept, same flag name).",
+          "aliases": [
+            {
+              "name": "folder-id",
+              "key": "folderId"
+            }
+          ]
         },
         {
           "name": "top",
@@ -420,7 +426,7 @@
     },
     {
       "name": "get-drive-item",
-      "summary": "Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint.",
+      "summary": "Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint. Use `--select` to slim the response — a full driveItem can run >10 KB with all the optional facets.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}",
@@ -437,9 +443,21 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-root-item`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC'",
+      "example": "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
       "responseShape": "single Microsoft Graph `driveItem` resource"
     },
     {
@@ -468,7 +486,7 @@
     },
     {
       "name": "get-drive-item-created-by-user",
-      "summary": "Return the `user` resource for whoever created a OneDrive / SharePoint file — full profile, not just the truncated `createdBy.user` summary embedded in the parent driveItem. Useful when you need title / department / mail of the author.",
+      "summary": "Return the `user` resource for whoever created a OneDrive / SharePoint file — full profile, not just the truncated `createdBy.user` summary embedded in the parent driveItem. Useful when you need title / department / mail of the author. Use `--select` to fetch only the fields you care about (e.g. `--select id,displayName,jobTitle,department,mail`).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/createdByUser",
@@ -485,14 +503,26 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC'",
+      "example": "ask-marcel get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,jobTitle,mail'",
       "responseShape": "single Microsoft Graph `user` resource"
     },
     {
       "name": "get-drive-item-last-modified-by-user",
-      "summary": "Return the full `user` resource for whoever last modified a OneDrive / SharePoint file — sibling to `get-drive-item-created-by-user`.",
+      "summary": "Return the full `user` resource for whoever last modified a OneDrive / SharePoint file — sibling to `get-drive-item-created-by-user`. Use `--select` to fetch only specific fields.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/lastModifiedByUser",
@@ -509,9 +539,21 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC'",
+      "example": "ask-marcel get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
       "responseShape": "single Microsoft Graph `user` resource"
     },
     {
@@ -721,7 +763,7 @@
     },
     {
       "name": "get-group",
-      "summary": "Return metadata for a single Azure AD / Microsoft 365 group.",
+      "summary": "Return metadata for a single Azure AD / Microsoft 365 group. Use `--select` to slim large group payloads (the full group resource includes 30+ fields).",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}",
@@ -732,14 +774,26 @@
           "key": "groupId",
           "required": true,
           "description": "Azure AD group object ID. Use `list-groups` to find one."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-group --group-id 'a1b2c3d4-...'",
+      "example": "ask-marcel get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
       "responseShape": "single Microsoft Graph `group` resource"
     },
     {
       "name": "get-mail-attachment",
-      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments).",
+      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -759,7 +813,7 @@
         }
       ],
       "example": "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `attachment` resource"
+      "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; itemAttachments and referenceAttachments are returned unchanged."
     },
     {
       "name": "get-mail-message",
@@ -1054,7 +1108,13 @@
           "name": "planner-task-id",
           "key": "plannerTaskId",
           "required": true,
-          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
+          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. Accepts `--task-id` as a shorter alias (each task command targets exactly one of Planner or To Do, so within this command's flag set there is no ambiguity).",
+          "aliases": [
+            {
+              "name": "task-id",
+              "key": "taskId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-planner-task --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
@@ -1072,7 +1132,13 @@
           "name": "planner-task-id",
           "key": "plannerTaskId",
           "required": true,
-          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
+          "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. Accepts `--task-id` as a shorter alias (each task command targets exactly one of Planner or To Do, so within this command's flag set there is no ambiguity).",
+          "aliases": [
+            {
+              "name": "task-id",
+              "key": "taskId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-planner-task-details --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
@@ -1478,7 +1544,13 @@
           "name": "todo-task-id",
           "key": "todoTaskId",
           "required": true,
-          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
+          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
+          "aliases": [
+            {
+              "name": "task-id",
+              "key": "taskId"
+            }
+          ]
         }
       ],
       "example": "ask-marcel get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
@@ -3390,7 +3462,7 @@
     },
     {
       "name": "list-incomplete-planner-tasks",
-      "summary": "List every incomplete Microsoft Planner task assigned to or owned by the signed-in user, across every plan. Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-percent predicate, and Graph rejects two `$filter` query params.",
+      "summary": "List every incomplete Microsoft Planner task assigned to or owned by the signed-in user, across every plan. Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-percent predicate, and Graph rejects two `$filter` query params. If you supply `--filter` anyway, the CLI returns a clear pointer to `list-planner-tasks`.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/planner/tasks?$filter=percentComplete ne 100",
@@ -3415,6 +3487,12 @@
           "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
         },
         {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        },
+        {
           "name": "orderby",
           "key": "orderby",
           "required": false,
@@ -3433,7 +3511,7 @@
     },
     {
       "name": "list-incomplete-todo-tasks",
-      "summary": "List every incomplete Microsoft To Do task in a given list (status not equal to `completed`). Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-status predicate, and Graph rejects two `$filter` query params.",
+      "summary": "List every incomplete Microsoft To Do task in a given list (status not equal to `completed`). Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-status predicate, and Graph rejects two `$filter` query params. If you supply `--filter` anyway, the CLI returns a clear pointer to `list-todo-tasks` (which lets you AND your predicate with the completion filter yourself).",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists/{todo-task-list-id}/tasks?$filter=status ne 'completed'",
@@ -3474,6 +3552,12 @@
           "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
         },
         {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        },
+        {
           "name": "orderby",
           "key": "orderby",
           "required": false,
@@ -3504,7 +3588,7 @@
     },
     {
       "name": "list-mail-attachments",
-      "summary": "List the attachments (file, item, reference) on a single Outlook message.",
+      "summary": "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline,@odata.type` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments",
@@ -3554,7 +3638,7 @@
         }
       ],
       "example": "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",
-      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]`",
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary)",
       "pagination": true
     },
     {
@@ -5819,7 +5903,13 @@
           "name": "todo-task-id",
           "key": "todoTaskId",
           "required": true,
-          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. (No `--task-id` alias — that name is ambiguous between Planner and To Do; use the explicit canonical instead.)"
+          "description": "To Do task ID. Returned by `ask-marcel list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
+          "aliases": [
+            {
+              "name": "task-id",
+              "key": "taskId"
+            }
+          ]
         },
         {
           "name": "top",
@@ -5913,7 +6003,7 @@
     },
     {
       "name": "list-todo-tasks",
-      "summary": "List every task in a single Microsoft To Do task list, regardless of completion status. Use `list-incomplete-todo-tasks` if you only want the open ones.",
+      "summary": "List every task in a single Microsoft To Do task list, regardless of completion status. Use `list-incomplete-todo-tasks` if you only want the open ones. Known Graph quirk: certain `--select` combinations (notably any combo that includes `title`) trip `RequestBroker--ParseUri` on this endpoint; the CLI rewrites that opaque error to a hint pointing at the workaround.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists/{todo-task-list-id}/tasks",
