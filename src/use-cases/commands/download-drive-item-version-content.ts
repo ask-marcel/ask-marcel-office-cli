@@ -52,6 +52,7 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType, size, base64 }` — the historical-version bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB versions.',
   needsElevatedToken: true,
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

@@ -1,20 +1,21 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildElevatedListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
-// Audit v1.0.0 §B2: previously used `buildElevatedListCommand` (M365ChatClient
-// token) but the silent-SSO capture consistently timed out and the
-// documented `login` remediation didn't refresh the cookies. The Teams
-// web-client token reaches `/me/chats` per Microsoft's docs; the
-// elevation was over-cautious. Switch to the regular token to match
-// sibling `list-chat-members`.
+// Audit round-8 §1.5: round-6 hypothesized that `/me/chats` would succeed
+// against the basic Teams web client token; the audit verified it does
+// NOT — Graph rejects with `Forbidden: Missing scope permissions ...
+// Chat.ReadBasic`. The M365ChatClient elevated identity DOES carry
+// Chat.ReadBasic, so revert to the elevated path. If the silent-SSO
+// capture times out the command will surface that timeout (documented
+// pre-existing failure mode), not the misleading "Missing scope" 403.
 const baseSchema = z.object({}).strict();
-const { execute, schema } = buildListCommand(() => '/me/chats', baseSchema);
+const { execute, schema } = buildElevatedListCommand(() => '/me/chats', baseSchema);
 
 const meta: CommandMeta = {
   summary:
-    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants.",
+    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: '/me/chats',
@@ -23,7 +24,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel list-chats',
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`',
   pagination: true,
-  scopesRequired: ['Chat.ReadBasic'],
+  needsElevatedToken: true,
 };
 
 export { execute, meta, schema };

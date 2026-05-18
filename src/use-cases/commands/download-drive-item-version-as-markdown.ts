@@ -58,6 +58,7 @@ const meta: CommandMeta = {
   example: "ask-marcel download-drive-item-version-as-markdown --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
   responseShape: '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the converted case; raw-bytes envelope for plain-text source extensions.',
   needsElevatedToken: true,
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

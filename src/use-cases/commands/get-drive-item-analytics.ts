@@ -7,7 +7,7 @@ const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/
 
 const meta: CommandMeta = {
   summary:
-    'Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content.',
+    'Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content. **Known empty case**: returns `{ allTime: null, lastSevenDays: null }` on low-traffic items, or when the calling identity (the Teams web client basic token) lacks the analytics scope on the tenant. Do not interpret nulls as "no views" — interpret as "not available for this caller". For active files where you expect data and see nulls, escalate to a token with `Reports.Read.All`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/analytics',

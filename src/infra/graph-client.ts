@@ -138,6 +138,19 @@ const emptyOnJsonFailure = (): GraphErrorBody => ({});
 // the empty-message case and rewrite to a clear "retry / capture" hint.
 const looksEmpty = (s: string | undefined): boolean => s === undefined || s.trim() === '';
 
+// Audit round-8 Wave F: Graph's `Missing scope permissions` 403 inlines the
+// caller's entire granted-scope list (~30 scopes, 700+ chars) into the error
+// message. The trailing "Scopes on the request 'X,Y,Z,...'" is noise — the
+// LLM only needs the *required* scope name(s) to know what's missing.
+// Strip the granted-list suffix and replace with a pointer at scopes-check.
+const SCOPE_DUMP_PATTERN = /^(.*Missing scope permissions[^.]*\.\s*API requires one of '[^']+'\.)\s*Scopes on the request '[^']*'.*$/i;
+
+const truncateScopeDump = (message: string): string => {
+  const match = SCOPE_DUMP_PATTERN.exec(message);
+  if (match === null || match[1] === undefined) return message;
+  return `${match[1]} Run \`ask-marcel scopes-check\` to see granted scopes, or \`ask-marcel help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
+};
+
 const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
@@ -163,9 +176,9 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   // §2.7 flagged as malformed. Only prepend the tag if it's actually a
   // non-empty string.
   if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
-    return { type: 'api_error', status: res.status, message: `${tag}: ${message}`, ...(code ? { code } : {}) };
+    return { type: 'api_error', status: res.status, message: truncateScopeDump(`${tag}: ${message}`), ...(code ? { code } : {}) };
   }
-  return { type: 'api_error', status: res.status, message: message ?? res.statusText, ...(code ? { code } : {}) };
+  return { type: 'api_error', status: res.status, message: truncateScopeDump(message ?? res.statusText), ...(code ? { code } : {}) };
 };
 
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {

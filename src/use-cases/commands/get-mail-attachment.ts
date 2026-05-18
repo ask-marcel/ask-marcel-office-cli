@@ -42,6 +42,7 @@ const meta: CommandMeta = {
   example: "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
   responseShape:
     'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; itemAttachments and referenceAttachments are returned unchanged.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

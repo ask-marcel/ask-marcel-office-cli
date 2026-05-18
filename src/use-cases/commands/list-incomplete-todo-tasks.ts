@@ -13,6 +13,8 @@ import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.
 // pointer at the sibling command that supports it.
 const schema = z.object({ todoTaskListId: z.string().min(1) }).extend(odataQuerySchema.shape);
 
+const PARSE_URI_NEEDLE = 'RequestBroker--ParseUri';
+
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -24,7 +26,32 @@ const execute: Command['execute'] = async (graph, params) => {
     });
   }
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks?$filter=status ne 'completed'`, parsed.data);
-  return graph.get(path);
+  const result = await graph.get(path);
+  if (result.ok) return result;
+  // Audit round-8 sec 1.1: this command hits the same /tasks endpoint as
+  // the all-tasks sibling, which means it triggers the same RequestBroker--
+  // ParseUri quirk on certain --select / --orderby values (notably any
+  // combo with `title`). Mirror the round-6 rewrite from the sibling so
+  // an LLM gets the same friendly hint from either command.
+  if (result.error.type === 'api_error' && result.error.message.includes(PARSE_URI_NEEDLE)) {
+    if (parsed.data.select !== undefined) {
+      return err({
+        type: 'api_error',
+        status: result.error.status,
+        message: `Graph rejected --select=${parsed.data.select} on this tasks endpoint with RequestBroker--ParseUri (known quirk — some field combinations are unsupported, most reliably any combo that includes \`title\`). Drop \`title\` from --select and request it in a second call (or per-task via get-todo-task), or call this command without --select and slim the response client-side.`,
+        code: 'cli_rewrite_todo_select_title',
+      });
+    }
+    if (parsed.data.orderby !== undefined) {
+      return err({
+        type: 'api_error',
+        status: result.error.status,
+        message: `Graph rejected --orderby=${parsed.data.orderby} on this tasks endpoint with RequestBroker--ParseUri (known quirk — sorting on \`title\` is unsupported). Call this command without --orderby and sort the response client-side, or order by a numeric/date field like \`createdDateTime\` / \`importance\` instead.`,
+        code: 'cli_rewrite_todo_orderby_title',
+      });
+    }
+  }
+  return result;
 };
 
 const meta: CommandMeta = {

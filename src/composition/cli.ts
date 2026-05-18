@@ -68,12 +68,31 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
     )
     .addOption(
-      new Option(
-        '--output <format>',
-        'Output format. `text` (default, LLM-readable YAML-ish lines, ~30-60% fewer tokens on listings; errors render as `error: <message>`). `json` preserves the `{ok, data, nextLink?, deltaLink?, count?}` envelope for tool-chaining where unambiguous field extraction matters.'
-      )
-        .choices(['text', 'json'])
-        .default('text')
+      ((): Option => {
+        // Audit round-8 Wave G: reject duplicate `--output` flags AND
+        // validate the choice. Adding an argParser bypasses Commander's
+        // built-in `.choices()` enforcement, so the parser has to do both
+        // jobs. Track invocations via a closure flag (Commander seeds
+        // `previous` from the default, which would otherwise make any single
+        // `--output json` look like the second occurrence).
+        const ALLOWED: ReadonlyArray<string> = ['text', 'json'];
+        let outputSeen = false;
+        return new Option(
+          '--output <format>',
+          'Output format. `text` (default, LLM-readable YAML-ish lines, ~30-60% fewer tokens on listings; errors render as `error: <message>`). `json` preserves the `{ok, data, nextLink?, deltaLink?, count?}` envelope for tool-chaining where unambiguous field extraction matters.'
+        )
+          .default('text')
+          .argParser((value: string, previous: unknown): string => {
+            if (outputSeen) {
+              throw new InvalidArgumentError(`--output cannot be passed more than once (previous: "${String(previous)}", new: "${value}").`);
+            }
+            if (!ALLOWED.includes(value)) {
+              throw new InvalidArgumentError(`Allowed choices are ${ALLOWED.join(', ')}.`);
+            }
+            outputSeen = true;
+            return value;
+          });
+      })()
     );
 
   // Audit v1.0.0 §2.3: bare `ask-marcel` (no subcommand) used to silently
@@ -120,6 +139,18 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers.'
     )
     .action(() => {
+      // Audit round-8 Wave G1: --output text was silently honored on
+      // help-json, contradicting the global flag's contract. The manifest IS
+      // JSON; serializing as text has no use case. Reject only when the user
+      // EXPLICITLY passed `--output text` (defaulting to text and getting
+      // JSON anyway is fine — that's the historical behavior).
+      const outputSource = program.getOptionValueSource('output');
+      if (outputSource === 'cli' && getFormat() === 'text') {
+        fail(
+          "help-json always emits JSON (that's the contract — the manifest is the LLM-consumable serialized form of every command's meta). Drop `--output text` for this command. To browse the manifest as Markdown, use `ask-marcel docs <command>` instead."
+        );
+        return;
+      }
       process.stdout.write(`${JSON.stringify(buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0'))}\n`);
     });
 
@@ -212,6 +243,16 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
+  // Audit round-8 Wave E2: derive the --output-path-supporting command list
+  // from the manifest's `producesBytes` field instead of hand-keeping it as
+  // a string literal in the rejection error. Each new byte-producing command
+  // just sets `producesBytes: true` and the rejection message updates
+  // automatically.
+  const bytesProducingCommands = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.producesBytes === true)
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(cmdRegistry).filter(([, c]) => c.meta.category === category);
     if (entries.length === 0) continue;
@@ -288,7 +329,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         }
         const failMessage = ((): string => {
           if (persisted.error.type === 'no_inlined_bytes')
-            return `--output-path: ${name} did not return inlined bytes — this flag works with the families that produce a body to write: download-drive-item-as-pdf / -as-markdown, download-drive-item-version-as-pdf / -as-markdown / -content, download-onedrive-file-content, convert-mail-attachment-to-pdf / -to-markdown, convert-mail-to-markdown, get-mail-message-mime, get-my-profile-photo, get-onenote-page-content, get-sharepoint-site-onenote-page-content. Plain JSON commands (list-*, get-*-user, get-organization, list-recent-files, etc.) don't have a body to write — drop the flag for those.`;
+            return `--output-path: ${name} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag for those.`;
           if (persisted.error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
           return `--output-path: write failed: ${persisted.error.message}`;
         })();

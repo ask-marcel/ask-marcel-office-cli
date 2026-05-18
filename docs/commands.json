@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-18T04:48:47.545Z",
+  "generatedAt": "2026-05-18T07:51:50.799Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -317,7 +317,7 @@
     },
     {
       "name": "get-chat",
-      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*` and ship as a separate token scope).",
+      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*`). Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/chats/{chat-id}",
@@ -456,7 +456,7 @@
     },
     {
       "name": "get-drive-item-analytics",
-      "summary": "Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content.",
+      "summary": "Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content. **Known empty case**: returns `{ allTime: null, lastSevenDays: null }` on low-traffic items, or when the calling identity (the Teams web client basic token) lacks the analytics scope on the tenant. Do not interpret nulls as \"no views\" — interpret as \"not available for this caller\". For active files where you expect data and see nulls, escalate to a token with `Reports.Read.All`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/analytics",
@@ -588,7 +588,7 @@
     },
     {
       "name": "get-drive-root-delta",
-      "summary": "Track incremental changes (added / modified / deleted items) anywhere under the signed-in user's OneDrive root. The first call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since. Cross-folder companion to `get-drive-delta` (which scopes to one specific folder).",
+      "summary": "Track incremental changes (added / modified / deleted items) anywhere under the signed-in user's OneDrive root. **Takes zero required arguments** — acts implicitly on the signed-in user's primary OneDrive; use `get-drive-delta` to target a specific drive by ID. The first call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since. Cross-folder companion to `get-drive-delta` (which scopes to one specific folder).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/root/delta()",
@@ -785,7 +785,10 @@
           "name": "worksheet-id",
           "key": "worksheetId",
           "required": true,
-          "description": "Worksheet ID or name. Returned by `list-excel-worksheets`."
+          "description": "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`. If neither matches Graph responds `itemNotFound: The requested resource doesn't exist.` — when that happens, double-check spelling case-sensitively against `ask-marcel list-excel-worksheets --drive-id <d> --item-id <i>`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         }
       ],
       "example": "ask-marcel get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
@@ -972,7 +975,7 @@
     },
     {
       "name": "get-my-manager",
-      "summary": "Return the signed-in user's manager (a single `user` resource). When no manager is set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from a permission failure. Use `--select` to slim the response (e.g. `--select id,displayName,mail`).",
+      "summary": "Return the signed-in user's manager (a single `user` resource). When no manager is set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: { manager: null, note: '...' } }` so an LLM can distinguish 'no manager' from a permission failure without parsing prose. Use `--select` to slim the response (e.g. `--select id,displayName,mail`).",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/manager",
@@ -992,7 +995,7 @@
         }
       ],
       "example": "ask-marcel get-my-manager --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource, or `null` when no manager is set in the directory"
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description)."
     },
     {
       "name": "get-my-profile-photo",
@@ -1466,7 +1469,7 @@
     },
     {
       "name": "get-site-analytics",
-      "summary": "Return view / activity analytics for a SharePoint site — `allTime` totals (visits, viewers) and `lastSevenDays` rollup. Site-level parallel to `get-drive-item-analytics`. Useful for ranking sites by attention or detecting stale workspaces.",
+      "summary": "Return view / activity analytics for a SharePoint site — `allTime` totals (visits, viewers) and `lastSevenDays` rollup. Site-level parallel to `get-drive-item-analytics`. Useful for ranking sites by attention or detecting stale workspaces. **Known empty case**: returns `{ allTime: null, lastSevenDays: null }` even on active sites when the calling identity (the Teams web client basic token) lacks the analytics scope. Do not interpret nulls as \"no activity\" — interpret as \"not available for this caller\".",
       "category": "sharepoint",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/analytics",
@@ -2182,7 +2185,7 @@
     },
     {
       "name": "list-chats",
-      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants.",
+      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/chats",
@@ -2736,7 +2739,10 @@
           "name": "worksheet-id",
           "key": "worksheetId",
           "required": true,
-          "description": "Worksheet ID or name."
+          "description": "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "top",
@@ -2803,7 +2809,10 @@
           "name": "worksheet-id",
           "key": "worksheetId",
           "required": true,
-          "description": "Worksheet ID or name."
+          "description": "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "top",
@@ -3605,7 +3614,7 @@
         }
       ],
       "example": "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",
-      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary)",
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
       "pagination": true
     },
     {
@@ -6018,7 +6027,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode that is the `next: <url>` value in the `---` footer; in JSON mode it is the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode that is the `next: <url>` value in the `---` footer; in JSON mode it is the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",

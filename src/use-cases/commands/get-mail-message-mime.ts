@@ -30,6 +30,7 @@ const meta: CommandMeta = {
   example: "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
   responseShape:
     '`{ contentType: "text/plain", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

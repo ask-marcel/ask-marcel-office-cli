@@ -3,6 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { Command } from './command-types.ts';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
 import { renderCommandMarkdown } from './docs-render.ts';
+import { lookupScopes } from './graph-scopes.ts';
 
 export type DocsError = { type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
 
@@ -13,6 +14,10 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
   // the manifest field always populated on paginated commands so LLM
   // consumers don't need to read prose to learn the cursor mechanism.
   const paginationStrategy = cmd.meta.paginationStrategy ?? (cmd.meta.pagination ? 'nextLink' : undefined);
+  // Audit round-8 Wave C: scopesRequired now comes from a central map by
+  // default (`graph-scopes.ts`). Per-command inline overrides win so that
+  // future commands with non-standard scope needs can declare them locally.
+  const scopesRequired = cmd.meta.scopesRequired ?? lookupScopes(name);
   return {
     name,
     summary: cmd.meta.summary,
@@ -27,8 +32,9 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     ...(cmd.meta.bodyTemplate ? { bodyTemplate: cmd.meta.bodyTemplate } : {}),
     ...(cmd.meta.pagination ? { pagination: cmd.meta.pagination } : {}),
     ...(paginationStrategy ? { paginationStrategy } : {}),
-    ...(cmd.meta.scopesRequired ? { scopesRequired: cmd.meta.scopesRequired } : {}),
+    ...(scopesRequired && scopesRequired.length > 0 ? { scopesRequired } : {}),
     ...(cmd.meta.needsElevatedToken ? { needsElevatedToken: cmd.meta.needsElevatedToken } : {}),
+    ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
   };
 };
 

@@ -810,6 +810,131 @@ describe('commands', () => {
     }
   });
 
+  it('list-sharepoint-site-onenote-notebooks rewrites Graph error 10008 (5k-item OneNote limit) to a one-line actionable summary — audit round-8 H2', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/sites/s1/onenote/notebooks',
+        method: 'GET',
+        response: () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: '10008',
+                message:
+                  'The OneNote service is currently unavailable for this tenant because the SharePoint site collection has too many items. Browse to this page for more information: https://blogs.msdn.microsoft.com/onenotedev/2016/09/11/',
+              },
+            }),
+            { status: 503, headers: { 'content-type': 'application/json' } }
+          ),
+      },
+    ]);
+    const cmd = cmdMap['list-sharepoint-site-onenote-notebooks'];
+    if (!cmd) throw new Error('list-sharepoint-site-onenote-notebooks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { siteId: 's1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('5000-item limit');
+      expect(r.error.message).toContain('admin');
+      expect(r.error.message).not.toContain('msdn.microsoft.com');
+      expect(r.error.code).toBe('cli_rewrite_onenote_5k_limit');
+    }
+  });
+
+  it('get-my-manager returns `{ manager: null, note }` (not bare null) when Graph 404s Request_ResourceNotFound — audit round-8 H1', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/manager',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'Request_ResourceNotFound', message: 'Resource not found.' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['get-my-manager'];
+    if (!cmd) throw new Error('get-my-manager not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, {});
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { manager: null; note: string };
+      expect(v.manager).toBeNull();
+      expect(typeof v.note).toBe('string');
+      expect(v.note).toContain('no manager');
+    }
+  });
+
+  it('list-incomplete-todo-tasks passes through RequestBroker--ParseUri unchanged when neither --select nor --orderby is set (no false rewrite)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: "https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$filter=status ne 'completed'",
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-incomplete-todo-tasks'];
+    if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('RequestBroker--ParseUri');
+      expect(r.error.message).not.toContain('Drop `title`');
+    }
+  });
+
+  it('list-incomplete-todo-tasks rewrites --orderby title with the parser-quirk hint (audit round-8 §1.1)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: "https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$filter=status ne 'completed'&$orderby=title%20asc",
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-incomplete-todo-tasks'];
+    if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', orderby: 'title asc' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('Graph rejected --orderby=title asc');
+      expect(r.error.message).toContain('sorting on `title` is unsupported');
+    }
+  });
+
+  it('list-incomplete-todo-tasks rewrites the title-quirk RequestBroker--ParseUri error like its sibling (audit round-8 §1.1)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: "https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$filter=status ne 'completed'&$select=id%2Ctitle",
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-incomplete-todo-tasks'];
+    if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', select: 'id,title' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('Graph rejected --select=id,title');
+      expect(r.error.message).toContain('Drop `title` from --select');
+    }
+  });
+
   it('list-incomplete-todo-tasks rejects --filter with a pointer at list-todo-tasks (audit round-6 §2.7)', async () => {
     const cmd = cmdMap['list-incomplete-todo-tasks'];
     if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');

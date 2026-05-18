@@ -120,6 +120,14 @@ type CommandMeta = {
    * commands will time out.
    */
   readonly needsElevatedToken?: true;
+  /**
+   * `true` if the command returns inlined bytes (`{contentType, size, base64}`
+   * or `{contentType, size, text}`) and is therefore a valid target for the
+   * global `--output-path` flag. Used by the CLI composition to derive the
+   * rejection-message whitelist from the manifest rather than hand-keeping it
+   * as a string literal. Audit round-8 Wave E2.
+   */
+  readonly producesBytes?: true;
 };
 
 type Command = {

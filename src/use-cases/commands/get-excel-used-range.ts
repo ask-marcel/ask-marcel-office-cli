@@ -31,7 +31,9 @@ const meta: CommandMeta = {
       name: 'worksheet-id',
       key: 'worksheetId',
       required: true,
-      description: 'Worksheet ID or name. Returned by `list-excel-worksheets`.',
+      description:
+        "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`. If neither matches Graph responds `itemNotFound: The requested resource doesn't exist.` — when that happens, double-check spelling case-sensitively against `ask-marcel list-excel-worksheets --drive-id <d> --item-id <i>`.",
+      argumentHint: { kind: 'idOrName' },
     },
   ],
   example: "ask-marcel get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",

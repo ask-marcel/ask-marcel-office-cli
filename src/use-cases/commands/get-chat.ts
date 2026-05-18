@@ -1,21 +1,18 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildElevatedCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 
-// Audit v1.0.0 §B2: the previous elevated-token path consistently
-// timed out ("elevated token capture timed out — silent SSO ... did not
-// yield a Bearer within the deadline"), and the documented `login`
-// remediation didn't refresh the M365ChatClient cookies. The regular
-// Teams web-client token reaches `/chats/{id}` per Microsoft's chat-get
-// docs — the elevation was over-cautious. Switch to the regular token
-// to match sibling `list-chat-members`, which has always worked
-// without elevation.
+// Audit round-8 §1.5: round-6 moved this off elevation on the hypothesis
+// that the basic Teams web client token would reach `/chats/{id}`. The
+// audit verified the hypothesis was wrong — Graph rejects with `Missing
+// scope permissions ... Chat.ReadBasic`. Revert to the elevated
+// M365ChatClient path (which DOES carry Chat.ReadBasic).
 const schema = z.object({ chatId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/chats/${p.chatId}`, schema);
+const { execute } = buildElevatedCommand((p) => `/chats/${p.chatId}`, schema);
 
 const meta: CommandMeta = {
   summary:
-    'Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*` and ship as a separate token scope).',
+    'Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*`). Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).',
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: '/chats/{chat-id}',
@@ -30,7 +27,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
   responseShape: 'single Microsoft Graph `chat` resource',
-  scopesRequired: ['Chat.ReadBasic'],
+  needsElevatedToken: true,
 };
 
 export { execute, meta, schema };

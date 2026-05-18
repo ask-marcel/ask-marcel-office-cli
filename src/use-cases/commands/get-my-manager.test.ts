@@ -23,9 +23,14 @@ describe('get-my-manager', () => {
     expect(result).toEqual(ok(manager));
   });
 
-  it('maps the 404 Request_ResourceNotFound to ok(null) so an LLM can distinguish "no manager set" from a permission failure', async () => {
+  it('maps the 404 Request_ResourceNotFound to `{ manager: null, note }` so an LLM can distinguish "no manager set" from a permission failure (audit round-8 H1)', async () => {
     const result = await execute(fakeGraphReturning(err({ type: 'api_error', status: 404, message: 'Request_ResourceNotFound: Resource not found.' })), {});
-    expect(result).toEqual(ok(null));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { manager: null; note: string };
+      expect(v.manager).toBeNull();
+      expect(v.note).toContain('no manager');
+    }
   });
 
   it('passes through other 404s (different error code) as the original GraphError', async () => {

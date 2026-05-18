@@ -60,6 +60,7 @@ const meta: CommandMeta = {
   example: "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "text/plain", size, text }` for plain-text source extensions; `{ contentType, size, base64 }` for everything else. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

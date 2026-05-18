@@ -65,6 +65,21 @@ describe('graph client', () => {
     }
   });
 
+  it('truncates the granted-scope dump from `Missing scope permissions` 403 errors (audit round-8 Wave F)', async () => {
+    const longScopeDump =
+      "Forbidden: Missing scope permissions on the request. API requires one of 'Chat.ReadBasic, Chat.Read, Chat.ReadWrite'. Scopes on the request 'profile,openid,email,User.Read,Mail.Read,Calendars.Read,Tasks.Read,Sites.Read.All,Notes.Read.All,Group.Read.All,Team.ReadBasic.All,Channel.ReadBasic.All,People.Read,MailboxSettings.Read,Files.Read.All'";
+    const fetchFn = fakeFetch([{ match: (url) => url.includes('/me/chats'), body: { error: { code: 'Forbidden', message: longScopeDump } }, status: 403 }]);
+
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain("API requires one of 'Chat.ReadBasic, Chat.Read, Chat.ReadWrite'");
+      expect(result.error.message).not.toContain('User.Read,Mail.Read');
+      expect(result.error.message).toContain('scopes-check');
+    }
+  });
+
   it('falls back to the response status text when the error body is not parseable JSON', async () => {
     const fetchFn: FetchFn = async () => new Response('not-json-at-all', { status: 503, statusText: 'Service Unavailable' });
     const client = createGraphClient(fakeAuth(), fetchFn);

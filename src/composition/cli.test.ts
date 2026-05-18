@@ -211,6 +211,46 @@ describe('buildCli command surface', () => {
     expect(out).not.toContain('--title-substring is empty');
   });
 
+  it('help-json rejects an explicit --output text (manifest is JSON by contract — audit round-8 Wave G1)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'text', 'help-json']);
+      } catch {
+        /* commander may exit */
+      }
+    });
+    expect(out).toContain('help-json always emits JSON');
+    expect(out).not.toContain('"commands"');
+  });
+
+  it('help-json still works when --output is left at its default text value (no explicit flag)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', 'help-json']);
+      } catch {
+        /* commander may exit */
+      }
+    });
+    expect(out).toContain('"commands"');
+  });
+
+  it('rejects a duplicate --output flag (audit round-8 Wave G2)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ id: 'u1' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', '--output', 'text', 'get-current-user']);
+      } catch {
+        /* commander may exit */
+      }
+    });
+    expect(out).toContain('--output cannot be passed more than once');
+  });
+
   it('rejects a single-value flag passed more than once (audit round-7 B6)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({ value: [] }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });

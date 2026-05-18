@@ -16,6 +16,7 @@ export type CommandManifestEntry = {
   readonly paginationStrategy?: CommandMeta['paginationStrategy'];
   readonly scopesRequired?: CommandMeta['scopesRequired'];
   readonly needsElevatedToken?: CommandMeta['needsElevatedToken'];
+  readonly producesBytes?: CommandMeta['producesBytes'];
 };
 
 export const PAGINATION_HINT =

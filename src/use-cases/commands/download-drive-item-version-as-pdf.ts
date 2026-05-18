@@ -76,6 +76,7 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape with `passthrough: true` + a `note` so the caller can tell conversion was deliberately skipped. **If Graph silently falls back to raw bytes** (some historical versions of pptx/docx — verified live), the response also carries `passthrough: true` + a sharp note saying the bytes are the source, NOT a PDF — save them with the source extension, not `.pdf`. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
   needsElevatedToken: true,
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

@@ -1,11 +1,18 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import { buildListCommand } from './build-command.ts';
+import { buildElevatedListCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
+// Audit round-8 §1.5: this command was on the basic Teams token throughout
+// rounds 6 and 7 (audit had labelled `list-chat-members` "always worked
+// without elevation"). Round-8 testing showed the same `Missing scope
+// permissions` 403 as the chat-metadata siblings — Graph requires
+// `ChatMember.Read` which the basic token doesn't grant. Switch to the
+// elevated M365ChatClient identity for parity with `list-chats` /
+// `get-chat`.
 const baseSchema = z.object({ chatId: z.string().min(1) });
-const inner = buildListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
+const inner = buildElevatedListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
 
 // Audit round-7 B3: Graph surfaces the unhelpful `1: NotFound` (the `1:` is
 // the Teams thread-id segment, echoed without context) for any missing
@@ -50,7 +57,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',
   pagination: true,
-  scopesRequired: ['ChatMember.Read'],
+  needsElevatedToken: true,
 };
 
 export { execute, meta, schema };

@@ -25,6 +25,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel get-my-profile-photo',
   responseShape:
     '`{ contentType: "image/jpeg", size: <bytes>, base64: "<encoded>" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

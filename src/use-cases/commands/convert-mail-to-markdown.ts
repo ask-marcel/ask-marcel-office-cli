@@ -117,6 +117,7 @@ const meta: CommandMeta = {
   options: [{ name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' }],
   example: "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
   responseShape: '`{ contentType: "text/markdown", size, text }` — headers + turndown-rendered body with inline images embedded.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

@@ -32,6 +32,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
   responseShape: '`{ contentType: "text/markdown", size: <chars>, text: "..." }` — turndown-rendered markdown of the OneNote page body.',
+  producesBytes: true,
 };
 
 export { execute, meta, schema };

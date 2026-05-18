@@ -2,9 +2,12 @@ import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
+import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1), notebookId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/sites/${p.siteId}/onenote/notebooks/${p.notebookId}/sections`, baseSchema);
+const inner = buildListCommand((p) => `/sites/${p.siteId}/onenote/notebooks/${p.notebookId}/sections`, baseSchema);
+const execute = wrapOnenote5kLimit(inner.execute);
+const { schema } = inner;
 
 const meta: CommandMeta = {
   summary: 'List sections inside one OneNote notebook attached to a SharePoint site.',
