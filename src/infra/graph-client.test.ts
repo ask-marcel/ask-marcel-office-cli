@@ -9,6 +9,7 @@ const fakeAuth = (): AuthManager => ({
   getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
+  getLastElevatedOutcome: () => null,
 });
 
 const fakeFetch = (responses: Array<{ match: (url: string) => boolean; body: unknown; status?: number }>): FetchFn => {
@@ -43,6 +44,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed' as const, message: 'no auth' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     });
     const result = await client.get('/me/drives');
     expect(result.ok).toBe(false);
@@ -96,6 +98,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth);
     const result = await client.get('/me');
@@ -428,6 +431,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'token gone' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
     const result = await client.getBinary('/me/photo/$value');
@@ -639,6 +643,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'no token' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
     const result = await client.put('/me/drive/root:/x', new Uint8Array(100));
@@ -682,6 +687,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'no token' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
     const result = await client.delete('/me/drive/items/i1');
@@ -723,6 +729,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
     const result = await client.getBinaryElevated('/drives/d1/items/i1/versions/2.0/content');
@@ -737,6 +744,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
     const result = await client.getBinaryElevated('/drives/d1/items/i1/versions/2.0/content');
@@ -779,6 +787,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
     const result = await client.getElevated('/me/chats');
@@ -793,6 +802,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
     const result = await client.getElevated('/me/chats');
@@ -822,6 +832,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(tokenAuth);
     const result = await client.getCachedTokenInfo();
@@ -840,6 +851,7 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(tokenAuth);
     const result = await client.getCachedTokenInfo();
@@ -856,6 +868,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth);
     const result = await client.getCachedTokenInfo();
@@ -868,6 +881,7 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'token store unreadable' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failedAuth);
     const result = await client.getCachedTokenInfo();

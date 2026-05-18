@@ -15,6 +15,7 @@ describe('login command', () => {
       getAccessToken: async () => err({ type: 'auth_cancelled' as const }),
       getElevatedAccessToken: async () => err({ type: 'auth_cancelled' as const }),
       logout: async () => ok(undefined),
+      getLastElevatedOutcome: () => null,
     };
     const result = await login(fakeAuth);
     expect(result.ok).toBe(false);

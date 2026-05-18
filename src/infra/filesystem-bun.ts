@@ -39,4 +39,18 @@ export const createBunFileSystem = (): FileSystem => ({
       return err({ type: 'io_failed', message: formatError(e) });
     }
   },
+  // Login-fix round-1 Wave B: wipe the Playwright persistent browser
+  // profile during `logout`. Bun.file is per-file only; the recursive
+  // variant lives on fs/promises so we lazy-import it here. Best-effort
+  // — returns ok even when the directory does not exist (port contract).
+  deleteDirIfExists: async (path) => {
+    try {
+      const { rm } = await import('node:fs/promises');
+      await rm(path, { recursive: true, force: true });
+      return ok(undefined);
+    } catch (e) {
+      if (isMissingError(e)) return ok(undefined);
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
 });

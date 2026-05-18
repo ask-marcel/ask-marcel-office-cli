@@ -13,7 +13,7 @@
  * either runtime directly.
  */
 
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
@@ -57,6 +57,18 @@ export const createNodeFileSystem = (): FileSystem => ({
   deleteIfExists: async (path) => {
     try {
       await unlink(path);
+      return ok(undefined);
+    } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') return ok(undefined);
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
+  // Login-fix round-1 Wave B: wipe the Playwright persistent browser
+  // profile during `logout`. Best-effort recursive delete — returns ok
+  // even when the directory does not exist (port contract).
+  deleteDirIfExists: async (path) => {
+    try {
+      await rm(path, { recursive: true, force: true });
       return ok(undefined);
     } catch (e) {
       if (isNodeError(e) && e.code === 'ENOENT') return ok(undefined);

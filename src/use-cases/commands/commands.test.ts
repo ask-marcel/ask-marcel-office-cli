@@ -318,6 +318,7 @@ const fakeAuth = (): AuthManager => ({
   getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
+  getLastElevatedOutcome: () => null,
 });
 
 type FakeFetch = ((url: string, init?: RequestInit) => Promise<Response>) & { lastUrl: string | null; lastBody: string | null };

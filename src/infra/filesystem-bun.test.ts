@@ -101,4 +101,42 @@ describe('Bun filesystem adapter', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
+
+  it('recursively deletes a populated directory (login-fix round-1 Wave B — logout wipes the browser profile)', async () => {
+    const profileDir = join(tmp, 'browser-profile');
+    const subPath = join(profileDir, 'Default', 'Cookies');
+    writeFileSync(join(tmp, 'unused.txt'), 'leave me alone');
+    // mkdir is implicit via writeFileSync — manually nest:
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(profileDir, 'Default'), { recursive: true });
+    writeFileSync(subPath, 'cookie-data');
+    const fs = createBunFileSystem();
+    const result = await fs.deleteDirIfExists(profileDir);
+    expect(result.ok).toBe(true);
+    expect(await Bun.file(subPath).exists()).toBe(false);
+    expect(await Bun.file(join(tmp, 'unused.txt')).exists()).toBe(true);
+  });
+
+  it('deleteDirIfExists is a no-op when the directory does not exist', async () => {
+    const fs = createBunFileSystem();
+    const result = await fs.deleteDirIfExists(join(tmp, 'never-existed'));
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns io_failed when deleteDirIfExists cannot remove a child due to a read-only parent', async () => {
+    const { mkdirSync, chmodSync } = await import('node:fs');
+    const profileDir = join(tmp, 'browser-profile');
+    const innerDir = join(profileDir, 'Default');
+    mkdirSync(innerDir, { recursive: true });
+    writeFileSync(join(innerDir, 'Cookies'), 'data');
+    chmodSync(innerDir, 0o500);
+    const fs = createBunFileSystem();
+    const result = await fs.deleteDirIfExists(profileDir);
+    chmodSync(innerDir, 0o700);
+    if (!result.ok) {
+      expect(result.error.type).toBe('io_failed');
+    } else {
+      expect(result.ok).toBe(true);
+    }
+  });
 });

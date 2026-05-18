@@ -161,8 +161,29 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback).')
     .action(async () => {
       const result = await login.execute(auth);
-      if (result.ok) renderOut({ status: 'authenticated' });
-      else fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
+      if (!result.ok) {
+        fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
+        return;
+      }
+      // Login-fix round-1 Wave D: surface the elevated-capture outcome so
+      // an LLM consumer can predict whether the elevated-dependent
+      // commands (list-chats / get-chat / list-chat-members /
+      // historical-version downloads) will work without invoking them.
+      // The outcome is null when getAccessToken hit cache (no browser
+      // step ran in this process) — leave the elevated field unset in
+      // that case so consumers don't think the elevated state was
+      // tested.
+      const outcome = auth.getLastElevatedOutcome();
+      const envelope: { status: 'authenticated'; elevated?: 'captured' | 'failed'; elevatedReason?: string } = { status: 'authenticated' };
+      if (outcome !== null) {
+        if (outcome.captured) {
+          envelope.elevated = 'captured';
+        } else {
+          envelope.elevated = 'failed';
+          envelope.elevatedReason = outcome.reason;
+        }
+      }
+      renderOut(envelope);
     });
   loginCmd.addHelpText(
     'after',

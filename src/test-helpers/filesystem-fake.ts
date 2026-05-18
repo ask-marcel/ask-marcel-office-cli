@@ -37,6 +37,19 @@ export const createFileSystemFake = (): FileSystemFake => {
       bytesStore.delete(path);
       return ok(undefined);
     },
+    // Login-fix round-1: directories aren't modeled (the fake is flat),
+    // so wipe every key that has `path/` as a prefix to approximate a
+    // recursive delete. Returns ok regardless — matches port contract.
+    deleteDirIfExists: async (path) => {
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      for (const key of [...store.keys()]) {
+        if (key === path || key.startsWith(prefix)) store.delete(key);
+      }
+      for (const key of [...bytesStore.keys()]) {
+        if (key === path || key.startsWith(prefix)) bytesStore.delete(key);
+      }
+      return ok(undefined);
+    },
     seed: (path, content) => {
       store.set(path, content);
     },

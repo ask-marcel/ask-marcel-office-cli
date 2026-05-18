@@ -77,6 +77,7 @@ describe('persistIfRequested', () => {
       writeText: async () => ok(undefined),
       writeBytes: async () => err({ type: 'io_failed', message: 'EACCES: permission denied' }),
       deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
     };
     const data = { contentType: 'application/pdf', base64: 'JVBERi0=' };
     const result = await persistIfRequested(failingFs, '/root/forbidden.pdf', data);
@@ -92,6 +93,7 @@ describe('persistIfRequested', () => {
       writeText: async () => err({ type: 'io_failed', message: 'ENOSPC: no space left on device' }),
       writeBytes: async () => ok(undefined),
       deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
     };
     const data = { contentType: 'text/plain', text: 'hello' };
     const result = await persistIfRequested(failingFs, '/full/disk.txt', data);

@@ -6,18 +6,44 @@ import { installFetchMock } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createAuthManager, createAuthManagerFromApi } from './auth.ts';
-import type { BrowserAuth, BrowserTokenResult } from './browser-auth.ts';
+import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 
 const CACHE_PATH = '/virtual/token-cache.json';
+const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
 
-const fakeBrowserAuth = (config?: { acquireResult?: BrowserTokenResult | null; acquireError?: Error; elevatedResult?: AccessToken | null }): BrowserAuth => ({
-  acquireToken: async () => {
-    if (config?.acquireError) throw config.acquireError;
-    return config?.acquireResult ?? null;
-  },
-  acquireElevatedToken: async () => config?.elevatedResult ?? null,
-  close: async () => {},
-});
+// Login-fix round-1: fake browserAuth maps the legacy sentinel
+// (AccessToken | null) onto the new discriminated union — null becomes
+// `{ ok: false, reason: 'sso_timeout' }` to preserve existing tests
+// without touching every single one. New tests can pass an explicit
+// `elevatedFailure` to cover the launch_timeout / navigation_failed
+// branches.
+const fakeBrowserAuth = (config?: {
+  acquireResult?: BrowserTokenResult | null;
+  acquireError?: Error;
+  elevatedResult?: AccessToken | null;
+  elevatedFailure?: ElevatedFailureReason;
+  elevatedSequence?: ReadonlyArray<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>;
+}): BrowserAuth => {
+  let elevatedCallCount = 0;
+  return {
+    acquireToken: async () => {
+      if (config?.acquireError) throw config.acquireError;
+      return config?.acquireResult ?? null;
+    },
+    acquireElevatedToken: async () => {
+      if (config?.elevatedSequence !== undefined) {
+        const value = config.elevatedSequence[elevatedCallCount] ?? config.elevatedSequence[config.elevatedSequence.length - 1];
+        elevatedCallCount += 1;
+        return value ?? { ok: false as const, reason: 'sso_timeout' };
+      }
+      if (config?.elevatedFailure !== undefined) return { ok: false as const, reason: config.elevatedFailure };
+      const v = config?.elevatedResult;
+      if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
+      return { ok: true as const, token: v };
+    },
+    close: async () => {},
+  };
+};
 
 const futureToken = (): BrowserTokenResult => {
   const future = Math.floor(Date.now() / 1000) + 3600;
@@ -42,7 +68,7 @@ describe('auth manager recovery ladder', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result).toEqual(ok(accessTokenUnsafe(`${header}.${payload}.sig`)));
@@ -73,7 +99,7 @@ describe('auth manager recovery ladder', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired-token', expires_on: past, refresh_token: 'old-refresh' }));
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -94,7 +120,7 @@ describe('auth manager recovery ladder', () => {
 
     const browserToken = futureToken();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -105,7 +131,7 @@ describe('auth manager recovery ladder', () => {
     const fs = createFileSystemFake();
     const browserToken = futureToken();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -115,7 +141,7 @@ describe('auth manager recovery ladder', () => {
   it('returns auth_cancelled when browser returns null', async () => {
     const fs = createFileSystemFake();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
@@ -125,7 +151,7 @@ describe('auth manager recovery ladder', () => {
   it('returns auth_failed when browser throws', async () => {
     const fs = createFileSystemFake();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireError: new Error('browser launch failed') }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireError: new Error('browser launch failed') }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
@@ -138,10 +164,10 @@ describe('auth manager recovery ladder', () => {
       acquireToken: async () => {
         throw 'edge process killed';
       },
-      acquireElevatedToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -158,7 +184,7 @@ describe('auth manager recovery ladder', () => {
 
     const browserToken = futureToken();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -171,11 +197,105 @@ describe('auth manager recovery ladder', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'token', expires_on: future, refresh_token: 'refresh' }));
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.logout();
     expect(result.ok).toBe(true);
     expect(fs.has(CACHE_PATH)).toBe(false);
+  });
+
+  it('logout wipes the persistent browser-profile directory in addition to the token cache (audit login-fix round-1 Wave B)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'token', expires_on: future, refresh_token: 'refresh' }));
+    // Seed a couple of files under the browser-profile dir to verify
+    // the recursive delete actually fires.
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookie-data');
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Login Data`, 'login-data');
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.logout();
+    expect(result.ok).toBe(true);
+    expect(fs.has(CACHE_PATH)).toBe(false);
+    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(false);
+    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Login Data`)).toBe(false);
+  });
+
+  it('login auto-heals: when the first elevated capture returns { ok: false, reason: "sso_timeout" }, wipes the browser-profile directory and retries elevated once (audit login-fix round-1 Wave C)', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'stale-cookies');
+    const goodElevated = futureElevated();
+    const browser = fakeBrowserAuth({
+      acquireResult: futureToken(),
+      // First call fails with sso_timeout → triggers profile wipe + retry. Second call succeeds.
+      elevatedSequence: [
+        { ok: false, reason: 'sso_timeout' },
+        { ok: true, token: goodElevated },
+      ],
+    });
+    const logger = createLoggerFake();
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    // Profile was wiped between the two elevated attempts.
+    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(false);
+    // Auto-heal succeeded → cache has the elevated token.
+    const cached = await fs.readJson<{ elevated_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.elevated_access_token).toBe(goodElevated);
+    // Outcome surface (Wave D) reports capture succeeded.
+    expect(auth.getLastElevatedOutcome()).toEqual({ captured: true });
+  });
+
+  it('recaptureElevated returns the launch_timeout-specific error message when browser launch times out (audit login-fix round-1 Wave E)', async () => {
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ elevatedFailure: 'launch_timeout' });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getElevatedAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('elevated browser launch timed out');
+      expect(result.error.message).toContain('corrupt persistent profile');
+      expect(result.error.message).toContain('logout');
+    }
+  });
+
+  it('recaptureElevated returns the navigation_failed-specific error message when network/tenant blocks navigation (audit login-fix round-1 Wave E)', async () => {
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ elevatedFailure: 'navigation_failed' });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getElevatedAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('navigation to m365.cloud.microsoft did not complete');
+      expect(result.error.message).toContain('corp-proxy');
+    }
+  });
+
+  it('login auto-heal skips the retry when the first elevated failure is navigation_failed (network issue, retry would not help)', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
+    const browser = fakeBrowserAuth({
+      acquireResult: futureToken(),
+      elevatedFailure: 'navigation_failed',
+    });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    // Profile was NOT wiped — navigation_failed is not recoverable via wipe.
+    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(true);
+    // Outcome reports failure with the specific reason.
+    expect(auth.getLastElevatedOutcome()).toEqual({ captured: false, reason: 'navigation_failed' });
+  });
+
+  it('getLastElevatedOutcome returns null when getAccessToken hit the cache (no browser step ran)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    expect(auth.getLastElevatedOutcome()).toBeNull();
   });
 
   it('still clears cache on logout when browser close throws a non-Error value (covers String(e) fallback in logout catch)', async () => {
@@ -185,12 +305,12 @@ describe('auth manager recovery ladder', () => {
 
     const stringThrower: BrowserAuth = {
       acquireToken: async () => null,
-      acquireElevatedToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw 'edge crashed during close';
       },
     };
-    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.logout();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -206,14 +326,14 @@ describe('auth manager recovery ladder', () => {
 
     const failingBrowser: BrowserAuth = {
       acquireToken: async () => null,
-      acquireElevatedToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw new Error('close failed');
       },
     };
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(failingBrowser, CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(failingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.logout();
     expect(result.ok).toBe(false);
@@ -239,7 +359,7 @@ describe('auth manager recovery ladder', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired-token', expires_on: past, refresh_token: 'old-refresh' }));
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
@@ -271,7 +391,7 @@ describe('auth manager recovery ladder', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired-token', expires_on: past, refresh_token: 'old-refresh' }));
 
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, logger, fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
@@ -290,7 +410,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: elevatedToken, elevated_expires_on: future }));
 
-    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(accessTokenUnsafe(elevatedToken)));
   });
@@ -301,7 +421,7 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
 
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
@@ -316,7 +436,7 @@ describe('auth manager elevated token', () => {
     // elevated_access_token present, elevated_expires_on missing
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: 'orphan-token' }));
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
   });
@@ -326,7 +446,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: '', elevated_expires_on: future }));
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
   });
@@ -341,7 +461,7 @@ describe('auth manager elevated token', () => {
     );
 
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
@@ -352,7 +472,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
 
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: null }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -374,7 +494,7 @@ describe('auth manager elevated token', () => {
       },
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -386,7 +506,7 @@ describe('auth manager elevated token', () => {
   it('persists the elevated token alongside the Teams token at login time (best-effort)', async () => {
     const fs = createFileSystemFake();
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     await auth.getAccessToken();
     const cacheRead = await fs.readJson<{ elevated_access_token?: string }>(CACHE_PATH);
@@ -398,7 +518,7 @@ describe('auth manager elevated token', () => {
 
   it('login still succeeds even when elevated capture returns null (the 80+ non-version commands do not need it)', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: null }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -415,7 +535,7 @@ describe('auth manager elevated token', () => {
       },
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(throwingElevated, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(throwingElevated, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
   });
@@ -436,7 +556,7 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'old-refresh' }));
 
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
@@ -461,7 +581,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'old-refresh' }));
 
-    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ refresh_token: string }>(CACHE_PATH);
@@ -483,7 +603,7 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'old-refresh' }));
 
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
@@ -493,7 +613,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     // No cache seeded; getElevatedAccessToken called with empty FS.
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ access_token: string; elevated_access_token?: string }>(CACHE_PATH);
@@ -505,7 +625,7 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     const noExpAccessJwt = `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify({ aud: 'https://graph.microsoft.com' }))}.sig`;
     const browserResult: BrowserTokenResult = { accessToken: accessTokenUnsafe(noExpAccessJwt), refreshToken: 'rt' };
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     await auth.getAccessToken();
     const cached = await fs.readJson<{ expires_on: number }>(CACHE_PATH);
     expect(cached.ok && cached.value.expires_on).toBe(0);
@@ -514,7 +634,7 @@ describe('auth manager elevated token', () => {
   it('persists refresh_token as empty string when browser returns null refresh (covers `refresh ?? ""` fallback)', async () => {
     const fs = createFileSystemFake();
     const browserResult: BrowserTokenResult = { accessToken: futureToken().accessToken, refreshToken: null };
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     await auth.getAccessToken();
     const cached = await fs.readJson<{ refresh_token: string }>(CACHE_PATH);
     expect(cached.ok && cached.value.refresh_token).toBe('');
@@ -529,7 +649,7 @@ describe('auth manager elevated token', () => {
       },
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
   });
@@ -537,7 +657,13 @@ describe('auth manager elevated token', () => {
   it('persists elevated_expires_on as 0 when the elevated JWT has no exp claim', async () => {
     const fs = createFileSystemFake();
     const noExpJwt = `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify({ aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9' }))}.sig`;
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: accessTokenUnsafe(noExpJwt) }), CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: accessTokenUnsafe(noExpJwt) }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs
+    );
     await auth.getAccessToken();
     const cached = await fs.readJson<{ elevated_access_token?: string; elevated_expires_on?: number }>(CACHE_PATH);
     expect(cached.ok && cached.value.elevated_expires_on).toBe(0);
@@ -555,7 +681,7 @@ describe('auth manager elevated token', () => {
       },
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -577,10 +703,10 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
           resolveLoginRef.current = resolve;
         });
       },
-      acquireElevatedToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const a = auth.getAccessToken();
     const b = auth.getAccessToken();
@@ -603,10 +729,10 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         acquireCallCount += 1;
         return futureToken();
       },
-      acquireElevatedToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(browser, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const first = await auth.getAccessToken();
     expect(first.ok).toBe(true);
@@ -628,13 +754,13 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       acquireToken: async () => null,
       acquireElevatedToken: async () => {
         elevatedCallCount += 1;
-        return new Promise<AccessToken | null>((resolve) => {
-          resolveElevatedRef.current = (v) => resolve(v);
+        return new Promise<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>((resolve) => {
+          resolveElevatedRef.current = (v) => resolve({ ok: true, token: v });
         });
       },
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
 
     const a = auth.getElevatedAccessToken();
     const b = auth.getElevatedAccessToken();

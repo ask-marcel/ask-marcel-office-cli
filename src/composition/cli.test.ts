@@ -29,18 +29,21 @@ const okAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: true, value: undefined }),
+  getLastElevatedOutcome: () => null,
 });
 
 const cancelledAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
+  getLastElevatedOutcome: () => null,
 });
 
 const failedAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'browser launch failed' } as AuthError }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: false, error: { type: 'auth_failed', message: 'rm denied' } as AuthError }),
+  getLastElevatedOutcome: () => null,
 });
 
 const okGraph = (value: unknown): GraphClient => ({
@@ -80,6 +83,44 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
     expect(out).toBe('status: authenticated\n');
+  });
+
+  it('renders login envelope with elevated=captured when the browser auth captured the M365ChatClient token (audit login-fix round-1 Wave D)', async () => {
+    const elevatedCapturedAuth: AuthManager = {
+      getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
+      getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
+      logout: async () => ({ ok: true, value: undefined }),
+      getLastElevatedOutcome: () => ({ captured: true }),
+    };
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: elevatedCapturedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    expect(out).toContain('"status":"authenticated"');
+    expect(out).toContain('"elevated":"captured"');
+  });
+
+  it('renders login envelope with elevated=failed AND elevatedReason when elevated capture failed (audit login-fix round-1 Wave D)', async () => {
+    const elevatedFailedAuth: AuthManager = {
+      getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
+      getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
+      logout: async () => ({ ok: true, value: undefined }),
+      getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }),
+    };
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: elevatedFailedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    expect(out).toContain('"status":"authenticated"');
+    expect(out).toContain('"elevated":"failed"');
+    expect(out).toContain('"elevatedReason":"sso_timeout"');
+  });
+
+  it('omits the elevated field on login envelope when getAccessToken hit cache (no browser step ran)', async () => {
+    // Default okAuth returns null from getLastElevatedOutcome — old behavior preserved.
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    expect(out).toContain('"status":"authenticated"');
+    expect(out).not.toContain('"elevated"');
   });
 
   it('renders a Graph error message as a plain "error: <message>" line by default (no JSON envelope)', async () => {
@@ -564,6 +605,7 @@ describe('buildCli command surface', () => {
       writeText: async () => ({ ok: true, value: undefined }),
       writeBytes: async () => ({ ok: false, error: { type: 'io_failed' as const, message: 'EACCES: permission denied, open' } }),
       deleteIfExists: async () => ({ ok: true, value: undefined }),
+      deleteDirIfExists: async () => ({ ok: true, value: undefined }),
     };
     const inlinedPdf: GraphClient = {
       ...okGraph({}),

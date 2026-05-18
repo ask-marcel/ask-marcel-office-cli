@@ -608,8 +608,9 @@ describe('browser auth — production wiring', () => {
       pageOpts: { requestsPerGoto: [[elevatedRequest]] },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig());
-    const token = await browser.acquireElevatedToken();
-    expect(token as unknown as string).toBe(elevatedJwt);
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token as unknown as string).toBe(elevatedJwt);
   });
 
   it('acquireElevatedToken ignores Bearer tokens that do not match an elevated appid', async () => {
@@ -626,8 +627,9 @@ describe('browser auth — production wiring', () => {
       pageOpts: { requestsPerGoto: [[wrongAppRequest]] },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
-    const token = await browser.acquireElevatedToken();
-    expect(token).toBeNull();
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
   });
 
   it('acquireElevatedToken ignores tokens whose audience is not Graph (even if appid is on the elevated list)', async () => {
@@ -644,8 +646,9 @@ describe('browser auth — production wiring', () => {
       pageOpts: { requestsPerGoto: [[wrongAudRequest]] },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
-    const token = await browser.acquireElevatedToken();
-    expect(token).toBeNull();
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
   });
 
   it('acquireElevatedToken ignores requests without an Authorization header', async () => {
@@ -657,18 +660,30 @@ describe('browser auth — production wiring', () => {
       pageOpts: { requestsPerGoto: [[noAuthRequest]] },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
-    const token = await browser.acquireElevatedToken();
-    expect(token).toBeNull();
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
   });
 
-  it('acquireElevatedToken returns null on poll-deadline timeout when no elevated request fires', async () => {
+  it('acquireElevatedToken returns { ok: false, reason: "sso_timeout" } on poll-deadline timeout when no elevated request fires', async () => {
     const { api } = makeFakeApi({ pageOpts: {} });
     const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
-    const token = await browser.acquireElevatedToken();
-    expect(token).toBeNull();
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
   });
 
-  it('acquireElevatedToken treats goto errors as non-fatal — keeps polling for the request event', async () => {
+  it('acquireElevatedToken returns { ok: false, reason: "navigation_failed" } when goto errors AND polling yields no token (audit login-fix round-1 Wave E)', async () => {
+    const { api } = makeFakeApi({
+      pageOpts: { gotoErrors: [new Error('navigation timeout')] },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 100, pollIntervalMs: 20, elevatedRecaptureTimeoutMs: 100 }));
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('navigation_failed');
+  });
+
+  it('acquireElevatedToken still captures a token when goto errors but the request event fires (navigation_failed only surfaces when polling also fails)', async () => {
     const elevatedJwt = makeJwt({
       exp: Math.floor(Date.now() / 1000) + 3600,
       aud: 'https://graph.microsoft.com',
@@ -682,7 +697,62 @@ describe('browser auth — production wiring', () => {
       pageOpts: { requestsPerGoto: [[elevatedRequest]], gotoErrors: [new Error('navigation timeout')] },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig());
-    const token = await browser.acquireElevatedToken();
-    expect(token as unknown as string).toBe(elevatedJwt);
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token as unknown as string).toBe(elevatedJwt);
+  });
+
+  it('acquireElevatedToken returns { ok: false, reason: "launch_timeout" } when launchPersistentContext hangs longer than elevatedLaunchTimeoutMs (audit login-fix round-1 Wave A)', async () => {
+    // Build an api whose launchPersistentContext never resolves — simulate a
+    // hung Playwright launch (corrupt profile / stale Singleton lock).
+    const hangingApi: BrowserAuthApi = {
+      launchPersistentContext: () => new Promise(() => undefined),
+    };
+    const browser = createBrowserAuthFromApi(hangingApi, fastConfig({ elevatedLaunchTimeoutMs: 50 }));
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('acquireElevatedToken returns { ok: false, reason: "launch_timeout" } when newPage hangs (Wave A — distinct hang point)', async () => {
+    const hangingPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: () => new Promise(() => undefined),
+        clearCookies: async () => undefined,
+        close: async () => undefined,
+      }),
+    };
+    const browser = createBrowserAuthFromApi(hangingPageApi, fastConfig({ elevatedLaunchTimeoutMs: 50 }));
+    const result = await browser.acquireElevatedToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('acquireElevatedToken propagates non-timeout errors from launchPersistentContext (e.g. Playwright not installed)', async () => {
+    const erroringApi: BrowserAuthApi = {
+      launchPersistentContext: async () => {
+        throw new Error('playwright executable missing');
+      },
+    };
+    const browser = createBrowserAuthFromApi(erroringApi, fastConfig({ elevatedLaunchTimeoutMs: 50 }));
+    await expect(browser.acquireElevatedToken()).rejects.toThrow('playwright executable missing');
+  });
+
+  it('acquireElevatedToken propagates non-timeout errors from newPage (closes context first to avoid leak)', async () => {
+    let closedCount = 0;
+    const erroringPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: async () => {
+          throw new Error('context disposed');
+        },
+        clearCookies: async () => undefined,
+        close: async () => {
+          closedCount += 1;
+        },
+      }),
+    };
+    const browser = createBrowserAuthFromApi(erroringPageApi, fastConfig({ elevatedLaunchTimeoutMs: 50 }));
+    await expect(browser.acquireElevatedToken()).rejects.toThrow('context disposed');
+    expect(closedCount).toBe(1);
   });
 });

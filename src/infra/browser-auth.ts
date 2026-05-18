@@ -10,6 +10,21 @@ import { loadPlaywright } from './playwright-loader.ts';
 
 type BrowserTokenResult = { accessToken: AccessToken; refreshToken: string | null };
 
+/**
+ * Discriminated outcome of an elevated-token capture attempt. Distinct
+ * failure variants let the caller pick the right error message AND let
+ * the auto-heal in auth.ts decide whether a retry is worthwhile (a
+ * recoverable failure like `launch_timeout` or `sso_timeout` is worth
+ * one retry after wiping the profile; `navigation_failed` is a network
+ * issue, not worth retrying).
+ *
+ * Login-fix round-1: was previously `AccessToken | null`, which conflated
+ * "browser launch hung", "navigation broke", and "silent-SSO polling
+ * timed out" into a single null and made the error message inaccurate.
+ */
+type ElevatedFailureReason = 'launch_timeout' | 'navigation_failed' | 'sso_timeout';
+type ElevatedTokenResult = { readonly ok: true; readonly token: AccessToken } | { readonly ok: false; readonly reason: ElevatedFailureReason };
+
 type BrowserAuth = {
   acquireToken: (scopes: string[], startUrl: string) => Promise<BrowserTokenResult | null>;
   /**
@@ -20,11 +35,13 @@ type BrowserAuth = {
    * content). Reuses the persistent profile cookies — no second
    * sign-in. Headless by default.
    *
-   * Returns null on cancellation / timeout. The caller decides whether
-   * the failure is fatal (it isn't for most commands; only the version
-   * commands need this).
+   * Returns a discriminated union so the caller can distinguish the three
+   * failure modes (browser-launch hang, navigation failure, silent-SSO
+   * polling timeout). The caller decides whether the failure is fatal
+   * (it isn't for most commands; only the version + chat commands need
+   * this).
    */
-  acquireElevatedToken: () => Promise<AccessToken | null>;
+  acquireElevatedToken: () => Promise<ElevatedTokenResult>;
   close: () => Promise<void>;
 };
 
@@ -97,6 +114,16 @@ type BrowserAuthConfig = {
    * timed out — run `ask-marcel login` to refresh.`
    */
   readonly elevatedRecaptureTimeoutMs?: number;
+  /**
+   * Hard deadline on `launchPersistentContext` + `newPage` for the
+   * elevated capture path. Defaults to 15s. Distinct from
+   * `elevatedRecaptureTimeoutMs` so the error message can name which
+   * step hung — launch vs polling. Audit login-fix round-1: previously
+   * unguarded, so a hung Playwright launch (corrupt persistent profile
+   * with stale `Singleton*` locks, or a slow browser binary) would
+   * block the whole command indefinitely.
+   */
+  readonly elevatedLaunchTimeoutMs?: number;
 };
 
 const TOKEN_HOSTS = ['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com'];
@@ -159,6 +186,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const pollDeadlineMs = config.pollDeadlineMs ?? 5 * 60 * 1000;
   const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
   const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
+  const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? 15_000;
 
   let context: ContextLike | null = null;
   let page: PageLike | null = null;
@@ -313,7 +341,28 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * decode each JWT, return the first one whose `appid` is on the
    * ODSP-elevated allow-list.
    */
-  const acquireElevatedToken = async (): Promise<AccessToken | null> => {
+  /**
+   * Race a promise against a hard-deadline reject. Used to wrap
+   * Playwright's `launchPersistentContext` and `newPage` which can
+   * hang indefinitely on profile corruption / filesystem locks.
+   * The shared sentinel error is detected by reference so the outer
+   * handler can attribute the failure to `launch_timeout` specifically
+   * (rather than the generic catch-all).
+   */
+  const ELEVATED_LAUNCH_TIMEOUT = Symbol('elevated_launch_timeout');
+  const withLaunchTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(ELEVATED_LAUNCH_TIMEOUT), ms);
+    });
+    try {
+      return await Promise.race([p, timeout]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  };
+
+  const acquireElevatedToken = async (): Promise<ElevatedTokenResult> => {
     await cleanupSingletonLocks(profileDir, fs);
 
     let captured: AccessToken | null = null;
@@ -323,8 +372,38 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // run its OAuth dance in headless mode. Visible launch is the
     // safer default. The window opens and closes within seconds; user
     // sees a brief flash but no interaction is required.
-    const elevatedCtx = await launchContext(false);
-    const elevatedPage = await elevatedCtx.newPage();
+    //
+    // Login-fix round-1 Wave A: wrap launch + newPage in a hard timeout
+    // so a hung Playwright doesn't block the whole command. Previously
+    // unguarded — a corrupt profile with stale Singleton locks would
+    // hang indefinitely (audit-confirmed).
+    let elevatedCtx: ContextLike;
+    let elevatedPage: PageLike;
+    try {
+      elevatedCtx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+        trace(`[DEBUG] elevated capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
+    try {
+      elevatedPage = await withLaunchTimeout(elevatedCtx.newPage(), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      try {
+        await elevatedCtx.close();
+      } catch {
+        // ignore
+      }
+      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+        trace(`[DEBUG] elevated capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
 
     elevatedPage.on('request', (req) => {
       if (captured) return;
@@ -346,11 +425,13 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
 
     logger.info('browser_navigating', { url: M365_CLOUD_URL, purpose: 'elevated' });
     trace(`[DEBUG] elevated capture: navigating to ${M365_CLOUD_URL}\n`);
+    let navigationFailed = false;
     try {
       await elevatedPage.goto(M365_CLOUD_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] elevated nav error (non-fatal): ${msg}\n`);
+      trace(`[DEBUG] elevated nav error: ${msg}\n`);
+      navigationFailed = true;
     }
 
     // Settle: silent SSO capture happens within 3-8s when cookies are warm.
@@ -358,42 +439,40 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // persistent profile and either silent SSO completes (token captured) or
     // the cookies are stale and silent SSO can't proceed without UI prompts
     // we don't drive. Use a SHORT deadline (default 20s) and fail fast with
-    // a clear error pointing at `ask-marcel login` if no token comes back —
-    // audit v1.0.0 §1.1 flagged that reusing the 5-min interactive deadline
-    // here hangs the chat commands for minutes and blows the LLM tool-call
-    // window.
+    // a clear discriminated failure so the caller can decide whether to
+    // retry (after wiping the profile) or surface the error.
+    const closeAll = async (): Promise<void> => {
+      try {
+        await elevatedPage.close();
+      } catch {
+        // ignore
+      }
+      try {
+        await elevatedCtx.close();
+      } catch {
+        // ignore
+      }
+    };
+
     const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < elevatedDeadline) {
       if (captured) {
         trace('[DEBUG] elevated capture: token found, closing\n');
-        try {
-          await elevatedPage.close();
-        } catch {
-          // ignore
-        }
-        try {
-          await elevatedCtx.close();
-        } catch {
-          // ignore
-        }
-        return captured;
+        await closeAll();
+        return { ok: true, token: captured };
       }
       await sleep(pollIntervalMs);
     }
 
+    await closeAll();
+    if (navigationFailed) {
+      trace('[DEBUG] elevated capture: deadline expired after navigation failure\n');
+      logger.info('elevated_token_navigation_failed');
+      return { ok: false, reason: 'navigation_failed' };
+    }
     trace('[DEBUG] elevated capture: deadline expired, no elevated token captured\n');
     logger.info('elevated_token_capture_timeout');
-    try {
-      await elevatedPage.close();
-    } catch {
-      // ignore
-    }
-    try {
-      await elevatedCtx.close();
-    } catch {
-      // ignore
-    }
-    return null;
+    return { ok: false, reason: 'sso_timeout' };
   };
 
   const close = async (): Promise<void> => {
@@ -410,4 +489,17 @@ const createBrowserAuth = (deps: { logger: Logger; fs?: FileSystem }): BrowserAu
   createBrowserAuthFromApi(createPlaywrightApi(loadPlaywright), { logger: deps.logger, fs: deps.fs ?? defaultFileSystem() });
 
 export { createBrowserAuth, createBrowserAuthFromApi, createPlaywrightApi };
-export type { BrowserAuth, BrowserAuthApi, BrowserAuthConfig, BrowserTokenResult, ChromiumLike, ContextLike, PageLike, PlaywrightLoader, RequestLike, ResponseLike };
+export type {
+  BrowserAuth,
+  BrowserAuthApi,
+  BrowserAuthConfig,
+  BrowserTokenResult,
+  ChromiumLike,
+  ContextLike,
+  ElevatedFailureReason,
+  ElevatedTokenResult,
+  PageLike,
+  PlaywrightLoader,
+  RequestLike,
+  ResponseLike,
+};
