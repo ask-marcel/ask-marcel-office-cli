@@ -27,6 +27,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

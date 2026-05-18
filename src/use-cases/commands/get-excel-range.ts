@@ -47,7 +47,7 @@ const addressSchema = z
     if (count !== null && count > CELL_COUNT_CAP) {
       ctx.addIssue({
         code: 'custom',
-        message: `--address spans ${count.toLocaleString()} cells (cap: ${CELL_COUNT_CAP.toLocaleString()}). A request this size would stream a multi-MB Graph response and likely exhaust LLM context. Split into narrower ranges (e.g. one column at a time, or row bands).`,
+        message: `spans ${count.toLocaleString()} cells (cap: ${CELL_COUNT_CAP.toLocaleString()}). A request this size would stream a multi-MB Graph response and likely exhaust LLM context. Split into narrower ranges (e.g. one column at a time, or row bands).`,
       });
     }
   });
@@ -66,13 +66,20 @@ const meta: CommandMeta = {
   options: [
     { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`.' },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
-    { name: 'worksheet-id', key: 'worksheetId', required: true, description: 'Worksheet ID or worksheet name. Returned by `ask-marcel list-excel-worksheets`.' },
+    {
+      name: 'worksheet-id',
+      key: 'worksheetId',
+      required: true,
+      description: 'Worksheet ID or worksheet name. Returned by `ask-marcel list-excel-worksheets`.',
+      argumentHint: { kind: 'idOrName' },
+    },
     {
       name: 'address',
       key: 'address',
       required: true,
       description:
         'A1-style range address, e.g. `A1:C10` or a single cell like `B7`. The CLI rejects ranges spanning more than 100 000 cells client-side to prevent runaway responses. Do NOT prefix with the worksheet name — `--worksheet-id` already pins the sheet, and a cross-sheet prefix like `OtherSheet!A1:C2` is rejected by Graph.',
+      argumentHint: { kind: 'a1Address' },
     },
   ],
   example: "ask-marcel get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",

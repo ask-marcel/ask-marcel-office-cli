@@ -30,6 +30,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
   responseShape: 'single Microsoft Graph `chat` resource',
+  scopesRequired: ['Chat.ReadBasic'],
 };
 
 export { execute, meta, schema };

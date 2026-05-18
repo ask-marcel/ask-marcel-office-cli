@@ -83,7 +83,7 @@ const odataQueryOptions: ReadonlyArray<CommandOptionMeta> = [
     key: 'select',
     required: false,
     description:
-      'OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource.',
+      'OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`.',
   },
   {
     name: 'filter',

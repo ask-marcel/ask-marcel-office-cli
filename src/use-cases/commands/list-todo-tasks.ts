@@ -26,6 +26,7 @@ const execute: Command['execute'] = async (graph, params) => {
         type: 'api_error',
         status: result.error.status,
         message: `Graph rejected --select=${parsed.data.select} on this tasks endpoint with RequestBroker--ParseUri (known quirk — some field combinations are unsupported, most reliably any combo that includes \`title\`). Drop \`title\` from --select and request it in a second call (or per-task via get-todo-task), or call this command without --select and slim the response client-side.`,
+        code: 'cli_rewrite_todo_select_title',
       });
     }
     if (parsed.data.orderby !== undefined) {
@@ -33,6 +34,7 @@ const execute: Command['execute'] = async (graph, params) => {
         type: 'api_error',
         status: result.error.status,
         message: `Graph rejected --orderby=${parsed.data.orderby} on this tasks endpoint with RequestBroker--ParseUri (known quirk — sorting on \`title\` is unsupported). Call this command without --orderby and sort the response client-side, or order by a numeric/date field like \`createdDateTime\` / \`importance\` instead.`,
+        code: 'cli_rewrite_todo_orderby_title',
       });
     }
   }

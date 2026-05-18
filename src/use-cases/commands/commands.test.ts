@@ -499,6 +499,11 @@ describe('commands', () => {
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
       expect(result.error.message).toContain('cells (cap: 100,000)');
+      // Audit round-7 B2: formatZodError prepends `--address` itself, so the
+      // superRefine message must not start with `--address ` too (or we get the
+      // duplicate `--address --address spans …`).
+      expect(result.error.message).not.toMatch(/--address --address/);
+      expect(result.error.message).toMatch(/^--address spans/);
     }
   });
 
@@ -734,6 +739,53 @@ describe('commands', () => {
     }
   });
 
+  it('list-chat-members passes through non-`1: NotFound` Graph errors unchanged (no false rewrite)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/chats/19:abc@thread.v2/members',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'AccessDenied', message: 'User does not have permission.' } }), {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-chat-members'];
+    if (!cmd) throw new Error('list-chat-members not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { chatId: '19:abc@thread.v2' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('AccessDenied');
+      expect(r.error.message).not.toContain('Microsoft Teams chat not found');
+    }
+  });
+
+  it('list-chat-members rewrites the opaque `1: NotFound` error to a clear chat-id hint (audit round-7 B3)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/chats/19:bogus@thread.v2/members',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: '1', message: 'NotFound' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-chat-members'];
+    if (!cmd) throw new Error('list-chat-members not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { chatId: '19:bogus@thread.v2' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('NotFound: Microsoft Teams chat not found');
+      expect(r.error.message).toContain('19:bogus@thread.v2');
+      expect(r.error.message).toContain('list-chats');
+    }
+  });
+
   it('get-team-channel rewrites the opaque `1: NotFound` error to a clear channel-id hint (audit v1.0.0 B2)', async () => {
     const fetchFn = stagedFetch([
       {
@@ -854,7 +906,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-as-pdf short-circuits to a raw bytes download for plain-text source extensions (re-encodes the text body as base64 for a uniform binary envelope)', async () => {
+  it('download-drive-item-as-pdf short-circuits plain-text source extensions to `{contentType: "text/plain", size, text}` for envelope parity with download-onedrive-file-content (audit round-7 B5)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 4 }) },
       {
@@ -869,9 +921,10 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText' });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as { contentType: string; base64: string };
-      expect(v.contentType).toBe('text/markdown');
-      expect(atob(v.base64)).toBe('hi');
+      const v = result.value as { contentType: string; size: number; text: string; passthrough: true; note: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.text).toBe('hi');
+      expect(v.passthrough).toBe(true);
     }
   });
 

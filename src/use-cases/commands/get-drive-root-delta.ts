@@ -18,6 +18,7 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,
+  paginationStrategy: 'deltaLink',
 };
 
 export { execute, meta, schema };

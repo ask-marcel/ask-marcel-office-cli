@@ -186,6 +186,46 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
+  it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
+    const captureGraph: GraphClient = {
+      get: async () => ({ ok: true, value: { value: [] } }),
+      post: async () => ({ ok: true, value: {} }),
+      getBinary: async () => ({ ok: true, value: {} }),
+      getElevated: async () => ({ ok: true, value: {} }),
+      getBinaryElevated: async () => ({ ok: true, value: {} }),
+      fetchUrl: async () => ({ ok: true, value: {} }),
+      put: async () => ({ ok: true, value: {} }),
+      delete: async () => ({ ok: true, value: {} }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
+    };
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', 'search-onenote-pages', '--query', '']);
+      } catch {
+        /* commander may exit on validation failure */
+      }
+    });
+    expect(out).toContain('--query is empty');
+    expect(out).not.toContain('--title-substring is empty');
+  });
+
+  it('rejects a single-value flag passed more than once (audit round-7 B6)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ value: [] }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', 'list-folder-files', '--drive-id', 'd1', '--item-id', 'i1', '--filter', 'A', '--filter', 'B']);
+      } catch {
+        /* commander may exit on validation failure */
+      }
+    });
+    expect(out).toContain('--filter cannot be passed more than once');
+    expect(out).toContain('previous: "A"');
+    expect(out).toContain('new: "B"');
+  });
+
   it('still accepts the canonical flag name when the user does not use the alias', async () => {
     let capturedPath = '';
     const captureGraph: GraphClient = {

@@ -20,6 +20,7 @@ const meta: CommandMeta = {
   example: "ask-marcel search-onedrive-files --drive-id 'b!1234' --query 'q1 budget'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

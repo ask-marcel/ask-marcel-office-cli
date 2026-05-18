@@ -35,6 +35,7 @@ const meta: CommandMeta = {
         'Example: `https://graph.microsoft.com/v1.0/me/messages?$skiptoken=AKDsfg...`. ' +
         'Loop: keep calling until the response no longer contains `nextLink`. ' +
         'Also handles `deltaLink` (also hoisted) if you want to resume a delta query.',
+      argumentHint: { kind: 'graphSubpath' },
     },
   ],
   example: "ask-marcel next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",

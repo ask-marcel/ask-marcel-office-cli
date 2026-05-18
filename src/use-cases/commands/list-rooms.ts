@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand(() => '/places/microsoft.graph.room
 
 const meta: CommandMeta = {
   summary:
-    'List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking.',
+    'List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking. Pass `--top 5` to limit the response — large tenants return tens of KB by default.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/places/microsoft.graph.room',

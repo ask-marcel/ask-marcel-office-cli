@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand(() => '/places/microsoft.graph.room
 
 const meta: CommandMeta = {
   summary:
-    'List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms.',
+    'List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms. Pass `--top N` to limit the response on large tenants.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/places/microsoft.graph.roomList',

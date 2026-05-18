@@ -16,6 +16,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel list-groups',
   responseShape: 'collection of Microsoft Graph `group` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

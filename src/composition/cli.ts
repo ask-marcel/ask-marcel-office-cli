@@ -1,4 +1,4 @@
-import { Command, Option } from 'commander';
+import { Command, InvalidArgumentError, Option } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { OutputFormat } from '../presenter/output.ts';
@@ -35,8 +35,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return raw === 'json' ? 'json' : 'text';
   };
   const renderOut = (data: unknown): void => render(data, logger, getFormat());
-  const fail = (message: string): void => {
-    renderError(message, getFormat());
+  const fail = (message: string, code?: string): void => {
+    renderError(message, getFormat(), code);
     deps.onCommandError?.();
   };
 
@@ -218,20 +218,33 @@ const buildCli = (deps: BuildCliDeps): Command => {
     program.commandsGroup(`${CATEGORY_LABELS[category]}:`);
     for (const [name, cmd] of entries) {
       const commandDef = program.command(name).description(cmd.meta.summary);
+      // Audit round-7 B6: every single-value flag rejects repeated occurrences.
+      // Commander.js by default last-wins on `--filter A --filter B` — surprising
+      // for an LLM consumer that constructed two filters expecting both to apply.
+      const noRepeatParser =
+        (flagName: string) =>
+        (value: string, previous: unknown): string => {
+          if (typeof previous === 'string') {
+            throw new InvalidArgumentError(
+              `--${flagName} cannot be passed more than once (previous: "${previous}", new: "${value}"). Single-value flags reject duplicate occurrences.`
+            );
+          }
+          return value;
+        };
       for (const opt of cmd.meta.options) {
         if (opt.aliases && opt.aliases.length > 0) {
           // When aliases exist we can't use `requiredOption` for the canonical
           // — Commander would reject alias-only invocations (the canonical
           // long flag would be missing). Schema validation
           // (z.string().min(1)) enforces required-ness instead.
-          commandDef.option(`--${opt.name} <value>`, opt.description);
+          commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
           for (const alias of opt.aliases) {
-            commandDef.option(`--${alias.name} <value>`, `(alias for --${opt.name})`);
+            commandDef.option(`--${alias.name} <value>`, `(alias for --${opt.name})`, noRepeatParser(alias.name));
           }
         } else if (opt.required) {
-          commandDef.requiredOption(`--${opt.name} <value>`, opt.description);
+          commandDef.requiredOption(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
         } else {
-          commandDef.option(`--${opt.name} <value>`, opt.description);
+          commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
         }
       }
       const helpLines = [
@@ -244,17 +257,27 @@ const buildCli = (deps: BuildCliDeps): Command => {
       commandDef.addHelpText('after', helpLines.join('\n'));
       commandDef.action(async (opts: Record<string, string>) => {
         const normalized: Record<string, string> = { ...opts };
+        // Audit round-7 B4: track which alias the user actually typed so the
+        // post-validation error message references the flag they typed rather
+        // than the canonical schema name (e.g. `--query is empty` not
+        // `--title-substring is empty`).
+        const aliasUsedFor: Record<string, string> = {};
         for (const opt of cmd.meta.options) {
           for (const alias of opt.aliases ?? []) {
-            const aliasValue = normalized[alias.key];
-            if (typeof aliasValue === 'string' && normalized[opt.key] === undefined) {
+            const aliasValue = opts[alias.key];
+            if (typeof aliasValue === 'string' && opts[opt.key] === undefined) {
               normalized[opt.key] = aliasValue;
+              aliasUsedFor[opt.name] = alias.name;
             }
           }
         }
         const result = await cmd.execute(graph, normalized);
         if (!result.ok) {
-          fail(result.error.message);
+          let message = result.error.message;
+          for (const [canonical, alias] of Object.entries(aliasUsedFor)) {
+            message = message.replaceAll(`--${canonical}`, `--${alias}`);
+          }
+          fail(message, result.error.code);
           return;
         }
         const outputPath = program.opts<{ outputPath?: string }>().outputPath;

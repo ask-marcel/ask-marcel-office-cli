@@ -23,6 +23,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel list-chats',
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`',
   pagination: true,
+  scopesRequired: ['Chat.ReadBasic'],
 };
 
 export { execute, meta, schema };

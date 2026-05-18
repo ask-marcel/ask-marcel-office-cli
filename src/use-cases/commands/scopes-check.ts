@@ -13,7 +13,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config.",
+    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff).",
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '(meta) cached-token introspection — no Graph endpoint',

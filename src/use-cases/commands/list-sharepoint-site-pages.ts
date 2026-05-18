@@ -25,6 +25,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `sitePage` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

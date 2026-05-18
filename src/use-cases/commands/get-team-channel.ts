@@ -20,6 +20,7 @@ const execute: Command['execute'] = async (graph, params) => {
       type: 'api_error',
       status: result.error.status,
       message: `NotFound: Microsoft Teams channel not found (channel-id: "${channelId}"). Verify it exists in this team via \`ask-marcel list-team-channels --team-id <team-id>\`.`,
+      code: 'cli_rewrite_channel_not_found',
     });
   }
   return result;

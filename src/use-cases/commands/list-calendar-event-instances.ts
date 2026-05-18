@@ -39,6 +39,7 @@ const execute: Command['execute'] = async (graph, params) => {
       status: result.error.status,
       message:
         'The --event-id is not a recurring series — Graph rejects /instances for singleInstance events. Find a seriesMaster event with `ask-marcel list-calendar-events --filter "type eq \'seriesMaster\'"` and pass that ID instead.',
+      code: 'cli_rewrite_expand_series_not_recurring',
     });
   }
   return result;
@@ -58,6 +59,7 @@ const meta: CommandMeta = {
       key: 'calendarId',
       required: false,
       description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`.',
+      argumentHint: { kind: 'magicValue', values: ['primary', 'default'] },
     },
     { name: 'event-id', key: 'eventId', required: true, description: 'Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
     {

@@ -50,9 +50,18 @@ const render = (data: unknown, logger: Logger, format: OutputFormat): void => {
   else process.stdout.write(renderTextOutput(data));
 };
 
-const renderError = (message: string, format: OutputFormat): void => {
-  if (format === 'json') process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
-  else process.stdout.write(`error: ${message}\n`);
+const renderError = (message: string, format: OutputFormat, errorCode?: string): void => {
+  // Audit round-7 Wave G: `errorCode` is an additive field — old consumers
+  // keying on `error: string` continue to work; new consumers can branch on
+  // the structured code (`itemNotFound`, `InvalidIdMalformed`, `MissingScope`,
+  // CLI-rewrite codes like `cli_rewrite_orderby_title`, etc.) without
+  // substring-matching the human message.
+  if (format === 'json') {
+    const payload = { ok: false, error: message, ...(errorCode ? { errorCode } : {}) };
+    process.stdout.write(`${JSON.stringify(payload)}\n`);
+    return;
+  }
+  process.stdout.write(`error: ${message}\n`);
 };
 
 export { render, renderError };

@@ -58,6 +58,18 @@ describe('renderReadmeTables', () => {
     const md = renderReadmeTables(manifest);
     expect(md.indexOf('list-apple-drives')).toBeLessThan(md.indexOf('list-zebra-drives'));
   });
+
+  it("renders positional arguments in the readme table's required-params column with `<name>` markers (audit round-7 Wave A)", () => {
+    const positional: CommandManifestEntry = {
+      ...listDrives,
+      name: 'docs',
+      category: 'lifecycle',
+      positionalArguments: [{ name: 'command', required: true, description: 'Command name.' }],
+    };
+    const manifest: CommandManifest = { ...sampleManifest, commands: [positional] };
+    const md = renderReadmeTables(manifest);
+    expect(md).toContain('`<command>`');
+  });
 });
 
 describe('renderCommandMarkdown', () => {
@@ -122,5 +134,32 @@ describe('renderCommandMarkdown', () => {
     const md = renderCommandMarkdown(calendarEvent);
     expect(md).toContain('| `--event-id` | The Graph event ID. |');
     expect(md).not.toContain('aliases:');
+  });
+
+  it('renders a Scopes required line when scopesRequired is set (audit round-7 Wave E)', () => {
+    const withScopes: CommandManifestEntry = { ...calendarEvent, scopesRequired: ['Chat.ReadBasic', 'User.Read'] };
+    const md = renderCommandMarkdown(withScopes);
+    expect(md).toContain('**Scopes required:**');
+    expect(md).toContain('`Chat.ReadBasic`');
+    expect(md).toContain('`User.Read`');
+    expect(md).toContain('scopes-check');
+  });
+
+  it('renders an elevated-token warning when needsElevatedToken is true (audit round-7 Wave E)', () => {
+    const elevated: CommandManifestEntry = { ...calendarEvent, needsElevatedToken: true };
+    const md = renderCommandMarkdown(elevated);
+    expect(md).toContain('**Needs elevated token:**');
+    expect(md).toContain('M365ChatClient');
+    expect(md).toContain('ask-marcel login');
+  });
+
+  it('renders a Positional arguments section when positionalArguments is set (audit round-7 Wave A)', () => {
+    const positional: CommandManifestEntry = {
+      ...listDrives,
+      positionalArguments: [{ name: 'command', required: true, description: 'Name of the command to show docs for.' }],
+    };
+    const md = renderCommandMarkdown(positional);
+    expect(md).toContain('## Positional arguments');
+    expect(md).toContain('| `<command>` | yes | Name of the command to show docs for. |');
   });
 });

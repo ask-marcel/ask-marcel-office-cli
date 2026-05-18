@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
+import { fetchRawBytes, inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 
@@ -42,16 +42,30 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     });
   }
 
-  if (isPlainTextFilename(name) || isPdfSource(name)) {
+  // Audit round-7 B5: parity with `download-onedrive-file-content`. Decode
+  // plain-text source bytes as UTF-8 and return `{contentType: "text/plain",
+  // size, text}` instead of base64 — sibling commands now share the same
+  // envelope shape for the same input.
+  if (isPlainTextFilename(name)) {
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
+    if (!bytes.ok) return bytes;
+    const text = new TextDecoder().decode(bytes.value);
+    return ok({
+      contentType: 'text/plain',
+      size: bytes.value.byteLength,
+      text,
+      passthrough: true,
+      note: `source is plain-text (${name}); raw text returned without Graph format=pdf conversion`,
+    });
+  }
+  if (isPdfSource(name)) {
     const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
     if (!raw.ok) return raw;
     const payload = raw.value as { contentType: string; size: number; base64: string };
     return ok({
       ...payload,
       passthrough: true,
-      note: isPdfSource(name)
-        ? `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`
-        : `source is plain-text (${name}); raw bytes returned without Graph format=pdf conversion`,
+      note: `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`,
     });
   }
   return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);

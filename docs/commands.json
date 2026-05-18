@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-18T02:37:57.494Z",
+  "generatedAt": "2026-05-18T04:48:47.545Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -267,7 +267,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -303,7 +303,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -345,7 +345,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -393,7 +393,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -442,7 +442,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -502,7 +502,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -538,7 +538,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -574,7 +574,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -604,7 +604,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -647,7 +647,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -677,7 +677,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -713,13 +713,19 @@
           "name": "worksheet-id",
           "key": "worksheetId",
           "required": true,
-          "description": "Worksheet ID or worksheet name. Returned by `ask-marcel list-excel-worksheets`."
+          "description": "Worksheet ID or worksheet name. Returned by `ask-marcel list-excel-worksheets`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "address",
           "key": "address",
           "required": true,
-          "description": "A1-style range address, e.g. `A1:C10` or a single cell like `B7`. The CLI rejects ranges spanning more than 100 000 cells client-side to prevent runaway responses. Do NOT prefix with the worksheet name — `--worksheet-id` already pins the sheet, and a cross-sheet prefix like `OtherSheet!A1:C2` is rejected by Graph."
+          "description": "A1-style range address, e.g. `A1:C10` or a single cell like `B7`. The CLI rejects ranges spanning more than 100 000 cells client-side to prevent runaway responses. Do NOT prefix with the worksheet name — `--worksheet-id` already pins the sheet, and a cross-sheet prefix like `OtherSheet!A1:C2` is rejected by Graph.",
+          "argumentHint": {
+            "kind": "a1Address"
+          }
         }
       ],
       "example": "ask-marcel get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
@@ -803,7 +809,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -839,7 +845,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -869,7 +875,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -952,7 +958,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -976,7 +982,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1059,7 +1065,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1191,7 +1197,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1227,13 +1233,16 @@
           "name": "column-id",
           "key": "columnId",
           "required": true,
-          "description": "columnDefinition ID. Returned by `list-sharepoint-list-columns`."
+          "description": "columnDefinition ID or column display name (e.g. `Title`). Returned by `list-sharepoint-list-columns`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1263,7 +1272,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1323,7 +1332,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1353,13 +1362,16 @@
           "name": "list-id",
           "key": "listId",
           "required": true,
-          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`."
+          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1389,7 +1401,10 @@
           "name": "list-id",
           "key": "listId",
           "required": true,
-          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`."
+          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "list-item-id",
@@ -1407,7 +1422,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1491,7 +1506,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1521,7 +1536,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1557,7 +1572,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1587,7 +1602,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1657,7 +1672,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -1693,7 +1708,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -1730,7 +1745,14 @@
           "name": "calendar-id",
           "key": "calendarId",
           "required": false,
-          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`."
+          "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "primary",
+              "default"
+            ]
+          }
         },
         {
           "name": "event-id",
@@ -1766,7 +1788,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -1815,7 +1837,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -1889,7 +1911,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -1938,7 +1960,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -1999,7 +2021,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2078,7 +2100,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2133,7 +2155,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2182,7 +2204,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2237,7 +2259,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -2280,7 +2302,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2335,7 +2357,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2390,7 +2412,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2417,7 +2439,7 @@
     },
     {
       "name": "list-drives",
-      "summary": "List all OneDrive / SharePoint drives the signed-in user has access to.",
+      "summary": "List all OneDrive / SharePoint drives the signed-in user has access to. On personal accounts this returns only the user's primary OneDrive (single entry in `value[]`); on tenanted accounts it includes every drive the user can reach including delegated mailboxes and shared SharePoint document libraries.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drives",
@@ -2439,7 +2461,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2500,7 +2522,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2561,7 +2583,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2628,7 +2650,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -2677,7 +2699,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -2732,7 +2754,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2799,7 +2821,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2854,7 +2876,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -2891,7 +2913,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2952,7 +2974,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -2995,7 +3017,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3062,7 +3084,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3117,7 +3139,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3172,7 +3194,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3227,7 +3249,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3282,7 +3304,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3337,7 +3359,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3380,7 +3402,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3429,7 +3451,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3494,7 +3516,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3561,7 +3583,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3616,7 +3638,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3671,7 +3693,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3726,7 +3748,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3775,7 +3797,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3836,7 +3858,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3903,7 +3925,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -3952,7 +3974,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4001,7 +4023,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4056,7 +4078,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4105,7 +4127,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4166,7 +4188,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4226,7 +4248,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         }
       ],
       "example": "ask-marcel list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
@@ -4270,7 +4292,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         }
       ],
       "example": "ask-marcel list-planner-plans",
@@ -4301,7 +4323,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4344,7 +4366,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4393,7 +4415,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4442,7 +4464,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4469,7 +4491,7 @@
     },
     {
       "name": "list-room-lists",
-      "summary": "List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms.",
+      "summary": "List room lists — usually one per building. Use these to scope a room search by location: a roomList groups the rooms in one office, then `/places/{roomList}/rooms` lists just those rooms. Pass `--top N` to limit the response on large tenants.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/places/microsoft.graph.roomList",
@@ -4491,7 +4513,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4518,7 +4540,7 @@
     },
     {
       "name": "list-rooms",
-      "summary": "List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking.",
+      "summary": "List bookable meeting rooms in the tenant. Each `room` has `displayName`, `emailAddress`, `capacity`, `building`, `floorNumber`, and `isWheelChairAccessible`. Use the `emailAddress` as a meeting `attendee` for room booking. Pass `--top 5` to limit the response — large tenants return tens of KB by default.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/places/microsoft.graph.room",
@@ -4540,7 +4562,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4589,7 +4611,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4644,7 +4666,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4711,7 +4733,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4760,7 +4782,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4821,7 +4843,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4876,7 +4898,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -4936,7 +4958,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -4990,7 +5012,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5039,7 +5061,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5082,7 +5104,10 @@
           "name": "list-id",
           "key": "listId",
           "required": true,
-          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`."
+          "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
         },
         {
           "name": "top",
@@ -5094,7 +5119,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5143,7 +5168,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5204,7 +5229,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5259,7 +5284,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5326,7 +5351,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5375,7 +5400,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5418,7 +5443,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "expand",
@@ -5454,7 +5479,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5509,7 +5534,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5576,7 +5601,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5618,7 +5643,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5701,7 +5726,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5803,7 +5828,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5881,7 +5906,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5936,7 +5961,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -5982,14 +6007,14 @@
     },
     {
       "name": "my-quick-context",
-      "summary": "One-shot discovery for the IDs every other command needs. Issues five Graph calls in parallel (`/me`, `/me/drive`, `/me/mailFolders/inbox`, `/me/todo/lists`, `/me/calendar`) and returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }`. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, etc.",
+      "summary": "One-shot discovery for the IDs every other command needs. Issues nine Graph calls in parallel and returns the IDs each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc.",
       "category": "meta",
       "graphMethod": "GET",
-      "graphPathTemplate": "(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar",
+      "graphPathTemplate": "(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
       "options": [],
       "example": "ask-marcel my-quick-context",
-      "responseShape": "{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId, inboxId, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId }"
+      "responseShape": "{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId?, inboxId?, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId? } — every ID except `user.id` is optional and absent when its source call failed."
     },
     {
       "name": "next-page",
@@ -6003,7 +6028,10 @@
           "name": "url",
           "key": "url",
           "required": true,
-          "description": "Full Graph v1.0 URL — copy the top-level `nextLink` field from the previous response (the CLI hoists Graph's `@odata.nextLink` out of `data` to envelope level). Example: `https://graph.microsoft.com/v1.0/me/messages?$skiptoken=AKDsfg...`. Loop: keep calling until the response no longer contains `nextLink`. Also handles `deltaLink` (also hoisted) if you want to resume a delta query."
+          "description": "Full Graph v1.0 URL — copy the top-level `nextLink` field from the previous response (the CLI hoists Graph's `@odata.nextLink` out of `data` to envelope level). Example: `https://graph.microsoft.com/v1.0/me/messages?$skiptoken=AKDsfg...`. Loop: keep calling until the response no longer contains `nextLink`. Also handles `deltaLink` (also hoisted) if you want to resume a delta query.",
+          "argumentHint": {
+            "kind": "graphSubpath"
+          }
         }
       ],
       "example": "ask-marcel next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
@@ -6011,7 +6039,7 @@
     },
     {
       "name": "scopes-check",
-      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config.",
+      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff).",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "(meta) cached-token introspection — no Graph endpoint",
@@ -6050,7 +6078,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -6099,7 +6127,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -6154,7 +6182,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",
@@ -6215,7 +6243,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "orderby",
@@ -6264,7 +6292,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
         },
         {
           "name": "filter",

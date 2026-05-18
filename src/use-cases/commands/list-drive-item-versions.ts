@@ -28,6 +28,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `driveItemVersion` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

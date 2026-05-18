@@ -14,12 +14,19 @@ const meta: CommandMeta = {
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/listitem-list',
   options: [
     { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.' },
-    { name: 'list-id', key: 'listId', required: true, description: 'SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.' },
+    {
+      name: 'list-id',
+      key: 'listId',
+      required: true,
+      description: 'SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.',
+      argumentHint: { kind: 'idOrName' },
+    },
     ...noSkipOptions,
   ],
   example: "ask-marcel list-sharepoint-site-list-items --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks'",
   responseShape: 'collection of Microsoft Graph `listItem` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

@@ -1,10 +1,32 @@
 import { z } from 'zod';
+import { err } from '../../domain/result.ts';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { Command, CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ chatId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
+const inner = buildListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
+
+// Audit round-7 B3: Graph surfaces the unhelpful `1: NotFound` (the `1:` is
+// the Teams thread-id segment, echoed without context) for any missing
+// chat-id — empty, malformed, or well-formed-but-unknown. Same rewrite
+// shape as round-6's `get-team-channel` fix, but with a chat-id-format hint
+// since chat IDs are particularly fiddly (`19:<thread>@thread.v2`).
+const execute: Command['execute'] = async (graph, params) => {
+  const result = await inner.execute(graph, params);
+  if (result.ok) return result;
+  if (result.error.type === 'api_error' && /^1:\s*NotFound/i.test(result.error.message)) {
+    const chatId = typeof params['chatId'] === 'string' ? params['chatId'] : '<unknown>';
+    return err({
+      type: 'api_error',
+      status: result.error.status,
+      message: `NotFound: Microsoft Teams chat not found (chat-id: "${chatId}"). The chat ID format must be \`19:<thread>@thread.v2\` (or \`19:meeting_<id>@thread.v2\` for meeting chats). Source IDs via \`ask-marcel list-chats\` — or URL-decode the \`19%3a...%40thread.v2\` segment of a \`joinUrl\` returned by \`list-calendar-events\`.`,
+      code: 'cli_rewrite_chat_not_found',
+    });
+  }
+  return result;
+};
+const { schema } = inner;
 
 const meta: CommandMeta = {
   summary: 'List the members of a single Microsoft Teams chat.',
@@ -28,6 +50,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',
   pagination: true,
+  scopesRequired: ['ChatMember.Read'],
 };
 
 export { execute, meta, schema };

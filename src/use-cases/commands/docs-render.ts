@@ -8,10 +8,14 @@ export type CommandManifestEntry = {
   readonly graphPathTemplate: string;
   readonly graphDocsUrl: string;
   readonly options: CommandMeta['options'];
+  readonly positionalArguments?: CommandMeta['positionalArguments'];
   readonly example: string;
   readonly responseShape?: string;
   readonly bodyTemplate?: string;
   readonly pagination?: true;
+  readonly paginationStrategy?: CommandMeta['paginationStrategy'];
+  readonly scopesRequired?: CommandMeta['scopesRequired'];
+  readonly needsElevatedToken?: CommandMeta['needsElevatedToken'];
 };
 
 export const PAGINATION_HINT =
@@ -66,8 +70,11 @@ const renderAliasSuffix = (aliases: CommandManifestEntry['options'][number]['ali
 };
 
 const renderRequiredParams = (entry: CommandManifestEntry): string => {
-  if (entry.options.length === 0) return '_(none)_';
-  return entry.options.map((o) => `\`--${o.name}\``).join(', ');
+  const positionals = (entry.positionalArguments ?? []).map((p) => `\`<${p.name}>\``);
+  const flags = entry.options.map((o) => `\`--${o.name}\``);
+  const all = [...positionals, ...flags];
+  if (all.length === 0) return '_(none)_';
+  return all.join(', ');
 };
 
 const renderCategoryTable = (category: CommandCategory, entries: ReadonlyArray<CommandManifestEntry>): string => {
@@ -97,6 +104,20 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   ];
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${PAGINATION_HINT}`);
+  if (entry.scopesRequired && entry.scopesRequired.length > 0) {
+    const tagged = entry.scopesRequired.map((s) => `\`${s}\``).join(', ');
+    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel scopes-check\` to verify before invoking.`);
+  }
+  if (entry.needsElevatedToken) {
+    lines.push(
+      '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `ask-marcel login` to retry the capture.'
+    );
+  }
+  if (entry.positionalArguments !== undefined && entry.positionalArguments.length > 0) {
+    lines.push('', '## Positional arguments', '');
+    lines.push('| Argument | Required | Description |', '|----------|----------|-------------|');
+    for (const a of entry.positionalArguments) lines.push(`| \`<${a.name}>\` | ${a.required ? 'yes' : 'no'} | ${a.description} |`);
+  }
   if (entry.options.length > 0) {
     lines.push('', '## Options', '');
     lines.push('| Flag | Description |', '|------|-------------|');

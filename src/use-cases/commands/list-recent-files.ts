@@ -17,6 +17,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel list-recent-files',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

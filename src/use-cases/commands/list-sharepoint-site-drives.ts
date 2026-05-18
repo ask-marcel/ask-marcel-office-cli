@@ -16,6 +16,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

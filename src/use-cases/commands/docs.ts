@@ -6,19 +6,31 @@ import { renderCommandMarkdown } from './docs-render.ts';
 
 export type DocsError = { type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
 
-const toEntry = (name: string, cmd: Command): CommandManifestEntry => ({
-  name,
-  summary: cmd.meta.summary,
-  category: cmd.meta.category,
-  graphMethod: cmd.meta.graphMethod,
-  graphPathTemplate: cmd.meta.graphPathTemplate,
-  graphDocsUrl: cmd.meta.graphDocsUrl,
-  options: cmd.meta.options,
-  example: cmd.meta.example,
-  ...(cmd.meta.responseShape ? { responseShape: cmd.meta.responseShape } : {}),
-  ...(cmd.meta.bodyTemplate ? { bodyTemplate: cmd.meta.bodyTemplate } : {}),
-  ...(cmd.meta.pagination ? { pagination: cmd.meta.pagination } : {}),
-});
+const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
+  // Default every `pagination: true` command to `nextLink` strategy when the
+  // command file doesn't specify one — that's the standard $top + nextLink
+  // shape, true of ~80% of paginated commands. Audit-round-7 Wave F: makes
+  // the manifest field always populated on paginated commands so LLM
+  // consumers don't need to read prose to learn the cursor mechanism.
+  const paginationStrategy = cmd.meta.paginationStrategy ?? (cmd.meta.pagination ? 'nextLink' : undefined);
+  return {
+    name,
+    summary: cmd.meta.summary,
+    category: cmd.meta.category,
+    graphMethod: cmd.meta.graphMethod,
+    graphPathTemplate: cmd.meta.graphPathTemplate,
+    graphDocsUrl: cmd.meta.graphDocsUrl,
+    options: cmd.meta.options,
+    example: cmd.meta.example,
+    ...(cmd.meta.positionalArguments ? { positionalArguments: cmd.meta.positionalArguments } : {}),
+    ...(cmd.meta.responseShape ? { responseShape: cmd.meta.responseShape } : {}),
+    ...(cmd.meta.bodyTemplate ? { bodyTemplate: cmd.meta.bodyTemplate } : {}),
+    ...(cmd.meta.pagination ? { pagination: cmd.meta.pagination } : {}),
+    ...(paginationStrategy ? { paginationStrategy } : {}),
+    ...(cmd.meta.scopesRequired ? { scopesRequired: cmd.meta.scopesRequired } : {}),
+    ...(cmd.meta.needsElevatedToken ? { needsElevatedToken: cmd.meta.needsElevatedToken } : {}),
+  };
+};
 
 /**
  * Lifecycle commands aren't backed by a Graph endpoint and aren't in the
@@ -69,12 +81,20 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'docs',
     summary:
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass any registered command name as the positional argument. For lifecycle commands (login/logout/update/docs) prints the same --help that command would.',
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/logout/update/docs) prints the same --help that command would.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
-    options: [{ name: 'command', key: 'command', required: true, description: 'Command name to show docs for. Run `ask-marcel --help` for the full list.' }],
+    options: [],
+    positionalArguments: [
+      {
+        name: 'command',
+        required: true,
+        description:
+          'Name of the command to show docs for (e.g. `list-mail-messages`). Run `ask-marcel --help` or `ask-marcel help-json` for the full list. Passed as a bare positional — do NOT prefix with `--command`.',
+      },
+    ],
     example: 'ask-marcel docs list-mail-messages',
     responseShape: 'Markdown text on stdout (NOT JSON-wrapped — this is the one command whose stdout is plain text).',
   },

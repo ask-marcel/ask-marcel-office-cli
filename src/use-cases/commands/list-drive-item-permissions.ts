@@ -25,6 +25,7 @@ const meta: CommandMeta = {
   example: "ask-marcel list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `permission` resources under `value[]`',
   pagination: true,
+  paginationStrategy: 'nextLinkNoSkip',
 };
 
 export { execute, meta, schema };

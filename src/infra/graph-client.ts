@@ -4,10 +4,10 @@ import type { AuthManager } from '../infra/auth.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 
 type GraphError =
-  | { type: 'api_error'; status: number; message: string }
-  | { type: 'auth_failed'; message: string }
-  | { type: 'network_error'; message: string }
-  | { type: 'validation_error'; message: string };
+  | { type: 'api_error'; status: number; message: string; code?: string }
+  | { type: 'auth_failed'; message: string; code?: string }
+  | { type: 'network_error'; message: string; code?: string }
+  | { type: 'validation_error'; message: string; code?: string };
 
 type GraphClient = {
   /**
@@ -142,6 +142,10 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
+  // Audit round-7 Wave G: surface the Graph error code as a structured field
+  // so LLM consumers can branch on `errorCode === "itemNotFound"` etc.
+  // instead of substring-matching the human message.
+  const code = typeof tag === 'string' && tag !== '' ? tag : undefined;
 
   if (typeof tag === 'string' && tag === 'UnknownError' && looksEmpty(message)) {
     return {
@@ -149,6 +153,7 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
       status: res.status,
       message:
         'UnknownError: (Graph returned an empty error body — likely a transient backend glitch; retry once. If persistent, capture the failing request URL + body and report.)',
+      code: 'UnknownError',
     };
   }
 
@@ -158,9 +163,9 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   // §2.7 flagged as malformed. Only prepend the tag if it's actually a
   // non-empty string.
   if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
-    return { type: 'api_error', status: res.status, message: `${tag}: ${message}` };
+    return { type: 'api_error', status: res.status, message: `${tag}: ${message}`, ...(code ? { code } : {}) };
   }
-  return { type: 'api_error', status: res.status, message: message ?? res.statusText };
+  return { type: 'api_error', status: res.status, message: message ?? res.statusText, ...(code ? { code } : {}) };
 };
 
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
