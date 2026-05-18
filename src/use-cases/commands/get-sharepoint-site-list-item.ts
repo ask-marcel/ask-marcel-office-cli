@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
+import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { selectExpandOptions } from './odata-query.ts';
 
-const schema = z.object({ siteId: z.string().min(1), listId: z.string().min(1), listItemId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/sites/${p.siteId}/lists/${p.listId}/items/${p.listItemId}`, schema);
+const baseSchema = z.object({ siteId: z.string().min(1), listId: z.string().min(1), listItemId: z.string().min(1) });
+const { execute, schema } = buildSelectableCommand((p) => `/sites/${p.siteId}/lists/${p.listId}/items/${p.listItemId}`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'Get a single row (listItem) of a SharePoint list by ID.',
@@ -21,6 +22,7 @@ const meta: CommandMeta = {
       description: 'listItem ID (typically a small integer). Returned by `ask-marcel list-sharepoint-site-list-items`.',
       aliases: [{ name: 'item-id', key: 'itemId' }],
     },
+    ...selectExpandOptions,
   ],
   example: "ask-marcel get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
   responseShape: 'single Microsoft Graph `listItem` resource',

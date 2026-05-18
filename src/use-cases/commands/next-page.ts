@@ -5,10 +5,6 @@ import { formatZodError } from './format-zod-error.ts';
 
 const PREFIX = 'https://graph.microsoft.com/v1.0';
 
-const ELEVATED_PATH_PREFIXES: ReadonlyArray<string> = ['/me/chats', '/chats/'];
-
-const requiresElevated = (path: string): boolean => ELEVATED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
-
 const schema = z.object({
   url: z
     .string()
@@ -19,13 +15,12 @@ const schema = z.object({
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const path = parsed.data.url.slice(PREFIX.length);
-  return requiresElevated(path) ? graph.getElevated(path) : graph.get(path);
+  return graph.get(parsed.data.url.slice(PREFIX.length));
 };
 
 const meta: CommandMeta = {
   summary:
-    'Fetch the next page of a paginated Graph response. Pass the top-level `nextLink` value (NOT `data["@odata.nextLink"]` — the CLI promotes that field to envelope-level and strips it from data) returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.',
+    'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode that is the `next: <url>` value in the `---` footer; in JSON mode it is the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field.',
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '{url}',

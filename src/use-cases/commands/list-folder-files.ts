@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/children`, baseSchema);
+const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/children`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the children (files and subfolders) of a folder in OneDrive / SharePoint.',
@@ -22,7 +22,7 @@ const meta: CommandMeta = {
         'driveItem ID of the folder (Graph identifies folders as driveItems too — there is no separate folder type). Use the root folder ID from `ask-marcel get-drive-root-item` to list the top of a drive. Accepts `--folder-id` as an alias since the command name implies "folder".',
       aliases: [{ name: 'folder-id', key: 'folderId' }],
     },
-    ...odataQueryOptions,
+    ...noSkipOptions,
   ],
   example: "ask-marcel list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',

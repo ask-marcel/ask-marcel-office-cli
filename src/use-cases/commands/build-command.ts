@@ -2,7 +2,20 @@ import type { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, filterSelectSchema, odataQuerySchema, selectExpandSchema, type FilterSelectParams, type ODataQueryParams, type SelectExpandParams } from './odata-query.ts';
+import {
+  appendOData,
+  filterSelectSchema,
+  noSkipShape,
+  odataQuerySchema,
+  pickODataShape,
+  selectExpandSchema,
+  type FilterSelectParams,
+  type ODataKey,
+  type ODataQueryParams,
+  type SelectExpandParams,
+} from './odata-query.ts';
+
+type NoSkipParams = Omit<ODataQueryParams, 'skip'>;
 
 const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
   const execute: Command['execute'] = async (graph, params) => {
@@ -98,4 +111,58 @@ const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
   return { schema: merged, execute };
 };
 
-export { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildFilterSelectListCommand, buildListCommand, buildSelectableCommand };
+/**
+ * Collection GET on an endpoint that supports the usual OData passthroughs
+ * EXCEPT `$skip` (e.g. `/me/drive/recent`, `/sites/{id}/lists`,
+ * `/me/drive/search`). Graph rejects `$skip` with
+ * `invalidRequest: $skip is not supported on this API.`; the CLI mirrors
+ * by dropping `--skip` from the advertised flag set.
+ */
+const buildNoSkipListCommand = <Shape extends z.ZodRawShape>(
+  pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
+  schema: z.ZodObject<Shape>
+): Pick<Command, 'schema' | 'execute'> => {
+  const merged = schema.extend(noSkipShape);
+  const execute: Command['execute'] = async (graph, params) => {
+    const parsed = merged.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const data = parsed.data as z.infer<z.ZodObject<Shape>> & NoSkipParams;
+    const path = appendOData(pathFn(data), data);
+    return graph.get(path);
+  };
+  return { schema: merged, execute };
+};
+
+/**
+ * Collection GET that supports an EXPLICIT subset of OData passthroughs.
+ * Use for endpoints where Graph silently drops some flags — passing
+ * `keys: ['top', 'select']` advertises only `--top` and `--select` and
+ * keeps the manifest honest. The other narrower builders
+ * (`buildNoSkipListCommand`, `buildFilterSelectListCommand`) are
+ * specializations; this is the generic escape hatch.
+ */
+const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataKey>(
+  pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
+  schema: z.ZodObject<Shape>,
+  keys: ReadonlyArray<K>
+): Pick<Command, 'schema' | 'execute'> => {
+  const merged = schema.extend(pickODataShape(keys));
+  const execute: Command['execute'] = async (graph, params) => {
+    const parsed = merged.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data as Partial<ODataQueryParams>);
+    return graph.get(path);
+  };
+  return { schema: merged, execute };
+};
+
+export {
+  buildCommand,
+  buildElevatedCommand,
+  buildElevatedListCommand,
+  buildFilterSelectListCommand,
+  buildListCommand,
+  buildNoSkipListCommand,
+  buildPickODataListCommand,
+  buildSelectableCommand,
+};

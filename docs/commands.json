@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-16T06:32:52.877Z",
+  "generatedAt": "2026-05-18T02:37:57.494Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -267,7 +267,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -303,7 +303,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -317,7 +317,7 @@
     },
     {
       "name": "get-chat",
-      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages. Requires the elevated M365ChatClient token captured at login.",
+      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*` and ship as a separate token scope).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/chats/{chat-id}",
@@ -345,7 +345,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -390,16 +390,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -448,7 +442,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -508,7 +502,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -544,7 +538,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -575,6 +569,18 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
@@ -595,16 +601,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -631,7 +631,7 @@
     },
     {
       "name": "get-drive-root-item",
-      "summary": "Get the root folder (driveItem) of a OneDrive / SharePoint drive.",
+      "summary": "Get the root folder (driveItem) of a OneDrive / SharePoint drive. Use `--select` to slim the response (e.g. `--select id,name,folder`).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/root",
@@ -642,6 +642,18 @@
           "key": "driveId",
           "required": true,
           "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives` in the `id` field."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-drive-root-item --drive-id 'b!1234'",
@@ -660,6 +672,18 @@
           "key": "folderName",
           "required": true,
           "description": "Well-known folder name. One of: `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`. Returns the corresponding driveItem (folder) — use the returned `id` with `list-folder-files` etc."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-drive-special-folder --folder-name 'documents'",
@@ -667,7 +691,7 @@
     },
     {
       "name": "get-excel-range",
-      "summary": "Get the cell values, formulas, and formats of a specific Excel range (e.g. `A1:C10`).",
+      "summary": "Get the cell values, formulas, and formats of a specific Excel range (e.g. `A1:C10`). The CLI caps the in-flight range at 100 000 cells to prevent runaway responses — split absurd ranges (`ZZ999999:AAA1` etc.) into smaller bands.",
       "category": "excel",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/range(address='{address}')",
@@ -695,7 +719,7 @@
           "name": "address",
           "key": "address",
           "required": true,
-          "description": "A1-style range address, e.g. `A1:C10` or a single cell like `B7`."
+          "description": "A1-style range address, e.g. `A1:C10` or a single cell like `B7`. The CLI rejects ranges spanning more than 100 000 cells client-side to prevent runaway responses. Do NOT prefix with the worksheet name — `--worksheet-id` already pins the sheet, and a cross-sheet prefix like `OtherSheet!A1:C2` is rejected by Graph."
         }
       ],
       "example": "ask-marcel get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
@@ -779,7 +803,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -793,7 +817,7 @@
     },
     {
       "name": "get-mail-attachment",
-      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call.",
+      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call. Use `--select id,name,contentType,size` to fetch metadata only and skip the multi-MB `contentBytes` payload.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -810,6 +834,18 @@
           "key": "attachmentId",
           "required": true,
           "description": "Attachment ID. Returned by `ask-marcel list-mail-attachments`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
@@ -833,7 +869,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -861,7 +897,7 @@
         }
       ],
       "example": "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"message/rfc822\" or similar, size, base64 }` — the raw MIME envelope, inlined. Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments."
+      "responseShape": "`{ contentType: \"text/plain\", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments."
     },
     {
       "name": "get-mail-rule",
@@ -895,25 +931,12 @@
     },
     {
       "name": "get-mailbox-settings",
-      "summary": "Get the signed-in user's Outlook mailbox settings (timezone, working hours, automatic replies). Use `--select` to fetch only specific fields (e.g. `--select timeZone,workingHours`).",
+      "summary": "Get the signed-in user's Outlook mailbox settings (timezone, working hours, automatic replies). Note: Graph silently ignores `$select` / `$expand` on this endpoint, so the CLI does NOT expose them — the full payload (including the auto-reply HTML body) is always returned. Slim client-side if you only need a subset.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailboxSettings",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings",
-      "options": [
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
+      "options": [],
       "example": "ask-marcel get-mailbox-settings",
       "responseShape": "single Microsoft Graph `mailboxSettings` resource"
     },
@@ -929,7 +952,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -953,7 +976,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1002,7 +1025,7 @@
     },
     {
       "name": "get-onenote-page-content",
-      "summary": "Get the raw HTML body of a single OneNote page. Returned in a JSON envelope so the HTML survives transport. For markdown output use `get-onenote-page-as-markdown`.",
+      "summary": "Get the raw HTML body of a single OneNote page. Returned as a `text/html` payload so the HTML body is available verbatim (text mode prints the body raw; JSON mode wraps it in the standard `{contentType, size, text}` envelope). For markdown output use `get-onenote-page-as-markdown`.",
       "category": "notes",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/onenote/pages/{onenote-page-id}/content",
@@ -1036,7 +1059,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1168,7 +1191,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1205,6 +1228,18 @@
           "key": "columnId",
           "required": true,
           "description": "columnDefinition ID. Returned by `list-sharepoint-list-columns`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
@@ -1223,6 +1258,18 @@
           "key": "siteId",
           "required": true,
           "description": "SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
@@ -1271,6 +1318,18 @@
           "key": "driveId",
           "required": true,
           "description": "Drive (document library) ID on the site. Returned by `ask-marcel list-sharepoint-site-drives`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
@@ -1295,6 +1354,18 @@
           "key": "listId",
           "required": true,
           "description": "SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
@@ -1331,6 +1402,18 @@
               "key": "itemId"
             }
           ]
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
@@ -1338,7 +1421,7 @@
     },
     {
       "name": "get-sharepoint-site-onenote-page-content",
-      "summary": "Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response is wrapped in the standard text-content envelope so the HTML survives JSON transport.",
+      "summary": "Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response carries the standard `{contentType: text/html, size, text}` shape so the HTML body is available verbatim under either output format.",
       "category": "notes",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/onenote/pages/{onenote-page-id}/content",
@@ -1408,7 +1491,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1438,7 +1521,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1474,7 +1557,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1504,7 +1587,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1574,7 +1657,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -1610,7 +1693,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1683,7 +1766,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1732,7 +1815,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1759,7 +1842,7 @@
     },
     {
       "name": "list-calendar-events-delta",
-      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Most tenants accept the call without `--top` and return a sane page (~200 events); pass `--top` only when you want a smaller bound. If Graph returns an empty `UnknownError:` (rare), the CLI rewrites it to a hint pointing at the `--top` workaround.",
+      "summary": "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Other OData passthroughs (`$select`, `$filter`, `$orderby`, `$skip`) are silently ignored by Graph on this delta endpoint, so the CLI does NOT expose them — slice / sort / project client-side. Most tenants accept the call without `--top` and return a sane page (~200 events); pass `--top` only when you want a smaller bound. If Graph returns an empty `UnknownError:` (rare), the CLI rewrites it to a hint pointing at the `--top` workaround.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/delta()",
@@ -1770,36 +1853,6 @@
           "key": "top",
           "required": false,
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-calendar-events-delta --top 50",
@@ -1836,7 +1889,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1885,7 +1938,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1946,7 +1999,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -1967,12 +2020,12 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-calendar-view --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-calendar-view --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
       "name": "list-calendar-view-delta",
-      "summary": "Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally — `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).",
+      "summary": "Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally — `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Other OData passthroughs (`$select`, `$filter`, `$orderby`, `$skip`) are silently ignored by Graph on this delta endpoint, so the CLI does NOT expose them.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendarView/delta()?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -1995,36 +2048,6 @@
           "key": "top",
           "required": false,
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
@@ -2055,7 +2078,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2092,7 +2115,7 @@
           "name": "chat-id",
           "key": "chatId",
           "required": true,
-          "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. This CLI does not list chats (the Teams web client token has no `Chat.Read*` scope), so the chat ID has to come from outside. Easiest source from inside this CLI: pick any Teams meeting from `list-calendar-events` and URL-decode the `19%3ameeting_...%40thread.v2` segment of its `onlineMeeting.joinUrl`. Other sources: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or Power Automate."
+          "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`."
         },
         {
           "name": "top",
@@ -2110,7 +2133,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2137,7 +2160,7 @@
     },
     {
       "name": "list-chats",
-      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants. This command requires the elevated M365ChatClient token captured at login.",
+      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs the `Chat.Read*` scope which neither token grants.",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/chats",
@@ -2159,7 +2182,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2214,7 +2237,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -2254,16 +2277,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2315,16 +2332,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2376,16 +2387,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2434,7 +2439,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2495,7 +2500,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2556,7 +2561,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2583,7 +2588,7 @@
     },
     {
       "name": "list-excel-table-rows",
-      "summary": "List the data rows of a named Excel table (excluding the header row).",
+      "summary": "List the data rows of a named Excel table (excluding the header row). Note: Graph silently ignores `$filter` and `$orderby` on this endpoint, so the CLI does not expose those flags — slice / sort client-side.",
       "category": "excel",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/tables/{table-id}/rows",
@@ -2623,19 +2628,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -2650,7 +2643,7 @@
     },
     {
       "name": "list-excel-tables",
-      "summary": "List the named tables across every worksheet in an Excel workbook.",
+      "summary": "List the named tables across every worksheet in an Excel workbook. Note: Graph silently ignores `$filter` and `$orderby` on this endpoint, so the CLI does not expose those flags — slice / sort client-side.",
       "category": "excel",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/tables",
@@ -2684,19 +2677,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -2751,7 +2732,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2818,7 +2799,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2845,7 +2826,7 @@
     },
     {
       "name": "list-excel-worksheets",
-      "summary": "List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint. Returns a clear \"not an accessible Excel workbook\" error if the item is a folder, non-.xlsx file, or sensitivity-label-blocked.",
+      "summary": "List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint. Returns a clear \"not an accessible Excel workbook\" error if the item is a folder, non-.xlsx file, or sensitivity-label-blocked. Note: Graph silently ignores `$top`, `$filter`, and `$orderby` on this endpoint, so the CLI does not expose those flags — slice / sort client-side.",
       "category": "excel",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets",
@@ -2864,12 +2845,6 @@
           "description": "driveItem ID of the .xlsx file. Returned by `list-folder-files` or `search-onedrive-files`."
         },
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
           "name": "skip",
           "key": "skip",
           "required": false,
@@ -2879,19 +2854,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -2928,7 +2891,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -2986,16 +2949,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3035,16 +2992,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3111,7 +3062,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3132,7 +3083,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
       "pagination": true
     },
@@ -3166,7 +3117,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3221,7 +3172,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3276,7 +3227,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3331,7 +3282,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3386,7 +3337,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3426,16 +3377,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3484,7 +3429,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3549,7 +3494,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3588,7 +3533,7 @@
     },
     {
       "name": "list-mail-attachments",
-      "summary": "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline,@odata.type` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
+      "summary": "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments",
@@ -3616,7 +3561,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3671,7 +3616,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3726,7 +3671,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3781,7 +3726,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3830,7 +3775,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3891,7 +3836,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -3918,7 +3863,7 @@
     },
     {
       "name": "list-mail-rules",
-      "summary": "List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns an `ErrorInvalidParameter` from Graph. `--mail-folder-id` defaults to `inbox` because that is the only value Graph accepts; the flag is kept (optional) for callers that want to pass a resolved Inbox ID explicitly.",
+      "summary": "List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns `MailFolderNotSupportedError` from Graph. `--mail-folder-id` defaults to `inbox` because that is the only value Graph accepts; the flag is kept (optional) for callers that want to pass a resolved Inbox ID explicitly. Note: Graph silently ignores every OData passthrough on this endpoint, so the CLI does NOT expose them — the full rule set is always returned.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders/{mail-folder-id}/messageRules",
@@ -3928,52 +3873,15 @@
           "name": "mail-folder-id",
           "key": "mailFolderId",
           "required": false,
-          "description": "mailFolder ID. Optional; defaults to `inbox`. In practice only `inbox` (or its resolved ID) works — Graph rejects every other folder for messageRules."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+          "description": "mailFolder ID. Optional; defaults to `inbox`. In practice only `inbox` (or its resolved ID) works — Graph rejects every other folder for messageRules with `MailFolderNotSupportedError`."
         }
       ],
       "example": "ask-marcel list-mail-rules",
-      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`",
-      "pagination": true
+      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`"
     },
     {
       "name": "list-my-direct-reports",
-      "summary": "List the signed-in user's direct reports (employees who report to them in the directory).",
+      "summary": "List the signed-in user's direct reports (employees who report to them in the directory). When `--orderby` is supplied the CLI auto-injects the `ConsistencyLevel: eventual` header Graph requires on directory endpoints — otherwise Graph rejects the sort with `Request_UnsupportedQuery`.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/directReports",
@@ -3995,7 +3903,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4044,7 +3952,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4093,7 +4001,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4148,7 +4056,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4197,7 +4105,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4258,7 +4166,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4285,56 +4193,18 @@
     },
     {
       "name": "list-outlook-categories",
-      "summary": "List the signed-in user's Outlook color categories — the named tags that can be applied to mail, calendar items, and contacts. Each entry has `displayName` and a `color` from Outlook's preset palette.",
+      "summary": "List the signed-in user's Outlook color categories — the named tags that can be applied to mail, calendar items, and contacts. Each entry has `displayName` and a `color` from Outlook's preset palette. Note: Graph silently ignores every OData passthrough on this endpoint (`$top`, `$skip`, `$select`, `$filter`, `$orderby`, `$expand`), so the CLI does not expose any of those flags — the full collection is always returned. Slice client-side.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/outlook/masterCategories",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories",
-      "options": [
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
-        }
-      ],
+      "options": [],
       "example": "ask-marcel list-outlook-categories",
-      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`",
-      "pagination": true
+      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`"
     },
     {
       "name": "list-plan-buckets",
-      "summary": "List the buckets (columns / lanes) of a Microsoft Planner plan.",
+      "summary": "List the buckets (columns / lanes) of a Microsoft Planner plan. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/planner/plans/{planner-plan-id}/buckets",
@@ -4353,40 +4223,10 @@
           ]
         },
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         }
       ],
       "example": "ask-marcel list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
@@ -4420,47 +4260,17 @@
     },
     {
       "name": "list-planner-plans",
-      "summary": "List every Microsoft Planner plan the signed-in user has access to (across every group). Use this to discover plan IDs without needing an existing task as the entry point.",
+      "summary": "List every Microsoft Planner plan the signed-in user has access to (across every group). Use this to discover plan IDs without needing an existing task as the entry point. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/planner/plans",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/planneruser-list-plans",
       "options": [
         {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
-        },
-        {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
-          "name": "filter",
-          "key": "filter",
-          "required": false,
-          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         }
       ],
       "example": "ask-marcel list-planner-plans",
@@ -4491,7 +4301,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4531,16 +4341,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4589,7 +4393,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4638,7 +4442,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4687,7 +4491,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4736,7 +4540,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4785,7 +4589,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4840,7 +4644,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4907,7 +4711,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -4928,7 +4732,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
       "pagination": true
     },
@@ -4956,7 +4760,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5017,7 +4821,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5072,7 +4876,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5132,7 +4936,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -5183,16 +4987,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5238,16 +5036,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5299,16 +5091,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5357,7 +5143,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5418,7 +5204,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5473,7 +5259,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5540,7 +5326,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5586,16 +5372,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5638,7 +5418,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "expand",
@@ -5671,16 +5451,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5735,7 +5509,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5802,7 +5576,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5823,7 +5597,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
@@ -5844,7 +5618,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5858,10 +5632,10 @@
     },
     {
       "name": "list-team-installed-apps",
-      "summary": "List the Teams apps installed in a team (incl. teamsAppDefinition `displayName`, `version`, `distributionMethod`). Useful for surfacing which integrations are wired into a given team. Note: Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
+      "summary": "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
       "category": "teams",
       "graphMethod": "GET",
-      "graphPathTemplate": "/teams/{team-id}/installedApps",
+      "graphPathTemplate": "/teams/{team-id}/installedApps?$expand=teamsAppDefinition",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/team-list-installedapps",
       "options": [
         {
@@ -5872,7 +5646,7 @@
         }
       ],
       "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
-      "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`",
+      "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
       "pagination": true
     },
     {
@@ -5927,7 +5701,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -5954,7 +5728,7 @@
     },
     {
       "name": "list-todo-task-lists",
-      "summary": "List the signed-in user’s Microsoft To Do task lists (e.g. `Tasks`, `Flagged Emails`, custom lists).",
+      "summary": "List the signed-in user's Microsoft To Do task lists (e.g. `Tasks`, `Flagged Emails`, custom lists). Note: Graph rejects `$select` and `$orderby` on this endpoint with `RequestBroker--ParseUri`, so the CLI does not expose those flags — slice / sort client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists",
@@ -5973,22 +5747,10 @@
           "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
         },
         {
-          "name": "select",
-          "key": "select",
-          "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
-        },
-        {
           "name": "filter",
           "key": "filter",
           "required": false,
           "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
         },
         {
           "name": "expand",
@@ -6041,7 +5803,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6119,7 +5881,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6174,7 +5936,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6231,7 +5993,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the top-level `nextLink` value (NOT `data[\"@odata.nextLink\"]` — the CLI promotes that field to envelope-level and strips it from data) returned by any list / search / delta command to walk pagination yourself. Automatically uses the elevated M365ChatClient token when the nextLink path starts with `/me/chats` or `/chats/...` so chat pagination follows the original auth context instead of 403ing on the basic Teams token.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode that is the `next: <url>` value in the `---` footer; in JSON mode it is the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",
@@ -6288,7 +6050,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6334,16 +6096,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6395,16 +6151,10 @@
           "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
-          "name": "skip",
-          "key": "skip",
-          "required": false,
-          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
-        },
-        {
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",
@@ -6465,7 +6215,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "orderby",
@@ -6514,7 +6264,7 @@
           "name": "select",
           "key": "select",
           "required": false,
-          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically."
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource."
         },
         {
           "name": "filter",

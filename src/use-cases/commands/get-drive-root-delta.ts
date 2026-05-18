@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
-const { execute, schema } = buildListCommand(() => '/me/drive/root/delta()', baseSchema);
+const { execute, schema } = buildNoSkipListCommand(() => '/me/drive/root/delta()', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/drive/root/delta()',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-delta',
-  options: [...odataQueryOptions],
+  options: [...noSkipOptions],
   example: 'ask-marcel get-drive-root-delta',
   responseShape:
     'collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',

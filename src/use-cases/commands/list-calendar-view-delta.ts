@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { topOnlyOptions, topOnlyShape } from './odata-query.ts';
 
 const baseSchema = z.object({
   startDateTime: z.string().min(1),
   endDateTime: z.string().min(1),
 });
 
-const schema = baseSchema.extend(odataQuerySchema.shape);
+const schema = baseSchema.extend(topOnlyShape);
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -25,7 +25,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally — `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`).',
+    'Get the first page of the incremental change set of expanded calendar-view occurrences over a date range. Subsequent pages: feed the returned `@odata.nextLink` to `next-page`; resume later via the `@odata.deltaLink`. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally — `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Other OData passthroughs (`$select`, `$filter`, `$orderby`, `$skip`) are silently ignored by Graph on this delta endpoint, so the CLI does NOT expose them.',
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/calendarView/delta()?startDateTime={start-date-time}&endDateTime={end-date-time}',
@@ -43,7 +43,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'ISO 8601 upper bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes.',
     },
-    ...odataQueryOptions,
+    ...topOnlyOptions,
   ],
   example: "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
   responseShape:

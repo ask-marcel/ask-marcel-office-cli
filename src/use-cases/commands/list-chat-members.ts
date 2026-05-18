@@ -19,10 +19,9 @@ const meta: CommandMeta = {
       required: true,
       description:
         'Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. ' +
-        'This CLI does not list chats (the Teams web client token has no `Chat.Read*` scope), so the chat ID has to come from outside. ' +
-        'Easiest source from inside this CLI: pick any Teams meeting from `list-calendar-events` and URL-decode the ' +
-        '`19%3ameeting_...%40thread.v2` segment of its `onlineMeeting.joinUrl`. ' +
-        'Other sources: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or Power Automate.',
+        'Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). ' +
+        'Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, ' +
+        'or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`.',
     },
     ...odataQueryOptions,
   ],

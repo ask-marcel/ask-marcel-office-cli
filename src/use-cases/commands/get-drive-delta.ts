@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/delta()`, baseSchema);
+const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/delta()`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'Get the incremental change set (added / modified / deleted items) under a OneDrive / SharePoint folder. Use the `@odata.deltaLink` from a previous response to resume.',
@@ -22,7 +22,7 @@ const meta: CommandMeta = {
         'driveItem ID of the folder whose subtree to track. Use the root folder ID from `get-drive-root-item` to track the entire drive. Accepts `--folder-id` as an alias for parity with `list-folder-files` (same concept, same flag name).',
       aliases: [{ name: 'folder-id', key: 'folderId' }],
     },
-    ...odataQueryOptions,
+    ...noSkipOptions,
   ],
   example: "ask-marcel get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
   responseShape:

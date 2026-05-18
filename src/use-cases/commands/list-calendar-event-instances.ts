@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { err } from '../../domain/result.ts';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { Command, CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({
@@ -15,13 +16,34 @@ const isWellKnownDefault = (id: string): boolean => {
   return lower === 'primary' || lower === 'default';
 };
 
-const { execute, schema } = buildListCommand(
+const inner = buildListCommand(
   (p) =>
     isWellKnownDefault(p.calendarId)
       ? `/me/calendar/events/${p.eventId}/instances?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`
       : `/me/calendars/${p.calendarId}/events/${p.eventId}/instances?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`,
   baseSchema
 );
+
+const EXPAND_SERIES_NEEDLE = 'ExpandSeries can only be performed against a series';
+
+// Graph rejects /instances on a singleInstance event with the opaque
+// `ErrorInvalidRequest: ... ExpandSeries can only be performed against a
+// series.`. Rewrite to a clear hint pointing the LLM at the seriesMaster
+// filter that finds a recurring event.
+const execute: Command['execute'] = async (graph, params) => {
+  const result = await inner.execute(graph, params);
+  if (result.ok) return result;
+  if (result.error.type === 'api_error' && result.error.message.includes(EXPAND_SERIES_NEEDLE)) {
+    return err({
+      type: 'api_error',
+      status: result.error.status,
+      message:
+        'The --event-id is not a recurring series — Graph rejects /instances for singleInstance events. Find a seriesMaster event with `ask-marcel list-calendar-events --filter "type eq \'seriesMaster\'"` and pass that ID instead.',
+    });
+  }
+  return result;
+};
+const { schema } = inner;
 
 const meta: CommandMeta = {
   summary:

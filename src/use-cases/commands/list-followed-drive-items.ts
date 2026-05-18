@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
-const { execute, schema } = buildListCommand(() => '/me/drive/following', baseSchema);
+const { execute, schema } = buildNoSkipListCommand(() => '/me/drive/following', baseSchema);
 
 const meta: CommandMeta = {
   summary:
@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/drive/following',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list-following',
-  options: [...odataQueryOptions],
+  options: [...noSkipOptions],
   example: 'ask-marcel list-followed-drive-items',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,

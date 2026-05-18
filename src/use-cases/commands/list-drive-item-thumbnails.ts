@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/thumbnails`, baseSchema);
+const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/thumbnails`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List thumbnail URLs (small / medium / large) for a OneDrive / SharePoint file. Each thumbnail set has pre-signed CDN URLs you can render in a UI without further auth.',
@@ -25,7 +25,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID. Returned by `list-folder-files` or `search-onedrive-files`.',
     },
-    ...odataQueryOptions,
+    ...noSkipOptions,
   ],
   example: "ask-marcel list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `thumbnailSet` resources under `value[]`',

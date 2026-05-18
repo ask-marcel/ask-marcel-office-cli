@@ -1,6 +1,7 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
+import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import { buildManifest, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/commands/docs-render.ts';
@@ -29,8 +30,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
   const { auth, graph, logger, processRunner, fs, version } = deps;
   const program = new Command();
 
+  const getFormat = (): OutputFormat => {
+    const raw = program.opts<{ output?: string }>().output;
+    return raw === 'json' ? 'json' : 'text';
+  };
+  const renderOut = (data: unknown): void => render(data, logger, getFormat());
   const fail = (message: string): void => {
-    renderError(message);
+    renderError(message, getFormat());
     deps.onCommandError?.();
   };
 
@@ -60,6 +66,14 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .option(
       '--output-path <path>',
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
+    )
+    .addOption(
+      new Option(
+        '--output <format>',
+        'Output format. `text` (default, LLM-readable YAML-ish lines, ~30-60% fewer tokens on listings; errors render as `error: <message>`). `json` preserves the `{ok, data, nextLink?, deltaLink?, count?}` envelope for tool-chaining where unambiguous field extraction matters.'
+      )
+        .choices(['text', 'json'])
+        .default('text')
     );
 
   // Audit v1.0.0 §2.3: bare `ask-marcel` (no subcommand) used to silently
@@ -116,7 +130,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback).')
     .action(async () => {
       const result = await login.execute(auth);
-      if (result.ok) render({ status: 'authenticated' }, logger);
+      if (result.ok) renderOut({ status: 'authenticated' });
       else fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
     });
   loginCmd.addHelpText(
@@ -138,7 +152,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description('Clear the cached Microsoft Graph token so the next command forces a fresh sign-in.')
     .action(async () => {
       const result = await logout.execute(auth);
-      if (result.ok) render({ status: 'logged_out' }, logger);
+      if (result.ok) renderOut({ status: 'logged_out' });
       else fail(result.error.type === 'auth_cancelled' ? 'Logout cancelled' : result.error.message);
     });
   logoutCmd.addHelpText(
@@ -158,7 +172,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .action(async () => {
       const manager = deps.packageManager ?? detectPackageManager(process.argv[1] ?? '');
       const result = await update.execute(processRunner, manager);
-      if (result.ok) render({ status: 'updated', via: manager }, logger);
+      if (result.ok) renderOut({ status: 'updated', via: manager });
       else if (result.error.type === 'spawn_failed') fail(`update failed: ${result.error.message}`);
       else fail(`update install exited with code ${result.error.exitCode}`);
     });
@@ -246,7 +260,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         const outputPath = program.opts<{ outputPath?: string }>().outputPath;
         const persisted = await persistIfRequested(fs, outputPath, result.value);
         if (persisted.ok) {
-          render(persisted.value, logger);
+          renderOut(persisted.value);
           return;
         }
         const failMessage = ((): string => {

@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
+import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/permissions`, baseSchema);
+const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/permissions`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List the sharing permissions on a OneDrive / SharePoint file or folder.',
@@ -20,7 +20,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID of the file or folder. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-item`.',
     },
-    ...odataQueryOptions,
+    ...noSkipOptions,
   ],
   example: "ask-marcel list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `permission` resources under `value[]`',

@@ -82,7 +82,8 @@ const odataQueryOptions: ReadonlyArray<CommandOptionMeta> = [
     name: 'select',
     key: 'select',
     required: false,
-    description: 'OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). Shrinks payloads dramatically.',
+    description:
+      'OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource.',
   },
   {
     name: 'filter',
@@ -147,5 +148,61 @@ const noSkipShape = Object.fromEntries(Object.entries(odataQuerySchema.shape).fi
 
 const noSkipOptions: ReadonlyArray<CommandOptionMeta> = odataQueryOptions.filter((o) => o.name !== 'skip');
 
-export { appendOData, filterSelectOptions, filterSelectSchema, noSkipOptions, noSkipShape, odataQueryOptions, odataQuerySchema, selectExpandOptions, selectExpandSchema };
-export type { FilterSelectParams, ODataQueryParams, SelectExpandParams };
+type ODataKey = keyof typeof odataQuerySchema.shape;
+
+/**
+ * Returns a zod-extension shape containing ONLY the named OData fields.
+ * Use for endpoints where Graph silently ignores some passthroughs — the
+ * CLI advertises only the ones the endpoint honors.
+ */
+const pickODataShape = <K extends ODataKey>(keys: ReadonlyArray<K>): Pick<typeof odataQuerySchema.shape, K> => {
+  const out: Partial<typeof odataQuerySchema.shape> = {};
+  for (const key of keys) out[key] = odataQuerySchema.shape[key];
+  return out as Pick<typeof odataQuerySchema.shape, K>;
+};
+
+/**
+ * Returns the matching CommandOptionMeta entries for use in `meta.options`.
+ * Order is preserved from the canonical `odataQueryOptions` definition.
+ */
+const pickODataOptions = (keys: ReadonlyArray<ODataKey>): ReadonlyArray<CommandOptionMeta> => {
+  const allowed = new Set<string>(keys);
+  return odataQueryOptions.filter((o) => allowed.has(o.name));
+};
+
+/**
+ * Subset for delta-tracking endpoints where Graph silently ignores every
+ * OData passthrough except `$top` (which itself must be translated to a
+ * `Prefer: odata.maxpagesize` header — `$top` as a query parameter returns
+ * `ErrorInvalidUrlQuery`). The CLI keeps `--top` as the user-facing flag
+ * and drops the others rather than advertising no-ops.
+ */
+const topOnlyShape = pickODataShape(['top']);
+const topOnlyOptions = pickODataOptions(['top']);
+
+/**
+ * Subset for endpoints where Graph honors ONLY `$select` (e.g.
+ * `/me/planner/plans`, `/planner/plans/{id}/buckets` — the other OData
+ * passthroughs are silently dropped server-side).
+ */
+const selectOnlyShape = pickODataShape(['select']);
+const selectOnlyOptions = pickODataOptions(['select']);
+
+export {
+  appendOData,
+  filterSelectOptions,
+  filterSelectSchema,
+  noSkipOptions,
+  noSkipShape,
+  odataQueryOptions,
+  odataQuerySchema,
+  pickODataOptions,
+  pickODataShape,
+  selectExpandOptions,
+  selectExpandSchema,
+  selectOnlyOptions,
+  selectOnlyShape,
+  topOnlyOptions,
+  topOnlyShape,
+};
+export type { FilterSelectParams, ODataKey, ODataQueryParams, SelectExpandParams };

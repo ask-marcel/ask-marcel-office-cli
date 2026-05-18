@@ -1,19 +1,21 @@
 import { z } from 'zod';
-import { buildSelectableCommand } from './build-command.ts';
+import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
 
-const baseSchema = z.object({});
-const { execute, schema } = buildSelectableCommand(() => '/me/mailboxSettings', baseSchema);
+// Graph's `/me/mailboxSettings` silently ignores `$select` (and `$expand`):
+// the full payload — including the ~3 KB autoReply HTML body — is always
+// returned regardless. Don't advertise the flag.
+const schema = z.object({});
+const { execute } = buildCommand(() => '/me/mailboxSettings', schema);
 
 const meta: CommandMeta = {
   summary:
-    "Get the signed-in user's Outlook mailbox settings (timezone, working hours, automatic replies). Use `--select` to fetch only specific fields (e.g. `--select timeZone,workingHours`).",
+    "Get the signed-in user's Outlook mailbox settings (timezone, working hours, automatic replies). Note: Graph silently ignores `$select` / `$expand` on this endpoint, so the CLI does NOT expose them — the full payload (including the auto-reply HTML body) is always returned. Slim client-side if you only need a subset.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailboxSettings',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings',
-  options: [...selectExpandOptions],
+  options: [],
   example: 'ask-marcel get-mailbox-settings',
   responseShape: 'single Microsoft Graph `mailboxSettings` resource',
 };

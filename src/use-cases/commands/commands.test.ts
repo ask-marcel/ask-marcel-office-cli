@@ -493,6 +493,21 @@ describe('commands', () => {
       });
   });
 
+  it('get-excel-range rejects an --address spanning more than 100 000 cells', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'ZZ999999:AAA1' }, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('validation_error');
+      expect(result.error.message).toContain('cells (cap: 100,000)');
+    }
+  });
+
+  it('get-excel-range accepts a single-cell --address without parsing', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'B7' }, { values: [['Fendi']] });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ values: [['Fendi']] });
+  });
+
   it('list-excel-worksheets returns worksheets', async () => {
     const result = await callCommand('list-excel-worksheets', { driveId: 'd1', itemId: 'i1' }, { value: [{ name: 'Sheet1' }] });
     expect(result.ok).toBe(true);
@@ -642,6 +657,104 @@ describe('commands', () => {
     if (!r.ok && r.error.type === 'api_error') {
       expect(r.error.message).toContain('Graph rejected --select=id,title');
       expect(r.error.message).toContain('Drop `title` from --select');
+    }
+  });
+
+  it('list-todo-tasks also rewrites RequestBroker--ParseUri when --orderby trips the same parser quirk (audit v1.0.0 Bug 3)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$orderby=title%20asc',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-todo-tasks'];
+    if (!cmd) throw new Error('list-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', orderby: 'title asc' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('Graph rejected --orderby=title asc');
+      expect(r.error.message).toContain('sorting on `title` is unsupported');
+    }
+  });
+
+  it('list-todo-tasks passes through RequestBroker--ParseUri unchanged when neither --select nor --orderby is set (no false rewrite)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-todo-tasks'];
+    if (!cmd) throw new Error('list-todo-tasks not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('RequestBroker--ParseUri');
+      expect(r.error.message).not.toContain('Drop `title`');
+    }
+  });
+
+  it('list-calendar-event-instances rewrites the opaque ExpandSeries error to a seriesMaster hint (audit v1.0.0 Issue 9)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/calendar/events/e1/instances',
+        method: 'GET',
+        response: () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: 'ErrorInvalidRequest',
+                message: "Your request can't be completed. ExpandSeries can only be performed against a series.",
+              },
+            }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          ),
+      },
+    ]);
+    const cmd = cmdMap['list-calendar-event-instances'];
+    if (!cmd) throw new Error('list-calendar-event-instances not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { eventId: 'e1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('not a recurring series');
+      expect(r.error.message).toContain("type eq 'seriesMaster'");
+    }
+  });
+
+  it('get-team-channel rewrites the opaque `1: NotFound` error to a clear channel-id hint (audit v1.0.0 B2)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/teams/tm1/channels/19:bogus@thread.skype',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: '1', message: 'NotFound' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['get-team-channel'];
+    if (!cmd) throw new Error('get-team-channel not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { teamId: 'tm1', channelId: '19:bogus@thread.skype' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'api_error') {
+      expect(r.error.message).toContain('NotFound: Microsoft Teams channel not found');
+      expect(r.error.message).toContain('19:bogus@thread.skype');
+      expect(r.error.message).toContain('list-team-channels');
     }
   });
 
@@ -2255,7 +2368,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   {
     name: 'list-mail-attachments',
     params: { messageId: 'm1' },
-    expectedPath: '/me/messages/m1/attachments?$select=id%2Cname%2CcontentType%2Csize%2CisInline%2C%40odata.type',
+    expectedPath: '/me/messages/m1/attachments?$select=id%2Cname%2CcontentType%2Csize%2CisInline',
   },
   { name: 'get-mail-attachment', params: { messageId: 'm1', attachmentId: 'a1' }, expectedPath: '/me/messages/m1/attachments/a1' },
   { name: 'list-mail-rules', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messageRules' },
@@ -2383,7 +2496,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-channel-files-folder', params: { teamId: 'tm1', channelId: 'ch1' }, expectedPath: '/teams/tm1/channels/ch1/filesFolder' },
   { name: 'get-drive-item-list-item', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/listItem' },
   { name: 'get-drive-item-analytics', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/analytics' },
-  { name: 'list-team-installed-apps', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/installedApps' },
+  { name: 'list-team-installed-apps', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/installedApps?$expand=teamsAppDefinition' },
   { name: 'list-calendar-groups', params: {}, expectedPath: '/me/calendarGroups' },
   { name: 'list-calendar-group-calendars', params: { calendarGroupId: 'cg1' }, expectedPath: '/me/calendarGroups/cg1/calendars' },
   { name: 'get-my-calendar', params: {}, expectedPath: '/me/calendar' },
@@ -2421,5 +2534,34 @@ describe('all commands build correct Graph URL', () => {
   it.each(pathFixtures)('$name calls $expectedPath', async ({ name, params, expectedPath }) => {
     const url = await capturedUrl(name, params);
     expect(url).toBe(`https://graph.microsoft.com/v1.0${expectedPath}`);
+  });
+});
+
+// Audit v1.0.0 §B1 — these collection endpoints all reject `$skip` server-side
+// (`invalidRequest: $skip is not supported on this API.`). The CLI must NOT
+// advertise `--skip` in the option set for these commands. Regression guard.
+const NO_SKIP_COMMANDS: Array<{ name: string; meta: { options: ReadonlyArray<{ name: string }> } }> = [
+  { name: 'list-folder-files', meta: listFolderFiles.meta },
+  { name: 'list-drive-item-permissions', meta: listDriveItemPermissions.meta },
+  { name: 'list-drive-item-versions', meta: listDriveItemVersions.meta },
+  { name: 'list-drive-item-thumbnails', meta: listDriveItemThumbnails.meta },
+  { name: 'search-onedrive-files', meta: searchOnedriveFiles.meta },
+  { name: 'search-my-documents', meta: searchMyDocuments.meta },
+  { name: 'get-drive-delta', meta: getDriveDelta.meta },
+  { name: 'get-drive-root-delta', meta: getDriveRootDelta.meta },
+  { name: 'list-recent-files', meta: listRecentFiles.meta },
+  { name: 'list-followed-drive-items', meta: listFollowedDriveItems.meta },
+  { name: 'list-sharepoint-site-drives', meta: listSharepointSiteDrives.meta },
+  { name: 'list-sharepoint-site-list-items', meta: listSharepointSiteListItems.meta },
+  { name: 'list-sharepoint-list-item-versions', meta: listSharepointListItemVersions.meta },
+  { name: 'list-site-content-types', meta: listSiteContentTypes.meta },
+  { name: 'list-sharepoint-site-pages', meta: listSharepointSitePages.meta },
+  { name: 'list-groups', meta: listGroups.meta },
+];
+
+describe('no-skip endpoints do not advertise --skip', () => {
+  it.each(NO_SKIP_COMMANDS)('$name.meta.options omits --skip', ({ meta }) => {
+    const hasSkip = meta.options.some((o) => o.name === 'skip');
+    expect(hasSkip).toBe(false);
   });
 });

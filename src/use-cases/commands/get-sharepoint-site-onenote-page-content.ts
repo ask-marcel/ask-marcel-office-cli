@@ -19,7 +19,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response is wrapped in the standard text-content envelope so the HTML survives JSON transport.',
+    'Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response carries the standard `{contentType: text/html, size, text}` shape so the HTML body is available verbatim under either output format.',
   category: 'notes',
   graphMethod: 'GET',
   graphPathTemplate: '/sites/{site-id}/onenote/pages/{onenote-page-id}/content',

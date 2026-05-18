@@ -6,12 +6,12 @@ import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.
 
 const schema = z.object({ messageId: z.string().min(1) }).extend(odataQuerySchema.shape);
 
-// Audit round-6 §1.3: `list-mail-attachments` previously returned the full
-// `contentBytes` inline for every attachment (a single 1.5 MB image inflates
-// `--top 1` to 1.5 MB even when the LLM just wanted to enumerate
-// attachments). Default `--select` to a slim metadata set so the LLM never
-// accidentally pulls megabytes. User-supplied `--select` overrides.
-const DEFAULT_SELECT = 'id,name,contentType,size,isInline,@odata.type';
+// Default `--select` to a slim metadata set so the LLM never accidentally
+// pulls megabytes of `contentBytes`. `@odata.type` is omitted because Graph
+// rejects it in `$select` with `Term '@odata.type' is not valid in a $select
+// or $expand expression` — discriminator is always returned regardless.
+// User-supplied `--select` overrides.
+const DEFAULT_SELECT = 'id,name,contentType,size,isInline';
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -23,7 +23,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline,@odata.type` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
+    "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments',

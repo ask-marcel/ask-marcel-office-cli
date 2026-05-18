@@ -1,4 +1,7 @@
 import type { Logger } from '../use-cases/ports/logger.ts';
+import { renderTextOutput } from './output-text.ts';
+
+type OutputFormat = 'text' | 'json';
 
 type SuccessEnvelope = {
   readonly ok: true;
@@ -37,13 +40,20 @@ const wrap = (data: unknown): SuccessEnvelope => {
   };
 };
 
-const render = (data: unknown, logger: Logger): void => {
-  logger.info('output_rendered', {});
+const renderJson = (data: unknown): void => {
   process.stdout.write(`${JSON.stringify(wrap(data))}\n`);
 };
 
-const renderError = (message: string): void => {
-  process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
+const render = (data: unknown, logger: Logger, format: OutputFormat): void => {
+  logger.info('output_rendered', {});
+  if (format === 'json') renderJson(data);
+  else process.stdout.write(renderTextOutput(data));
+};
+
+const renderError = (message: string, format: OutputFormat): void => {
+  if (format === 'json') process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
+  else process.stdout.write(`error: ${message}\n`);
 };
 
 export { render, renderError };
+export type { OutputFormat };
