@@ -122,57 +122,29 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
   // leak across login attempts.
   let lastElevatedOutcome: ElevatedOutcome | null = null;
 
-  // Login-fix round-1 Wave C: try elevated capture, and if a recoverable
-  // failure is returned (launch_timeout / sso_timeout — both point at a
-  // corrupt or stale persistent profile), wipe the profile and retry ONCE.
-  // navigation_failed is a network issue; retry won't help.
-  const tryElevatedWithAutoHeal = async (): Promise<AccessToken | null> => {
-    const first = await browserAuth.acquireElevatedToken();
-    if (first.ok) {
-      lastElevatedOutcome = { captured: true };
-      return first.token;
-    }
-    if (first.reason === 'navigation_failed') {
-      lastElevatedOutcome = { captured: false, reason: first.reason };
-      return null;
-    }
-    // Recoverable failure → wipe the profile (Playwright's persistent
-    // context dir) and retry exactly once. Best-effort delete; if the
-    // profile dir doesn't exist we just retry against a fresh dir.
-    logger.info('auth.elevated.auto_heal_attempt', { firstReason: first.reason });
-    await fs.deleteDirIfExists(browserProfileDir);
-    const second = await browserAuth.acquireElevatedToken();
-    if (second.ok) {
-      logger.info('auth.elevated.auto_heal_succeeded');
-      lastElevatedOutcome = { captured: true };
-      return second.token;
-    }
-    logger.info('auth.elevated.auto_heal_failed', { reason: second.reason });
-    lastElevatedOutcome = { captured: false, reason: second.reason };
-    return null;
-  };
-
   const acquireViaBrowser = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
-      const result = await browserAuth.acquireToken(SCOPES.split(' '), TEAMS_URL);
+      // Login-fix round-2: single-session capture. The old flow opened
+      // a second browser at m365.cloud.microsoft for the elevated step,
+      // which on federated tenants (ExampleCorp / ThirdPartyIdP) flashed a fresh sign-in
+      // prompt because the elevated identity's silent-SSO cookies hadn't
+      // settled from disk. We now reuse the same browser context: after
+      // the Teams token comes through the network listener, the SAME
+      // page navigates to m365.cloud.microsoft so cookies stay live in
+      // memory. Also drops the round-1 auto-heal profile wipe — it was
+      // wiping the freshly-authenticated Teams cookies and making
+      // federated tenants strictly worse.
+      const { teams: result, elevated } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
       if (!result) return err({ type: 'auth_cancelled' });
-      // Best-effort: also try to capture an elevated token while the
-      // browser session is fresh. If it fails (cookies in profile don't
-      // SSO into m365.cloud.microsoft, slow tenant, etc.), don't fail
-      // the whole login — 80+ commands still work without elevated.
-      let elevated: AccessToken | null = null;
-      try {
-        elevated = await tryElevatedWithAutoHeal();
-        if (elevated) {
-          logger.info('auth.elevated.captured_at_login');
-        } else {
-          logger.info('auth.elevated.skipped_at_login');
-        }
-      } catch (e) {
-        logger.info('auth.elevated.error_at_login', { message: e instanceof Error ? e.message : String(e) });
-        lastElevatedOutcome = { captured: false, reason: 'unknown_error' };
+      const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
+      if (elevated.ok) {
+        logger.info('auth.elevated.captured_at_login');
+        lastElevatedOutcome = { captured: true };
+      } else {
+        logger.info('auth.elevated.skipped_at_login', { reason: elevated.reason });
+        lastElevatedOutcome = { captured: false, reason: elevated.reason };
       }
-      await persistTeams(result.accessToken, result.refreshToken, elevated);
+      await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
       logger.info('auth.ladder.rung', { rung: 'browser' });
       return ok(result.accessToken);
     } catch (e) {

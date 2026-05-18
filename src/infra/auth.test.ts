@@ -41,6 +41,23 @@ const fakeBrowserAuth = (config?: {
       if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
       return { ok: true as const, token: v };
     },
+    // Login-fix round-2: fake composes acquireToken + acquireElevatedToken
+    // results into the single-session shape. Tests that want to assert the
+    // partial-success path (Teams ok, elevated failed) set both
+    // `acquireResult` and `elevatedFailure`.
+    acquireBothTokens: async () => {
+      if (config?.acquireError) throw config.acquireError;
+      const teams = config?.acquireResult ?? null;
+      if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+      const v = config?.elevatedResult;
+      if (config?.elevatedFailure !== undefined) {
+        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure } };
+      }
+      if (v === undefined || v === null) {
+        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+      }
+      return { teams, elevated: { ok: true as const, token: v } };
+    },
     close: async () => {},
   };
 };
@@ -161,10 +178,11 @@ describe('auth manager recovery ladder', () => {
   it('returns auth_failed when browser throws a non-Error value (covers String(e) fallback in acquireViaBrowser outer catch)', async () => {
     const fs = createFileSystemFake();
     const stringThrower: BrowserAuth = {
-      acquireToken: async () => {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => {
         throw 'edge process killed';
       },
-      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -220,28 +238,21 @@ describe('auth manager recovery ladder', () => {
     expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Login Data`)).toBe(false);
   });
 
-  it('login auto-heals: when the first elevated capture returns { ok: false, reason: "sso_timeout" }, wipes the browser-profile directory and retries elevated once (audit login-fix round-1 Wave C)', async () => {
+  it('login-fix round-2: a single-session capture that returns both Teams + elevated persists the elevated token to cache and reports captured outcome (no second browser)', async () => {
     const fs = createFileSystemFake();
-    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'stale-cookies');
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'fresh-cookies');
     const goodElevated = futureElevated();
     const browser = fakeBrowserAuth({
       acquireResult: futureToken(),
-      // First call fails with sso_timeout → triggers profile wipe + retry. Second call succeeds.
-      elevatedSequence: [
-        { ok: false, reason: 'sso_timeout' },
-        { ok: true, token: goodElevated },
-      ],
+      elevatedResult: goodElevated,
     });
-    const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
-    // Profile was wiped between the two elevated attempts.
-    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(false);
-    // Auto-heal succeeded → cache has the elevated token.
+    // Round-2: profile is NOT wiped during login — same-context capture means cookies must stay live.
+    expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(true);
     const cached = await fs.readJson<{ elevated_access_token?: string }>(CACHE_PATH);
     expect(cached.ok && cached.value.elevated_access_token).toBe(goodElevated);
-    // Outcome surface (Wave D) reports capture succeeded.
     expect(auth.getLastElevatedOutcome()).toEqual({ captured: true });
   });
 
@@ -270,7 +281,7 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
-  it('login auto-heal skips the retry when the first elevated failure is navigation_failed (network issue, retry would not help)', async () => {
+  it('login-fix round-2: when the single-session elevated capture reports navigation_failed, login still succeeds, profile is preserved, outcome surfaces the reason', async () => {
     const fs = createFileSystemFake();
     fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
     const browser = fakeBrowserAuth({
@@ -280,9 +291,8 @@ describe('auth manager recovery ladder', () => {
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
-    // Profile was NOT wiped — navigation_failed is not recoverable via wipe.
+    // Round-2: profile is never wiped during login — only `logout` does that.
     expect(fs.has(`${BROWSER_PROFILE_DIR}/Default/Cookies`)).toBe(true);
-    // Outcome reports failure with the specific reason.
     expect(auth.getLastElevatedOutcome()).toEqual({ captured: false, reason: 'navigation_failed' });
   });
 
@@ -306,6 +316,7 @@ describe('auth manager recovery ladder', () => {
     const stringThrower: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {
         throw 'edge crashed during close';
       },
@@ -327,6 +338,7 @@ describe('auth manager recovery ladder', () => {
     const failingBrowser: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {
         throw new Error('close failed');
       },
@@ -492,6 +504,7 @@ describe('auth manager elevated token', () => {
       acquireElevatedToken: async () => {
         throw new Error('playwright not installed');
       },
+      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -526,18 +539,19 @@ describe('auth manager elevated token', () => {
     expect(cached.ok && cached.value.elevated_access_token).toBeUndefined();
   });
 
-  it('login still succeeds even when elevated capture throws (best-effort, error is logged not propagated)', async () => {
+  it('login still succeeds even when single-session elevated capture fails (best-effort, surfaces via getLastElevatedOutcome)', async () => {
     const fs = createFileSystemFake();
-    const throwingElevated: BrowserAuth = {
-      acquireToken: async () => futureToken(),
-      acquireElevatedToken: async () => {
-        throw new Error('headless edge crashed');
-      },
+    const teams = futureToken();
+    const elevatedFailed: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({ teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(throwingElevated, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(elevatedFailed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
+    expect(auth.getLastElevatedOutcome()).toEqual({ captured: false, reason: 'sso_timeout' });
   });
 
   it('refresh falls through to browser when fetch itself throws (covers refreshToken catch block)', async () => {
@@ -640,18 +654,19 @@ describe('auth manager elevated token', () => {
     expect(cached.ok && cached.value.refresh_token).toBe('');
   });
 
-  it('login still succeeds when elevated capture throws a non-Error value (covers String(e) fallback in the login-time catch)', async () => {
+  it('login still succeeds when single-session elevated reports navigation_failed (best-effort)', async () => {
     const fs = createFileSystemFake();
-    const stringThrower: BrowserAuth = {
-      acquireToken: async () => futureToken(),
-      acquireElevatedToken: async () => {
-        throw 'edge crashed via SIGKILL';
-      },
+    const teams = futureToken();
+    const failed: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({ teams, elevated: { ok: false as const, reason: 'navigation_failed' as const } }),
       close: async () => {},
     };
-    const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(failed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
+    expect(auth.getLastElevatedOutcome()).toEqual({ captured: false, reason: 'navigation_failed' });
   });
 
   it('persists elevated_expires_on as 0 when the elevated JWT has no exp claim', async () => {
@@ -679,6 +694,7 @@ describe('auth manager elevated token', () => {
       acquireElevatedToken: async () => {
         throw 'edge process killed by SIGKILL';
       },
+      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -697,13 +713,15 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     let acquireCallCount = 0;
     const resolveLoginRef: { current: ((value: BrowserTokenResult) => void) | null } = { current: null };
     const slowBrowser: BrowserAuth = {
-      acquireToken: async () => {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => {
         acquireCallCount += 1;
-        return new Promise<BrowserTokenResult>((resolve) => {
+        const teams = await new Promise<BrowserTokenResult>((resolve) => {
           resolveLoginRef.current = resolve;
         });
+        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
       },
-      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -725,11 +743,12 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     const fs = createFileSystemFake();
     let acquireCallCount = 0;
     const browser: BrowserAuth = {
-      acquireToken: async () => {
-        acquireCallCount += 1;
-        return futureToken();
-      },
+      acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => {
+        acquireCallCount += 1;
+        return { teams: futureToken(), elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+      },
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -758,6 +777,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
           resolveElevatedRef.current = (v) => resolve({ ok: true, token: v });
         });
       },
+      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
