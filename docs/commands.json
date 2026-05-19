@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-19T01:48:33.524Z",
+  "generatedAt": "2026-05-19T03:55:25.588Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -53,7 +53,7 @@
     },
     {
       "name": "convert-mail-to-markdown",
-      "summary": "Render a single Outlook email as markdown — headers in this order: `**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` (only when present), `**Date:**` — followed by the body run through turndown. Inline images attached with `isInline:true` and an `image/*` content-type are embedded as base64 `data:` URIs so the output is self-contained (Hardening #1: non-image inline attachments are NOT embedded). One Graph round-trip via `?$expand=attachments`.",
+      "summary": "Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. Inline images attached with `isInline:true` and an `image/*` content-type (size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (Hardening #1: non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). File attachments are listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -67,7 +67,7 @@
         }
       ],
       "example": "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text }` — headers + turndown-rendered body with inline images embedded."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded."
     },
     {
       "name": "download-drive-item-as-markdown",

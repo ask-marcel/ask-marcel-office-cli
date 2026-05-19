@@ -1507,7 +1507,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-to-markdown renders a single email with headers + body via turndown', async () => {
+  it('convert-mail-to-markdown renders a single email with headers + body via turndown and skips the attachments-list call entirely when hasAttachments is false (one round-trip)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m1',
@@ -1519,7 +1519,7 @@ describe('commands', () => {
             toRecipients: [{ emailAddress: { address: 'bob@contoso.com' } }],
             receivedDateTime: '2026-04-30T08:00:00Z',
             body: { contentType: 'html', content: '<p>Hi <strong>team</strong>.</p>' },
-            attachments: [],
+            hasAttachments: false,
           }),
       },
     ]);
@@ -1534,20 +1534,37 @@ describe('commands', () => {
       expect(v.text).toContain('**Subject:** Q3');
       expect(v.text).toContain('**From:** Alice <alice@contoso.com>');
       expect(v.text).toContain('Hi **team**.');
+      expect(v.text).not.toContain('**Attachments:**');
     }
   });
 
-  it('convert-mail-to-markdown embeds inline image attachments as data: URIs (Hardening #1)', async () => {
+  it('convert-mail-to-markdown fetches per-attachment bytes lazily for inline image-only — heavy file attachments are listed by name+size and their bytes never round-trip (audit v1.0.0 multi-MB-attachment timeout fix)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m2',
         method: 'GET',
         response: () =>
           Response.json({
-            subject: 'with logo',
+            subject: 'with logo and heavy attachment',
             body: { contentType: 'html', content: '<p>Logo: <img src="cid:logo123" alt="logo"></p>' },
-            attachments: [{ '@odata.type': '#microsoft.graph.fileAttachment', isInline: true, contentId: 'logo123', contentType: 'image/png', contentBytes: 'iVBORw0=' }],
+            hasAttachments: true,
           }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m2/attachments?',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            value: [
+              { id: 'a1', name: 'logo.png', contentType: 'image/png', contentId: 'logo123', isInline: true, size: 256 },
+              { id: 'a2', name: 'report.pdf', contentType: 'application/pdf', isInline: false, size: 4_200_000 },
+            ],
+          }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m2/attachments/a1',
+        method: 'GET',
+        response: () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', contentBytes: 'iVBORw0=' }),
       },
     ]);
     const cmd = cmdMap['convert-mail-to-markdown'];
@@ -1557,22 +1574,28 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
+      // Inline image embedded via the per-attachment bytes fetch.
       expect(v.text).toContain('data:image/png;base64,iVBORw0=');
       expect(v.text).not.toContain('cid:logo123');
+      // Heavy file attachment listed by metadata only — no bytes ever fetched.
+      expect(v.text).toContain('**Attachments:**');
+      expect(v.text).toContain('report.pdf');
+      expect(v.text).toContain('4.2 MB');
+      expect(v.text).toContain('a2');
     }
   });
 
-  it('convert-mail-to-markdown does NOT embed non-image inline attachments (Hardening #1 verified)', async () => {
+  it('convert-mail-to-markdown skips per-attachment bytes-fetch for non-image inline attachments and never embeds their contentBytes (Hardening #1)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m3',
         method: 'GET',
-        response: () =>
-          Response.json({
-            subject: 'sneaky',
-            body: { contentType: 'html', content: '<p>X: <img src="cid:evil"></p>' },
-            attachments: [{ '@odata.type': '#microsoft.graph.fileAttachment', isInline: true, contentId: 'evil', contentType: 'text/html', contentBytes: 'PHNjcmlwdD4=' }],
-          }),
+        response: () => Response.json({ subject: 'sneaky', body: { contentType: 'html', content: '<p>X: <img src="cid:evil"></p>' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m3/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [{ id: 'aEvil', name: 'evil.html', contentType: 'text/html', contentId: 'evil', isInline: true, size: 128 }] }),
       },
     ]);
     const cmd = cmdMap['convert-mail-to-markdown'];
@@ -1587,12 +1610,66 @@ describe('commands', () => {
     }
   });
 
+  it('convert-mail-to-markdown skips per-attachment bytes-fetch for inline images larger than the 2 MB guard and emits a placeholder in the markdown', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mHuge',
+        method: 'GET',
+        response: () => Response.json({ subject: 'huge inline', body: { contentType: 'html', content: '<p>X: <img src="cid:huge"></p>' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mHuge/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [{ id: 'aHuge', name: 'huge.png', contentType: 'image/png', contentId: 'huge', isInline: true, size: 5_200_000 }] }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mHuge' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('inline image too large to embed');
+      expect(v.text).toContain('huge.png');
+      expect(v.text).toContain('5.2 MB');
+      expect(v.text).not.toContain('data:image/png');
+    }
+  });
+
+  it('convert-mail-to-markdown returns the markdown body with a note when the attachments-list fetch fails — the body in hand is still useful, the partial-success preserves it (failure isolation)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mPartial',
+        method: 'GET',
+        response: () => Response.json({ subject: 'partial', body: { contentType: 'html', content: '<p>Body here.</p>' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mPartial/attachments?',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'ServiceUnavailable', message: 'partial' } }), { status: 503, headers: { 'content-type': 'application/json' } }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mPartial' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string; note?: string };
+      expect(v.text).toContain('Body here.');
+      expect(v.note).toBeDefined();
+      expect(v.note ?? '').toContain('attachment');
+    }
+  });
+
   it('convert-mail-to-markdown handles plain-text bodies (no turndown round-trip)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m4',
         method: 'GET',
-        response: () => Response.json({ subject: 'plain', body: { contentType: 'text', content: 'Hello\nworld' }, attachments: [] }),
+        response: () => Response.json({ subject: 'plain', body: { contentType: 'text', content: 'Hello\nworld' }, hasAttachments: false }),
       },
     ]);
     const cmd = cmdMap['convert-mail-to-markdown'];
@@ -1603,6 +1680,390 @@ describe('commands', () => {
     if (result.ok) {
       const v = result.value as { text: string };
       expect(v.text).toContain('Hello');
+    }
+  });
+
+  it('convert-mail-to-markdown embeds a 2 MB inline image at the exact boundary (size === 2_000_000) — the size guard rejects only sizes STRICTLY greater than 2 MB, not equal', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mBoundary',
+        method: 'GET',
+        response: () => Response.json({ subject: 'boundary', body: { contentType: 'html', content: '<p>I: <img src="cid:edge"></p>' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mBoundary/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [{ id: 'aEdge', name: 'edge.png', contentType: 'image/png', contentId: 'edge', isInline: true, size: 2_000_000 }] }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mBoundary/attachments/aEdge',
+        method: 'GET',
+        response: () => Response.json({ contentBytes: 'AAAA' }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mBoundary' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('data:image/png;base64,AAAA');
+      expect(v.text).not.toContain('inline image too large to embed');
+    }
+  });
+
+  it('convert-mail-to-markdown fetches multiple inline images in parallel and leaves the cid: ref in place when an individual per-attachment fetch fails (failure isolation per-image)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            subject: 'multi',
+            body: { contentType: 'html', content: '<p>A:<img src="cid:a"> B:<img src="cid:b"> C:<img src="cid:c"></p>' },
+            hasAttachments: true,
+          }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti/attachments?',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            value: [
+              { id: 'a1', name: 'a.png', contentType: 'image/png', contentId: 'a', isInline: true, size: 256 },
+              { id: 'a2', name: 'b.jpg', contentType: 'image/jpeg', contentId: 'b', isInline: true, size: 256 },
+              { id: 'a3', name: 'c.png', contentType: 'image/png', contentId: 'c', isInline: true, size: 256 },
+            ],
+          }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti/attachments/a1',
+        method: 'GET',
+        response: () => Response.json({ contentBytes: 'BBBB' }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti/attachments/a2',
+        method: 'GET',
+        response: () => new Response(JSON.stringify({ error: { code: 'NotFound', message: 'lost' } }), { status: 404, headers: { 'content-type': 'application/json' } }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti/attachments/a3',
+        method: 'GET',
+        response: () => Response.json({ contentBytes: '' }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mMulti' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('data:image/png;base64,BBBB');
+      expect(v.text).toContain('cid:b');
+      expect(v.text).toContain('cid:c');
+    }
+  });
+
+  it('convert-mail-to-markdown isInlineImage predicate rejects: non-image contentType (application/pdf), missing contentId, empty contentId, isInline:false with image contentType, isInline:undefined — all five fall through to the file-list path instead of being embed candidates', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mPred',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            subject: 'predicate',
+            body: { contentType: 'html', content: '<p>X: <img src="cid:r1"><img src="cid:r2"><img src="cid:r4"><img src="cid:r5"></p>' },
+            hasAttachments: true,
+          }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mPred/attachments?',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            value: [
+              { id: 'r1', name: 'r1.pdf', contentType: 'application/pdf', contentId: 'r1', isInline: true, size: 100 },
+              { id: 'r2', name: 'r2.png', contentType: 'image/png', isInline: true, size: 100 },
+              { id: 'r3', name: 'r3.png', contentType: 'image/png', contentId: '', isInline: true, size: 100 },
+              { id: 'r4', name: 'r4.png', contentType: 'image/png', contentId: 'r4', isInline: false, size: 100 },
+              { id: 'r5', name: 'r5.png', contentType: 'image/png', contentId: 'r5', size: 100 },
+            ],
+          }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mPred' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      // No per-attachment bytes were fetched (no third-stage handler in fixture and the test would throw otherwise).
+      expect(v.text).not.toContain('data:image/png');
+      expect(v.text).not.toContain('data:application/pdf');
+      // All five fall into the file-list because none qualify as inline image.
+      expect(v.text).toContain('r1.pdf');
+      expect(v.text).toContain('r2.png');
+      expect(v.text).toContain('r3.png');
+      expect(v.text).toContain('r4.png');
+      expect(v.text).toContain('r5.png');
+    }
+  });
+
+  it('convert-mail-to-markdown header lines: Subject-only when To/Cc/Date absent; To+Cc rendered comma-joined when multiple recipients; Cc-only when To absent; receivedDateTime omitted when empty string', async () => {
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+
+    // Scenario 1: Subject only, no recipients, empty receivedDateTime string.
+    const r1 = await cmd.execute(
+      createGraphClient(
+        fakeAuth(),
+        stagedFetch([
+          {
+            urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mHA',
+            method: 'GET',
+            response: () => Response.json({ subject: 'lonely', body: { contentType: 'text', content: 'b' }, receivedDateTime: '', hasAttachments: false }),
+          },
+        ])
+      ),
+      { messageId: 'mHA' }
+    );
+    expect(r1.ok).toBe(true);
+    if (r1.ok) {
+      const v = r1.value as { text: string };
+      expect(v.text).toContain('**Subject:** lonely');
+      expect(v.text).not.toContain('**To:**');
+      expect(v.text).not.toContain('**Cc:**');
+      expect(v.text).not.toContain('**Date:**');
+    }
+
+    // Scenario 2: multiple To recipients + Cc (kills the comma-join separator mutant + the recipients-count > 0 boundary).
+    const r2 = await cmd.execute(
+      createGraphClient(
+        fakeAuth(),
+        stagedFetch([
+          {
+            urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mHB',
+            method: 'GET',
+            response: () =>
+              Response.json({
+                subject: 'broad',
+                toRecipients: [{ emailAddress: { address: 'a@x.com', name: 'Alice' } }, { emailAddress: { address: 'b@x.com' } }, { emailAddress: {} }],
+                ccRecipients: [{ emailAddress: { address: 'c@x.com', name: 'Cc1' } }],
+                body: { contentType: 'text', content: 'b' },
+                hasAttachments: false,
+              }),
+          },
+        ])
+      ),
+      { messageId: 'mHB' }
+    );
+    expect(r2.ok).toBe(true);
+    if (r2.ok) {
+      const v = r2.value as { text: string };
+      expect(v.text).toContain('**To:** Alice <a@x.com>, b@x.com');
+      expect(v.text).toContain('**Cc:** Cc1 <c@x.com>');
+    }
+
+    // Scenario 3: empty toRecipients array yields no `**To:**` line (kills the length > 0 → length >= 0 mutant).
+    const r3 = await cmd.execute(
+      createGraphClient(
+        fakeAuth(),
+        stagedFetch([
+          {
+            urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mHC',
+            method: 'GET',
+            response: () => Response.json({ subject: 's', toRecipients: [], body: { contentType: 'text', content: 'b' }, hasAttachments: false }),
+          },
+        ])
+      ),
+      { messageId: 'mHC' }
+    );
+    expect(r3.ok).toBe(true);
+    if (r3.ok) {
+      const v = r3.value as { text: string };
+      expect(v.text).not.toContain('**To:**');
+    }
+  });
+
+  it('convert-mail-to-markdown surfaces the message-level fetch failure unchanged (no body in hand — propagate the GraphError directly to the caller)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mGone',
+        method: 'GET',
+        response: () => new Response(JSON.stringify({ error: { code: 'ErrorItemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mGone' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(404);
+      expect(result.error.message).toContain('gone');
+    }
+  });
+
+  it('convert-mail-to-markdown header line for **Date:** is rendered when receivedDateTime is a non-empty ISO string', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mDate',
+        method: 'GET',
+        response: () => Response.json({ subject: 'd', receivedDateTime: '2026-04-30T08:00:00Z', body: { contentType: 'text', content: 'b' }, hasAttachments: false }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mDate' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('**Date:** 2026-04-30T08:00:00Z');
+    }
+  });
+
+  it('convert-mail-to-markdown formatRecipients returns undefined when toRecipients is non-empty but every entry filters out (no `**To:**` line)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mEmptyTo',
+        method: 'GET',
+        response: () =>
+          Response.json({ subject: 's', toRecipients: [{ emailAddress: {} }, { emailAddress: {} }], body: { contentType: 'text', content: 'b' }, hasAttachments: false }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mEmptyTo' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).not.toContain('**To:**');
+    }
+  });
+
+  it('convert-mail-to-markdown skips the per-attachment bytes-fetch when an inline image lacks an id field (Graph metadata anomaly: contentId present but id missing) — cid ref stays in place, no Graph call is made for it', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mNoId',
+        method: 'GET',
+        response: () => Response.json({ subject: 'no-id', body: { contentType: 'html', content: '<p>X: <img src="cid:lost"></p>' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mNoId/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [{ name: 'lost.png', contentType: 'image/png', contentId: 'lost', isInline: true, size: 200 }] }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mNoId' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('cid:lost');
+      expect(v.text).not.toContain('data:image/png');
+    }
+  });
+
+  it('convert-mail-to-markdown with hasAttachments:true but an empty attachments-list array — body is rendered without an `**Attachments:**` section, separated from headers by exactly one blank line', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mEmpty',
+        method: 'GET',
+        response: () => Response.json({ subject: 'empty-list', body: { contentType: 'text', content: 'just-body' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mEmpty/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [] }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mEmpty' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).not.toContain('**Attachments:**');
+      expect(v.text).toContain('**Subject:** empty-list\n\njust-body');
+    }
+  });
+
+  it('convert-mail-to-markdown places the file-attachments list AFTER the body (rendering order is preserved) and prefixes the list with **Attachments:** then closes with the use-`convert-mail-attachment-to-pdf` hint', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mOrder',
+        method: 'GET',
+        response: () => Response.json({ subject: 'order', body: { contentType: 'text', content: 'body-content-marker' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mOrder/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: [{ id: 'a1', name: 'first.pdf', contentType: 'application/pdf', size: 1000, isInline: false }] }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mOrder' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      const bodyIdx = v.text.indexOf('body-content-marker');
+      const attachIdx = v.text.indexOf('**Attachments:**');
+      expect(bodyIdx).toBeGreaterThanOrEqual(0);
+      expect(attachIdx).toBeGreaterThan(bodyIdx);
+      expect(v.text).toContain('_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._');
+      expect(v.text).toContain('first.pdf');
+      expect(v.text).toContain('1.0 KB');
+    }
+  });
+
+  it('convert-mail-to-markdown renders the attachments-list with size + contentType + id when present and omits each field when the metadata is missing — and filters out attachments lacking a name', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mList',
+        method: 'GET',
+        response: () => Response.json({ subject: 'list-shape', body: { contentType: 'text', content: 'body' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mList/attachments?',
+        method: 'GET',
+        response: () =>
+          Response.json({
+            value: [
+              { id: 'aFull', name: 'full.docx', contentType: 'application/vnd.openxmlformats', size: 50_000, isInline: false },
+              { id: 'aNoSize', name: 'no-size.pdf', contentType: 'application/pdf', isInline: false },
+              { name: 'no-id.txt', contentType: 'text/plain', size: 500, isInline: false },
+              { id: 'aNoType', name: 'no-type.bin', size: 999, isInline: false },
+              { id: 'aNoName', contentType: 'application/octet-stream', size: 100, isInline: false },
+            ],
+          }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mList' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('full.docx');
+      expect(v.text).toContain('50.0 KB');
+      expect(v.text).toContain('application/vnd.openxmlformats');
+      expect(v.text).toContain('id: aFull');
+      expect(v.text).toContain('no-size.pdf');
+      expect(v.text).toContain('no-id.txt');
+      expect(v.text).toContain('500 B');
+      expect(v.text).toContain('no-type.bin');
+      expect(v.text).not.toContain('aNoName');
     }
   });
 
@@ -2556,7 +3017,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-mailbox-settings', params: {}, expectedPath: '/me/mailboxSettings' },
   { name: 'search-mail-messages', params: { query: 'invoice' }, expectedPath: '/me/messages?$search="invoice"' },
   { name: 'extract-sharepoint-links-in-mail', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1?$select=subject,body' },
-  { name: 'convert-mail-to-markdown', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1?$expand=attachments' },
+  { name: 'convert-mail-to-markdown', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
   { name: 'list-onenote-notebooks', params: {}, expectedPath: '/me/onenote/notebooks' },
   { name: 'list-onenote-notebook-sections', params: { notebookId: 'n1' }, expectedPath: '/me/onenote/notebooks/n1/sections' },
   { name: 'list-all-onenote-sections', params: {}, expectedPath: '/me/onenote/sections' },
