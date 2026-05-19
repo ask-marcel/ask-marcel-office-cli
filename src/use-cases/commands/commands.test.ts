@@ -966,7 +966,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText/content',
         method: 'GET',
-        response: () => new Response(new TextEncoder().encode('# hi') as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+        response: () => new Response(new TextEncoder().encode('# hi'), { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
       },
     ]);
     const cmd = cmdMap['download-onedrive-file-content'];
@@ -992,8 +992,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://contoso.sharepoint.com/cdn/v3.bin',
         method: 'GET',
-        response: () =>
-          new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-version-content'];
@@ -1019,7 +1018,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://contoso.sharepoint.com/cdn/q3.pdf',
         method: 'GET',
-        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-as-pdf'];
@@ -1127,7 +1126,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://contoso.sharepoint.com/cdn/v3.pdf',
         method: 'GET',
-        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-version-as-pdf'];
@@ -1215,7 +1214,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://contoso.sharepoint.com/cdn/report.pdf',
         method: 'GET',
-        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-as-pdf'];
@@ -1241,7 +1240,7 @@ describe('commands', () => {
       {
         urlPrefix: 'https://contoso.sharepoint.com/cdn/v2.pdf',
         method: 'GET',
-        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
+        response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
     const cmd = cmdMap['download-drive-item-version-as-pdf'];
@@ -2243,7 +2242,7 @@ describe('commands', () => {
         return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/plan.pdf' });
       }
       if (url === 'https://contoso.sharepoint.com/cdn/plan.pdf') {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') {
         return new Response(null, { status: 204 });
@@ -2321,7 +2320,7 @@ describe('commands', () => {
         return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/report.pdf' });
       }
       if (url === 'https://contoso.sharepoint.com/cdn/report.pdf') {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       if (url.includes('format=pdf')) {
         formatPdfCalled = true;
@@ -2354,7 +2353,7 @@ describe('commands', () => {
         return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/q3.pdf' });
       }
       if (url === 'https://contoso.sharepoint.com/cdn/q3.pdf') {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
       }
       throw new Error(`unexpected fetch ${url}`);
     };
@@ -3376,12 +3375,12 @@ describe('no-skip endpoints do not advertise --skip', () => {
 // Regression guard: the CLI must advertise ONLY the working flags.
 describe('chats endpoints advertise only the OData flags Graph honours', () => {
   it('list-chat-members.meta.options exposes skip/select/filter but NOT top/orderby/expand', () => {
-    const names = listChatMembers.meta.options.map((o) => o.name).toSorted();
+    const names = listChatMembers.meta.options.map((o) => o.name).toSorted((a, b) => a.localeCompare(b));
     expect(names).toEqual(['chat-id', 'filter', 'select', 'skip']);
   });
 
   it('list-chats.meta.options exposes top/skip/select/filter but NOT orderby/expand', () => {
-    const names = listChats.meta.options.map((o) => o.name).toSorted();
+    const names = listChats.meta.options.map((o) => o.name).toSorted((a, b) => a.localeCompare(b));
     expect(names).toEqual(['filter', 'select', 'skip', 'top']);
   });
 

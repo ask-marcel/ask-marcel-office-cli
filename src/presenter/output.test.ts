@@ -64,7 +64,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     const logger = createLoggerFake();
     const out = await captureStream('stdout', () => render({ id: 'me' }, logger, 'json'));
     const parsed = JSON.parse(out.trim()) as Record<string, unknown>;
-    expect(Object.keys(parsed).toSorted()).toEqual(['data', 'ok']);
+    expect(Object.keys(parsed).toSorted((a, b) => a.localeCompare(b))).toEqual(['data', 'ok']);
   });
 
   it('wraps a non-object data value (string / number / null) in { ok: true, data } unchanged', async () => {

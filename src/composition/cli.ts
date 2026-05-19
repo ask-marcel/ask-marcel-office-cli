@@ -58,7 +58,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
     // Audit v1.0.0 §B10: humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
     const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
-    if (enoent !== null && enoent[1] !== undefined) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
+    if (enoent !== null) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
     return `--output-path: write failed: ${error.message}`;
   };
 
@@ -138,7 +138,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // `preAction` of every subcommand would be wrong (it never fires for the
   // bare case); instead we override `parseAsync` itself.
   const originalParseAsync = program.parseAsync.bind(program);
-  program.parseAsync = (async (argv?: readonly string[], options?: { readonly from?: 'node' | 'electron' | 'user' }) => {
+  program.parseAsync = async (argv?: readonly string[], options?: { readonly from?: 'node' | 'electron' | 'user' }) => {
     const args = argv ?? process.argv;
     const from = options?.from ?? 'node';
     const userArgsStart = from === 'node' || from === 'electron' ? 2 : 0;
@@ -146,9 +146,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
       program.outputHelp();
       return program;
     }
-    const fixedOptions = options === undefined ? undefined : ({ from } as { from: 'node' | 'electron' | 'user' });
-    return originalParseAsync(args as string[], fixedOptions);
-  }) as typeof program.parseAsync;
+    const fixedOptions = options === undefined ? undefined : { from };
+    return originalParseAsync(args, fixedOptions);
+  };
 
   // Override Commander's built-in `help <command>` (which silently exits 1 on
   // unknown subcommands — audit v1.0.0 §1.2). Disable the built-in first, then
@@ -355,7 +355,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         for (const opt of cmd.meta.options) {
           for (const alias of opt.aliases ?? []) {
             const aliasValue = opts[alias.key];
-            if (typeof aliasValue === 'string' && opts[opt.key] === undefined) {
+            if (typeof aliasValue === 'string' && !Object.hasOwn(opts, opt.key)) {
               normalized[opt.key] = aliasValue;
               aliasUsedFor[opt.name] = alias.name;
             }

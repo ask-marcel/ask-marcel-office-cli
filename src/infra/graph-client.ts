@@ -167,7 +167,7 @@ const SCOPE_DUMP_PATTERN = /^(.*Missing scope permissions[^.]*\.\s*API requires 
 
 const truncateScopeDump = (message: string): string => {
   const match = SCOPE_DUMP_PATTERN.exec(message);
-  if (match === null || match[1] === undefined) return message;
+  if (match === null) return message;
   return `${match[1]} Run \`ask-marcel scopes-check\` to see granted scopes, or \`ask-marcel help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
 };
 

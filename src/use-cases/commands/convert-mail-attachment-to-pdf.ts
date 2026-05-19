@@ -122,9 +122,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(graph, a as { name?: string; contentBytes?: string });
+      return convertFileAttachment(graph, a);
     case '#microsoft.graph.referenceAttachment':
-      return convertReferenceAttachment(graph, a as { sourceUrl?: string });
+      return convertReferenceAttachment(graph, a);
     case '#microsoft.graph.itemAttachment':
       return err({
         type: 'api_error',

@@ -9,9 +9,8 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
   const graph: GraphClient = {
     get: async (path: string) => {
       calls.push(path);
-      const resp = responses[path];
-      if (resp === undefined) throw new Error(`unexpected get(${path})`);
-      return resp;
+      if (!Object.hasOwn(responses, path)) throw new Error(`unexpected get(${path})`);
+      return responses[path];
     },
     post: async () => ok({}),
     getBinary: async () => ok({}),
@@ -46,7 +45,7 @@ describe('my-quick-context', () => {
 
     await execute(graph, {});
 
-    expect(calls.toSorted()).toEqual([
+    expect(calls.toSorted((a, b) => a.localeCompare(b))).toEqual([
       '/me',
       '/me/calendar',
       '/me/drive',

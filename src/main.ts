@@ -24,7 +24,7 @@ const main = async (): Promise<void> => {
 };
 
 const isCommanderError = (e: unknown): boolean =>
-  e !== null && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string' && (e as { code: string }).code.startsWith('commander.');
+  e !== null && typeof e === 'object' && 'code' in e && typeof e.code === 'string' && (e as { code: string }).code.startsWith('commander.');
 
 try {
   await main();

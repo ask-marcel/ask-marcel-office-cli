@@ -150,7 +150,7 @@ const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataK
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data as Partial<ODataQueryParams>);
+    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data);
     return graph.get(path);
   };
   return { schema: merged, execute };
@@ -171,7 +171,7 @@ const buildElevatedPickODataListCommand = <Shape extends z.ZodRawShape, K extend
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data as Partial<ODataQueryParams>);
+    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data);
     return graph.getElevated(path);
   };
   return { schema: merged, execute };

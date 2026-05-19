@@ -21,20 +21,19 @@ const execute: Command['execute'] = async (graph, params) => {
   const calls = ALL_ENTITY_TYPES.map((entityType) => graph.post('/search/query', { requests: [{ entityTypes: [entityType], query: { queryString }, size: PAGE_SIZE }] }));
   const results = await Promise.all(calls);
 
+  // `results` and `ALL_ENTITY_TYPES` have identical length by construction
+  // (Promise.all of a map over ALL_ENTITY_TYPES), so positional pairing is safe.
   const merged: SearchHitsContainer[] = [];
   const partialErrors: { readonly entityType: EntityType; readonly error: GraphError }[] = [];
-  for (let i = 0; i < results.length; i += 1) {
+  ALL_ENTITY_TYPES.forEach((entityType, i) => {
     const r = results[i];
-    const entityType = ALL_ENTITY_TYPES[i];
-    if (entityType === undefined) continue;
-    if (r === undefined) continue;
     if (r.ok) {
       const innerValue = (r.value as SearchResponse).value;
       if (Array.isArray(innerValue)) merged.push(...innerValue);
     } else {
       partialErrors.push({ entityType, error: r.error });
     }
-  }
+  });
 
   if (merged.length === 0 && partialErrors.length > 0) return err(partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all entity-type sub-requests failed' });
 

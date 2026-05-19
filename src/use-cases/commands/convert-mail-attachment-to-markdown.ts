@@ -140,11 +140,11 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(a as { name?: string; contentBytes?: string });
+      return convertFileAttachment(a);
     case '#microsoft.graph.referenceAttachment':
-      return convertReferenceAttachment(graph, a as { sourceUrl?: string });
+      return convertReferenceAttachment(graph, a);
     case '#microsoft.graph.itemAttachment':
-      return convertItemAttachment(a as { item?: Record<string, unknown> });
+      return convertItemAttachment(a);
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }

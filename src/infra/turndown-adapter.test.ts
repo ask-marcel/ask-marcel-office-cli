@@ -80,7 +80,7 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
       callCount += 1;
       if (callCount === 1) throw new TypeError("Cannot read properties of undefined (reading 'parentNode')");
       return original.call(this, input);
-    } as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>Hello <b>world</b>.</p>');
       expect(result.ok).toBe(true);
@@ -99,9 +99,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('falls back to stripped-text body (with a markdown note prefix) when BOTH turndown passes throw, so the LLM still gets readable content (tier 3)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError("Cannot read properties of undefined (reading 'parentNode')");
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>Hello <b>world</b>.</p><script>alert(1)</script>');
       expect(result.ok).toBe(true);
@@ -119,9 +119,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('decodes basic HTML entities in the stripped-text fallback path', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>tom &amp; jerry &lt;3 &nbsp;always</p>');
       expect(result.ok).toBe(true);
@@ -134,9 +134,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('emits only the failure note when the input HTML is empty (so callers do not get a blank fallback string)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('');
       expect(result.ok).toBe(true);
@@ -152,9 +152,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('inserts a newline at <br>, <br/>, and </p> in the stripped-text fallback', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>line1</p><p>line2</p>line3<br>line4<br/>line5');
       expect(result.ok).toBe(true);
@@ -175,9 +175,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('strips HTML comments from the stripped-text fallback (both well-formed and unclosed)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const wellFormed = htmlToMarkdown('<p>before<!-- secret -->after</p>');
       const unclosed = htmlToMarkdown('<p>visible<!-- never closed');
@@ -200,9 +200,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('drops unclosed <script> bodies in the stripped-text fallback (no closing </script> in the input)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>kept</p><script>alert(1)');
       expect(result.ok).toBe(true);
@@ -218,9 +218,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('handles HTML whose final fragment has no `<` (the no-more-tags branch)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>start</p>just trailing text with no more tags');
       expect(result.ok).toBe(true);
@@ -236,9 +236,9 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
   it('stops cleanly when an HTML tag is unclosed (no `>` found after the `<`)', () => {
     const proto = (TurndownService as unknown as { prototype: { turndown: (input: string) => string } }).prototype;
     const original = proto.turndown;
-    proto.turndown = (() => {
+    proto.turndown = () => {
       throw new TypeError('boom');
-    }) as typeof original;
+    };
     try {
       const result = htmlToMarkdown('<p>before</p><span class="never-closed');
       expect(result.ok).toBe(true);

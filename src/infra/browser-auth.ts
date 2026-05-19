@@ -393,15 +393,20 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * Race a promise against a hard-deadline reject. Used to wrap
    * Playwright's `launchPersistentContext` and `newPage` which can
    * hang indefinitely on profile corruption / filesystem locks.
-   * The shared sentinel error is detected by reference so the outer
-   * handler can attribute the failure to `launch_timeout` specifically
-   * (rather than the generic catch-all).
+   * The shared sentinel error is detected by its marker message so the
+   * outer handler can attribute the failure to `launch_timeout`
+   * specifically (rather than the generic catch-all). Using a plain
+   * Error with a literal-string message rather than a Symbol because
+   * `@typescript-eslint/prefer-promise-reject-errors` (strict-lint)
+   * requires rejection reasons to be Errors, and atelier rule 10
+   * forbids custom Error subclasses.
    */
-  const ELEVATED_LAUNCH_TIMEOUT = Symbol('elevated_launch_timeout');
+  const ELEVATED_LAUNCH_TIMEOUT_MESSAGE = 'ask-marcel:elevated_launch_timeout';
+  const isLaunchTimeout = (e: unknown): boolean => e instanceof Error && e.message === ELEVATED_LAUNCH_TIMEOUT_MESSAGE;
   const withLaunchTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<T>((_, reject) => {
-      timer = setTimeout(() => reject(ELEVATED_LAUNCH_TIMEOUT), ms);
+      timer = setTimeout(() => reject(new Error(ELEVATED_LAUNCH_TIMEOUT_MESSAGE)), ms);
     });
     try {
       return await Promise.race([p, timeout]);
@@ -430,7 +435,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     try {
       elevatedCtx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
     } catch (e) {
-      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+      if (isLaunchTimeout(e)) {
         trace(`[DEBUG] elevated capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
         logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs });
         return { ok: false, reason: 'launch_timeout' };
@@ -445,7 +450,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       } catch {
         // ignore
       }
-      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+      if (isLaunchTimeout(e)) {
         trace(`[DEBUG] elevated capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
         logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
         return { ok: false, reason: 'launch_timeout' };
@@ -459,8 +464,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
       const claims = decodeJwtPayload(raw);
-      const appid = typeof claims['appid'] === 'string' ? (claims['appid'] as string) : undefined;
-      const aud = typeof claims['aud'] === 'string' ? (claims['aud'] as string) : undefined;
+      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
+      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
       if (!appid || !aud) return;
       if (!ELEVATED_APP_IDS.includes(appid)) return;
       if (aud !== 'https://graph.microsoft.com') return;
@@ -555,7 +560,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     try {
       elevatedCtx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
     } catch (e) {
-      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+      if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: launch timed out after ${elevatedLaunchTimeoutMs}ms\n`);
         return { teams: null, elevated: { ok: false, reason: 'launch_timeout' } };
       }
@@ -569,7 +574,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       } catch {
         // ignore
       }
-      if (e === ELEVATED_LAUNCH_TIMEOUT) {
+      if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
         return { teams: null, elevated: { ok: false, reason: 'launch_timeout' } };
       }
@@ -616,8 +621,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
       const claims = decodeJwtPayload(raw);
-      const appid = typeof claims['appid'] === 'string' ? (claims['appid'] as string) : undefined;
-      const aud = typeof claims['aud'] === 'string' ? (claims['aud'] as string) : undefined;
+      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
+      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
       if (!appid || !aud) return;
       if (!ELEVATED_APP_IDS.includes(appid)) return;
       if (aud !== 'https://graph.microsoft.com') return;

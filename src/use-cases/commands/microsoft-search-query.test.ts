@@ -49,7 +49,7 @@ describe('microsoft-search-query', () => {
     await execute(graph, { query: 'marcel' });
 
     expect(captured).toHaveLength(6);
-    expect(captured.map((r) => r.entityTypes[0]).toSorted()).toEqual(['driveItem', 'event', 'listItem', 'message', 'person', 'site']);
+    expect(captured.map((r) => r.entityTypes[0]).toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual(['driveItem', 'event', 'listItem', 'message', 'person', 'site']);
     for (const r of captured) {
       expect(r.query.queryString).toBe('marcel');
       expect(r.size).toBe(25);

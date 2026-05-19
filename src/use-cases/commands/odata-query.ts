@@ -28,7 +28,7 @@ const boundedPositiveIntegerSchema = (label: string, max: number): z.ZodString =
         message: `must be ≤ ${max} (Graph silently caps ${label} at ${max} on every collection endpoint; pass a smaller value or paginate via next-page)`,
       });
     }
-  }) as unknown as z.ZodString;
+  });
 
 const nonNegativeIntegerSchema = (label: string): z.ZodString =>
   z.string().superRefine((value, ctx) => {
@@ -37,7 +37,7 @@ const nonNegativeIntegerSchema = (label: string): z.ZodString =>
       ? `must be a non-negative integer (Graph rejects ${label}=negatives)`
       : `must be a non-negative integer (got "${value}", which is not a number)`;
     ctx.addIssue({ code: 'custom', message: reason });
-  }) as unknown as z.ZodString;
+  });
 
 const odataQuerySchema = z.object({
   top: boundedPositiveIntegerSchema('top', TOP_HARD_CAP).optional(),

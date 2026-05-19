@@ -187,7 +187,7 @@ describe('graph client', () => {
   it('passes an AbortSignal.timeout signal to fetch (verifies the timeout is wired in)', async () => {
     let capturedSignal: AbortSignal | null | undefined = null;
     const captureFetch: FetchFn = async (_url, init) => {
-      capturedSignal = init?.signal as AbortSignal | undefined;
+      capturedSignal = init?.signal;
       return Response.json({ ok: true });
     };
     const client = createGraphClient(fakeAuth(), captureFetch);
@@ -266,7 +266,7 @@ describe('graph client', () => {
   });
 
   it('fetchUrl rejects unparseable URL strings as a clear network_error', async () => {
-    const client = createGraphClient(fakeAuth(), (async () => new Response()) as FetchFn);
+    const client = createGraphClient(fakeAuth(), async () => new Response());
     const result = await client.fetchUrl('not-a-url');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {

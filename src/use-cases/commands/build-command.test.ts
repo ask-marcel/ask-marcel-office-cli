@@ -139,7 +139,7 @@ describe('buildListCommand', () => {
   it('exposes the merged schema (user fields + OData fragment) on the returned command', () => {
     const cmd = buildListCommand((p) => `/sites/${p.siteId}`, z.object({ siteId: z.string() }));
     const shape = (cmd.schema as unknown as { shape: Record<string, unknown> }).shape;
-    expect(Object.keys(shape).toSorted()).toEqual(['expand', 'filter', 'orderby', 'select', 'siteId', 'skip', 'top']);
+    expect(Object.keys(shape).toSorted((a, b) => a.localeCompare(b))).toEqual(['expand', 'filter', 'orderby', 'select', 'siteId', 'skip', 'top']);
   });
 });
 
@@ -191,6 +191,6 @@ describe('buildElevatedPickODataListCommand', () => {
   it('exposes only the picked OData fragment plus the user schema on the merged schema', () => {
     const cmd = buildElevatedPickODataListCommand((p) => `/chats/${p.chatId}/members`, z.object({ chatId: z.string() }), ['skip', 'select', 'filter']);
     const shape = (cmd.schema as unknown as { shape: Record<string, unknown> }).shape;
-    expect(Object.keys(shape).toSorted()).toEqual(['chatId', 'filter', 'select', 'skip']);
+    expect(Object.keys(shape).toSorted((a, b) => a.localeCompare(b))).toEqual(['chatId', 'filter', 'select', 'skip']);
   });
 });

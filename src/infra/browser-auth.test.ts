@@ -49,7 +49,7 @@ const makeFakePage = (opts: FakePageOpts): { page: PageLike; state: FakePageStat
 
   const page: PageLike = {
     on: (event, handler) => {
-      if (event === 'response') responseHandlers.push(handler as (r: ResponseLike) => void);
+      if (event === 'response') responseHandlers.push(handler);
       else if (event === 'request') requestHandlers.push(handler as (r: RequestLike) => void);
     },
     goto: async (url) => {
