@@ -20,6 +20,12 @@ const fakeFetch = (responses: Array<{ match: (url: string) => boolean; body: unk
   };
 };
 
+const timeoutFetch: FetchFn = async () => {
+  const e = new Error('signal timed out');
+  e.name = 'TimeoutError';
+  throw e;
+};
+
 describe('graph client', () => {
   it('makes authenticated GET requests to the Graph API', async () => {
     const fetchFn = fakeFetch([{ match: (url) => url === 'https://graph.microsoft.com/v1.0/me/drives', body: { value: [{ id: 'drive-1', name: 'OneDrive' }] } }]);
@@ -132,17 +138,35 @@ describe('graph client', () => {
     }
   });
 
-  it('maps a TimeoutError thrown by AbortSignal.timeout to "request timed out after 60s"', async () => {
-    const timeoutFetch: FetchFn = async () => {
-      const e = new Error('signal timed out');
-      e.name = 'TimeoutError';
-      throw e;
-    };
+  it('maps a TimeoutError thrown by AbortSignal.timeout to "request timed out after 60s" on Graph JSON GETs (the short-tier budget)', async () => {
     const client = createGraphClient(fakeAuth(), timeoutFetch);
     const result = await client.get('/me');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'network_error') {
       expect(result.error.message).toContain('request timed out after 60s');
+    }
+  });
+
+  // Audit v1.0.0 — SharePoint PDF download timeout fix. CDN body transfers
+  // for multi-MB files take longer than the JSON-tier 60s budget, so
+  // fetchUrl / simplePut / chunkedPut sit on a separate 5-minute tier. The
+  // network-error message reflects which tier fired so a caller knows
+  // which scale of failure they hit.
+  it('maps a TimeoutError on fetchUrl (CDN body transfer) to "request timed out after 5min" — the long-tier budget for binary transfers', async () => {
+    const client = createGraphClient(fakeAuth(), timeoutFetch);
+    const result = await client.fetchUrl('https://contoso.sharepoint.com/sites/x/big.pdf');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'network_error') {
+      expect(result.error.message).toContain('request timed out after 5min');
+    }
+  });
+
+  it('maps a TimeoutError on the simple PUT path (≤4 MiB upload) to "request timed out after 5min" — the long-tier budget applies symmetrically to uploads', async () => {
+    const client = createGraphClient(fakeAuth(), timeoutFetch);
+    const result = await client.put('/me/drive/root:/.ask-marcel-temp/foo.bin', new Uint8Array(16));
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'network_error') {
+      expect(result.error.message).toContain('request timed out after 5min');
     }
   });
 

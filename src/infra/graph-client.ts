@@ -82,7 +82,18 @@ const isAllowedFetchUrlHost = (host: string): boolean => ALLOWED_FETCH_URL_HOSTS
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
+// Two-tier timeout. JSON Graph calls return in seconds — 60s is the right
+// budget to catch genuine hangs. Binary CDN body transfers and large
+// chunked uploads scale with file size × network speed; on a slow corporate
+// uplink a 50 MB SharePoint PDF can take several minutes to stream and
+// 60s aborts the body read mid-transfer. The two-tier split gives the
+// JSON tier fast-failure characteristics and the binary tier enough
+// wall-clock to actually move bytes (audit v1.0.0 — SharePoint PDF
+// download timeout fix).
 const REQUEST_TIMEOUT_MS = 60_000;
+const BINARY_TRANSFER_TIMEOUT_MS = 5 * 60_000; // 5 min
+const REQUEST_TIMEOUT_LABEL = '60s';
+const BINARY_TRANSFER_TIMEOUT_LABEL = '5min';
 const SIMPLE_PUT_THRESHOLD = 4 * 1024 * 1024; // 4 MiB
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320 KiB; 5 MiB is 16 × 320 KiB
 
@@ -107,9 +118,9 @@ const toBase64 = (bytes: Uint8Array): string => {
 // Transient transport flakiness (single `fetch failed` on parallel
 // invocations that succeed sequentially) is also called out so the LLM
 // knows to retry.
-const networkErrorMessage = (e: unknown, label: string): string => {
+const networkErrorMessage = (e: unknown, label: string, timeoutLabel: string): string => {
   const base = (() => {
-    if (e instanceof Error && e.name === 'TimeoutError') return 'request timed out after 60s';
+    if (e instanceof Error && e.name === 'TimeoutError') return `request timed out after ${timeoutLabel}`;
     if (e instanceof Error && e.name === 'AbortError') return 'request aborted';
     if (e instanceof Error) return e.message;
     if (typeof e === 'string') return e;
@@ -205,7 +216,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `${method} ${path}`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `${method} ${path}`, REQUEST_TIMEOUT_LABEL) });
     }
   };
 
@@ -230,7 +241,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (elevated)`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (elevated)`, REQUEST_TIMEOUT_LABEL) });
     }
   };
 
@@ -261,7 +272,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (binary)`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (binary)`, REQUEST_TIMEOUT_LABEL) });
     }
   };
 
@@ -292,7 +303,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const res = await fetchFn(url, {
         method: 'GET',
         headers: { accept: 'text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
       });
       if (!res.ok) return err(await apiErrorFrom(res));
       const contentType = res.headers.get('content-type');
@@ -309,7 +320,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${url} (CDN follow)`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${url} (CDN follow)`, BINARY_TRANSFER_TIMEOUT_LABEL) });
     }
   };
 
@@ -321,12 +332,12 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         method: 'PUT',
         headers: { ...headers.value, 'content-type': contentType ?? 'application/octet-stream' },
         body: body as unknown as BodyInit,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
       });
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `PUT ${path}`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `PUT ${path}`, BINARY_TRANSFER_TIMEOUT_LABEL) });
     }
   };
 
@@ -362,10 +373,12 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
           method: 'PUT',
           headers: { 'Content-Range': `bytes ${start}-${end}/${total}` },
           body: chunk as unknown as BodyInit,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
         });
         if (!res.ok) {
-          // Best-effort session cancellation; ignore failure.
+          // Best-effort session cancellation; ignore failure. DELETE keeps
+          // the short-tier budget — it's a Graph-side cleanup that should
+          // return promptly.
           try {
             await fetchFn(uploadUrl, { method: 'DELETE', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
           } catch {
@@ -383,7 +396,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         } catch {
           /* ignore */
         }
-        return err({ type: 'network_error', message: networkErrorMessage(e, `PUT chunk @ byte ${start}`) });
+        return err({ type: 'network_error', message: networkErrorMessage(e, `PUT chunk @ byte ${start}`, BINARY_TRANSFER_TIMEOUT_LABEL) });
       }
     }
     return err({ type: 'api_error', status: 500, message: 'chunked upload completed without final response' });
@@ -408,7 +421,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(undefined);
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `DELETE ${path}`) });
+      return err({ type: 'network_error', message: networkErrorMessage(e, `DELETE ${path}`, REQUEST_TIMEOUT_LABEL) });
     }
   };
 
