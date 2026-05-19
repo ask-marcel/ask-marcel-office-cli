@@ -1535,6 +1535,12 @@ describe('commands', () => {
       expect(v.text).toContain('**From:** Alice <alice@contoso.com>');
       expect(v.text).toContain('Hi **team**.');
       expect(v.text).not.toContain('**Attachments:**');
+      // Header lines are NEWLINE-separated, not concatenated (kills renderHeaders join('\n') → join('') mutant).
+      expect(v.text).toContain('**Subject:** Q3\n**From:**');
+      // Body section is preceded by exactly ONE blank line, not zero — kills the L169 '\n\n' → 'Stryker' join-separator mutant.
+      expect(v.text).toContain('**Date:** 2026-04-30T08:00:00Z\n\nHi');
+      // Text doesn't start with a blank line (kills L169 `s !== ''` → true mutant — the filter must actually drop empty strings, otherwise an empty fileList becomes a leading '\n\n').
+      expect(v.text.startsWith('**Subject:**')).toBe(true);
     }
   });
 
@@ -1630,9 +1636,12 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
-      expect(v.text).toContain('inline image too large to embed');
-      expect(v.text).toContain('huge.png');
+      // Specific placeholder format — kills string-literal mutants on the label prefix/separator.
+      // Parens get escaped by turndown when the placeholder lands inside an HTML <img> alt-text path,
+      // so assert the unescaped fragments individually.
+      expect(v.text).toContain('inline image too large to embed: huge.png');
       expect(v.text).toContain('5.2 MB');
+      expect(v.text).not.toContain('cid:huge');
       expect(v.text).not.toContain('data:image/png');
     }
   });
@@ -1664,12 +1673,12 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-to-markdown handles plain-text bodies (no turndown round-trip)', async () => {
+  it('convert-mail-to-markdown handles plain-text bodies WITHOUT turndown processing — HTML-looking markup is preserved literally when contentType is text (kills the `m.body?.contentType === "html"` → true mutant which would otherwise strip the tags)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/m4',
         method: 'GET',
-        response: () => Response.json({ subject: 'plain', body: { contentType: 'text', content: 'Hello\nworld' }, hasAttachments: false }),
+        response: () => Response.json({ subject: 'plain', body: { contentType: 'text', content: '<p>Hello</p>\n<br>world' }, hasAttachments: false }),
       },
     ]);
     const cmd = cmdMap['convert-mail-to-markdown'];
@@ -1679,7 +1688,35 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
-      expect(v.text).toContain('Hello');
+      // The literal HTML tags survive — turndown was NOT called.
+      expect(v.text).toContain('<p>Hello</p>');
+      expect(v.text).toContain('<br>world');
+      // Text does not end with extra blank lines — kills the L169 .filter() mutant
+      // (without filter, an empty fileList would tail '\n\n' onto the join).
+      expect(v.text.endsWith('\n\n')).toBe(false);
+      expect(v.text.endsWith('\n')).toBe(false);
+    }
+  });
+
+  it('convert-mail-to-markdown defaults body.content to empty string when missing — no `Stryker was here!` or other garbage leaks into the output (kills the L157 StringLiteral `?? ""` → `?? "Stryker"` mutant)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mNoBody',
+        method: 'GET',
+        response: () => Response.json({ subject: 'no-body', body: { contentType: 'text' }, hasAttachments: false }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mNoBody' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).not.toContain('Stryker');
+      // The output is just the headers — kills the L141 ArrayDeclaration mutant
+      // that would have started attachments with a sentinel string element.
+      expect(v.text).toBe('**Subject:** no-body');
     }
   });
 
@@ -2026,6 +2063,92 @@ describe('commands', () => {
     }
   });
 
+  it('convert-mail-to-markdown meta block declares the expected stable contract (category=mail, GET, producesBytes:true, --message-id is required) — kills mutation on the manifest fields LLM consumers depend on', () => {
+    expect(convertMailToMarkdown.meta.category).toBe('mail');
+    expect(convertMailToMarkdown.meta.graphMethod).toBe('GET');
+    expect(convertMailToMarkdown.meta.producesBytes).toBe(true);
+    expect(convertMailToMarkdown.meta.responseShape).toContain('contentType');
+    expect(convertMailToMarkdown.meta.responseShape).toContain('text/markdown');
+    const messageIdOption = convertMailToMarkdown.meta.options.find((o) => o.name === 'message-id');
+    expect(messageIdOption).toBeDefined();
+    expect(messageIdOption?.required).toBe(true);
+  });
+
+  it('convert-mail-to-markdown attachments-list URL uses the metadata-only $select (id,name,contentType,size,isInline,contentId) — kills mutation on ATTACHMENT_METADATA_SELECT (the whole point of the staged-fetch fix is to NEVER pull contentBytes here)', async () => {
+    const urls: string[] = [];
+    const fetchFn: FetchFn = async (url) => {
+      urls.push(url);
+      if (url.includes('/attachments?')) {
+        return Response.json({ value: [] });
+      }
+      return Response.json({ subject: 's', body: { contentType: 'text', content: 'b' }, hasAttachments: true });
+    };
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    await cmd.execute(graph, { messageId: 'mUrl' });
+    const attachmentsUrl = urls.find((u) => u.includes('/attachments?'));
+    expect(attachmentsUrl).toBeDefined();
+    expect(attachmentsUrl ?? '').toContain('$select=');
+    expect(attachmentsUrl ?? '').toContain('id');
+    expect(attachmentsUrl ?? '').toContain('name');
+    expect(attachmentsUrl ?? '').toContain('contentType');
+    expect(attachmentsUrl ?? '').toContain('size');
+    expect(attachmentsUrl ?? '').toContain('isInline');
+    expect(attachmentsUrl ?? '').toContain('contentId');
+    expect(attachmentsUrl ?? '').not.toContain('contentBytes');
+  });
+
+  it('convert-mail-to-markdown skips the **Subject:** line when the message has no subject field — kills the `if (m.subject !== undefined)` → `if (true)` mutant which would otherwise push `**Subject:** undefined`', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mNoSub',
+        method: 'GET',
+        response: () => Response.json({ from: { emailAddress: { address: 'x@y.com' } }, body: { contentType: 'text', content: 'just a body' }, hasAttachments: false }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mNoSub' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).not.toContain('**Subject:**');
+      expect(v.text).not.toContain('undefined');
+      // Output starts with **From:** (the first header that IS present).
+      expect(v.text.startsWith('**From:**')).toBe(true);
+    }
+  });
+
+  it('convert-mail-to-markdown filters inline-image candidates BEFORE the per-attachment bytes fetch — kills the `attachments.filter(isInlineImage)` → `attachments` method-expression mutant by counting that file attachments do NOT trigger an /attachments/{id} fetch', async () => {
+    const calls: string[] = [];
+    const fetchFn: FetchFn = async (url) => {
+      calls.push(url);
+      if (url.endsWith('/me/messages/mFilter')) {
+        return Response.json({ subject: 'filter', body: { contentType: 'text', content: 'b' }, hasAttachments: true });
+      }
+      if (url.includes('/attachments?')) {
+        return Response.json({
+          value: [
+            { id: 'aFile', name: 'doc.pdf', contentType: 'application/pdf', isInline: false, size: 1000 },
+            { id: 'aOther', name: 'other.docx', contentType: 'application/vnd.openxmlformats', isInline: false, size: 2000 },
+          ],
+        });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mFilter' });
+    expect(result.ok).toBe(true);
+    // Only 2 calls should have happened: message body + attachments list. NO per-attachment bytes fetch.
+    expect(calls.length).toBe(2);
+    expect(calls.some((u) => u.includes('/attachments/aFile'))).toBe(false);
+    expect(calls.some((u) => u.includes('/attachments/aOther'))).toBe(false);
+  });
+
   it('convert-mail-to-markdown renders the attachments-list with size + contentType + id when present and omits each field when the metadata is missing — and filters out attachments lacking a name', async () => {
     const fetchFn = stagedFetch([
       {
@@ -2044,6 +2167,7 @@ describe('commands', () => {
               { name: 'no-id.txt', contentType: 'text/plain', size: 500, isInline: false },
               { id: 'aNoType', name: 'no-type.bin', size: 999, isInline: false },
               { id: 'aNoName', contentType: 'application/octet-stream', size: 100, isInline: false },
+              { id: 'aMB', name: 'exactly-one-mb.bin', contentType: 'application/octet-stream', size: 1_000_000, isInline: false },
             ],
           }),
       },
@@ -2064,6 +2188,17 @@ describe('commands', () => {
       expect(v.text).toContain('500 B');
       expect(v.text).toContain('no-type.bin');
       expect(v.text).not.toContain('aNoName');
+      // formatBytes boundary at exactly 1 MB: `< 1_000_000` returns KB; `>= 1_000_000` returns MB.
+      // 1_000_000 must render as `1.0 MB` (not `1000.0 KB`) — kills the `n < 1_000_000` → `<=` equality-operator mutant.
+      expect(v.text).toContain('exactly-one-mb.bin');
+      expect(v.text).toContain('1.0 MB');
+      expect(v.text).not.toContain('1000.0 KB');
+      // EXACT file-list item shape: name, size in parens with comma-separated contentType, id (kills the `, ` separator string-literal mutants).
+      expect(v.text).toContain('- full.docx (50.0 KB, application/vnd.openxmlformats, id: aFull)');
+      // Footer hint string verbatim — kills the literal mutant.
+      expect(v.text).toContain('_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._');
+      // `**Attachments:**` header is present and on its own line preceding the items.
+      expect(v.text).toContain('**Attachments:**\n- ');
     }
   });
 
