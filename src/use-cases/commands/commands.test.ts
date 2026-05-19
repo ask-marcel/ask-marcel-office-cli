@@ -6,6 +6,8 @@ import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
 import { buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { renderSingleCommand } from './docs.ts';
+import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersionAsMarkdown from './download-drive-item-version-as-markdown.ts';
@@ -2812,5 +2814,28 @@ describe('search-mail-messages rejects --filter client-side', () => {
   it('still works when only --query is supplied (no regression on the happy path)', async () => {
     const url = await capturedUrl('search-mail-messages', { query: 'invoice' });
     expect(url).toBe('https://graph.microsoft.com/v1.0/me/messages?$search="invoice"');
+  });
+
+  it("on an empty `--filter ''` the client-side guard does NOT fire — the rejection guard checks for a non-empty filter, so the message comes from the downstream Zod min-1 check, not the `$search`-conflict pointer (boundary on params['filter'].length > 0)", async () => {
+    const fetchFn = fakeFetch({ value: [] });
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await searchMailMessages.execute(graph, { query: 'invoice', filter: '' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('validation_error');
+      expect(result.error.message).not.toContain('incompatible with $search');
+    }
+  });
+
+  it('renders docs for search-mail-messages with the documented response shape, the KQL-query option description, and the pagination hint — guards the meta block content against silent rewrites', () => {
+    const rendered = renderSingleCommand(cmdRegistry, 'search-mail-messages');
+    expect(rendered.ok).toBe(true);
+    if (rendered.ok) {
+      expect(rendered.value).toContain('GET /me/messages');
+      expect(rendered.value).toContain('ranked by relevance');
+      expect(rendered.value).toContain('KQL or free-text query');
+      expect(rendered.value).toContain('Examples: ');
+      expect(rendered.value.toLowerCase()).toContain('pagination');
+    }
   });
 });

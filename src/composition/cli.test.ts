@@ -586,6 +586,22 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('/nonexistent-dir-no-write');
   });
 
+  it("renders a commander 'required option not specified' error for `search-mail-messages` without --query (asserts meta.options.required: true survives manifest → Commander wiring)", async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'search-mail-messages']);
+      } catch {
+        /* expected — commander throws via exitOverride on missing required option */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('required option');
+    expect(parsed.error).toContain('--query');
+  });
+
   it('routes commander parser errors (unknown option) to the JSON envelope on stdout, not stderr plain text (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
