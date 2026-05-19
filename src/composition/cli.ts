@@ -8,6 +8,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/c
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
+import type { OutputPathError } from '../use-cases/commands/output-path.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import * as update from '../use-cases/commands/update.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
@@ -38,6 +39,42 @@ const buildCli = (deps: BuildCliDeps): Command => {
   const fail = (message: string, code?: string): void => {
     renderError(message, getFormat(), code);
     deps.onCommandError?.();
+  };
+
+  // Audit round-8 Wave E2: manifest-driven --output-path-supporting list.
+  const bytesProducingCommands = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.producesBytes === true)
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+
+  const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
+    if (error.type === 'no_inlined_bytes')
+      return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag for those.`;
+    if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
+    // Audit v1.0.0 §B11: paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
+    if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
+    // Audit v1.0.0 §B4: *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
+    if (error.type === 'passthrough_extension_mismatch')
+      return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
+    // Audit v1.0.0 §B10: humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
+    const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
+    if (enoent !== null && enoent[1] !== undefined) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
+    return `--output-path: write failed: ${error.message}`;
+  };
+
+  // Audit v1.0.0 §B5: route help-json / docs through persistIfRequested so --output-path is honoured (was silently ignored).
+  const writeOrPrintText = async (textBody: string, contentType: string, commandName: string): Promise<void> => {
+    const outputPath = program.opts<{ outputPath?: string }>().outputPath;
+    if (outputPath === undefined) {
+      process.stdout.write(`${textBody}\n`);
+      return;
+    }
+    const persisted = await persistIfRequested(fs, outputPath, { contentType, size: textBody.length, text: textBody });
+    if (persisted.ok) {
+      renderOut(persisted.value);
+      return;
+    }
+    fail(formatOutputPathError(persisted.error, commandName));
   };
 
   // Single-stream JSON contract: commander's parser errors (unknown option,
@@ -138,7 +175,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description(
       'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers.'
     )
-    .action(() => {
+    .action(async () => {
       // Audit round-8 Wave G1: --output text was silently honored on
       // help-json, contradicting the global flag's contract. The manifest IS
       // JSON; serializing as text has no use case. Reject only when the user
@@ -151,7 +188,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
         );
         return;
       }
-      process.stdout.write(`${JSON.stringify(buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0'))}\n`);
+      const manifest = JSON.stringify(buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0'));
+      await writeOrPrintText(manifest, 'application/json', 'help-json');
     });
 
   program.commandsGroup('Lifecycle:');
@@ -247,13 +285,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/update/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
     )
     .argument('<command>', 'Command name to show docs for (run `ask-marcel --help` to list every command).')
-    .action((commandName: string) => {
+    .action(async (commandName: string) => {
       const result = renderSingleCommand(cmdRegistry, commandName);
-      if (result.ok) {
-        process.stdout.write(`${result.value}\n`);
+      if (!result.ok) {
+        fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
         return;
       }
-      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
+      await writeOrPrintText(result.value, 'text/markdown', 'docs');
     });
   docsCmd.addHelpText(
     'after',
@@ -263,16 +301,6 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Lifecycle:     `ask-marcel docs login` (or logout / update / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
     ].join('\n  ')
   );
-
-  // Audit round-8 Wave E2: derive the --output-path-supporting command list
-  // from the manifest's `producesBytes` field instead of hand-keeping it as
-  // a string literal in the rejection error. Each new byte-producing command
-  // just sets `producesBytes: true` and the rejection message updates
-  // automatically.
-  const bytesProducingCommands = Object.entries(cmdRegistry)
-    .filter(([, c]) => c.meta.producesBytes === true)
-    .map(([n]) => n)
-    .toSorted((a, b) => a.localeCompare(b));
 
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(cmdRegistry).filter(([, c]) => c.meta.category === category);
@@ -348,13 +376,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
           renderOut(persisted.value);
           return;
         }
-        const failMessage = ((): string => {
-          if (persisted.error.type === 'no_inlined_bytes')
-            return `--output-path: ${name} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag for those.`;
-          if (persisted.error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
-          return `--output-path: write failed: ${persisted.error.message}`;
-        })();
-        fail(failMessage);
+        fail(formatOutputPathError(persisted.error, name));
       });
     }
   }

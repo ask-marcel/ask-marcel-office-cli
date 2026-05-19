@@ -102,4 +102,53 @@ describe('persistIfRequested', () => {
       expect(result.error.message).toContain('ENOSPC');
     }
   });
+
+  // Audit v1.0.0 §B4: when a *-as-pdf command silently falls back to raw
+  // source bytes (Graph cannot convert this version on this tenant), the
+  // response carries `passthrough: true` and the source contentType. Saving
+  // those bytes under `.pdf` produces a corrupt "PDF" — an LLM that then
+  // feeds savedTo to a downstream PDF tool will fail noisily, far from the
+  // root cause. Reject the write upfront with a sharp message instead.
+  it('rejects --output-path ending in .pdf when the response is a passthrough non-PDF (source bytes, not converted PDF)', async () => {
+    const fs = createFileSystemFake();
+    const data = {
+      contentType: 'application/octet-stream',
+      size: 18158,
+      base64: 'AAAA',
+      passthrough: true,
+      note: 'Graph returned `application/octet-stream` for version 1.0 of Rimowa First Topic.docx — format=pdf conversion was NOT applied',
+    };
+    const result = await persistIfRequested(fs, '/work/test-output/rimowa-v1.pdf', data);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('passthrough_extension_mismatch');
+    expect(fs.has('/work/test-output/rimowa-v1.pdf')).toBe(false);
+  });
+
+  it('writes the bytes when the response carries passthrough:true but the output-path extension matches application/pdf (e.g. the source was already a pdf)', async () => {
+    const fs = createFileSystemFake();
+    const data = {
+      contentType: 'application/pdf',
+      size: 5,
+      base64: 'JVBERi0=',
+      passthrough: true,
+      note: 'source is already PDF; raw bytes returned without Graph format=pdf conversion',
+    };
+    const result = await persistIfRequested(fs, '/work/test-output/source-was-pdf.pdf', data);
+    expect(result.ok).toBe(true);
+    expect(fs.has('/work/test-output/source-was-pdf.pdf')).toBe(true);
+  });
+
+  // Audit v1.0.0 §B11: passing a path ending in `/` to --output-path used
+  // to surface a cryptic Node `EISDIR: illegal operation on a directory`.
+  // Reject at the validation layer with a clear "must be a file path" message.
+  it('rejects an --output-path that ends in / or \\ (looks like a directory, not a file)', async () => {
+    const fs = createFileSystemFake();
+    const data = { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' };
+    const posix = await persistIfRequested(fs, '/work/test-output/', data);
+    expect(posix.ok).toBe(false);
+    if (!posix.ok) expect(posix.error.type).toBe('is_directory');
+    const windows = await persistIfRequested(fs, 'C:\\Users\\me\\', data);
+    expect(windows.ok).toBe(false);
+    if (!windows.ok) expect(windows.error.type).toBe('is_directory');
+  });
 });

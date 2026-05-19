@@ -435,6 +435,157 @@ describe('buildCli command surface', () => {
     expect(parsed.commands.some((c) => c.name === 'list-drives')).toBe(true);
   });
 
+  // Audit v1.0.0 §B5 — `help-json` and `docs` used to bypass --output-path
+  // entirely, neither writing the file nor surfacing a "not supported"
+  // error. Both now honour the flag and write their text body. On error
+  // (e.g. directory path) the same envelope as every other bytes-producing
+  // command is surfaced (writeOrPrintText error path).
+  it("'help-json' and 'docs' honour --output-path: write to disk + emit savedTo envelope; surface is_directory on a directory path", async () => {
+    const logger = createLoggerFake();
+    const fs = createFileSystemFake();
+    const make = (): ReturnType<typeof buildCli> => buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), version: '1.0.0', fs });
+    const helpOut = await captureStream('stdout', () =>
+      make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/manifest.json', 'help-json'])
+    );
+    const helpParsed = JSON.parse(helpOut.trim()) as { ok: true; data: { savedTo: string } };
+    expect(helpParsed.data.savedTo).toBe('/work/test-output/manifest.json');
+    const manifest = JSON.parse(fs.snapshot('/work/test-output/manifest.json') ?? '{}') as { commands: ReadonlyArray<unknown> };
+    expect(manifest.commands.length).toBeGreaterThan(100);
+    const docsOut = await captureStream('stdout', () =>
+      make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/get-current-user.md', 'docs', 'get-current-user'])
+    );
+    const docsParsed = JSON.parse(docsOut.trim()) as { ok: true; data: { savedTo: string } };
+    expect(docsParsed.data.savedTo).toBe('/work/test-output/get-current-user.md');
+    expect(fs.snapshot('/work/test-output/get-current-user.md') ?? '').toContain('get-current-user');
+    const failOut = await captureStream('stdout', async () => {
+      try {
+        await make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/', 'help-json']);
+      } catch {
+        /* expected */
+      }
+    });
+    const failParsed = JSON.parse(failOut.trim()) as { ok: false; error: string };
+    expect(failParsed.error).toContain('must be a file path, not a directory');
+  });
+
+  // Audit v1.0.0 §B11 — `--output-path` to a directory path used to surface
+  // Node's `EISDIR: illegal operation on a directory`. Now it returns a
+  // clear "must be a file path, not a directory" message.
+  it('renders --output-path ending in / as "must be a file path, not a directory" rather than EISDIR', async () => {
+    const logger = createLoggerFake();
+    const fs = createFileSystemFake();
+    const inlinedPdf: GraphClient = {
+      ...okGraph({}),
+      get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
+      getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
+    };
+    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync([
+          'node',
+          'ask-marcel',
+          '--output',
+          'json',
+          '--output-path',
+          '/work/test-output/',
+          'download-drive-item-as-pdf',
+          '--drive-id',
+          'd1',
+          '--item-id',
+          'i1',
+        ]);
+      } catch {
+        /* expected */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('must be a file path, not a directory');
+  });
+
+  // Audit v1.0.0 §B4 — `*-as-pdf` commands silently falling back to source
+  // bytes used to write a corrupt "PDF" to disk. Now the CLI rejects the
+  // write with a clear message naming the actual content type.
+  it('renders --output-path: passthrough source bytes (not converted PDF) — save as <contentType>, not .pdf, when the response carries passthrough:true', async () => {
+    const logger = createLoggerFake();
+    const fs = createFileSystemFake();
+    const passthroughGraph: GraphClient = {
+      ...okGraph({}),
+      get: async () => ({ ok: true, value: { name: 'doc-v1.docx' } }),
+      getBinaryElevated: async () => ({
+        ok: true,
+        value: { contentType: 'application/octet-stream', size: 12, base64: 'JVBERi0=' },
+      }),
+    };
+    const cli = buildCli({ auth: okAuth(), graph: passthroughGraph, logger, processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync([
+          'node',
+          'ask-marcel',
+          '--output',
+          'json',
+          '--output-path',
+          '/work/test-output/doc-v1.pdf',
+          'download-drive-item-version-as-pdf',
+          '--drive-id',
+          'd1',
+          '--item-id',
+          'i1',
+          '--version-id',
+          '1.0',
+        ]);
+      } catch {
+        /* expected */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('passthrough');
+    expect(parsed.error).toContain('application/octet-stream');
+    expect(fs.has('/work/test-output/doc-v1.pdf')).toBe(false);
+  });
+
+  // Audit v1.0.0 §B10 — when --output-path parent dir is missing /
+  // non-writable, the raw Node `ENOENT: no such file or directory, mkdir
+  // '/x'` used to leak through. Now translated to a clear message.
+  it('translates a Node ENOENT/mkdir error from --output-path into a clear "parent directory missing or not writable" message', async () => {
+    const logger = createLoggerFake();
+    const fs: FileSystem = {
+      readJson: async () => ({ ok: false, error: { type: 'not_found' as const } }),
+      writeText: async () => ({ ok: true, value: undefined }),
+      writeBytes: async () => ({ ok: false, error: { type: 'io_failed' as const, message: "ENOENT: no such file or directory, mkdir '/nonexistent-dir-no-write'" } }),
+      deleteIfExists: async () => ({ ok: true, value: undefined }),
+      deleteDirIfExists: async () => ({ ok: true, value: undefined }),
+    };
+    const inlinedPdf: GraphClient = {
+      ...okGraph({}),
+      get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
+      getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
+    };
+    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync([
+        'node',
+        'ask-marcel',
+        '--output',
+        'json',
+        '--output-path',
+        '/nonexistent-dir-no-write/test.pdf',
+        'download-drive-item-as-pdf',
+        '--drive-id',
+        'd1',
+        '--item-id',
+        'i1',
+      ])
+    );
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('parent directory missing or not writable');
+    expect(parsed.error).toContain('/nonexistent-dir-no-write');
+  });
+
   it('routes commander parser errors (unknown option) to the JSON envelope on stdout, not stderr plain text (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
