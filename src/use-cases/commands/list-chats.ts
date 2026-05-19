@@ -21,7 +21,7 @@ const { execute, schema } = buildElevatedPickODataListCommand(() => '/me/chats',
 
 const meta: CommandMeta = {
   summary:
-    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
+    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: '/me/chats',

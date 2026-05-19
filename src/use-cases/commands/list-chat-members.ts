@@ -40,7 +40,8 @@ const execute: Command['execute'] = async (graph, params) => {
 const { schema } = inner;
 
 const meta: CommandMeta = {
-  summary: 'List the members of a single Microsoft Teams chat.',
+  summary:
+    'List the members of a single Microsoft Teams chat. Graph rejects `$top` / `$orderby` / `$expand` on this endpoint, so the CLI advertises only the subset Graph honours (`--skip`, `--select`, `--filter`).',
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: '/chats/{chat-id}/members',

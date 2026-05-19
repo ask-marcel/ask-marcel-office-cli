@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-18T10:14:48.451Z",
+  "generatedAt": "2026-05-19T01:48:33.524Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -149,7 +149,7 @@
     },
     {
       "name": "download-drive-item-version-as-pdf",
-      "summary": "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the bytes inline. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. The CLI uses an ODSP-elevated token (M365ChatClient identity captured at login) for both the Graph call and the CDN-redirect follow, so the LLM never has to fetch an external URL. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes return. Note: Graph's `?format=pdf` does serve the *current* version through this endpoint even though the as-markdown and stream-content siblings reject it — that's an undocumented Graph quirk. For the current version always use `download-drive-item-as-pdf` so you don't depend on it.",
+      "summary": "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the bytes inline. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. The CLI uses an ODSP-elevated token (M365ChatClient identity captured at login) for both the Graph call and the CDN-redirect follow, so the LLM never has to fetch an external URL. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes return. Note: Graph's `?format=pdf` sometimes serves the *current* version through this endpoint, but not reliably — audit v1.0.0 §D4 saw it fall back to raw source bytes (`passthrough: true`) even for the current version on the test tenant. For the current version always use `download-drive-item-as-pdf` so you don't depend on this quirk. When the response carries `passthrough: true`, the bytes are the source file (not a PDF); save them with the source extension, not `.pdf` — the global output-path flag refuses the mismatch (audit §B4).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=pdf",
@@ -1058,7 +1058,7 @@
     },
     {
       "name": "get-organization",
-      "summary": "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. The full resource is ~57 KB; use `--select` to slim it (e.g. `--select id,displayName,verifiedDomains`).",
+      "summary": "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. Graph wraps the single organization resource under `value[]` (audit v1.0.0 §D7 — even though only one tenant exists, the endpoint returns a collection). The full resource is ~57 KB; use `--select` to slim it (e.g. `--select id,displayName,verifiedDomains`).",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/organization",
@@ -1619,7 +1619,7 @@
     },
     {
       "name": "get-todo-task",
-      "summary": "Get a single Microsoft To Do task by its ID and its parent list ID.",
+      "summary": "Get a single Microsoft To Do task by its ID and its parent list ID. Use `--select` to slim the response (e.g. `--select id,title,status`) or `--expand checklistItems` / `--expand linkedResources` to inline child collections.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/todo/lists/{todo-task-list-id}/tasks/{todo-task-id}",
@@ -1652,14 +1652,26 @@
               "key": "taskId"
             }
           ]
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `todoTask` resource"
+      "responseShape": "single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied)"
     },
     {
       "name": "get-user-manager",
-      "summary": "Return a specific user's manager (a single `user` resource). When the user has no manager set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from 'unknown user'. Use `--select` to slim the response.",
+      "summary": "Return a specific user's manager (a single `user` resource). When the user has no manager set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: { manager: null, note: '...' } }` (same shape as `get-my-manager`) so an LLM can distinguish 'no manager' from 'unknown user' with a single discriminator across both commands. Use `--select` to slim the response.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/users/{user-id}/manager",
@@ -1685,7 +1697,7 @@
         }
       ],
       "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource, or `null` when no manager is set in the directory"
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`)."
     },
     {
       "name": "list-all-onenote-sections",
@@ -2130,7 +2142,7 @@
     },
     {
       "name": "list-chat-members",
-      "summary": "List the members of a single Microsoft Teams chat.",
+      "summary": "List the members of a single Microsoft Teams chat. Graph rejects `$top` / `$orderby` / `$expand` on this endpoint, so the CLI advertises only the subset Graph honours (`--skip`, `--select`, `--filter`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/chats/{chat-id}/members",
@@ -2141,12 +2153,6 @@
           "key": "chatId",
           "required": true,
           "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`."
-        },
-        {
-          "name": "top",
-          "key": "top",
-          "required": false,
-          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
         },
         {
           "name": "skip",
@@ -2165,18 +2171,6 @@
           "key": "filter",
           "required": false,
           "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
@@ -2185,7 +2179,7 @@
     },
     {
       "name": "list-chats",
-      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
+      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/chats",
@@ -2214,18 +2208,6 @@
           "key": "filter",
           "required": false,
           "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
-        },
-        {
-          "name": "orderby",
-          "key": "orderby",
-          "required": false,
-          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
-        },
-        {
-          "name": "expand",
-          "key": "expand",
-          "required": false,
-          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel list-chats",
@@ -6059,7 +6041,7 @@
     },
     {
       "name": "search-mail-messages",
-      "summary": "Search the signed-in user’s entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. Note: Graph does not allow `$search` and `$filter` together — supplying `--filter` will return `InvalidRestriction`; use one or the other.",
+      "summary": "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages?$search=\"{query}\"",
