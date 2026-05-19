@@ -28,14 +28,16 @@ const execute: Command['execute'] = async (graph, params) => {
     result.error.message.includes('Request_ResourceNotFound') &&
     result.error.message.includes("Resource 'manager'")
   ) {
-    return ok(null);
+    // Audit v1.0.0 §B7: shape matches get-my-manager so consumers can
+    // detect "no manager set" with the same check on either command.
+    return ok({ manager: null, note: 'target user has no manager set in the directory (Graph returned 404 Request_ResourceNotFound)' });
   }
   return result;
 };
 
 const meta: CommandMeta = {
   summary:
-    "Return a specific user's manager (a single `user` resource). When the user has no manager set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: null }` so an LLM can distinguish 'no manager' from 'unknown user'. Use `--select` to slim the response.",
+    "Return a specific user's manager (a single `user` resource). When the user has no manager set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: { manager: null, note: '...' } }` (same shape as `get-my-manager`) so an LLM can distinguish 'no manager' from 'unknown user' with a single discriminator across both commands. Use `--select` to slim the response.",
   category: 'user',
   graphMethod: 'GET',
   graphPathTemplate: '/users/{user-id}/manager',
@@ -51,7 +53,8 @@ const meta: CommandMeta = {
     ...selectExpandOptions,
   ],
   example: "ask-marcel get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
-  responseShape: 'single Microsoft Graph `user` resource, or `null` when no manager is set in the directory',
+  responseShape:
+    'single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`).',
 };
 
 export { execute, meta, schema };

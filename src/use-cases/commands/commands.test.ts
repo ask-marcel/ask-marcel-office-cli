@@ -2787,3 +2787,30 @@ describe('get-todo-task supports --select and --expand', () => {
     expect(url).toBe('https://graph.microsoft.com/v1.0/me/todo/lists/tl1/tasks/t1?$select=id%2Ctitle');
   });
 });
+
+// Audit v1.0.0 §B6 / D1 — Graph rejects `$search` with `$filter` together
+// (the real Graph error is `SearchWithFilter`, not the docs' previous
+// `InvalidRestriction`). Reject the conflict client-side before round-trip
+// so the LLM gets a precise pointer to the right alternative command
+// instead of an opaque Graph code.
+describe('search-mail-messages rejects --filter client-side', () => {
+  it('returns validation_error when --filter is supplied alongside --query (Graph does not allow $search + $filter together)', async () => {
+    const cmd = cmdMap['search-mail-messages'];
+    if (!cmd) throw new Error('search-mail-messages not registered');
+    const fetchFn = fakeFetch({ value: [] });
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { query: 'invoice', filter: "from/emailAddress/address eq 'alice'" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('validation_error');
+      expect(result.error.message).toContain('--filter');
+      expect(result.error.message).toContain('list-mail-messages');
+    }
+    expect(fetchFn.lastUrl).toBeNull();
+  });
+
+  it('still works when only --query is supplied (no regression on the happy path)', async () => {
+    const url = await capturedUrl('search-mail-messages', { query: 'invoice' });
+    expect(url).toBe('https://graph.microsoft.com/v1.0/me/messages?$search="invoice"');
+  });
+});

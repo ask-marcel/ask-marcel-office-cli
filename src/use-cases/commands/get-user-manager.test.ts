@@ -39,14 +39,19 @@ describe('get-user-manager', () => {
     expect(result).toEqual(err(unknownUser));
   });
 
-  it("maps the no-manager-set 404 to ok(null) — Graph quotes `Resource 'manager'` (the navigation property) when the user exists but has no manager link", async () => {
+  it("maps the no-manager-set 404 to ok({ manager: null, note }) — Graph quotes `Resource 'manager'` (the navigation property) when the user exists but has no manager link (audit v1.0.0 §B7: parity with get-my-manager)", async () => {
     const noMgr: GraphError = {
       type: 'api_error',
       status: 404,
       message: "Request_ResourceNotFound: Resource 'manager' does not exist or one of its queried reference-property objects are not present.",
     };
     const result = await execute(fakeGraphReturning(err(noMgr)), { userId: 'alice@contoso.com' });
-    expect(result).toEqual(ok(null));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { manager: null; note: string };
+      expect(v.manager).toBeNull();
+      expect(v.note).toContain('no manager');
+    }
   });
 
   it('passes through non-404 errors unchanged (auth_failed, network_error, validation_error, 401/500 api_error)', async () => {
