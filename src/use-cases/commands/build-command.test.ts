@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildListCommand } from './build-command.ts';
+import { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildElevatedPickODataListCommand, buildListCommand } from './build-command.ts';
 
 const fakeGraph: GraphClient = {
   get: async () => ok({}),
@@ -163,5 +163,34 @@ describe('buildElevatedListCommand', () => {
     const cmd = buildElevatedListCommand(() => '/me/chats', z.object({}));
     await cmd.execute(graph, { top: '3', filter: "topic eq 'project'" });
     expect(captured).toBe("/me/chats?$top=3&$filter=topic%20eq%20'project'");
+  });
+});
+
+describe('buildElevatedPickODataListCommand', () => {
+  it('routes to graph.getElevated and applies ONLY the picked OData keys (dropped keys never reach the URL even if supplied)', async () => {
+    let captured = '';
+    const graph: GraphClient = {
+      get: async () => ok({}),
+      post: async () => ok({}),
+      getBinary: async () => ok({}),
+      getElevated: async (path: string) => {
+        captured = path;
+        return ok({});
+      },
+      getBinaryElevated: async () => ok({}),
+      fetchUrl: async () => ok({}),
+      put: async () => ok({}),
+      delete: async () => ok({}),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+    };
+    const cmd = buildElevatedPickODataListCommand(() => '/me/chats', z.object({}), ['top', 'select']);
+    await cmd.execute(graph, { top: '3', orderby: 'lastUpdatedDateTime desc', select: 'id,topic', expand: 'members' });
+    expect(captured).toBe('/me/chats?$top=3&$select=id%2Ctopic');
+  });
+
+  it('exposes only the picked OData fragment plus the user schema on the merged schema', () => {
+    const cmd = buildElevatedPickODataListCommand((p) => `/chats/${p.chatId}/members`, z.object({ chatId: z.string() }), ['skip', 'select', 'filter']);
+    const shape = (cmd.schema as unknown as { shape: Record<string, unknown> }).shape;
+    expect(Object.keys(shape).toSorted()).toEqual(['chatId', 'filter', 'select', 'skip']);
   });
 });

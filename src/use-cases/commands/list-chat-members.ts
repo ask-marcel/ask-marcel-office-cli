@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import { buildElevatedListCommand } from './build-command.ts';
+import { buildElevatedPickODataListCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { pickODataOptions } from './odata-query.ts';
 
 // Audit round-8 §1.5: this command was on the basic Teams token throughout
 // rounds 6 and 7 (audit had labelled `list-chat-members` "always worked
@@ -11,8 +11,12 @@ import { odataQueryOptions } from './odata-query.ts';
 // `ChatMember.Read` which the basic token doesn't grant. Switch to the
 // elevated M365ChatClient identity for parity with `list-chats` /
 // `get-chat`.
+//
+// Audit v1.0.0 §B1: `/chats/{id}/members` rejects `$top`, `$orderby`, and
+// `$expand` with `BadRequest`. Advertise only the subset Graph honours.
 const baseSchema = z.object({ chatId: z.string().min(1) });
-const inner = buildElevatedListCommand((p) => `/chats/${p.chatId}/members`, baseSchema);
+const CHAT_MEMBERS_ODATA_KEYS = ['skip', 'select', 'filter'] as const;
+const inner = buildElevatedPickODataListCommand((p) => `/chats/${p.chatId}/members`, baseSchema, CHAT_MEMBERS_ODATA_KEYS);
 
 // Audit round-7 B3: Graph surfaces the unhelpful `1: NotFound` (the `1:` is
 // the Teams thread-id segment, echoed without context) for any missing
@@ -52,7 +56,7 @@ const meta: CommandMeta = {
         'Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, ' +
         'or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`.',
     },
-    ...odataQueryOptions,
+    ...pickODataOptions(CHAT_MEMBERS_ODATA_KEYS),
   ],
   example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',

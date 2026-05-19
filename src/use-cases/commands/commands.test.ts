@@ -2744,3 +2744,46 @@ describe('no-skip endpoints do not advertise --skip', () => {
     expect(hasSkip).toBe(false);
   });
 });
+
+// Audit v1.0.0 §B1/B2/B3 — Graph's `/chats/{id}/members` rejects `$top`,
+// `$orderby`, `$expand` with `BadRequest`; `/me/chats` rejects `$orderby`
+// and hangs on `$expand`. Both endpoints DO honour the subset listed below.
+// Regression guard: the CLI must advertise ONLY the working flags.
+describe('chats endpoints advertise only the OData flags Graph honours', () => {
+  it('list-chat-members.meta.options exposes skip/select/filter but NOT top/orderby/expand', () => {
+    const names = listChatMembers.meta.options.map((o) => o.name).toSorted();
+    expect(names).toEqual(['chat-id', 'filter', 'select', 'skip']);
+  });
+
+  it('list-chats.meta.options exposes top/skip/select/filter but NOT orderby/expand', () => {
+    const names = listChats.meta.options.map((o) => o.name).toSorted();
+    expect(names).toEqual(['filter', 'select', 'skip', 'top']);
+  });
+
+  it('list-chat-members drops $top/$orderby/$expand from the URL even when supplied as params', async () => {
+    const url = await capturedUrl('list-chat-members', { chatId: 'ch1', top: '5', orderby: 'x', expand: 'members', select: 'id', filter: "x eq 'y'" });
+    expect(url).toBe("https://graph.microsoft.com/v1.0/chats/ch1/members?$select=id&$filter=x%20eq%20'y'");
+  });
+
+  it('list-chats builds the URL with only the picked OData keys when params are valid', async () => {
+    const url = await capturedUrl('list-chats', { top: '5', select: 'id' });
+    expect(url).toBe('https://graph.microsoft.com/v1.0/me/chats?$top=5&$select=id');
+  });
+});
+
+// Audit v1.0.0 §B9 — the single-resource GET on a Microsoft task list was
+// the only "get" without `--select`. Sister GETs (get-my-manager,
+// get-user-manager, get-mail-message, etc.) all expose `--select`/`--expand`
+// so an LLM can slim the response payload. Regression guard: advertise both.
+describe('get-todo-task supports --select and --expand', () => {
+  it("the command's meta.options includes 'select' and 'expand' so an LLM can slim the response payload", () => {
+    const names = getTodoTask.meta.options.map((o) => o.name);
+    expect(names).toContain('select');
+    expect(names).toContain('expand');
+  });
+
+  it('the command forwards --select to Graph as $select', async () => {
+    const url = await capturedUrl('get-todo-task', { todoTaskListId: 'tl1', todoTaskId: 't1', select: 'id,title' });
+    expect(url).toBe('https://graph.microsoft.com/v1.0/me/todo/lists/tl1/tasks/t1?$select=id%2Ctitle');
+  });
+});

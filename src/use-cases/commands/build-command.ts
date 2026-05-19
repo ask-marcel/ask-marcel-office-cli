@@ -156,10 +156,32 @@ const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataK
   return { schema: merged, execute };
 };
 
+/**
+ * Elevated-token twin of `buildPickODataListCommand`. Use for endpoints that
+ * require the M365ChatClient identity (e.g. `/me/chats`, `/chats/{}/members`)
+ * AND honour only a subset of OData passthroughs — the chats family rejects
+ * `$orderby` / `$expand` with `BadRequest`, so the picker is the right tool.
+ */
+const buildElevatedPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataKey>(
+  pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
+  schema: z.ZodObject<Shape>,
+  keys: ReadonlyArray<K>
+): Pick<Command, 'schema' | 'execute'> => {
+  const merged = schema.extend(pickODataShape(keys));
+  const execute: Command['execute'] = async (graph, params) => {
+    const parsed = merged.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data as Partial<ODataQueryParams>);
+    return graph.getElevated(path);
+  };
+  return { schema: merged, execute };
+};
+
 export {
   buildCommand,
   buildElevatedCommand,
   buildElevatedListCommand,
+  buildElevatedPickODataListCommand,
   buildFilterSelectListCommand,
   buildListCommand,
   buildNoSkipListCommand,
