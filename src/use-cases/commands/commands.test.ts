@@ -1646,6 +1646,33 @@ describe('commands', () => {
     }
   });
 
+  it('convert-mail-to-markdown returns validation_error when the attachments-list returns a malformed shape (Graph glitch returning value: "not an array") — boundary validation prevents the downstream TypeError on .filter()', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mBadShape',
+        method: 'GET',
+        response: () => Response.json({ subject: 'bad-shape', body: { contentType: 'text', content: 'b' }, hasAttachments: true }),
+      },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mBadShape/attachments?',
+        method: 'GET',
+        response: () => Response.json({ value: 'not-an-array' }),
+      },
+    ]);
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mBadShape' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Body in hand is still rendered; the malformed metadata is surfaced as a note (failure isolation).
+      const v = result.value as { text: string; note?: string };
+      expect(v.text).toContain('bad-shape');
+      expect(v.note).toBeDefined();
+      expect(v.note ?? '').toContain('attachments-list');
+    }
+  });
+
   it('convert-mail-to-markdown returns the markdown body with a note when the attachments-list fetch fails — the body in hand is still useful, the partial-success preserves it (failure isolation)', async () => {
     const fetchFn = stagedFetch([
       {

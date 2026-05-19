@@ -63,14 +63,25 @@ const renderHeaders = (m: {
   return lines.join('\n');
 };
 
-type AttachmentMeta = {
-  readonly id?: string;
-  readonly name?: string;
-  readonly contentType?: string;
-  readonly size?: number;
-  readonly isInline?: boolean;
-  readonly contentId?: string;
-};
+// Schema validates the attachments-list Graph response at the boundary.
+// Without this, a malformed shape (e.g., `{ value: "not an array" }` from a
+// tenant glitch) launders through the `as` cast and throws TypeError
+// downstream on `.filter()`. The schema-failure path surfaces a precise
+// note in the markdown envelope instead of an unhandled exception.
+const attachmentMetaSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  contentType: z.string().optional(),
+  size: z.number().optional(),
+  isInline: z.boolean().optional(),
+  contentId: z.string().optional(),
+});
+
+const attachmentsListSchema = z.object({
+  value: z.array(attachmentMetaSchema).optional(),
+});
+
+type AttachmentMeta = z.infer<typeof attachmentMetaSchema>;
 
 // Decimal units (1 KB = 1000 bytes, 1 MB = 1_000_000 bytes) — matches
 // Outlook / Microsoft 365 user-facing size displays for email attachments.
@@ -80,11 +91,18 @@ const formatBytes = (n: number): string => {
   return `${(n / 1_000_000).toFixed(1)} MB`;
 };
 
-const isInlineImage = (a: AttachmentMeta): boolean => a.isInline === true && nonEmpty(a.contentType) && a.contentType.toLowerCase().startsWith('image/') && nonEmpty(a.contentId);
+// Narrowed shape produced by `isInlineImage`-filtered attachments: contentType
+// and contentId are guaranteed non-empty by that predicate, so downstream code
+// doesn't need defensive `?? ''` defaults. Documents the invariant in the type
+// system instead of in a comment.
+type InlineImageCandidate = AttachmentMeta & { readonly contentType: string; readonly contentId: string };
 
-type EmbedFetchResult = { readonly meta: AttachmentMeta; readonly inline?: InlineAttachment; readonly oversize: boolean };
+const isInlineImage = (a: AttachmentMeta): a is InlineImageCandidate =>
+  a.isInline === true && nonEmpty(a.contentType) && a.contentType.toLowerCase().startsWith('image/') && nonEmpty(a.contentId);
 
-const fetchInlineImageBytes = async (graph: GraphClient, messageId: string, meta: AttachmentMeta): Promise<EmbedFetchResult> => {
+type EmbedFetchResult = { readonly meta: InlineImageCandidate; readonly inline?: InlineAttachment; readonly oversize: boolean };
+
+const fetchInlineImageBytes = async (graph: GraphClient, messageId: string, meta: InlineImageCandidate): Promise<EmbedFetchResult> => {
   if ((meta.size ?? 0) > INLINE_IMAGE_SIZE_LIMIT_BYTES) return { meta, oversize: true };
   if (!nonEmpty(meta.id)) return { meta, oversize: false };
   const fetched = await graph.get(`/me/messages/${messageId}/attachments/${meta.id}`);
@@ -94,14 +112,14 @@ const fetchInlineImageBytes = async (graph: GraphClient, messageId: string, meta
   return {
     meta,
     oversize: false,
-    inline: { contentId: meta.contentId ?? '', contentType: meta.contentType ?? '', contentBytes: body.contentBytes },
+    inline: { contentId: meta.contentId, contentType: meta.contentType, contentBytes: body.contentBytes },
   };
 };
 
 const renderOversizePlaceholders = (html: string, embeds: ReadonlyArray<EmbedFetchResult>): string => {
   let out = html;
   for (const e of embeds) {
-    if (!e.oversize || !nonEmpty(e.meta.contentId)) continue;
+    if (!e.oversize) continue;
     const label = `[inline image too large to embed: ${e.meta.name ?? 'image'} (${formatBytes(e.meta.size ?? 0)})]`;
     out = out.replaceAll(`cid:${e.meta.contentId}`, label);
   }
@@ -142,10 +160,15 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   let attachmentsListNote: string | undefined;
   if (m.hasAttachments === true) {
     const listed = await graph.get(`/me/messages/${messageId}/attachments?${ATTACHMENT_METADATA_SELECT}`);
-    if (listed.ok) {
-      attachments = ((listed.value as { readonly value?: ReadonlyArray<AttachmentMeta> }).value ?? []) as ReadonlyArray<AttachmentMeta>;
-    } else {
+    if (!listed.ok) {
       attachmentsListNote = `attachments-list fetch failed (${listed.error.type}: ${listed.error.message}) — markdown body returned without attachment metadata`;
+    } else {
+      const parsed = attachmentsListSchema.safeParse(listed.value);
+      if (parsed.success) {
+        attachments = parsed.data.value ?? [];
+      } else {
+        attachmentsListNote = `attachments-list returned a malformed shape (${formatZodError(parsed.error)}) — markdown body returned without attachment metadata`;
+      }
     }
   }
 

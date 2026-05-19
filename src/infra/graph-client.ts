@@ -129,6 +129,15 @@ const networkErrorMessage = (e: unknown, label: string, timeoutLabel: string): s
   return `${base} (${label}) — transient; retry once before treating as permanent`;
 };
 
+// Collapses the per-catch boilerplate that previously repeated across 8 sites:
+// each catch had to manually format the label and pick the right timeout-tier
+// constant. Putting both pieces here makes the binary-vs-json choice explicit
+// at every call site without leaking the timeout-label strings outwards.
+const wrapNetworkError = (e: unknown, method: 'GET' | 'POST' | 'PUT' | 'DELETE', label: string, tier: 'json' | 'binary'): GraphError => ({
+  type: 'network_error',
+  message: networkErrorMessage(e, `${method} ${label}`, tier === 'binary' ? BINARY_TRANSFER_TIMEOUT_LABEL : REQUEST_TIMEOUT_LABEL),
+});
+
 type GraphErrorBody = {
   readonly error?: {
     readonly code?: string;
@@ -216,7 +225,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `${method} ${path}`, REQUEST_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, method, path, 'json'));
     }
   };
 
@@ -241,7 +250,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (elevated)`, REQUEST_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, 'GET', `${path} (elevated)`, 'json'));
     }
   };
 
@@ -272,7 +281,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${path} (binary)`, REQUEST_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, 'GET', `${path} (binary)`, 'json'));
     }
   };
 
@@ -320,7 +329,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `GET ${url} (CDN follow)`, BINARY_TRANSFER_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, 'GET', `${url} (CDN follow)`, 'binary'));
     }
   };
 
@@ -337,7 +346,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(await res.json());
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `PUT ${path}`, BINARY_TRANSFER_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, 'PUT', path, 'binary'));
     }
   };
 
@@ -396,7 +405,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         } catch {
           /* ignore */
         }
-        return err({ type: 'network_error', message: networkErrorMessage(e, `PUT chunk @ byte ${start}`, BINARY_TRANSFER_TIMEOUT_LABEL) });
+        return err(wrapNetworkError(e, 'PUT', `chunk @ byte ${start}`, 'binary'));
       }
     }
     return err({ type: 'api_error', status: 500, message: 'chunked upload completed without final response' });
@@ -421,7 +430,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       if (!res.ok) return err(await apiErrorFrom(res));
       return ok(undefined);
     } catch (e: unknown) {
-      return err({ type: 'network_error', message: networkErrorMessage(e, `DELETE ${path}`, REQUEST_TIMEOUT_LABEL) });
+      return err(wrapNetworkError(e, 'DELETE', path, 'json'));
     }
   };
 
