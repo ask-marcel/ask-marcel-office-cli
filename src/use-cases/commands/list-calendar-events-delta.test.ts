@@ -9,6 +9,7 @@ const graphReturning = (response: Result<unknown, GraphError>): GraphClient => (
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
+  teamsChat: async () => ok({}),
   getBinaryElevated: async () => ok({}),
   fetchUrl: async () => ok({}),
   put: async () => ok({}),

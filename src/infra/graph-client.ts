@@ -2,6 +2,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
+import { BINARY_TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
 type GraphError =
   | { type: 'api_error'; status: number; message: string; code?: string }
@@ -26,6 +27,16 @@ type GraphClient = {
    * elevated token).
    */
   getElevated: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * JSON-GET against the Teams chat-aggregator
+   * (`chatsvcagg.teams.microsoft.com/api/v2/...`). Signs the request
+   * with the chatsvcagg-audience bearer captured at login — same Teams
+   * web client identity as `get`, different audience. Used by commands
+   * that need to read chat message BODIES (which the basic Graph token
+   * cannot — `Chat.Read*` scopes are missing). `path` is the chatsvcagg
+   * path starting with `/api/v2/...`.
+   */
+  teamsChat: (path: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
@@ -82,18 +93,9 @@ const isAllowedFetchUrlHost = (host: string): boolean => ALLOWED_FETCH_URL_HOSTS
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
-// Two-tier timeout. JSON Graph calls return in seconds — 60s is the right
-// budget to catch genuine hangs. Binary CDN body transfers and large
-// chunked uploads scale with file size × network speed; on a slow corporate
-// uplink a 50 MB SharePoint PDF can take several minutes to stream and
-// 60s aborts the body read mid-transfer. The two-tier split gives the
-// JSON tier fast-failure characteristics and the binary tier enough
-// wall-clock to actually move bytes (audit v1.0.0 — SharePoint PDF
-// download timeout fix).
-const REQUEST_TIMEOUT_MS = 60_000;
-const BINARY_TRANSFER_TIMEOUT_MS = 5 * 60_000; // 5 min
-const REQUEST_TIMEOUT_LABEL = '60s';
-const BINARY_TRANSFER_TIMEOUT_LABEL = '5min';
+// Two-tier timeout constants live in src/infra/network-error.ts (shared
+// with the TeamsClient adapter). The chunk constants are GraphClient-
+// specific so they stay here.
 const SIMPLE_PUT_THRESHOLD = 4 * 1024 * 1024; // 4 MiB
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320 KiB; 5 MiB is 16 × 320 KiB
 
@@ -111,31 +113,13 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-// Audit v1.0.0 §2.5: bare `fetch failed` / `request timed out after 60s` had
-// zero context about which Graph URL or method failed — an LLM caller cannot
-// decide whether to retry without that. Prepend the request label
-// (`GET /me/messages`) so the error envelope always names the call site.
-// Transient transport flakiness (single `fetch failed` on parallel
-// invocations that succeed sequentially) is also called out so the LLM
-// knows to retry.
-const networkErrorMessage = (e: unknown, label: string, timeoutLabel: string): string => {
-  const base = (() => {
-    if (e instanceof Error && e.name === 'TimeoutError') return `request timed out after ${timeoutLabel}`;
-    if (e instanceof Error && e.name === 'AbortError') return 'request aborted';
-    if (e instanceof Error) return e.message;
-    if (typeof e === 'string') return e;
-    return 'network request failed';
-  })();
-  return `${base} (${label}) — transient; retry once before treating as permanent`;
-};
-
 // Collapses the per-catch boilerplate that previously repeated across 8 sites:
 // each catch had to manually format the label and pick the right timeout-tier
 // constant. Putting both pieces here makes the binary-vs-json choice explicit
 // at every call site without leaking the timeout-label strings outwards.
-const wrapNetworkError = (e: unknown, method: 'GET' | 'POST' | 'PUT' | 'DELETE', label: string, tier: 'json' | 'binary'): GraphError => ({
+const wrapNetworkError = (e: unknown, method: HttpMethod, label: string, tier: TimeoutTier): GraphError => ({
   type: 'network_error',
-  message: networkErrorMessage(e, `${method} ${label}`, tier === 'binary' ? BINARY_TRANSFER_TIMEOUT_LABEL : REQUEST_TIMEOUT_LABEL),
+  message: networkErrorMessage(e, `${method} ${label}`, timeoutLabelFor(tier)),
 });
 
 type GraphErrorBody = {
@@ -251,6 +235,36 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (elevated)`, 'json'));
+    }
+  };
+
+  // Teams chatsvcagg path — same Teams web client identity as `get`, but the
+  // bearer is issued for `chatsvcagg.teams.microsoft.com` instead of Graph.
+  // The Teams web client mints this token automatically; we piggy-back the
+  // captured bearer to read chat message bodies (Graph's `Chat.Read*`-gated
+  // endpoints can't reach them with the scopes the basic Teams token carries).
+  const chatsvcaggAuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
+    const tokenResult = await auth.getChatsvcaggAccessToken();
+    if (!tokenResult.ok) {
+      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
+      return err({ type: 'auth_failed', message: msg });
+    }
+    return ok({ Authorization: `Bearer ${tokenResult.value}` });
+  };
+
+  const teamsChat = async (path: string): Promise<Result<unknown, GraphError>> => {
+    const headers = await chatsvcaggAuthHeaders();
+    if (!headers.ok) return headers;
+    try {
+      const res = await fetchFn(`https://chatsvcagg.teams.microsoft.com${path}`, {
+        method: 'GET',
+        headers: { ...headers.value, accept: 'application/json' },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return err(await apiErrorFrom(res));
+      return ok(await res.json());
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${path} (chatsvcagg)`, 'json'));
     }
   };
 
@@ -453,6 +467,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   return {
     get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
     getElevated,
+    teamsChat,
     post: (path, body) => request('POST', path, body),
     getBinary,
     getBinaryElevated,

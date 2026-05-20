@@ -9,6 +9,7 @@ const fakeGraph: GraphClient = {
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ({ ok: true, value: {} }),
+  teamsChat: async () => ok({}),
   getBinaryElevated: async () => ({ ok: true, value: {} }),
   fetchUrl: async () => ok({}),
   put: async () => ok({}),
@@ -37,6 +38,7 @@ describe('buildCommand', () => {
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ({ ok: true, value: {} }),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
@@ -71,6 +73,7 @@ describe('buildElevatedCommand', () => {
         captured = path;
         return ok({});
       },
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ({ ok: true, value: {} }),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
@@ -95,6 +98,7 @@ describe('buildListCommand', () => {
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ok({}),
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ok({}),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
@@ -116,6 +120,7 @@ describe('buildListCommand', () => {
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ok({}),
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ok({}),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
@@ -154,6 +159,7 @@ describe('buildElevatedListCommand', () => {
         captured = path;
         return ok({});
       },
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ok({}),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
@@ -177,6 +183,7 @@ describe('buildElevatedPickODataListCommand', () => {
         captured = path;
         return ok({});
       },
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ok({}),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),

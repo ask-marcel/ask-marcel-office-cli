@@ -29,6 +29,8 @@ const okAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: true, value: undefined }),
+  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+  getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
 
@@ -36,6 +38,8 @@ const cancelledAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
+  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+  getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
 
@@ -43,6 +47,8 @@ const failedAuth = (): AuthManager => ({
   getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'browser launch failed' } as AuthError }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
   logout: async () => ({ ok: false, error: { type: 'auth_failed', message: 'rm denied' } as AuthError }),
+  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+  getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
 
@@ -51,6 +57,7 @@ const okGraph = (value: unknown): GraphClient => ({
   post: async () => ({ ok: true, value }),
   getBinary: async () => ({ ok: true, value }),
   getElevated: async () => ({ ok: true, value: {} }),
+  teamsChat: async () => ({ ok: true, value: {} }),
   getBinaryElevated: async () => ({ ok: true, value: {} }),
   fetchUrl: async () => ({ ok: true, value }),
   put: async () => ({ ok: true, value }),
@@ -63,6 +70,7 @@ const errGraph = (error: GraphError): GraphClient => ({
   post: async () => ({ ok: false, error }),
   getBinary: async () => ({ ok: false, error }),
   getElevated: async () => ({ ok: true, value: {} }),
+  teamsChat: async () => ({ ok: true, value: {} }),
   getBinaryElevated: async () => ({ ok: true, value: {} }),
   fetchUrl: async () => ({ ok: false, error }),
   put: async () => ({ ok: false, error }),
@@ -90,6 +98,8 @@ describe('buildCli command surface', () => {
       getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
       getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ({ ok: true, value: undefined }),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => ({ captured: true }),
     };
     const logger = createLoggerFake();
@@ -104,6 +114,8 @@ describe('buildCli command surface', () => {
       getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
       getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ({ ok: true, value: undefined }),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }),
     };
     const logger = createLoggerFake();
@@ -215,6 +227,7 @@ describe('buildCli command surface', () => {
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ({ ok: true, value: {} }),
       getBinaryElevated: async () => ({ ok: true, value: {} }),
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
@@ -233,6 +246,7 @@ describe('buildCli command surface', () => {
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ({ ok: true, value: {} }),
       getBinaryElevated: async () => ({ ok: true, value: {} }),
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
@@ -317,6 +331,7 @@ describe('buildCli command surface', () => {
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ({ ok: true, value: {} }),
       getBinaryElevated: async () => ({ ok: true, value: {} }),
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),

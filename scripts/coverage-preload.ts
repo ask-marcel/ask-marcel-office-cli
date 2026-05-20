@@ -32,6 +32,7 @@ import '../src/infra/browser-auth.ts';
 import '../src/infra/filesystem-bun.ts';
 import '../src/infra/filesystem-node.ts';
 import '../src/infra/graph-client.ts';
+import '../src/infra/network-error.ts';
 import '../src/infra/process-runner-bun.ts';
 import '../src/infra/process-runner-node.ts';
 
@@ -110,3 +111,6 @@ import '../src/use-cases/commands/list-joined-teams.ts';
 import '../src/use-cases/commands/get-team.ts';
 import '../src/use-cases/commands/list-team-channels.ts';
 import '../src/use-cases/commands/get-team-channel.ts';
+import '../src/use-cases/commands/list-teams-chats-with-messages.ts';
+import '../src/use-cases/commands/list-teams-chat-messages.ts';
+import '../src/use-cases/commands/get-teams-chat-message.ts';

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-19T03:55:25.588Z",
+  "generatedAt": "2026-05-20T10:40:19.640Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1616,6 +1616,30 @@
       ],
       "example": "ask-marcel get-team-primary-channel --team-id 'tm1'",
       "responseShape": "single Microsoft Graph `channel` resource"
+    },
+    {
+      "name": "get-teams-chat-message",
+      "summary": "Return a single Microsoft Teams chat message by its id via the chat-aggregator. Uses the chatsvcagg-audience bearer captured at login (same identity as the basic Teams token, different audience). **Best-effort, may break on Microsoft client updates** — the chatsvcagg surface is not in the public Microsoft Graph API. Source the chat-id + message-id via `list-teams-chats-with-messages` or `list-teams-chat-messages`.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/{chat-id}/messages/{message-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-get",
+      "options": [
+        {
+          "name": "chat-id",
+          "key": "chatId",
+          "required": true,
+          "description": "Teams chat ID. Source via `list-chats` or `list-teams-chats-with-messages`."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Teams chat message ID. Source via `list-teams-chats-with-messages` or `list-teams-chat-messages`."
+        }
+      ],
+      "example": "ask-marcel get-teams-chat-message --chat-id '19:abc...@thread.v2' --message-id '1700000000000'",
+      "responseShape": "single Teams chat message — `id`, `from`, `body.content`, `createdDateTime`, etc. **Microsoft-internal schema — fields may change without notice.**"
     },
     {
       "name": "get-todo-task",
@@ -5664,6 +5688,60 @@
       "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
       "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
       "pagination": true
+    },
+    {
+      "name": "list-teams-chat-messages",
+      "summary": "List messages in a single Microsoft Teams chat via the chat-aggregator. Companion to `list-teams-chats-with-messages` when the inlined-per-chat history isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chatsvcagg surface is not in the public Microsoft Graph API. Pagination via `_skipToken` in the response.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/{chat-id}/messages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-list",
+      "options": [
+        {
+          "name": "chat-id",
+          "key": "chatId",
+          "required": true,
+          "description": "Teams chat ID — typically `19:<thread>@thread.v2` (1:1 / group) or `19:meeting_<id>@thread.v2` (meeting chat). Source via `list-chats` or `list-teams-chats-with-messages`."
+        },
+        {
+          "name": "page-size",
+          "key": "pageSize",
+          "required": false,
+          "description": "Number of messages per page (positive integer; default 50). Server may silently cap."
+        },
+        {
+          "name": "skip-token",
+          "key": "skipToken",
+          "required": false,
+          "description": "Opaque pagination cursor returned in the prior response's `_skipToken` field. Omit on the first call."
+        }
+      ],
+      "example": "ask-marcel list-teams-chat-messages --chat-id '19:abc...@thread.v2' --page-size 30",
+      "responseShape": "chatsvcagg envelope: `{ messages: [...], _skipToken?: string }`. Each message has `id`, `from`, `body.content`, `createdDateTime`, etc. **Microsoft-internal schema — fields may change without notice.**"
+    },
+    {
+      "name": "list-teams-chats-with-messages",
+      "summary": "List the signed-in user's Microsoft Teams chats with the last few message bodies inlined per chat. Uses the chatsvcagg-audience bearer captured at login (same identity as the basic Teams token, different audience) — this is the path Teams web/desktop uses to populate the chat sidebar. **Best-effort, may break on Microsoft client updates**: the chatsvcagg surface is not part of the public Microsoft Graph API; Microsoft can change route shapes without notice. If the response shape looks different from what you expect, run `ask-marcel logout && ask-marcel login` to refresh the captured tokens. Pagination via `_skipToken` field in the response — pass it back as `--skip-token` on the next call. Caller scopes do NOT matter here; the chatsvcagg server gates access on the appid + identity, not on Graph scopes.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chat-list",
+      "options": [
+        {
+          "name": "page-size",
+          "key": "pageSize",
+          "required": false,
+          "description": "Number of chats per page (positive integer; Teams web uses 20 by default). Server may silently cap larger values. Combine with `--skip-token` from a previous response to paginate."
+        },
+        {
+          "name": "skip-token",
+          "key": "skipToken",
+          "required": false,
+          "description": "Opaque pagination cursor returned in the prior response's `_skipToken` field. Pass it back to fetch the next page; omit on the first call."
+        }
+      ],
+      "example": "ask-marcel list-teams-chats-with-messages --page-size 10",
+      "responseShape": "chatsvcagg aggregator envelope: `{ chats: [...], _skipToken?: string }`. Each chat carries `id`, `topic`, `chatType`, `lastUpdatedDateTime`, AND an inlined `messages: [...]` with the last few bodies — this is the high-value field the existing `list-chats` cannot return. **Schema is Microsoft-internal — fields may change without notice; treat the response as semi-structured.**"
     },
     {
       "name": "list-todo-linked-resources",

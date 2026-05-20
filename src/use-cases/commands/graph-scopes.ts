@@ -195,6 +195,13 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-chats': ['Chat.ReadBasic'],
   'get-chat': ['Chat.ReadBasic'],
   'list-chat-members': ['ChatMember.Read'],
+  // chatsvcagg-tier commands — auth gates server-side on the captured Teams
+  // client identity, not on Graph delegated scopes. Empty array means "no
+  // Graph scope required" (the bearer audience is chatsvcagg.teams.microsoft.com,
+  // not graph.microsoft.com).
+  'list-teams-chats-with-messages': [],
+  'list-teams-chat-messages': [],
+  'get-teams-chat-message': [],
 
   // — Places (rooms) —
   'list-rooms': ['Place.Read.All'],

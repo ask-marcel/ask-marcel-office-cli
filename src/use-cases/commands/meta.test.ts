@@ -11,6 +11,14 @@ const schemaKeys = (schema: Command['schema']): string[] => {
 
 const placeholders = (template: string): string[] => Array.from(template.matchAll(/\{([a-z][a-z0-9-]*)\}/g), (m) => m[1] ?? '');
 
+// True when a Zod field is `.optional()` — used by the `required` invariant
+// below to keep meta.required in lock-step with the schema shape.
+const isOptionalSchemaField = (schema: Command['schema'], key: string): boolean => {
+  const shape = (schema as unknown as { shape?: Record<string, { isOptional?: () => boolean }> }).shape;
+  const field = shape?.[key];
+  return typeof field?.isOptional === 'function' ? field.isOptional() : false;
+};
+
 type PopulatedEntry = readonly [string, Command & { meta: CommandMeta }];
 
 const populated: ReadonlyArray<PopulatedEntry> = Object.entries(commands).map(([name, cmd]) => [name, cmd as Command & { meta: CommandMeta }] as PopulatedEntry);
@@ -41,9 +49,21 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
-      it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (the six runtime-additive OData passthrough flags are excluded)', () => {
-        const odataFlagNames = new Set(['top', 'skip', 'select', 'filter', 'orderby', 'expand']);
-        const expected = Array.from(new Set(cmd.meta.options.filter((o) => !odataFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
+      it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/skip-token analogues — are excluded)', () => {
+        const runtimeFlagNames = new Set([
+          'top',
+          'skip',
+          'select',
+          'filter',
+          'orderby',
+          'expand',
+          // chatsvcagg uses different query-param names than Graph's OData;
+          // they're functionally identical (runtime-additive, not path
+          // placeholders) so the invariant excludes them too.
+          'page-size',
+          'skip-token',
+        ]);
+        const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         const combined = `${cmd.meta.graphPathTemplate} ${cmd.meta.bodyTemplate ?? ''}`;
         const found = Array.from(new Set(placeholders(combined))).toSorted((a, b) => a.localeCompare(b));
         expect(found).toEqual(expected);
@@ -55,6 +75,24 @@ describe('command meta — invariants on every registered command', () => {
 
       it('provides a runnable example beginning with `ask-marcel`', () => {
         expect(cmd.meta.example).toMatch(/^ask-marcel /);
+      });
+
+      it('has a non-empty category, graphMethod from the HTTP-verb set, non-empty graphPathTemplate, and non-empty responseShape when declared (invariants on the meta block itself, killing inert-config-string mutants)', () => {
+        expect(cmd.meta.category.trim().length).toBeGreaterThan(0);
+        expect(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']).toContain(cmd.meta.graphMethod);
+        expect(cmd.meta.graphPathTemplate.trim().length).toBeGreaterThan(0);
+        // responseShape is optional on the type but, when present, must
+        // not be the empty string — that's the mutant we want to kill.
+        if (cmd.meta.responseShape !== undefined) {
+          expect(cmd.meta.responseShape.trim().length).toBeGreaterThan(0);
+        }
+      });
+
+      it('pairs each option.required with the schema field optionality — required:true iff the Zod field is NOT .optional() — keeping the help text and the runtime validator in lock-step', () => {
+        for (const opt of cmd.meta.options) {
+          const isOpt = isOptionalSchemaField(cmd.schema, opt.key);
+          expect({ key: opt.key, required: opt.required }).toEqual({ key: opt.key, required: !isOpt });
+        }
       });
 
       it('summary references only flags that are actually registered as options or aliases on this command', () => {

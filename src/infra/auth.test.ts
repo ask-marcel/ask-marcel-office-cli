@@ -23,8 +23,24 @@ const fakeBrowserAuth = (config?: {
   elevatedResult?: AccessToken | null;
   elevatedFailure?: ElevatedFailureReason;
   elevatedSequence?: ReadonlyArray<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>;
+  chatsvcaggResult?: AccessToken | null;
+  chatsvcaggFailure?: ElevatedFailureReason;
+  chatsvcaggError?: Error;
+  chatsvcaggSequence?: ReadonlyArray<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>;
 }): BrowserAuth => {
   let elevatedCallCount = 0;
+  let chatsvcaggCallCount = 0;
+  const chatsvcaggResult = (): { ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason } => {
+    if (config?.chatsvcaggSequence !== undefined) {
+      const value = config.chatsvcaggSequence[chatsvcaggCallCount] ?? config.chatsvcaggSequence[config.chatsvcaggSequence.length - 1];
+      chatsvcaggCallCount += 1;
+      return value ?? { ok: false as const, reason: 'sso_timeout' };
+    }
+    if (config?.chatsvcaggFailure !== undefined) return { ok: false as const, reason: config.chatsvcaggFailure };
+    const v = config?.chatsvcaggResult;
+    if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
+    return { ok: true as const, token: v };
+  };
   return {
     acquireToken: async () => {
       if (config?.acquireError) throw config.acquireError;
@@ -48,15 +64,19 @@ const fakeBrowserAuth = (config?: {
     acquireBothTokens: async () => {
       if (config?.acquireError) throw config.acquireError;
       const teams = config?.acquireResult ?? null;
-      if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+      if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult() };
       const v = config?.elevatedResult;
       if (config?.elevatedFailure !== undefined) {
-        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure } };
+        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure }, chatsvcagg: chatsvcaggResult() };
       }
       if (v === undefined || v === null) {
-        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult() };
       }
-      return { teams, elevated: { ok: true as const, token: v } };
+      return { teams, elevated: { ok: true as const, token: v }, chatsvcagg: chatsvcaggResult() };
+    },
+    acquireChatsvcaggToken: async () => {
+      if (config?.chatsvcaggError) throw config.chatsvcaggError;
+      return chatsvcaggResult();
     },
     close: async () => {},
   };
@@ -183,6 +203,7 @@ describe('auth manager recovery ladder', () => {
       acquireBothTokens: async () => {
         throw 'edge process killed';
       },
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -316,7 +337,12 @@ describe('auth manager recovery ladder', () => {
     const stringThrower: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
       close: async () => {
         throw 'edge crashed during close';
       },
@@ -338,7 +364,12 @@ describe('auth manager recovery ladder', () => {
     const failingBrowser: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
       close: async () => {
         throw new Error('close failed');
       },
@@ -504,7 +535,12 @@ describe('auth manager elevated token', () => {
       acquireElevatedToken: async () => {
         throw new Error('playwright not installed');
       },
-      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -545,7 +581,12 @@ describe('auth manager elevated token', () => {
     const elevatedFailed: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireBothTokens: async () => ({ teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireBothTokens: async () => ({
+        teams,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(elevatedFailed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -660,7 +701,12 @@ describe('auth manager elevated token', () => {
     const failed: BrowserAuth = {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireBothTokens: async () => ({ teams, elevated: { ok: false as const, reason: 'navigation_failed' as const } }),
+      acquireBothTokens: async () => ({
+        teams,
+        elevated: { ok: false as const, reason: 'navigation_failed' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(failed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -694,7 +740,12 @@ describe('auth manager elevated token', () => {
       acquireElevatedToken: async () => {
         throw 'edge process killed by SIGKILL';
       },
-      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -720,8 +771,9 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         const teams = await new Promise<BrowserTokenResult>((resolve) => {
           resolveLoginRef.current = resolve;
         });
-        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
       },
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -747,8 +799,9 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireBothTokens: async () => {
         acquireCallCount += 1;
-        return { teams: futureToken(), elevated: { ok: false as const, reason: 'sso_timeout' as const } };
+        return { teams: futureToken(), elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
       },
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -777,7 +830,12 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
           resolveElevatedRef.current = (v) => resolve({ ok: true, token: v });
         });
       },
-      acquireBothTokens: async () => ({ teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const } }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -792,5 +850,180 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
     expect(resA.ok).toBe(true);
     expect(resB.ok).toBe(true);
     expect(elevatedCallCount).toBe(1);
+  });
+});
+
+// Teams substrate (chatsvcagg) token capture. Mirrors the elevated-token
+// recovery ladder one-for-one — same single-session capture at login, same
+// cache hit / cache miss / silent recapture / launch+navigation failure
+// branches. Tests live in their own describe so a future cache redesign
+// can move chatsvcagg out without touching the elevated tests.
+const futureChatsvcagg = (): AccessToken => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const header = btoa(JSON.stringify({ alg: 'RS256' }));
+  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://chatsvcagg.teams.microsoft.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' }));
+  return accessTokenUnsafe(`${header}.${payload}.sig`);
+};
+
+describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
+  it('returns the cached chatsvcagg token when it is fresh (cache hit, no browser recapture)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const token = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: future, refresh_token: 'r', chatsvcagg_access_token: token, chatsvcagg_expires_on: future }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result).toEqual(ok(token));
+  });
+
+  it('triggers silent re-capture when the cached chatsvcagg token is expired and the persistent profile cookies are still warm', async () => {
+    const past = Math.floor(Date.now() / 1000) - 60;
+    const fresh = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'warm-cookies');
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: past }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result).toEqual(ok(fresh));
+    const cached = await fs.readJson<{ chatsvcagg_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(fresh);
+  });
+
+  it('reports the launch_timeout-specific message when the chatsvcagg re-capture browser launch times out', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('chatsvcagg browser launch timed out');
+      expect(result.error.message).toContain('logout');
+      expect(result.error.message).toContain('list-teams-chats-with-messages');
+    }
+  });
+
+  it('reports the navigation_failed-specific message when the chatsvcagg re-capture cannot reach teams.microsoft.com', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('navigation to teams.microsoft.com did not complete');
+      expect(result.error.message).toContain('corp-proxy');
+    }
+  });
+
+  it('reports the sso_timeout fallback message when the chatsvcagg re-capture is silently denied by stale profile cookies', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'sso_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('chatsvcagg token capture timed out');
+      expect(result.error.message).toContain('persistent browser-profile cookies are likely expired');
+    }
+  });
+
+  it('surfaces the underlying thrown message when the chatsvcagg re-capture throws non-Result', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggError: new Error('playwright crashed') }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toBe('chatsvcagg capture threw: playwright crashed');
+    }
+  });
+
+  it('persists chatsvcagg at login when both Teams + chatsvcagg captures succeed in the same session (round-2 single-session pattern)', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
+    const chatsvcagg = futureChatsvcagg();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggResult: chatsvcagg }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    const cached = await fs.readJson<{ chatsvcagg_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(chatsvcagg);
+    expect(auth.getLastChatsvcaggOutcome()).toEqual({ captured: true });
+  });
+
+  it('records the captured=false outcome when Teams succeeds at login but chatsvcagg silently times out (mirrors elevated round-2 behaviour)', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggFailure: 'sso_timeout' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs
+    );
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    expect(auth.getLastChatsvcaggOutcome()).toEqual({ captured: false, reason: 'sso_timeout' });
+  });
+
+  it('two concurrent getChatsvcaggAccessToken calls share one re-capture (same serialization as the elevated path)', async () => {
+    let chatsvcaggCallCount = 0;
+    const resolveRef: { current: ((v: AccessToken) => void) | null } = { current: null };
+    const fs = createFileSystemFake();
+    const slowBrowser: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => {
+        chatsvcaggCallCount += 1;
+        return new Promise<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>((resolve) => {
+          resolveRef.current = (v) => resolve({ ok: true, token: v });
+        });
+      },
+      close: async () => {},
+    };
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const a = auth.getChatsvcaggAccessToken();
+    const b = auth.getChatsvcaggAccessToken();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(chatsvcaggCallCount).toBe(1);
+    if (resolveRef.current) resolveRef.current(futureChatsvcagg());
+    const [resA, resB] = await Promise.all([a, b]);
+    expect(resA.ok).toBe(true);
+    expect(resB.ok).toBe(true);
+    expect(chatsvcaggCallCount).toBe(1);
+  });
+
+  it('getLastChatsvcaggOutcome returns null before any browser step has run', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'r' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    await auth.getAccessToken();
+    expect(auth.getLastChatsvcaggOutcome()).toBeNull();
+  });
+
+  it('persists chatsvcagg alongside an empty Teams token slot when the cache file does not exist yet (covers persistChatsvcagg default-merge branch)', async () => {
+    const fs = createFileSystemFake();
+    const chatsvcagg = futureChatsvcagg();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: chatsvcagg }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(true);
+    const cached = await fs.readJson<{ access_token?: string; chatsvcagg_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(chatsvcagg);
+    expect(cached.ok && cached.value.access_token).toBe('');
+  });
+
+  it('treats a chatsvcagg token whose exp falls inside the 60s expiry buffer as stale and re-captures (covers freshChatsvcaggToken boundary)', async () => {
+    const almostExpired = Math.floor(Date.now() / 1000) + 30; // inside the 60s buffer
+    const fresh = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'unused', expires_on: almostExpired, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: almostExpired })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result).toEqual(ok(fresh));
   });
 });

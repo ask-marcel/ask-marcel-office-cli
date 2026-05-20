@@ -9,6 +9,8 @@ const fakeAuth = (): AuthManager => ({
   getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
+  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+  getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
 
@@ -50,6 +52,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed' as const, message: 'no auth' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     });
     const result = await client.get('/me/drives');
@@ -104,6 +108,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth);
@@ -455,6 +461,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'token gone' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
@@ -667,6 +675,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'no token' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
@@ -711,6 +721,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'no token' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth);
@@ -753,6 +765,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -768,6 +782,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -811,6 +827,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failingAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -826,6 +844,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe('test')),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth, async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -856,6 +876,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(tokenAuth);
@@ -875,6 +897,8 @@ describe('graph client', () => {
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(tokenAuth);
@@ -892,6 +916,8 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(cancelledAuth);
@@ -905,11 +931,94 @@ describe('graph client', () => {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'token store unreadable' } }),
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const client = createGraphClient(failedAuth);
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('token store unreadable');
+  });
+
+  it('teamsChat signs requests against chatsvcagg.teams.microsoft.com using the chatsvcagg-tier bearer', async () => {
+    let captured: { url: string; auth: string | undefined } | null = null;
+    const captureFetch: FetchFn = async (url, init) => {
+      const auth = init?.headers as Record<string, string> | undefined;
+      captured = { url, auth: auth?.['Authorization'] };
+      return Response.json({ messages: [], _skipToken: null });
+    };
+    const okChatsvcaggAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+      logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getLastChatsvcaggOutcome: () => null,
+      getLastElevatedOutcome: () => null,
+    };
+    const client = createGraphClient(okChatsvcaggAuth, captureFetch);
+    const result = await client.teamsChat('/api/v2/users/me/chats');
+    expect(result.ok).toBe(true);
+    expect(captured).not.toBeNull();
+    expect(captured!.url).toBe('https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats');
+    expect(captured!.auth).toBe('Bearer test-chatsvcagg-token');
+  });
+
+  it('teamsChat returns auth_failed with "Auth cancelled" when chatsvcagg auth was cancelled (covers the cancel branch of chatsvcaggAuthHeaders)', async () => {
+    const fetchFn = fakeFetch([{ match: () => true, body: {} }]);
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.teamsChat('/api/v2/users/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('Auth cancelled');
+  });
+
+  it('teamsChat propagates the underlying auth-manager error message when chatsvcagg recapture fails (covers the non-cancel branch of chatsvcaggAuthHeaders)', async () => {
+    const fetchFn = fakeFetch([{ match: () => true, body: {} }]);
+    const failedAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+      logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'chatsvcagg token capture timed out' } }),
+      getLastChatsvcaggOutcome: () => null,
+      getLastElevatedOutcome: () => null,
+    };
+    const client = createGraphClient(failedAuth, fetchFn);
+    const result = await client.teamsChat('/api/v2/users/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('chatsvcagg token capture timed out');
+  });
+
+  it('teamsChat returns network_error with a 60s tier label when the fetch hangs past the JSON request timeout', async () => {
+    const okChatsvcaggAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+      logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getLastChatsvcaggOutcome: () => null,
+      getLastElevatedOutcome: () => null,
+    };
+    const client = createGraphClient(okChatsvcaggAuth, timeoutFetch);
+    const result = await client.teamsChat('/api/v2/users/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'network_error') {
+      expect(result.error.message).toContain('request timed out after 60s');
+      expect(result.error.message).toContain('GET /api/v2/users/me/chats');
+    }
+  });
+
+  it('teamsChat returns api_error with the status when chatsvcagg responds non-2xx', async () => {
+    const fetchFn = fakeFetch([{ match: (url) => url.includes('chatsvcagg'), body: { error: 'unauthorized' }, status: 401 }]);
+    const okChatsvcaggAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+      logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getLastChatsvcaggOutcome: () => null,
+      getLastElevatedOutcome: () => null,
+    };
+    const client = createGraphClient(okChatsvcaggAuth, fetchFn);
+    const result = await client.teamsChat('/api/v2/users/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(401);
   });
 });

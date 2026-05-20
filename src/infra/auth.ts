@@ -1,5 +1,5 @@
 import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken } from '../domain/access-token.ts';
+import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
@@ -23,6 +23,18 @@ type CachedToken = {
    */
   elevated_access_token?: string;
   elevated_expires_on?: number;
+  /**
+   * chatsvcagg-audience bearer: same Teams web client identity as
+   * `access_token`, but minted for `chatsvcagg.teams.microsoft.com`
+   * (the Teams chat-aggregator API). Used by `list-teams-chats-with-messages`
+   * and siblings — endpoints that return chat metadata WITH recent
+   * message bodies inlined, which Graph's `Chat.Read*`-gated endpoints
+   * can't reach with the scopes the CLI's two existing tokens carry.
+   * Same refresh model as elevated: re-capture via the persistent
+   * browser profile.
+   */
+  chatsvcagg_access_token?: string;
+  chatsvcagg_expires_on?: number;
 };
 type AuthError = { type: 'auth_failed'; message: string } | { type: 'auth_cancelled' };
 /**
@@ -42,6 +54,13 @@ type AuthManager = {
    * via headless Playwright. Used by the 3 historical-version commands.
    */
   getElevatedAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  /**
+   * Returns a chatsvcagg-audience token (same Teams web client identity
+   * as `getAccessToken`, but issued for the chatsvcagg resource). Falls
+   * through cache → re-capture via headless Playwright. Used by the
+   * `list-teams-chats-with-messages` family of commands.
+   */
+  getChatsvcaggAccessToken: () => Promise<Result<AccessToken, AuthError>>;
   logout: () => Promise<Result<void, AuthError>>;
   /**
    * Inspect the elevated-capture outcome from the most recent
@@ -50,6 +69,12 @@ type AuthManager = {
    * Login-fix round-1 Wave D.
    */
   getLastElevatedOutcome: () => ElevatedOutcome | null;
+  /**
+   * Inspect the chatsvcagg-capture outcome from the most recent
+   * `acquireViaBrowser` invocation. Same shape and lifetime semantics
+   * as `getLastElevatedOutcome`.
+   */
+  getLastChatsvcaggOutcome: () => ElevatedOutcome | null;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
@@ -88,6 +113,14 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     await writeCache(next);
   };
 
+  const persistChatsvcagg = async (chatsvcagg: AccessToken): Promise<void> => {
+    const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
+    const claims = decodeJwtPayload(chatsvcagg);
+    const exp = claims.exp as number | undefined;
+    const next: CachedToken = { ...existing, chatsvcagg_access_token: chatsvcagg, chatsvcagg_expires_on: exp ?? 0 };
+    await writeCache(next);
+  };
+
   const refreshToken = async (cached: CachedToken): Promise<Result<AccessToken, AuthError>> => {
     const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: cached.refresh_token, scope: SCOPES });
     let res: Response;
@@ -121,6 +154,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
   // null on every fresh `acquireViaBrowser` so stale outcomes don't
   // leak across login attempts.
   let lastElevatedOutcome: ElevatedOutcome | null = null;
+  let lastChatsvcaggOutcome: ElevatedOutcome | null = null;
 
   const acquireViaBrowser = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
@@ -134,7 +168,12 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       // memory. Also drops the round-1 auto-heal profile wipe — it was
       // wiping the freshly-authenticated Teams cookies and making
       // federated tenants strictly worse.
-      const { teams: result, elevated } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
+      //
+      // Substrate (chatsvcagg) round: same teams.microsoft.com session
+      // emits the chatsvcagg-audience bearer on its initial chat-list
+      // load, so the third capture leg piggy-backs on the existing
+      // browser run — zero additional UI prompts.
+      const { teams: result, elevated, chatsvcagg } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
       if (!result) return err({ type: 'auth_cancelled' });
       const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
       if (elevated.ok) {
@@ -145,6 +184,14 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
         lastElevatedOutcome = { captured: false, reason: elevated.reason };
       }
       await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
+      if (chatsvcagg.ok) {
+        logger.info('auth.chatsvcagg.captured_at_login');
+        lastChatsvcaggOutcome = { captured: true };
+        await persistChatsvcagg(chatsvcagg.token);
+      } else {
+        logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
+        lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
+      }
       logger.info('auth.ladder.rung', { rung: 'browser' });
       return ok(result.accessToken);
     } catch (e) {
@@ -257,6 +304,66 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     return recaptureElevatedShared();
   };
 
+  // chatsvcagg shares the elevated buffer + recovery shape: token has no
+  // refresh, and silent re-capture rides on the persistent profile.
+  const freshChatsvcaggToken = (cached: CachedToken | null): string | undefined => {
+    if (!cached?.chatsvcagg_access_token || !cached.chatsvcagg_expires_on) return undefined;
+    if (Date.now() / 1000 >= cached.chatsvcagg_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
+    return cached.chatsvcagg_access_token;
+  };
+
+  const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
+    if (reason === 'launch_timeout') {
+      return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message.)';
+    }
+    if (reason === 'navigation_failed') {
+      return 'chatsvcagg capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
+    }
+    return 'chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message.)';
+  };
+
+  const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => {
+    try {
+      const captured = await browserAuth.acquireChatsvcaggToken();
+      if (!captured.ok) {
+        return err({ type: 'auth_failed', message: recoverableChatsvcaggFailureMessage(captured.reason) });
+      }
+      await persistChatsvcagg(captured.token);
+      logger.info('auth.chatsvcagg.recaptured');
+      return ok(captured.token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `chatsvcagg capture threw: ${msg}` });
+    }
+  };
+
+  let inFlightChatsvcaggRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureChatsvcaggShared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightChatsvcaggRecapture !== null) {
+      logger.info('auth.chatsvcagg.shared_in_flight');
+      return inFlightChatsvcaggRecapture;
+    }
+    const launched = recaptureChatsvcagg();
+    inFlightChatsvcaggRecapture = launched.finally(() => {
+      inFlightChatsvcaggRecapture = null;
+    });
+    return inFlightChatsvcaggRecapture;
+  };
+
+  const getChatsvcaggAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
+    // chatsvcagg tokens carry `aud=https://chatsvcagg.teams.microsoft.com`,
+    // not Graph — the `accessToken()` validator's `isGraphToken` check
+    // would reject every cached chatsvcagg token and force a recapture on
+    // every call. `freshChatsvcaggToken` already validates expiry from the
+    // JWT payload, which is the only thing we need at this boundary.
+    const fresh = freshChatsvcaggToken(await readCache());
+    if (fresh !== undefined && fresh.startsWith('eyJ')) {
+      logger.info('auth.chatsvcagg.cache_hit');
+      return ok(accessTokenUnsafe(fresh));
+    }
+    return recaptureChatsvcaggShared();
+  };
+
   const logout = async (): Promise<Result<void, AuthError>> => {
     try {
       await fs.deleteIfExists(cachePath);
@@ -281,8 +388,9 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
   };
 
   const getLastElevatedOutcome = (): ElevatedOutcome | null => lastElevatedOutcome;
+  const getLastChatsvcaggOutcome = (): ElevatedOutcome | null => lastChatsvcaggOutcome;
 
-  return { getAccessToken, getElevatedAccessToken, logout, getLastElevatedOutcome };
+  return { getAccessToken, getElevatedAccessToken, getChatsvcaggAccessToken, logout, getLastElevatedOutcome, getLastChatsvcaggOutcome };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());

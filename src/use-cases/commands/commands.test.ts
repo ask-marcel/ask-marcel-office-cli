@@ -92,6 +92,9 @@ import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
+import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
+import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
+import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
 import * as listRecentFiles from './list-recent-files.ts';
@@ -245,6 +248,9 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'get-team-channel': getTeamChannel,
   'list-chats': listChats,
   'get-chat': getChat,
+  'list-teams-chats-with-messages': listTeamsChatsWithMessages,
+  'list-teams-chat-messages': listTeamsChatMessages,
+  'get-teams-chat-message': getTeamsChatMessage,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,
   'list-my-memberships': listMyMemberships,
@@ -320,6 +326,8 @@ const fakeAuth = (): AuthManager => ({
   getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
+  getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+  getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
 
@@ -2933,6 +2941,9 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-team-channels', params: { teamId: 'tm1' } },
   { name: 'get-team-channel', params: { teamId: 'tm1', channelId: 'ch1' } },
   { name: 'list-chats', params: {} },
+  { name: 'list-teams-chats-with-messages', params: {} },
+  { name: 'list-teams-chat-messages', params: { chatId: '19:abc@thread.v2' } },
+  { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2', messageId: 'm1' } },
   { name: 'get-chat', params: { chatId: 'ch1' } },
   { name: 'list-my-direct-reports', params: {} },
   { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' } },
@@ -3076,6 +3087,8 @@ describe('command schema rejection', () => {
     { name: 'get-sharepoint-site-onenote-page-content', params: {} },
     { name: 'list-drive-item-thumbnails', params: {} },
     { name: 'get-excel-used-range', params: {} },
+    { name: 'list-teams-chat-messages', params: {} },
+    { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2' } },
   ];
 
   it.each(rejectCases)('$name rejects missing required params as a validation_error Result', async ({ name, params }) => {
@@ -3337,6 +3350,138 @@ describe('all commands build correct Graph URL', () => {
   it.each(pathFixtures)('$name calls $expectedPath', async ({ name, params, expectedPath }) => {
     const url = await capturedUrl(name, params);
     expect(url).toBe(`https://graph.microsoft.com/v1.0${expectedPath}`);
+  });
+});
+
+// chatsvcagg-tier commands hit a different host than the Graph base URL —
+// they sign with the Teams substrate bearer captured at login. URL shape is
+// verified separately because it's not Graph-prefixed.
+const chatsvcaggPathFixtures: Array<{ name: string; params: Record<string, string>; expectedUrl: string }> = [
+  {
+    name: 'list-teams-chats-with-messages',
+    params: { pageSize: '20' },
+    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats?isPaginationEnabled=true&pageSize=20',
+  },
+  {
+    name: 'list-teams-chat-messages',
+    params: { chatId: '19:abc@thread.v2', pageSize: '30' },
+    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/19%3Aabc%40thread.v2/messages?pageSize=30',
+  },
+  {
+    name: 'get-teams-chat-message',
+    params: { chatId: '19:abc@thread.v2', messageId: '1700000000001' },
+    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/19%3Aabc%40thread.v2/messages/1700000000001',
+  },
+];
+
+describe('chatsvcagg-tier commands call the Teams substrate aggregator', () => {
+  it.each(chatsvcaggPathFixtures)('$name calls $expectedUrl', async ({ name, params, expectedUrl }) => {
+    const url = await capturedUrl(name, params);
+    expect(url).toBe(expectedUrl);
+  });
+
+  // pageSize default is the empirical Teams-web page size (20 for the
+  // aggregator, 50 for per-chat history). Mutation guard against
+  // `parsed.data.pageSize ?? '20'` flipping the default.
+  it('list-teams-chats-with-messages defaults pageSize to 20 when --page-size is omitted', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', {});
+    expect(url).toContain('pageSize=20');
+  });
+
+  it('list-teams-chat-messages defaults pageSize to 50 when --page-size is omitted', async () => {
+    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2' });
+    expect(url).toContain('pageSize=50');
+  });
+
+  // skipToken is appended only when present — mutation guard against the
+  // conditional flipping. Pass an opaque cursor and assert it lands on
+  // the wire URL-encoded.
+  it('list-teams-chats-with-messages appends skipToken when --skip-token is provided', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', { skipToken: 'opaque-cursor-123' });
+    expect(url).toContain('skipToken=opaque-cursor-123');
+    expect(url).toContain('isPaginationEnabled=true');
+  });
+
+  it('list-teams-chats-with-messages does NOT append skipToken when omitted', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', {});
+    expect(url).not.toContain('skipToken');
+  });
+
+  it('list-teams-chat-messages appends skipToken when --skip-token is provided', async () => {
+    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2', skipToken: 'cursor-xyz' });
+    expect(url).toContain('skipToken=cursor-xyz');
+  });
+
+  it('list-teams-chat-messages does NOT append skipToken when omitted', async () => {
+    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2' });
+    expect(url).not.toContain('skipToken');
+  });
+
+  // pageSize regex rejects non-positive-integer inputs — mutation guard
+  // against the regex anchors being dropped.
+  it('list-teams-chats-with-messages rejects pageSize "0" (regex anchor guard)', async () => {
+    const cmd = cmdMap['list-teams-chats-with-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: '0' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('list-teams-chats-with-messages rejects pageSize "abc" (regex non-digit guard)', async () => {
+    const cmd = cmdMap['list-teams-chats-with-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: 'abc' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('list-teams-chats-with-messages rejects pageSize "10abc" (regex end-anchor guard)', async () => {
+    const cmd = cmdMap['list-teams-chats-with-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: '10abc' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('list-teams-chats-with-messages rejects pageSize "a10" (regex start-anchor guard — non-digit prefix must NOT be accepted)', async () => {
+    const cmd = cmdMap['list-teams-chats-with-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: 'a10' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('list-teams-chats-with-messages accepts pageSize "100" (regex `*` quantifier guard — three-digit values are valid)', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', { pageSize: '100' });
+    expect(url).toContain('pageSize=100');
+  });
+
+  it('list-teams-chat-messages rejects pageSize "0" (regex anchor guard)', async () => {
+    const cmd = cmdMap['list-teams-chat-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c1', pageSize: '0' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('list-teams-chat-messages rejects pageSize "10abc" (regex end-anchor guard)', async () => {
+    const cmd = cmdMap['list-teams-chat-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c1', pageSize: '10abc' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  // Chat-ID + Message-ID are URI-encoded into the path (colons +
+  // ats are %-encoded). Mutation guard on the encodeURIComponent call.
+  it('list-teams-chat-messages URI-encodes the chat id in the path', async () => {
+    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2' });
+    expect(url).toContain('/chats/19%3Aabc%40thread.v2/messages');
+  });
+
+  it('get-teams-chat-message URI-encodes both chat id AND message id in the path', async () => {
+    const url = await capturedUrl('get-teams-chat-message', { chatId: '19:abc@thread.v2', messageId: 'm/with/slashes' });
+    expect(url).toContain('/chats/19%3Aabc%40thread.v2/messages/m%2Fwith%2Fslashes');
   });
 });
 

@@ -965,3 +965,220 @@ describe('browser auth — single-session acquireBothTokens (login-fix round-2)'
     expect(result.elevated.ok).toBe(true);
   });
 });
+
+// chatsvcagg-tier capture. The chatsvcagg-audience bearer is minted by the
+// Teams web client (same appid as the basic Teams identity, different
+// audience). In login-fix round-3 the chatsvcagg leg is captured in the
+// same browser session as Teams + elevated; the standalone
+// `acquireChatsvcaggToken` is the re-capture fallback when only the
+// chatsvcagg cache slot has expired and the persistent profile is warm.
+describe('browser auth — chatsvcagg capture (Teams substrate audience)', () => {
+  const chatsvcaggJwt = (): string =>
+    makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+
+  const chatsvcaggRequest = (): RequestLike => ({
+    url: () => 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats',
+    headers: () => ({ authorization: `Bearer ${chatsvcaggJwt()}` }),
+  });
+
+  it('captures a chatsvcagg-audience Bearer in the same single-session run as Teams + elevated (no third browser)', async () => {
+    const elevatedJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://graph.microsoft.com',
+      appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1',
+    });
+    const elevatedRequest: RequestLike = {
+      url: () => 'https://graph.microsoft.com/v1.0/me',
+      headers: () => ({ authorization: `Bearer ${elevatedJwt}` }),
+    };
+    // Both the Teams token (response listener) and the chatsvcagg bearer
+    // (request listener) are emitted by the SAME page run — the second
+    // goto navigates to m365.cloud.microsoft for the elevated leg.
+    const { api, getLaunchCount } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
+        requestsPerGoto: [[chatsvcaggRequest()], [elevatedRequest]],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(result.chatsvcagg.ok).toBe(true);
+    if (result.chatsvcagg.ok) expect(result.chatsvcagg.token as unknown as string).toBe(chatsvcaggJwt());
+    expect(getLaunchCount()).toBe(1);
+  });
+
+  it('captures a chatsvcagg bearer via the standalone re-capture path when no Teams response is ever seen but the request listener fires', async () => {
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[chatsvcaggRequest()]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token as unknown as string).toBe(chatsvcaggJwt());
+  });
+
+  it('returns { ok: false, reason: "sso_timeout" } from standalone re-capture when no chatsvcagg request fires within the deadline', async () => {
+    const { api } = makeFakeApi({
+      pageOpts: { urlsAfterGoto: ['https://teams.microsoft.com/v2/'] },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 30, pollIntervalMs: 5, elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  it('returns { ok: false, reason: "navigation_failed" } from standalone re-capture when teams.microsoft.com goto throws and no request was captured', async () => {
+    const { api } = makeFakeApi({
+      pageOpts: {
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+        gotoErrors: [new Error('NS_ERROR_PROXY_CONNECTION_REFUSED')],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 30, pollIntervalMs: 5, elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('navigation_failed');
+  });
+
+  it('returns { ok: false, reason: "launch_timeout" } from standalone re-capture when launchPersistentContext hangs', async () => {
+    const hangingApi: BrowserAuthApi = {
+      launchPersistentContext: () => new Promise(() => undefined),
+    };
+    const browser = createBrowserAuthFromApi(hangingApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('returns { ok: false, reason: "launch_timeout" } from standalone re-capture when newPage hangs (distinct hang point)', async () => {
+    const hangingPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: () => new Promise(() => undefined),
+        clearCookies: async () => undefined,
+        close: async () => undefined,
+      }),
+    };
+    const browser = createBrowserAuthFromApi(hangingPageApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('propagates non-timeout errors from launchPersistentContext (e.g. Playwright not installed)', async () => {
+    const erroringApi: BrowserAuthApi = {
+      launchPersistentContext: async () => {
+        throw new Error('playwright executable missing');
+      },
+    };
+    const browser = createBrowserAuthFromApi(erroringApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    await expect(browser.acquireChatsvcaggToken()).rejects.toThrow('playwright executable missing');
+  });
+
+  it('propagates non-timeout errors from newPage and closes the context to avoid a leak', async () => {
+    let closedCount = 0;
+    const erroringPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: async () => {
+          throw new Error('context disposed');
+        },
+        clearCookies: async () => undefined,
+        close: async () => {
+          closedCount += 1;
+        },
+      }),
+    };
+    const browser = createBrowserAuthFromApi(erroringPageApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    await expect(browser.acquireChatsvcaggToken()).rejects.toThrow('context disposed');
+    expect(closedCount).toBe(1);
+  });
+
+  it('ignores Bearer tokens that do not match the chatsvcagg audience (e.g. Graph-audience traffic on the same page)', async () => {
+    const graphAudJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://graph.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const wrongAudRequest: RequestLike = {
+      url: () => 'https://graph.microsoft.com/v1.0/me',
+      headers: () => ({ authorization: `Bearer ${graphAudJwt}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[wrongAudRequest]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 30, pollIntervalMs: 5, elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  it('ignores chatsvcagg-audience Bearer tokens that fail JWT validation (expired)', async () => {
+    const expired = makeJwt({
+      exp: Math.floor(Date.now() / 1000) - 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const expiredRequest: RequestLike = {
+      url: () => 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats',
+      headers: () => ({ authorization: `Bearer ${expired}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[expiredRequest]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 30, pollIntervalMs: 5, elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  it('ignores requests without an Authorization header during chatsvcagg standalone capture', async () => {
+    const noAuthRequest: RequestLike = {
+      url: () => 'https://teams.microsoft.com/static/asset.js',
+      headers: () => ({ accept: 'text/javascript' }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[noAuthRequest]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ pollDeadlineMs: 30, pollIntervalMs: 5, elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  it('keeps capturing only the FIRST chatsvcagg Bearer it sees and ignores subsequent ones (matches elevated-tier behavior)', async () => {
+    const first = chatsvcaggJwt();
+    const second = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 7200,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const firstReq: RequestLike = { url: () => 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats', headers: () => ({ authorization: `Bearer ${first}` }) };
+    const secondReq: RequestLike = { url: () => 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/x/messages', headers: () => ({ authorization: `Bearer ${second}` }) };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[firstReq, secondReq]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token as unknown as string).toBe(first);
+  });
+});

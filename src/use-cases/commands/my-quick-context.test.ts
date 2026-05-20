@@ -15,6 +15,7 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
     post: async () => ok({}),
     getBinary: async () => ok({}),
     getElevated: async () => ok({}),
+    teamsChat: async () => ok({}),
     getBinaryElevated: async () => ok({}),
     fetchUrl: async () => ok({}),
     put: async () => ok({}),

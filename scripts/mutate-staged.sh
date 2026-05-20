@@ -26,10 +26,9 @@ fi
 count=$(echo "$files" | wc -l | tr -d ' ')
 echo "mutate:staged: testing ${count} file(s)"
 
-# Stryker accepts repeated --mutate args; each one narrows the mutation set.
-mutate_args=()
-while IFS= read -r f; do
-  mutate_args+=(--mutate "$f")
-done <<< "$files"
+# Stryker's `--mutate` flag takes a single comma-separated pattern list;
+# repeating `--mutate` keeps only the LAST value. Join the file list into
+# one comma-separated argument so all staged files are mutated together.
+mutate_arg=$(echo "$files" | paste -sd, -)
 
-bunx stryker run "${mutate_args[@]}"
+bunx stryker run --mutate "$mutate_arg"

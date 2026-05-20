@@ -83,6 +83,9 @@ import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
+import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
+import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
+import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
 import * as listRecentFiles from './list-recent-files.ts';
@@ -238,6 +241,9 @@ const commands: Record<string, Command> = {
   'get-team-channel': getTeamChannel,
   'list-chats': listChats,
   'get-chat': getChat,
+  'list-teams-chats-with-messages': listTeamsChatsWithMessages,
+  'list-teams-chat-messages': listTeamsChatMessages,
+  'get-teams-chat-message': getTeamsChatMessage,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,
   'list-my-memberships': listMyMemberships,

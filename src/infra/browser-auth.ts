@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken } from '../domain/access-token.ts';
-import { decodeJwtPayload } from '../domain/jwt-utils.ts';
+import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
+import { decodeJwtPayload, isTokenFresh } from '../domain/jwt-utils.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
@@ -26,19 +26,23 @@ type ElevatedFailureReason = 'launch_timeout' | 'navigation_failed' | 'sso_timeo
 type ElevatedTokenResult = { readonly ok: true; readonly token: AccessToken } | { readonly ok: false; readonly reason: ElevatedFailureReason };
 
 /**
- * Combined outcome of capturing BOTH the Teams web client token AND the
- * elevated M365ChatClient token inside one browser session. Login-fix
- * round-2 introduced this to fix the user-visible "second browser asks
- * me to log in again" symptom on federated tenants (ExampleCorp / ThirdPartyIdP): the
- * old flow opened two separate browser sessions, and silent SSO for the
- * elevated identity wouldn't pick up the cookies just freshly written
- * by the first session. Capturing both in one context means cookies are
- * live in memory — no disk-commit-vs-read race, no separate sign-in
- * prompt for the elevated identity.
+ * Combined outcome of capturing all three tokens (Teams basic / M365
+ * elevated / chatsvcagg substrate) inside one browser session. Login-fix
+ * round-2 introduced this for the basic+elevated pair to fix the "second
+ * browser asks me to log in again" symptom on federated tenants
+ * (ExampleCorp / ThirdPartyIdP) — capturing both in one context kept the federated
+ * cookie chain live in memory. The substrate (chatsvcagg) capture rides
+ * on the SAME teams.microsoft.com session that emits the basic Teams
+ * token, so adding a third capture leg is essentially free.
+ *
+ * The chatsvcagg slot reuses `ElevatedTokenResult` directly — same
+ * three failure modes apply (launch hang / navigation failure / silent
+ * SSO timeout), no new discriminants needed.
  */
 type BothTokensResult = {
   readonly teams: BrowserTokenResult | null;
   readonly elevated: ElevatedTokenResult;
+  readonly chatsvcagg: ElevatedTokenResult;
 };
 
 type BrowserAuth = {
@@ -63,6 +67,19 @@ type BrowserAuth = {
    * `acquireBothTokens` instead so the user sees only one browser.
    */
   acquireElevatedToken: () => Promise<ElevatedTokenResult>;
+  /**
+   * Capture a chatsvcagg-audience bearer (Teams basic identity, but the
+   * `chatsvcagg.teams.microsoft.com` resource instead of Graph) by
+   * navigating headless to `teams.microsoft.com/v2/`. The persistent
+   * profile's SSO cookies do the auth silently. Used by
+   * `getChatsvcaggAccessToken()` when the cached chatsvcagg token has
+   * expired and the basic Teams session is still warm.
+   *
+   * Same failure-mode shape as `acquireElevatedToken` — launch hang,
+   * navigation failure, silent SSO timeout — so the auth-manager can
+   * reuse the same auto-heal logic.
+   */
+  acquireChatsvcaggToken: () => Promise<ElevatedTokenResult>;
   /**
    * Login-fix round-2: capture BOTH tokens inside ONE browser session.
    * After the Teams response listener intercepts the Teams token,
@@ -180,6 +197,34 @@ const ELEVATED_APP_IDS: ReadonlyArray<string> = [
 ];
 
 const M365_CLOUD_URL = 'https://m365.cloud.microsoft/search';
+
+/**
+ * The Microsoft Teams web client identity. The Phase A probe at
+ * `scripts/probe-elevated-scopes.ts` confirmed empirically that the same
+ * appid that mints the basic Graph token ALSO mints separate-audience
+ * tokens for chatsvcagg, IC3, the Skype substrate, and Outlook — the
+ * Teams web app multiplexes them via MSAL's `acquireTokenSilent` with
+ * different `scopes` arrays. We piggy-back on the chatsvcagg one.
+ */
+const BASIC_TEAMS_APP_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
+
+/**
+ * Substrate audience the chatsvcagg capture is gated by. Adding to this
+ * list would extend the capture to additional audiences from the same
+ * identity (IC3 messaging, Skype, Outlook). Only chatsvcagg is needed for
+ * Phase C; the others are Phase D candidates.
+ */
+const CHATSVCAGG_AUD = 'https://chatsvcagg.teams.microsoft.com';
+
+/**
+ * Standalone re-capture target for the chatsvcagg token — the Teams web
+ * client at /v2/ emits the chatsvcagg bearer on its initial chat-list
+ * load, which fires automatically on page settle when the persistent
+ * profile's cookies are warm. Used by `acquireChatsvcaggToken()` when
+ * the cached token has expired but the basic Teams session is still
+ * valid.
+ */
+const TEAMS_WEB_URL = 'https://teams.microsoft.com/v2/';
 
 const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
 
@@ -554,6 +599,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     let capturedAccess: AccessToken | null = null;
     let capturedRefresh: string | null = null;
     let capturedElevated: AccessToken | null = null;
+    let capturedChatsvcagg: AccessToken | null = null;
 
     let elevatedCtx: ContextLike;
     let elevatedPage: PageLike;
@@ -562,7 +608,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     } catch (e) {
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: launch timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' } };
+        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' }, chatsvcagg: { ok: false, reason: 'launch_timeout' } };
       }
       throw e;
     }
@@ -576,7 +622,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       }
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' } };
+        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' }, chatsvcagg: { ok: false, reason: 'launch_timeout' } };
       }
       throw e;
     }
@@ -613,10 +659,14 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       void handleTeamsResponse(r);
     });
 
-    // Elevated request listener — captures Bearer tokens from outgoing
-    // headers whose JWT carries an ODSP-allowlisted appid and Graph aud.
+    // Request listener — captures TWO distinct bearer flavours from outgoing
+    // headers:
+    //   1. Elevated Graph bearer (ODSP-allowlisted appid + Graph aud)
+    //   2. chatsvcagg-audience bearer (basic Teams appid + chatsvcagg aud)
+    // Both fire on the same teams.microsoft.com session — multiplexed by MSAL
+    // for different resources.
     activePage.on('request', (req) => {
-      if (capturedElevated) return;
+      if (capturedElevated && capturedChatsvcagg) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -624,13 +674,24 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
       const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
       if (!appid || !aud) return;
-      if (!ELEVATED_APP_IDS.includes(appid)) return;
-      if (aud !== 'https://graph.microsoft.com') return;
-      const validated = accessToken(raw);
-      if (!validated.ok) return;
-      capturedElevated = validated.value;
-      logger.info('elevated_token_captured', { appid, len: validated.value.length });
-      trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
+      if (!capturedElevated && ELEVATED_APP_IDS.includes(appid) && aud === 'https://graph.microsoft.com') {
+        const validated = accessToken(raw);
+        if (validated.ok) {
+          capturedElevated = validated.value;
+          logger.info('elevated_token_captured', { appid, len: validated.value.length });
+          trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
+        }
+      }
+      if (!capturedChatsvcagg && appid === BASIC_TEAMS_APP_ID && aud === CHATSVCAGG_AUD) {
+        // chatsvcagg tokens have aud=chatsvcagg, not Graph — can't go
+        // through `accessToken()`'s Graph-audience validator. Validate
+        // freshness directly and skip malformed payloads.
+        if (raw.startsWith('eyJ') && isTokenFresh(raw)) {
+          capturedChatsvcagg = accessTokenUnsafe(raw);
+          logger.info('chatsvcagg_token_captured', { len: raw.length });
+          trace(`[DEBUG] acquireBothTokens: chatsvcagg token captured len=${raw.length}\n`);
+        }
+      }
     });
 
     // Navigate to teamsUrl and wait for sign-in to complete.
@@ -687,11 +748,19 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     if (!capturedAccess) {
       trace('[DEBUG] acquireBothTokens: Teams token deadline expired\n');
       await cleanup();
-      return { teams: null, elevated: { ok: false, reason: 'sso_timeout' } };
+      return { teams: null, elevated: { ok: false, reason: 'sso_timeout' }, chatsvcagg: { ok: false, reason: 'sso_timeout' } };
     }
 
-    // Teams token captured. Now navigate the SAME page to the elevated
-    // URL so silent SSO uses the live cookie chain.
+    // Teams token captured. The chatsvcagg bearer fires from teams.microsoft.com
+    // itself when the page makes its first chat-list call after sign-in — wait
+    // a brief best-effort settle on the same page (uses the existing
+    // postReloginSettleMs budget). If chatsvcagg hasn't fired yet, the silent
+    // re-capture path picks it up on first command use.
+    const chatsvcaggSettleDeadline = Date.now() + postReloginSettleMs;
+    while (Date.now() < chatsvcaggSettleDeadline && !capturedChatsvcagg) {
+      await sleep(pollIntervalMs);
+    }
+
     trace(`[DEBUG] acquireBothTokens: Teams captured; navigating to elevated ${elevatedUrl}\n`);
     logger.info('browser_navigating', { url: elevatedUrl, purpose: 'elevated_same_session' });
     let navigationFailed = false;
@@ -711,15 +780,113 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     await cleanup();
 
     const teamsResult: BrowserTokenResult = { accessToken: capturedAccess, refreshToken: capturedRefresh };
-    if (capturedElevated) {
-      return { teams: teamsResult, elevated: { ok: true, token: capturedElevated } };
+    const elevatedFailureReason: ElevatedFailureReason = navigationFailed ? 'navigation_failed' : 'sso_timeout';
+    const elevatedResult: ElevatedTokenResult = capturedElevated ? { ok: true, token: capturedElevated } : { ok: false, reason: elevatedFailureReason };
+    const chatsvcaggResult: ElevatedTokenResult = capturedChatsvcagg ? { ok: true, token: capturedChatsvcagg } : { ok: false, reason: 'sso_timeout' };
+    if (!capturedElevated) {
+      trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
+      logger.info('elevated_token_capture_timeout');
     }
+    if (!capturedChatsvcagg) {
+      trace('[DEBUG] acquireBothTokens: chatsvcagg settle expired, Teams kept\n');
+      logger.info('chatsvcagg_token_capture_timeout');
+    }
+    return { teams: teamsResult, elevated: elevatedResult, chatsvcagg: chatsvcaggResult };
+  };
+
+  const acquireChatsvcaggToken = async (): Promise<ElevatedTokenResult> => {
+    trace('[DEBUG] acquireChatsvcaggToken: ENTER\n');
+    await cleanupSingletonLocks(profileDir, fs);
+
+    let captured: AccessToken | null = null;
+
+    let ctx: ContextLike;
+    let p: PageLike;
+    try {
+      ctx = await withLaunchTimeout(launchContext(true), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      if (isLaunchTimeout(e)) {
+        trace(`[DEBUG] chatsvcagg capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('chatsvcagg_token_launch_timeout', { ms: elevatedLaunchTimeoutMs });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
+    try {
+      p = await withLaunchTimeout(ctx.newPage(), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      try {
+        await ctx.close();
+      } catch {
+        // ignore
+      }
+      if (isLaunchTimeout(e)) {
+        trace(`[DEBUG] chatsvcagg capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('chatsvcagg_token_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
+
+    p.on('request', (req) => {
+      if (captured) return;
+      const auth = req.headers()['authorization'];
+      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
+      const raw = auth.slice('Bearer '.length);
+      const claims = decodeJwtPayload(raw);
+      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
+      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
+      if (appid !== BASIC_TEAMS_APP_ID || aud !== CHATSVCAGG_AUD) return;
+      // Same as acquireBothTokens: chatsvcagg-audience tokens can't use
+      // the Graph-audience validator.
+      if (!raw.startsWith('eyJ') || !isTokenFresh(raw)) return;
+      captured = accessTokenUnsafe(raw);
+      logger.info('chatsvcagg_token_captured', { len: raw.length });
+      trace(`[DEBUG] chatsvcagg token captured len=${raw.length}\n`);
+    });
+
+    logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: 'chatsvcagg' });
+    trace(`[DEBUG] chatsvcagg capture: navigating to ${TEAMS_WEB_URL}\n`);
+    let navigationFailed = false;
+    try {
+      await p.goto(TEAMS_WEB_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      trace(`[DEBUG] chatsvcagg nav error: ${msg}\n`);
+      navigationFailed = true;
+    }
+
+    const closeAll = async (): Promise<void> => {
+      try {
+        await p.close();
+      } catch {
+        // ignore
+      }
+      try {
+        await ctx.close();
+      } catch {
+        // ignore
+      }
+    };
+
+    const deadline = Date.now() + elevatedRecaptureTimeoutMs;
+    while (Date.now() < deadline) {
+      if (captured) {
+        trace('[DEBUG] chatsvcagg capture: token found, closing\n');
+        await closeAll();
+        return { ok: true, token: captured };
+      }
+      await sleep(pollIntervalMs);
+    }
+
+    await closeAll();
     if (navigationFailed) {
-      return { teams: teamsResult, elevated: { ok: false, reason: 'navigation_failed' } };
+      logger.info('chatsvcagg_token_navigation_failed');
+      return { ok: false, reason: 'navigation_failed' };
     }
-    trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
-    logger.info('elevated_token_capture_timeout');
-    return { teams: teamsResult, elevated: { ok: false, reason: 'sso_timeout' } };
+    trace('[DEBUG] chatsvcagg capture: deadline expired\n');
+    logger.info('chatsvcagg_token_capture_timeout');
+    return { ok: false, reason: 'sso_timeout' };
   };
 
   const close = async (): Promise<void> => {
@@ -727,7 +894,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     await cleanup();
   };
 
-  return { acquireToken, acquireElevatedToken, acquireBothTokens, close };
+  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireBothTokens, close };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());

@@ -35,9 +35,10 @@ fi
 count=$(echo "$files" | wc -l | tr -d ' ')
 echo "mutate:changed: testing ${count} file(s) (base: ${BASE})"
 
-mutate_args=()
-while IFS= read -r f; do
-  mutate_args+=(--mutate "$f")
-done <<< "$files"
+# Stryker's `--mutate` is a single overrideable flag (`commander`-style):
+# repeating `--mutate path1 --mutate path2` keeps only the LAST value.
+# Join the file list into one comma-separated argument, the documented
+# form for narrowing the mutation set to multiple files.
+mutate_arg=$(echo "$files" | paste -sd, -)
 
-bunx stryker run "${mutate_args[@]}"
+bunx stryker run --mutate "$mutate_arg"

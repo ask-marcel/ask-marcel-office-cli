@@ -15,6 +15,8 @@ describe('login command', () => {
       getAccessToken: async () => err({ type: 'auth_cancelled' as const }),
       getElevatedAccessToken: async () => err({ type: 'auth_cancelled' as const }),
       logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
     const result = await login(fakeAuth);

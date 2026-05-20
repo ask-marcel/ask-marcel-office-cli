@@ -18,6 +18,7 @@ const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 
         calls.push({ via: 'elevated', path });
         return ok({});
       },
+      teamsChat: async () => ok({}),
       getBinaryElevated: async () => ok({}),
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
