@@ -15,6 +15,10 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
   'list-teams-chat-messages',
   'list-teams-chat-history',
   'get-teams-chat-message',
+  // resolve-teams-link is a pure URL parser — no Graph call.
+  'resolve-teams-link',
+  // find-chats-with-user iterates the chatsvcagg substrate (paginated /chats endpoint).
+  'find-chats-with-user',
 ]);
 
 describe('graph-scopes — central scope map', () => {

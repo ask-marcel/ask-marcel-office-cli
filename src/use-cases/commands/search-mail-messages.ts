@@ -26,7 +26,7 @@ const { schema } = inner;
 
 const meta: CommandMeta = {
   summary:
-    "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns.",
+    'Search the signed-in user\'s entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query \'subject:invoice from:alice\'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `"..."` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `"..."` on the wire.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages?$search="{query}"',

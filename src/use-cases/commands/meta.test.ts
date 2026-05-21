@@ -73,6 +73,13 @@ describe('command meta — invariants on every registered command', () => {
           // its own startTime + cursor token); not path placeholders.
           'sync-state',
           'max-pages',
+          // chatsvcagg paginated chat-list cursor for the post-2026-05-21
+          // `list-teams-chats-with-messages` rewrite — runtime-additive.
+          'continuation-token',
+          // `find-chats-with-user --name` is a search predicate, not a
+          // path placeholder. The graphPathTemplate points at the chat-list
+          // endpoint that gets scanned, not at a per-name route.
+          'name',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

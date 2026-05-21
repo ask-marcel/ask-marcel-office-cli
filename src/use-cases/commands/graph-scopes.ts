@@ -203,6 +203,8 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-teams-chat-messages': [],
   'list-teams-chat-history': [],
   'get-teams-chat-message': [],
+  'resolve-teams-link': [],
+  'find-chats-with-user': [],
 
   // — Places (rooms) —
   'list-rooms': ['Place.Read.All'],

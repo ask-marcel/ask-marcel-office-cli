@@ -95,6 +95,8 @@ import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
 import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
 import * as listTeamsChatHistory from './list-teams-chat-history.ts';
+import * as resolveTeamsLink from './resolve-teams-link.ts';
+import * as findChatsWithUser from './find-chats-with-user.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
@@ -253,6 +255,8 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-teams-chat-messages': listTeamsChatMessages,
   'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
+  'resolve-teams-link': resolveTeamsLink,
+  'find-chats-with-user': findChatsWithUser,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,
   'list-my-memberships': listMyMemberships,
@@ -486,6 +490,26 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { url: 'https://example.com/something' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  // Regression: a user report flagged that `list-chats` page 1 returned
+  // `data: { value: [...] }` while page 2 via `next-page` returned
+  // `data: [...]` directly. The static read shows both calls route
+  // through `graph.getElevated()` and hit the same `wrap()`, so envelope
+  // shapes SHOULD match. Pin that with a mocked test so any future
+  // divergence (e.g. someone adds a `next-page`-only response transform)
+  // fails loudly.
+  it('list-chats and next-page produce structurally identical response values for the same Graph response', async () => {
+    const sameBody = { '@odata.context': 'https://graph.microsoft.com/v1.0/$metadata#chats', value: [{ id: '19:abc', topic: 'A' }] };
+    const list = await callCommand('list-chats', {}, sameBody);
+    const next = await callCommand('next-page', { url: 'https://graph.microsoft.com/v1.0/me/chats?$skiptoken=opaque' }, sameBody);
+    expect(list.ok).toBe(true);
+    expect(next.ok).toBe(true);
+    if (list.ok && next.ok) {
+      // Both must hand the SAME object back to the presenter — wrap() then
+      // hoists `@odata.nextLink`/`deltaLink`/`count` identically.
+      expect(list.value).toEqual(next.value);
+    }
   });
 
   it('get-excel-range returns cell values', async () => {
@@ -2949,6 +2973,8 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-teams-chats-with-messages', params: {} },
   { name: 'list-teams-chat-messages', params: { chatId: '19:abc@thread.v2' } },
   { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2', messageId: 'm1' } },
+  { name: 'resolve-teams-link', params: { url: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000000?ctx=chat' } },
+  { name: 'find-chats-with-user', params: { name: 'nobody' } },
   { name: 'get-chat', params: { chatId: 'ch1' } },
   { name: 'list-my-direct-reports', params: {} },
   { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' } },
@@ -3094,6 +3120,8 @@ describe('command schema rejection', () => {
     { name: 'get-excel-used-range', params: {} },
     { name: 'list-teams-chat-messages', params: {} },
     { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2' } },
+    { name: 'resolve-teams-link', params: {} },
+    { name: 'find-chats-with-user', params: {} },
   ];
 
   it.each(rejectCases)('$name rejects missing required params as a validation_error Result', async ({ name, params }) => {
@@ -3367,7 +3395,7 @@ const chatsvcaggPathFixtures: Array<{ name: string; params: Record<string, strin
     name: 'list-teams-chats-with-messages',
     params: {},
     expectedUrl:
-      'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me?isPrefetch=false&enableMembershipSummary=true&supportsAdditionalSystemGeneratedFolders=true&supportsSliceItems=true&enableEngageCommunities=false',
+      'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me/chats?pageSize=100&enableMembershipSummary=true&supportsAdditionalSystemGeneratedFolders=true&supportsSliceItems=true&enableEngageCommunities=false',
   },
   {
     name: 'list-teams-chat-messages',
@@ -3387,18 +3415,46 @@ describe('chatsvcagg-tier commands call the Teams substrate aggregator', () => {
     expect(url).toBe(expectedUrl);
   });
 
-  // list-teams-chats-with-messages has no caller-tunable params (the substrate
-  // returns ALL chats in a single response), so the only thing to assert
-  // about the URL is that it carries the literal fixed query string the
-  // Teams web client uses. Mutation guard against any of those flags
-  // accidentally flipping default.
-  it('list-teams-chats-with-messages always issues the fixed substrate query string', async () => {
+  // list-teams-chats-with-messages routes to the paginated `/chats` sibling
+  // endpoint (post 2026-05-21 audit — `/teams/users/me` is the aggregate
+  // and caps at 273 with no working cursor; `/teams/users/me/chats` is the
+  // dedicated paginated chat-list). Mutation guard on the URL shape +
+  // fixed substrate query string.
+  it('list-teams-chats-with-messages issues the fixed substrate query string + pageSize default', async () => {
     const url = await capturedUrl('list-teams-chats-with-messages', {});
-    expect(url).toContain('isPrefetch=false');
+    expect(url).toContain('/teams/users/me/chats?');
+    expect(url).toContain('pageSize=100');
     expect(url).toContain('enableMembershipSummary=true');
     expect(url).toContain('supportsAdditionalSystemGeneratedFolders=true');
     expect(url).toContain('supportsSliceItems=true');
     expect(url).toContain('enableEngageCommunities=false');
+    // The aggregate endpoint had `isPrefetch=false`; the paginated /chats
+    // endpoint does not. Regression guard against accidentally routing
+    // back to the aggregate.
+    expect(url).not.toContain('isPrefetch');
+  });
+
+  it('list-teams-chats-with-messages appends continuationToken when --continuation-token is provided', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', { continuationToken: 'opaque-cursor-xyz' });
+    expect(url).toContain('continuationToken=opaque-cursor-xyz');
+  });
+
+  it('list-teams-chats-with-messages does NOT append continuationToken when omitted', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', {});
+    expect(url).not.toContain('continuationToken');
+  });
+
+  it('list-teams-chats-with-messages honours --page-size override', async () => {
+    const url = await capturedUrl('list-teams-chats-with-messages', { pageSize: '25' });
+    expect(url).toContain('pageSize=25');
+  });
+
+  it('list-teams-chats-with-messages rejects pageSize "0" (regex anchor guard)', async () => {
+    const cmd = cmdMap['list-teams-chats-with-messages'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: '0' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
   });
 
   // list-teams-chat-messages issues a bare path with no query string. The
@@ -3430,6 +3486,276 @@ describe('chatsvcagg-tier commands call the Teams substrate aggregator', () => {
 // follows the server-provided `_metadata.syncState` URL backward through
 // history, capped by `--max-pages`. Sibling of list-teams-chat-messages
 // but bypasses the 200-cap (IC3 has a real cursor; chatsvcagg doesn't).
+describe('find-chats-with-user paginates the chat-list and filters members', () => {
+  // Stateful fakeFetch — returns a different page per call, mimicking the
+  // paginated /chats endpoint's continuationToken flow.
+  type ChatFix = {
+    id: string;
+    title?: string | null;
+    chatType?: string;
+    members: Array<{ mri?: string; displayName?: string; email?: string; userSubType?: string; userPrincipalName?: string; givenName?: string; surname?: string }>;
+  };
+  type PageFix = { chats: Array<ChatFix>; continuationToken?: string; hasMoreData?: boolean };
+  const sequencedFetch = (pages: ReadonlyArray<PageFix>): FakeFetch => {
+    let calls = 0;
+    let lastUrl: string | null = null;
+    const urls: string[] = [];
+    const fn = async (url: string): Promise<Response> => {
+      lastUrl = url;
+      urls.push(url);
+      const page = pages[Math.min(calls, pages.length - 1)] ?? { chats: [] };
+      calls += 1;
+      return new Response(JSON.stringify(page), { headers: { 'content-type': 'application/json' } });
+    };
+    Object.defineProperty(fn, 'lastUrl', { get: () => lastUrl });
+    Object.defineProperty(fn, 'lastBody', { get: () => null });
+    Object.defineProperty(fn, 'urls', { get: () => urls });
+    return fn as FakeFetch & { urls: string[] };
+  };
+
+  it('returns chats whose members match the query on displayName (case-insensitive)', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          {
+            id: '19:a@unq.gbl.spaces',
+            title: 'A chat',
+            chatType: 'oneOnOne',
+            members: [{ mri: '8:orgid:1', displayName: 'Alex Kim', email: 'alex.kim@example.com', userSubType: 'Member' }],
+          },
+          {
+            id: '19:b@unq.gbl.spaces',
+            title: 'B chat',
+            chatType: 'oneOnOne',
+            members: [{ mri: '8:orgid:2', displayName: 'Someone Else', email: 'someone.else@corp.com', userSubType: 'Member' }],
+          },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'alex' }); // lowercase, accent preserved
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matches: Array<{ chatId: string }>; matchCount: number };
+      expect(v.matchCount).toBe(1);
+      expect(v.matches[0]?.chatId).toBe('19:a@unq.gbl.spaces');
+    }
+  });
+
+  it('surfaces dual-identity matches — same person, two MRIs across two chats', async () => {
+    // Alex has an org MRI in one chat and a guest MRI in another. Both
+    // hits surface in `matches`. This is the canonical workflow win.
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          {
+            id: '19:org@unq.gbl.spaces',
+            chatType: 'oneOnOne',
+            members: [{ mri: '8:orgid:42c44e51', displayName: 'Alex Kim', email: 'alex.kim@example.com', userSubType: 'Member' }],
+          },
+          {
+            id: '19:guest@unq.gbl.spaces',
+            chatType: 'oneOnOne',
+            members: [{ mri: '8:orgid:a1bb71fb', displayName: 'Alex Kim (Guest)', email: 'alex.kim@partner.example.com', userSubType: 'Guest' }],
+          },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'alex doe' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; matches: Array<{ chatId: string; matchedMembers: Array<{ mri?: string; userSubType?: string }> }> };
+      expect(v.matchCount).toBe(2);
+      const mris = v.matches.flatMap((m) => m.matchedMembers.map((mm) => mm.mri));
+      expect(mris).toContain('8:orgid:42c44e51');
+      expect(mris).toContain('8:orgid:a1bb71fb');
+      // Surfaces the userSubType so the caller can distinguish org from guest.
+      const subtypes = v.matches.flatMap((m) => m.matchedMembers.map((mm) => mm.userSubType));
+      expect(subtypes).toContain('Member');
+      expect(subtypes).toContain('Guest');
+    }
+  });
+
+  it('matches on email even when display-name is absent (anonymized/system entries)', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [{ id: '19:c@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '8:orgid:3', email: 'alex.kim@corp.com' }] }],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'alex.kim' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number }).matchCount).toBe(1);
+  });
+
+  it('matches on MRI directly (useful when the caller already has the MRI from another command)', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [{ id: '19:d@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '8:orgid:abc-1234', displayName: 'X Y', email: 'x.y@corp.com' }] }],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'abc-1234' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number }).matchCount).toBe(1);
+  });
+
+  it('walks continuationToken across pages until hasMoreData is false', async () => {
+    const fetchFn = sequencedFetch([
+      { chats: [{ id: '19:p1@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '1', displayName: 'Alice' }] }], continuationToken: 'cursor-2', hasMoreData: true },
+      { chats: [{ id: '19:p2@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '2', displayName: 'Alice Smith' }] }], continuationToken: 'cursor-3', hasMoreData: true },
+      { chats: [{ id: '19:p3@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '3', displayName: 'Alice Jones' }] }], hasMoreData: false }, // last page
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'alice' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; pagesFetched: number; hasMore: boolean };
+      expect(v.matchCount).toBe(3);
+      expect(v.pagesFetched).toBe(3);
+      expect(v.hasMore).toBe(false);
+    }
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls).toHaveLength(3);
+    expect(urls[1]).toContain('continuationToken=cursor-2');
+    expect(urls[2]).toContain('continuationToken=cursor-3');
+  });
+
+  it('stops at --max-pages and sets hasMore:true + surfaces nextContinuationToken when the server keeps offering more', async () => {
+    const fullPage = (cursor: string): PageFix => ({
+      chats: [{ id: `19:${cursor}@unq.gbl.spaces`, chatType: 'oneOnOne', members: [{ mri: '0', displayName: 'Match Me' }] }],
+      continuationToken: cursor,
+      hasMoreData: true,
+    });
+    const fetchFn = sequencedFetch([fullPage('c2'), fullPage('c3'), fullPage('c4')]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'match', maxPages: '2' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { hasMore: boolean; nextContinuationToken?: string; pagesFetched: number };
+      expect(v.hasMore).toBe(true);
+      expect(v.nextContinuationToken).toBe('c3');
+      expect(v.pagesFetched).toBe(2);
+    }
+  });
+
+  it('returns an empty match list when no member matches the query', async () => {
+    const fetchFn = sequencedFetch([{ chats: [{ id: '19:e@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '8:orgid:9', displayName: 'Bob' }] }] }]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'nonexistent person' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number; chatsScanned: number }).matchCount).toBe(0);
+  });
+
+  it('deduplicates a chat that somehow appears twice across pages (defense in depth)', async () => {
+    const fetchFn = sequencedFetch([
+      { chats: [{ id: '19:dup@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '1', displayName: 'Dup' }] }], continuationToken: 'c2', hasMoreData: true },
+      // Same id again on page 2 — should not double-count.
+      { chats: [{ id: '19:dup@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '1', displayName: 'Dup' }] }], hasMoreData: false },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'dup' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number }).matchCount).toBe(1);
+  });
+
+  it('rejects an empty --name before any HTTP call', async () => {
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { name: '' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+});
+
+describe('resolve-teams-link parses copy-link URLs into structured ids', () => {
+  it('extracts chatId + messageId from a typical Teams copy-link URL', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), {
+      url: 'https://teams.microsoft.com/l/message/19%3Abbbbbbbb-1111-2222-3333-444444444444_cccccccc-1111-2222-3333-444444444444%40unq.gbl.spaces/1752206983412?tenantId=tenant-abc&groupId=group-xyz&ctx=chat',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { chatId: string; messageId: string; tenantId?: string; groupId?: string; context?: string };
+      expect(v.chatId).toBe('19:bbbbbbbb-1111-2222-3333-444444444444_cccccccc-1111-2222-3333-444444444444@unq.gbl.spaces');
+      expect(v.messageId).toBe('1752206983412');
+      expect(v.tenantId).toBe('tenant-abc');
+      expect(v.groupId).toBe('group-xyz');
+      expect(v.context).toBe('chat');
+    }
+  });
+
+  it('handles URLs with no query string (only the two path segments)', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000000' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { chatId: string; messageId: string; tenantId?: string };
+      expect(v.chatId).toBe('19:abc@thread.v2');
+      expect(v.messageId).toBe('1700000000000');
+      expect(v.tenantId).toBeUndefined();
+    }
+  });
+
+  it('surfaces optional parentMessageId when the link carries a reply context', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), {
+      url: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000001?parentMessageId=1700000000000',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { parentMessageId?: string };
+      expect(v.parentMessageId).toBe('1700000000000');
+    }
+  });
+
+  it('rejects URLs that are not Teams message links with a clear validation_error', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://example.com/some/other/path' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.message).toContain('not a Teams message link');
+    }
+  });
+
+  it('rejects a Teams /l/message URL that is missing the message-id segment', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('rejects a non-URL string before parsing kicks in', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'not-a-url' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+});
+
 describe('list-teams-chat-history follows syncState URLs through IC3 history', () => {
   // Stateful fakeFetch — returns a different page per call, mimicking the
   // IC3 server's response sequence. Tracks every URL hit so tests can
@@ -3602,7 +3928,7 @@ describe('list-teams-chat-history follows syncState URLs through IC3 history', (
     const urls = (fetchFn as unknown as { urls: string[] }).urls;
     expect(urls[0]).toContain('https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Aabc%40thread.v2/messages');
     expect(urls[0]).toContain('startTime=1');
-    expect(urls[0]).toContain('pageSize=100');
+    expect(urls[0]).toContain('pageSize=200');
     // The `|` separator in the view param is sent literally — matches what
     // Teams web emits (probed 2026-05-21 via Playwright bearer-trace).
     expect(urls[0]).toContain('view=msnp24Equivalent|supportsMessageProperties');

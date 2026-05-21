@@ -49,7 +49,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
     if (error.type === 'no_inlined_bytes')
-      return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag for those.`;
+      return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel ${commandName} ... > out.json\`.`;
     if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
     // Audit v1.0.0 §B11: paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
     if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';

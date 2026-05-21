@@ -56,8 +56,8 @@ const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId } = parsed.data;
-  const pageSize = parsed.data.pageSize ?? '100';
-  const maxPages = Number(parsed.data.maxPages ?? '10');
+  const pageSize = parsed.data.pageSize ?? '200';
+  const maxPages = Number(parsed.data.maxPages ?? '20');
 
   const accumulated: Array<Ic3Message> = [];
   let nextRelativePath: string =
@@ -94,7 +94,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 100 * 10 = 1000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages',
@@ -117,14 +117,14 @@ const meta: CommandMeta = {
       name: 'page-size',
       key: 'pageSize',
       required: false,
-      description: 'Messages per IC3 page (positive integer; default 100, same value Teams web uses for scrollback). Server may silently cap.',
+      description: 'Messages per IC3 page (positive integer; default 200). Server may silently cap.',
     },
     {
       name: 'max-pages',
       key: 'maxPages',
       required: false,
       description:
-        'Safety cap on the backward walk (positive integer; default 10). Each page can return up to `--page-size` messages, so default ceiling is ~1000 messages or ~1 MB inline JSON per invocation. Raise carefully — response is buffered fully before returning.',
+        'Safety cap on the backward walk (positive integer; default 20). Each page can return up to `--page-size` messages, so default ceiling is ~4000 messages or ~4 MB inline JSON per invocation. Raise carefully — response is buffered fully before returning.',
     },
   ],
   example: "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
