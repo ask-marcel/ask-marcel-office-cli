@@ -327,6 +327,8 @@ const fakeAuth = (): AuthManager => ({
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
   getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+  getChatsvcaggRegion: async () => 'emea',
+  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -3354,23 +3356,25 @@ describe('all commands build correct Graph URL', () => {
 });
 
 // chatsvcagg-tier commands hit a different host than the Graph base URL —
-// they sign with the Teams substrate bearer captured at login. URL shape is
-// verified separately because it's not Graph-prefixed.
+// they sign with the Teams substrate bearer captured at login AND inject the
+// regional segment between the host and path. The fake auth above returns
+// `region: 'emea'` so every fixture URL lives under `/api/csa/emea/`.
 const chatsvcaggPathFixtures: Array<{ name: string; params: Record<string, string>; expectedUrl: string }> = [
   {
     name: 'list-teams-chats-with-messages',
-    params: { pageSize: '20' },
-    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats?isPaginationEnabled=true&pageSize=20',
+    params: {},
+    expectedUrl:
+      'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me?isPrefetch=false&enableMembershipSummary=true&supportsAdditionalSystemGeneratedFolders=true&supportsSliceItems=true&enableEngageCommunities=false',
   },
   {
     name: 'list-teams-chat-messages',
-    params: { chatId: '19:abc@thread.v2', pageSize: '30' },
-    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/19%3Aabc%40thread.v2/messages?pageSize=30',
+    params: { chatId: '19:abc@thread.v2' },
+    expectedUrl: 'https://teams.microsoft.com/api/csa/emea/api/v1/chats/19%3Aabc%40thread.v2/messages',
   },
   {
     name: 'get-teams-chat-message',
     params: { chatId: '19:abc@thread.v2', messageId: '1700000000001' },
-    expectedUrl: 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats/19%3Aabc%40thread.v2/messages/1700000000001',
+    expectedUrl: 'https://teams.microsoft.com/api/csa/emea/api/v1/chats/19%3Aabc%40thread.v2/messages/1700000000001',
   },
 ];
 
@@ -3380,96 +3384,30 @@ describe('chatsvcagg-tier commands call the Teams substrate aggregator', () => {
     expect(url).toBe(expectedUrl);
   });
 
-  // pageSize default is the empirical Teams-web page size (20 for the
-  // aggregator, 50 for per-chat history). Mutation guard against
-  // `parsed.data.pageSize ?? '20'` flipping the default.
-  it('list-teams-chats-with-messages defaults pageSize to 20 when --page-size is omitted', async () => {
+  // list-teams-chats-with-messages has no caller-tunable params (the substrate
+  // returns ALL chats in a single response), so the only thing to assert
+  // about the URL is that it carries the literal fixed query string the
+  // Teams web client uses. Mutation guard against any of those flags
+  // accidentally flipping default.
+  it('list-teams-chats-with-messages always issues the fixed substrate query string', async () => {
     const url = await capturedUrl('list-teams-chats-with-messages', {});
-    expect(url).toContain('pageSize=20');
+    expect(url).toContain('isPrefetch=false');
+    expect(url).toContain('enableMembershipSummary=true');
+    expect(url).toContain('supportsAdditionalSystemGeneratedFolders=true');
+    expect(url).toContain('supportsSliceItems=true');
+    expect(url).toContain('enableEngageCommunities=false');
   });
 
-  it('list-teams-chat-messages defaults pageSize to 50 when --page-size is omitted', async () => {
+  // list-teams-chat-messages issues a bare path with no query string. The
+  // chatsvcagg substrate caps at the 200 most recent messages and ignores
+  // every cursor/page-size param we've probed — verified 2026-05-21 — so
+  // the CLI ships only the chat-id (anything else would be a misleading
+  // no-op on the wire).
+  it('list-teams-chat-messages issues a bare path with no query string (substrate has no working pagination)', async () => {
     const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2' });
-    expect(url).toContain('pageSize=50');
-  });
-
-  // skipToken is appended only when present — mutation guard against the
-  // conditional flipping. Pass an opaque cursor and assert it lands on
-  // the wire URL-encoded.
-  it('list-teams-chats-with-messages appends skipToken when --skip-token is provided', async () => {
-    const url = await capturedUrl('list-teams-chats-with-messages', { skipToken: 'opaque-cursor-123' });
-    expect(url).toContain('skipToken=opaque-cursor-123');
-    expect(url).toContain('isPaginationEnabled=true');
-  });
-
-  it('list-teams-chats-with-messages does NOT append skipToken when omitted', async () => {
-    const url = await capturedUrl('list-teams-chats-with-messages', {});
-    expect(url).not.toContain('skipToken');
-  });
-
-  it('list-teams-chat-messages appends skipToken when --skip-token is provided', async () => {
-    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2', skipToken: 'cursor-xyz' });
-    expect(url).toContain('skipToken=cursor-xyz');
-  });
-
-  it('list-teams-chat-messages does NOT append skipToken when omitted', async () => {
-    const url = await capturedUrl('list-teams-chat-messages', { chatId: '19:abc@thread.v2' });
-    expect(url).not.toContain('skipToken');
-  });
-
-  // pageSize regex rejects non-positive-integer inputs — mutation guard
-  // against the regex anchors being dropped.
-  it('list-teams-chats-with-messages rejects pageSize "0" (regex anchor guard)', async () => {
-    const cmd = cmdMap['list-teams-chats-with-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: '0' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
-  });
-
-  it('list-teams-chats-with-messages rejects pageSize "abc" (regex non-digit guard)', async () => {
-    const cmd = cmdMap['list-teams-chats-with-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: 'abc' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
-  });
-
-  it('list-teams-chats-with-messages rejects pageSize "10abc" (regex end-anchor guard)', async () => {
-    const cmd = cmdMap['list-teams-chats-with-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: '10abc' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
-  });
-
-  it('list-teams-chats-with-messages rejects pageSize "a10" (regex start-anchor guard — non-digit prefix must NOT be accepted)', async () => {
-    const cmd = cmdMap['list-teams-chats-with-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { pageSize: 'a10' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
-  });
-
-  it('list-teams-chats-with-messages accepts pageSize "100" (regex `*` quantifier guard — three-digit values are valid)', async () => {
-    const url = await capturedUrl('list-teams-chats-with-messages', { pageSize: '100' });
-    expect(url).toContain('pageSize=100');
-  });
-
-  it('list-teams-chat-messages rejects pageSize "0" (regex anchor guard)', async () => {
-    const cmd = cmdMap['list-teams-chat-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c1', pageSize: '0' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
-  });
-
-  it('list-teams-chat-messages rejects pageSize "10abc" (regex end-anchor guard)', async () => {
-    const cmd = cmdMap['list-teams-chat-messages'];
-    if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c1', pageSize: '10abc' });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.type).toBe('validation_error');
+    expect(url).not.toContain('?');
+    expect(url).not.toContain('pageSize');
+    expect(url).not.toContain('messageToken');
   });
 
   // Chat-ID + Message-ID are URI-encoded into the path (colons +

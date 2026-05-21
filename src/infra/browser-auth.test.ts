@@ -1161,6 +1161,185 @@ describe('browser auth — chatsvcagg capture (Teams substrate audience)', () =>
     if (!result.ok) expect(result.reason).toBe('sso_timeout');
   });
 
+  it('captures the regional segment from acquireBothTokens too (covers the unified listener branch in the both-tokens path)', async () => {
+    // Sibling of the acquireChatsvcaggToken region-capture test below, but
+    // exercises the listener inside `acquireBothTokens` so the region-capture
+    // branch on the all-three-tokens path is covered too. Without this, the
+    // both-tokens path could regress to never capturing the region without
+    // any test failing.
+    const apacJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const csaRequest: RequestLike = {
+      url: () => 'https://teams.microsoft.com/api/csa/apac/api/v3/teams/users/me?isPrefetch=false',
+      headers: () => ({ authorization: `Bearer ${apacJwt}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
+        requestsPerGoto: [[csaRequest], []],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+    // Override elevatedRecaptureTimeoutMs so the elevated deadline doesn't
+    // hold the test for 20s — we don't care about the elevated leg here.
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(result.chatsvcagg.ok).toBe(true);
+    if (result.chatsvcagg.ok) expect(result.chatsvcagg.region).toBe('apac');
+  });
+
+  it('captures the regional segment from a `/api/csa/<region>/` URL the chatsvcagg bearer rides on', async () => {
+    // Post-2026-05 substrate migration: chatsvcagg moved from a dedicated
+    // host to `teams.microsoft.com/api/csa/<region>/api/v{N}/...`. The
+    // listener parses the region out of the first such URL it sees so the
+    // auth manager can persist it. Without this, every Teams substrate URL
+    // would default to 'emea' and AMER/APAC tenants would 404 on every
+    // chat-content command.
+    const amerJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const csaRequest: RequestLike = {
+      url: () => 'https://teams.microsoft.com/api/csa/amer/api/v3/teams/users/me?isPrefetch=false',
+      headers: () => ({ authorization: `Bearer ${amerJwt}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[csaRequest]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.token as unknown as string).toBe(amerJwt);
+      expect(result.region).toBe('amer');
+    }
+  });
+
+  it('falls back to "emea" when the chatsvcagg bearer was captured but no `/api/csa/<region>/` URL was observed within the deadline', async () => {
+    // The bearer can ride on a non-substrate URL during early sign-in
+    // (e.g. a token-endpoint probe). When that happens we still want to
+    // ship a usable auth state — fallback default lets European tenants
+    // work without a second capture pass.
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[chatsvcaggRequest()]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireChatsvcaggToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.region).toBe('emea');
+  });
+
+  it('traceChatsvcaggUrls records every URL a chatsvcagg-audience bearer rides on during the trace window', async () => {
+    // Diagnostic helper: open a headed browser, dump every chatsvcagg URL the
+    // page emits, close when the window expires. Used to discover post-2026-05
+    // substrate endpoints (chat-history scrollback, search) we haven't mapped.
+    const csaJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const reqA: RequestLike = { url: () => 'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me', headers: () => ({ authorization: `Bearer ${csaJwt}` }) };
+    const reqB: RequestLike = { url: () => 'https://teams.microsoft.com/api/csa/emea/api/v1/chats/X/messages', headers: () => ({ authorization: `Bearer ${csaJwt}` }) };
+    // Same URL again — should be deduped, not double-counted.
+    const reqADup: RequestLike = { url: () => 'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me', headers: () => ({ authorization: `Bearer ${csaJwt}` }) };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[reqA, reqB, reqADup]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    // 0.01 second — fastConfig durations are tiny so the test stays under 1s.
+    const result = await browser.traceChatsvcaggUrls(0.01);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.urls).toHaveLength(2);
+      expect(result.urls).toContain('https://teams.microsoft.com/api/csa/emea/api/v1/chats/X/messages');
+      expect(result.urls).toContain('https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me');
+    }
+  });
+
+  it('traceChatsvcaggUrls returns sso_timeout when the trace window expires without observing any chatsvcagg traffic', async () => {
+    // Empty session: page loads, no chatsvcagg-bearer requests fire. The
+    // diagnostic produced zero data, so we treat that as failure (lets the
+    // CLI message the user to actually use the browser during the window).
+    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: ['https://teams.microsoft.com/v2/'] } });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    const result = await browser.traceChatsvcaggUrls(0.01);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  it('traceChatsvcaggUrls returns navigation_failed when goto throws', async () => {
+    const { api } = makeFakeApi({
+      pageOpts: { urlsAfterGoto: ['https://teams.microsoft.com/v2/'], gotoErrors: [new Error('NS_ERROR_PROXY_CONNECTION_REFUSED')] },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    const result = await browser.traceChatsvcaggUrls(0.01);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('navigation_failed');
+  });
+
+  it('traceChatsvcaggUrls returns launch_timeout when launchPersistentContext hangs', async () => {
+    const hangingApi: BrowserAuthApi = { launchPersistentContext: () => new Promise(() => undefined) };
+    const browser = createBrowserAuthFromApi(hangingApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    const result = await browser.traceChatsvcaggUrls(0.01);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('traceChatsvcaggUrls returns launch_timeout when newPage hangs (distinct hang point)', async () => {
+    const hangingPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: () => new Promise(() => undefined),
+        clearCookies: async () => undefined,
+        close: async () => undefined,
+      }),
+    };
+    const browser = createBrowserAuthFromApi(hangingPageApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    const result = await browser.traceChatsvcaggUrls(0.01);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('launch_timeout');
+  });
+
+  it('traceChatsvcaggUrls propagates non-timeout errors from launchPersistentContext (e.g. Playwright not installed)', async () => {
+    const erroringApi: BrowserAuthApi = {
+      launchPersistentContext: async () => {
+        throw new Error('playwright executable missing');
+      },
+    };
+    const browser = createBrowserAuthFromApi(erroringApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    await expect(browser.traceChatsvcaggUrls(0.01)).rejects.toThrow('playwright executable missing');
+  });
+
+  it('traceChatsvcaggUrls propagates non-timeout errors from newPage and closes the context to avoid a leak', async () => {
+    let closedCount = 0;
+    const erroringPageApi: BrowserAuthApi = {
+      launchPersistentContext: async () => ({
+        newPage: async () => {
+          throw new Error('context disposed');
+        },
+        clearCookies: async () => undefined,
+        close: async () => {
+          closedCount += 1;
+        },
+      }),
+    };
+    const browser = createBrowserAuthFromApi(erroringPageApi, fastConfig({ elevatedLaunchTimeoutMs: 30 }));
+    await expect(browser.traceChatsvcaggUrls(0.01)).rejects.toThrow('context disposed');
+    expect(closedCount).toBe(1);
+  });
+
   it('keeps capturing only the FIRST chatsvcagg Bearer it sees and ignores subsequent ones (matches elevated-tier behavior)', async () => {
     const first = chatsvcaggJwt();
     const second = makeJwt({

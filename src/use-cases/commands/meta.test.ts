@@ -49,7 +49,7 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
-      it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/skip-token analogues — are excluded)', () => {
+      it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/message-token analogues — are excluded)', () => {
         const runtimeFlagNames = new Set([
           'top',
           'skip',
@@ -61,10 +61,21 @@ describe('command meta — invariants on every registered command', () => {
           // they're functionally identical (runtime-additive, not path
           // placeholders) so the invariant excludes them too.
           'page-size',
+          // pre-2026-05 chatsvcagg name; kept here so the test isn't
+          // a regression risk if someone reintroduces a similar flag
+          // before the rename rolls everywhere.
           'skip-token',
+          // post-2026-05 substrate pagination cursor for
+          // list-teams-chat-messages.
+          'message-token',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
-        const combined = `${cmd.meta.graphPathTemplate} ${cmd.meta.bodyTemplate ?? ''}`;
+        // `{region}` is an infra-level placeholder on the post-2026-05
+        // chatsvcagg substrate (`teams.microsoft.com/api/csa/{region}/...`).
+        // It's resolved from cached auth state, NEVER user-supplied, so it's
+        // not in `options` — strip it before checking so the invariant
+        // still enforces "every other placeholder maps to an option".
+        const combined = `${cmd.meta.graphPathTemplate} ${cmd.meta.bodyTemplate ?? ''}`.replaceAll('{region}', '');
         const found = Array.from(new Set(placeholders(combined))).toSorted((a, b) => a.localeCompare(b));
         expect(found).toEqual(expected);
       });

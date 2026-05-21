@@ -26,6 +26,18 @@ type ElevatedFailureReason = 'launch_timeout' | 'navigation_failed' | 'sso_timeo
 type ElevatedTokenResult = { readonly ok: true; readonly token: AccessToken } | { readonly ok: false; readonly reason: ElevatedFailureReason };
 
 /**
+ * chatsvcagg capture result. Carries the same three failure modes as
+ * `ElevatedTokenResult` PLUS the parsed regional segment from the URL
+ * the bearer rode on (`emea` / `amer` / `apac` / etc.) — the new
+ * substrate host (`teams.microsoft.com/api/csa/<region>/api/...`) routes
+ * per region, so callers must persist this alongside the token to
+ * construct future URLs. See `gotcha_chatsvcagg_substrate_moved` in
+ * the project memory for the 2026-05 migration that made this
+ * necessary.
+ */
+type ChatsvcaggTokenResult = { readonly ok: true; readonly token: AccessToken; readonly region: string } | { readonly ok: false; readonly reason: ElevatedFailureReason };
+
+/**
  * Combined outcome of capturing all three tokens (Teams basic / M365
  * elevated / chatsvcagg substrate) inside one browser session. Login-fix
  * round-2 introduced this for the basic+elevated pair to fix the "second
@@ -42,7 +54,7 @@ type ElevatedTokenResult = { readonly ok: true; readonly token: AccessToken } | 
 type BothTokensResult = {
   readonly teams: BrowserTokenResult | null;
   readonly elevated: ElevatedTokenResult;
-  readonly chatsvcagg: ElevatedTokenResult;
+  readonly chatsvcagg: ChatsvcaggTokenResult;
 };
 
 type BrowserAuth = {
@@ -79,7 +91,7 @@ type BrowserAuth = {
    * navigation failure, silent SSO timeout — so the auth-manager can
    * reuse the same auto-heal logic.
    */
-  acquireChatsvcaggToken: () => Promise<ElevatedTokenResult>;
+  acquireChatsvcaggToken: () => Promise<ChatsvcaggTokenResult>;
   /**
    * Login-fix round-2: capture BOTH tokens inside ONE browser session.
    * After the Teams response listener intercepts the Teams token,
@@ -95,8 +107,26 @@ type BrowserAuth = {
    * the partial success.
    */
   acquireBothTokens: (scopes: string[], teamsUrl: string) => Promise<BothTokensResult>;
+  /**
+   * Diagnostic — opens a HEADED browser session against
+   * `teams.microsoft.com/v2/` (reusing the persistent profile so silent
+   * SSO carries us in) and records every URL a chatsvcagg-audience
+   * bearer rides on for `durationSeconds`. The user is meant to drive
+   * the UI manually during the session (scroll up in a chat to discover
+   * the pagination cursor; type in the search bar to discover the
+   * search endpoint; etc.). Returns the deduped list of URLs observed.
+   *
+   * Same browser-launch failure modes as `acquireChatsvcaggToken`. A
+   * `launch_timeout` or `navigation_failed` returns the union shape; the
+   * `sso_timeout` reason from the failure type is reused for "browser
+   * launched but no chatsvcagg traffic was observed" — by definition
+   * the diagnostic produced zero data.
+   */
+  traceChatsvcaggUrls: (durationSeconds: number) => Promise<ChatsvcaggTraceResult>;
   close: () => Promise<void>;
 };
+
+type ChatsvcaggTraceResult = { readonly ok: true; readonly urls: ReadonlyArray<string> } | { readonly ok: false; readonly reason: ElevatedFailureReason };
 
 type ResponseLike = {
   url(): string;
@@ -217,6 +247,30 @@ const BASIC_TEAMS_APP_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const CHATSVCAGG_AUD = 'https://chatsvcagg.teams.microsoft.com';
 
 /**
+ * Fallback region used when no `/api/csa/<region>/` URL was observed
+ * during a chatsvcagg capture (e.g. the bearer rode on a request to a
+ * different host or a path that pre-dates the 2026-05 substrate move).
+ * `emea` is the only region we've empirically tested against — picking
+ * it as the default means a partial capture (token but no region URL)
+ * still produces a usable auth state for European tenants; AMER/APAC
+ * tenants on the partial path will get a clear `HTTP 404 …` error from
+ * the use-case rather than a silent miscall, which is acceptable given
+ * how rare the partial-capture case is.
+ */
+const DEFAULT_CHATSVCAGG_REGION = 'emea';
+
+/**
+ * Pulls the regional segment from URLs of the shape
+ * `https://teams.microsoft.com/api/csa/<region>/api/...`. Returns null
+ * if the URL doesn't match (e.g. token bearer rode on a host outside
+ * the substrate, which happens during early sign-in handshakes).
+ */
+const parseChatsvcaggRegion = (url: string): string | null => {
+  const match = /^https:\/\/teams\.microsoft\.com\/api\/csa\/([a-z0-9-]+)\//i.exec(url);
+  return match ? match[1].toLowerCase() : null;
+};
+
+/**
  * Standalone re-capture target for the chatsvcagg token — the Teams web
  * client at /v2/ emits the chatsvcagg bearer on its initial chat-list
  * load, which fires automatically on page settle when the persistent
@@ -229,6 +283,26 @@ const TEAMS_WEB_URL = 'https://teams.microsoft.com/v2/';
 const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Best-effort dual-close: close the page then the context, swallowing
+ * either failure. Used at the end of the chatsvcagg paths (token capture
+ * + URL tracing) which share the same launch shape — Sonar's
+ * `no-identical-functions` flagged the two prior inline copies as
+ * duplicates, so this is the canonical version.
+ */
+const closeBrowserSession = async (page: PageLike, context: ContextLike): Promise<void> => {
+  try {
+    await page.close();
+  } catch {
+    // ignore
+  }
+  try {
+    await context.close();
+  } catch {
+    // ignore
+  }
+};
 
 const defaultProfileDir = (): string => {
   const envOverride = process.env.ASKMARCEL_BROWSER_PROFILE;
@@ -600,6 +674,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     let capturedRefresh: string | null = null;
     let capturedElevated: AccessToken | null = null;
     let capturedChatsvcagg: AccessToken | null = null;
+    let capturedChatsvcaggRegion: string | null = null;
 
     let elevatedCtx: ContextLike;
     let elevatedPage: PageLike;
@@ -659,14 +734,21 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       void handleTeamsResponse(r);
     });
 
-    // Request listener — captures TWO distinct bearer flavours from outgoing
-    // headers:
+    // Unified request listener — captures three things from outgoing
+    // Authorization bearers (multiplexed by MSAL on a single
+    // teams.microsoft.com session):
     //   1. Elevated Graph bearer (ODSP-allowlisted appid + Graph aud)
     //   2. chatsvcagg-audience bearer (basic Teams appid + chatsvcagg aud)
-    // Both fire on the same teams.microsoft.com session — multiplexed by MSAL
-    // for different resources.
+    //   3. The substrate region from `/api/csa/<region>/` URLs the
+    //      chatsvcagg bearer rides on (post-2026-05 substrate move:
+    //      `chatsvcagg.teams.microsoft.com` was retired in favour of
+    //      `teams.microsoft.com/api/csa/<region>/api/...` per-region
+    //      routing — see `gotcha_chatsvcagg_substrate_moved` in memory).
+    // Also emits a `chatsvcagg_request` trace per unique URL the bearer
+    // rides on so the next substrate migration is self-diagnosable.
+    const seenChatsvcaggRoutes = new Set<string>();
     activePage.on('request', (req) => {
-      if (capturedElevated && capturedChatsvcagg) return;
+      if (capturedElevated && capturedChatsvcagg && capturedChatsvcaggRegion) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -682,14 +764,28 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
           trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
         }
       }
-      if (!capturedChatsvcagg && appid === BASIC_TEAMS_APP_ID && aud === CHATSVCAGG_AUD) {
+      if (appid === BASIC_TEAMS_APP_ID && aud === CHATSVCAGG_AUD) {
         // chatsvcagg tokens have aud=chatsvcagg, not Graph — can't go
         // through `accessToken()`'s Graph-audience validator. Validate
         // freshness directly and skip malformed payloads.
-        if (raw.startsWith('eyJ') && isTokenFresh(raw)) {
+        if (!capturedChatsvcagg && raw.startsWith('eyJ') && isTokenFresh(raw)) {
           capturedChatsvcagg = accessTokenUnsafe(raw);
           logger.info('chatsvcagg_token_captured', { len: raw.length });
           trace(`[DEBUG] acquireBothTokens: chatsvcagg token captured len=${raw.length}\n`);
+        }
+        const url = req.url();
+        if (!seenChatsvcaggRoutes.has(url)) {
+          seenChatsvcaggRoutes.add(url);
+          logger.info('chatsvcagg_request', { url });
+          trace(`[DEBUG] chatsvcagg_request: ${url}\n`);
+        }
+        if (!capturedChatsvcaggRegion) {
+          const region = parseChatsvcaggRegion(url);
+          if (region !== null) {
+            capturedChatsvcaggRegion = region;
+            logger.info('chatsvcagg_region_captured', { region });
+            trace(`[DEBUG] chatsvcagg region captured: ${region}\n`);
+          }
         }
       }
     });
@@ -755,9 +851,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // itself when the page makes its first chat-list call after sign-in — wait
     // a brief best-effort settle on the same page (uses the existing
     // postReloginSettleMs budget). If chatsvcagg hasn't fired yet, the silent
-    // re-capture path picks it up on first command use.
+    // re-capture path picks it up on first command use. Also wait for the
+    // substrate region: empirically the region URL fires a beat AFTER the
+    // token mint, so a token-only exit would persist with the fallback
+    // region — worse for AMER/APAC tenants.
     const chatsvcaggSettleDeadline = Date.now() + postReloginSettleMs;
-    while (Date.now() < chatsvcaggSettleDeadline && !capturedChatsvcagg) {
+    while (Date.now() < chatsvcaggSettleDeadline && !(capturedChatsvcagg && capturedChatsvcaggRegion)) {
       await sleep(pollIntervalMs);
     }
 
@@ -782,7 +881,16 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     const teamsResult: BrowserTokenResult = { accessToken: capturedAccess, refreshToken: capturedRefresh };
     const elevatedFailureReason: ElevatedFailureReason = navigationFailed ? 'navigation_failed' : 'sso_timeout';
     const elevatedResult: ElevatedTokenResult = capturedElevated ? { ok: true, token: capturedElevated } : { ok: false, reason: elevatedFailureReason };
-    const chatsvcaggResult: ElevatedTokenResult = capturedChatsvcagg ? { ok: true, token: capturedChatsvcagg } : { ok: false, reason: 'sso_timeout' };
+    // Region defaults to `DEFAULT_CHATSVCAGG_REGION` ('emea') when we captured a
+    // bearer but never saw a substrate URL — a partial capture. Better than
+    // dropping the token: European tenants (the dominant case during 2026-05
+    // probing) keep working; other-region tenants get a clear HTTP 404 from
+    // the use-case rather than a silent failure. The region is logged at
+    // `chatsvcagg_region_captured` when it's parsed; absence in the trace is
+    // the signal that the fallback was used.
+    const chatsvcaggResult: ChatsvcaggTokenResult = capturedChatsvcagg
+      ? { ok: true, token: capturedChatsvcagg, region: capturedChatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION }
+      : { ok: false, reason: 'sso_timeout' };
     if (!capturedElevated) {
       trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
       logger.info('elevated_token_capture_timeout');
@@ -794,11 +902,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     return { teams: teamsResult, elevated: elevatedResult, chatsvcagg: chatsvcaggResult };
   };
 
-  const acquireChatsvcaggToken = async (): Promise<ElevatedTokenResult> => {
+  const acquireChatsvcaggToken = async (): Promise<ChatsvcaggTokenResult> => {
     trace('[DEBUG] acquireChatsvcaggToken: ENTER\n');
     await cleanupSingletonLocks(profileDir, fs);
 
     let captured: AccessToken | null = null;
+    let capturedRegion: string | null = null;
 
     let ctx: ContextLike;
     let p: PageLike;
@@ -829,7 +938,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     p.on('request', (req) => {
-      if (captured) return;
+      if (captured && capturedRegion) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -839,10 +948,19 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       if (appid !== BASIC_TEAMS_APP_ID || aud !== CHATSVCAGG_AUD) return;
       // Same as acquireBothTokens: chatsvcagg-audience tokens can't use
       // the Graph-audience validator.
-      if (!raw.startsWith('eyJ') || !isTokenFresh(raw)) return;
-      captured = accessTokenUnsafe(raw);
-      logger.info('chatsvcagg_token_captured', { len: raw.length });
-      trace(`[DEBUG] chatsvcagg token captured len=${raw.length}\n`);
+      if (!captured && raw.startsWith('eyJ') && isTokenFresh(raw)) {
+        captured = accessTokenUnsafe(raw);
+        logger.info('chatsvcagg_token_captured', { len: raw.length });
+        trace(`[DEBUG] chatsvcagg token captured len=${raw.length}\n`);
+      }
+      if (!capturedRegion) {
+        const region = parseChatsvcaggRegion(req.url());
+        if (region !== null) {
+          capturedRegion = region;
+          logger.info('chatsvcagg_region_captured', { region });
+          trace(`[DEBUG] chatsvcagg region captured: ${region}\n`);
+        }
+      }
     });
 
     logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: 'chatsvcagg' });
@@ -856,30 +974,26 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       navigationFailed = true;
     }
 
-    const closeAll = async (): Promise<void> => {
-      try {
-        await p.close();
-      } catch {
-        // ignore
-      }
-      try {
-        await ctx.close();
-      } catch {
-        // ignore
-      }
-    };
-
     const deadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < deadline) {
-      if (captured) {
-        trace('[DEBUG] chatsvcagg capture: token found, closing\n');
-        await closeAll();
-        return { ok: true, token: captured };
+      // Region URL empirically fires a beat AFTER the token mint, so a
+      // token-only early-exit would leave us with the fallback region.
+      // Keep waiting until BOTH are captured, OR the deadline expires —
+      // at which point we ship what we have (token + 'emea' fallback).
+      if (captured && capturedRegion) {
+        trace('[DEBUG] chatsvcagg capture: token + region found, closing\n');
+        await closeBrowserSession(p, ctx);
+        return { ok: true, token: captured, region: capturedRegion };
       }
       await sleep(pollIntervalMs);
     }
+    if (captured) {
+      trace(`[DEBUG] chatsvcagg capture: token captured but no region URL within budget; falling back to ${DEFAULT_CHATSVCAGG_REGION}\n`);
+      await closeBrowserSession(p, ctx);
+      return { ok: true, token: captured, region: DEFAULT_CHATSVCAGG_REGION };
+    }
 
-    await closeAll();
+    await closeBrowserSession(p, ctx);
     if (navigationFailed) {
       logger.info('chatsvcagg_token_navigation_failed');
       return { ok: false, reason: 'navigation_failed' };
@@ -889,12 +1003,98 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     return { ok: false, reason: 'sso_timeout' };
   };
 
+  const traceChatsvcaggUrls = async (durationSeconds: number): Promise<ChatsvcaggTraceResult> => {
+    // Diagnostic for the post-2026-05 substrate: the v1/chats/{id}/messages
+    // route caps at 200 messages with no working pagination cursor, and we
+    // haven't found a substrate search endpoint either. Both must exist —
+    // Teams web scrolls back through chat history and supports search — so
+    // this command opens a HEADED browser, lets the user interact with the
+    // Teams UI, and dumps every chatsvcagg-bearer URL we see. The user runs
+    // it once when a missing endpoint surfaces; the captured URLs reveal the
+    // route shape so the use-case can be updated.
+    trace('[DEBUG] traceChatsvcaggUrls: ENTER\n');
+    await cleanupSingletonLocks(profileDir, fs);
+
+    let ctx: ContextLike;
+    let p: PageLike;
+    try {
+      ctx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      if (isLaunchTimeout(e)) {
+        trace(`[DEBUG] trace: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('chatsvcagg_trace_launch_timeout', { ms: elevatedLaunchTimeoutMs });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
+    try {
+      p = await withLaunchTimeout(ctx.newPage(), elevatedLaunchTimeoutMs);
+    } catch (e) {
+      try {
+        await ctx.close();
+      } catch {
+        // ignore
+      }
+      if (isLaunchTimeout(e)) {
+        trace(`[DEBUG] trace: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info('chatsvcagg_trace_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
+        return { ok: false, reason: 'launch_timeout' };
+      }
+      throw e;
+    }
+
+    const seen = new Set<string>();
+    p.on('request', (req) => {
+      const auth = req.headers()['authorization'];
+      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
+      const claims = decodeJwtPayload(auth.slice('Bearer '.length));
+      if (claims['aud'] !== CHATSVCAGG_AUD) return;
+      const url = req.url();
+      if (seen.has(url)) return;
+      seen.add(url);
+      logger.info('chatsvcagg_request', { url });
+      trace(`[DEBUG] chatsvcagg_request: ${url}\n`);
+    });
+
+    logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: 'chatsvcagg_trace' });
+    trace(`[DEBUG] trace: navigating to ${TEAMS_WEB_URL}\n`);
+    let navigationFailed = false;
+    try {
+      await p.goto(TEAMS_WEB_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      trace(`[DEBUG] trace nav error: ${msg}\n`);
+      navigationFailed = true;
+    }
+
+    if (navigationFailed) {
+      await closeBrowserSession(p, ctx);
+      logger.info('chatsvcagg_trace_navigation_failed');
+      return { ok: false, reason: 'navigation_failed' };
+    }
+
+    // Stay open for the full duration so the user can interact with the
+    // UI (scroll a chat, use the search bar, etc.). No early exit on
+    // capture — the whole point is to record every URL during this
+    // window.
+    await sleep(durationSeconds * 1000);
+    await closeBrowserSession(p, ctx);
+
+    const urls = Array.from(seen).toSorted((a, b) => a.localeCompare(b));
+    logger.info('chatsvcagg_trace_complete', { urlCount: urls.length });
+    if (urls.length === 0) {
+      trace('[DEBUG] trace: window expired without observing any chatsvcagg traffic\n');
+      return { ok: false, reason: 'sso_timeout' };
+    }
+    return { ok: true, urls };
+  };
+
   const close = async (): Promise<void> => {
     logger.info('browser_auth_close');
     await cleanup();
   };
 
-  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireBothTokens, close };
+  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireBothTokens, traceChatsvcaggUrls, close };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
@@ -930,6 +1130,8 @@ export type {
   BrowserAuthApi,
   BrowserAuthConfig,
   BrowserTokenResult,
+  ChatsvcaggTokenResult,
+  ChatsvcaggTraceResult,
   ChromiumLike,
   ContextLike,
   ElevatedFailureReason,

@@ -16,6 +16,8 @@ describe('login command', () => {
       getElevatedAccessToken: async () => err({ type: 'auth_cancelled' as const }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };

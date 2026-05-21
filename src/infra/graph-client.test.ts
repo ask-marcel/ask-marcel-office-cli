@@ -10,6 +10,8 @@ const fakeAuth = (): AuthManager => ({
   getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
   logout: async () => ok(undefined),
   getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+  getChatsvcaggRegion: async () => 'emea',
+  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -53,6 +55,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     });
@@ -109,6 +113,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -462,6 +468,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -676,6 +684,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -722,6 +732,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -766,6 +778,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -783,6 +797,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -828,6 +844,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'elevated capture timed out' } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -845,6 +863,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -877,6 +897,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -898,6 +920,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('not-used')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -917,6 +941,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -932,6 +958,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -941,7 +969,7 @@ describe('graph client', () => {
     if (!result.ok && result.error.type === 'auth_failed') expect(result.error.message).toBe('token store unreadable');
   });
 
-  it('teamsChat signs requests against chatsvcagg.teams.microsoft.com using the chatsvcagg-tier bearer', async () => {
+  it('teamsChat signs requests against teams.microsoft.com/api/csa/<region>/ using the chatsvcagg-tier bearer', async () => {
     let captured: { url: string; auth: string | undefined } | null = null;
     const captureFetch: FetchFn = async (url, init) => {
       const auth = init?.headers as Record<string, string> | undefined;
@@ -953,6 +981,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -960,7 +990,7 @@ describe('graph client', () => {
     const result = await client.teamsChat('/api/v2/users/me/chats');
     expect(result.ok).toBe(true);
     expect(captured).not.toBeNull();
-    expect(captured!.url).toBe('https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats');
+    expect(captured!.url).toBe('https://teams.microsoft.com/api/csa/emea/api/v2/users/me/chats');
     expect(captured!.auth).toBe('Bearer test-chatsvcagg-token');
   });
 
@@ -979,6 +1009,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'chatsvcagg token capture timed out' } }),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -994,6 +1026,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1013,6 +1047,8 @@ describe('graph client', () => {
       getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
       logout: async () => ok(undefined),
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1020,5 +1056,33 @@ describe('graph client', () => {
     const result = await client.teamsChat('/api/v2/users/me/chats');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(401);
+  });
+
+  // Regression: HTTP/2 servers (chatsvcagg/Kestrel) routinely answer non-2xx
+  // with content-length: 0 AND empty statusText. The pre-fix code surfaced an
+  // empty `message`, so the CLI printed bare `error: ` with nothing after —
+  // undebuggable. The fallback must synthesize `HTTP <status>` + pathname so
+  // an LLM consumer can at least act on the status code and route.
+  it('apiErrorFrom synthesizes a HTTP-status message when the response has no body and no statusText (HTTP/2 case)', async () => {
+    const fetchFn: FetchFn = async () => new Response(null, { status: 404, statusText: '' });
+    const okChatsvcaggAuth: AuthManager = {
+      getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+      getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+      logout: async () => ok(undefined),
+      getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+      getChatsvcaggRegion: async () => 'emea',
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      getLastChatsvcaggOutcome: () => null,
+      getLastElevatedOutcome: () => null,
+    };
+    const client = createGraphClient(okChatsvcaggAuth, fetchFn);
+    const result = await client.teamsChat('/api/v2/users/me/chats?isPaginationEnabled=true&pageSize=10');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(404);
+      expect(result.error.message).toContain('HTTP 404');
+      expect(result.error.message).toContain('/api/v2/users/me/chats');
+      expect(result.error.message).not.toBe('');
+    }
   });
 });

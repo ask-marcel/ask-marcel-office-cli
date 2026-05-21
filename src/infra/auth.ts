@@ -5,7 +5,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
+import type { BrowserAuth, ChatsvcaggTraceResult, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
@@ -35,6 +35,15 @@ type CachedToken = {
    */
   chatsvcagg_access_token?: string;
   chatsvcagg_expires_on?: number;
+  /**
+   * The Teams substrate is region-routed under
+   * `teams.microsoft.com/api/csa/<region>/api/...` (post-2026-05 host
+   * migration — see `gotcha_chatsvcagg_substrate_moved` in memory).
+   * Captured from the first `/api/csa/<region>/` URL the chatsvcagg
+   * bearer rides on during login. Absent in caches written before the
+   * migration; readers fall back to `DEFAULT_CHATSVCAGG_REGION`.
+   */
+  chatsvcagg_region?: string;
 };
 type AuthError = { type: 'auth_failed'; message: string } | { type: 'auth_cancelled' };
 /**
@@ -61,6 +70,16 @@ type AuthManager = {
    * `list-teams-chats-with-messages` family of commands.
    */
   getChatsvcaggAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  /**
+   * Returns the regional segment used to construct chatsvcagg substrate
+   * URLs (`teams.microsoft.com/api/csa/<region>/api/...`). Captured at
+   * login from the first such URL the chatsvcagg bearer rides on. Falls
+   * back to `DEFAULT_CHATSVCAGG_REGION` ('emea') when the cache is
+   * either absent or pre-2026-05-migration. Synchronous on cache; calls
+   * `getChatsvcaggAccessToken()` first if no cache exists so a region is
+   * available immediately after login.
+   */
+  getChatsvcaggRegion: () => Promise<string>;
   logout: () => Promise<Result<void, AuthError>>;
   /**
    * Inspect the elevated-capture outcome from the most recent
@@ -75,12 +94,30 @@ type AuthManager = {
    * as `getLastElevatedOutcome`.
    */
   getLastChatsvcaggOutcome: () => ElevatedOutcome | null;
+  /**
+   * Diagnostic — passthrough to `BrowserAuth.traceChatsvcaggUrls`. Opens
+   * a headed browser, lets the user interact with `teams.microsoft.com`
+   * for `durationSeconds`, and returns every chatsvcagg-bearer URL the
+   * page emitted. Used by the `debug-chatsvcagg` lifecycle command to
+   * help discover new substrate routes (today: chat-history scrollback,
+   * search) Microsoft hasn't published.
+   */
+  traceChatsvcaggUrls: (durationSeconds: number) => Promise<ChatsvcaggTraceResult>;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const SCOPES = 'https://graph.microsoft.com/.default openid profile offline_access';
 const SPA_ORIGIN = 'https://teams.microsoft.com';
 const TEAMS_URL = 'https://teams.microsoft.com/';
+/**
+ * Fallback region when no `chatsvcagg_region` is persisted (pre-2026-05
+ * caches, or a chatsvcagg capture that never saw a `/api/csa/<region>/`
+ * URL). `emea` matches the only region we've empirically tested — the
+ * use-case will surface a clear `HTTP 404 …` from the new substrate if
+ * an AMER/APAC tenant ends up here, which is preferable to refusing to
+ * issue the call at all.
+ */
+const DEFAULT_CHATSVCAGG_REGION = 'emea';
 
 const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, browserProfileDir: string, logger: Logger, fs: FileSystem): AuthManager => {
   const readCache = async (): Promise<CachedToken | null> => {
@@ -113,11 +150,16 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     await writeCache(next);
   };
 
-  const persistChatsvcagg = async (chatsvcagg: AccessToken): Promise<void> => {
+  const persistChatsvcagg = async (chatsvcagg: AccessToken, region: string): Promise<void> => {
     const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
     const claims = decodeJwtPayload(chatsvcagg);
     const exp = claims.exp as number | undefined;
-    const next: CachedToken = { ...existing, chatsvcagg_access_token: chatsvcagg, chatsvcagg_expires_on: exp ?? 0 };
+    const next: CachedToken = {
+      ...existing,
+      chatsvcagg_access_token: chatsvcagg,
+      chatsvcagg_expires_on: exp ?? 0,
+      chatsvcagg_region: region,
+    };
     await writeCache(next);
   };
 
@@ -185,9 +227,9 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       }
       await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
       if (chatsvcagg.ok) {
-        logger.info('auth.chatsvcagg.captured_at_login');
+        logger.info('auth.chatsvcagg.captured_at_login', { region: chatsvcagg.region });
         lastChatsvcaggOutcome = { captured: true };
-        await persistChatsvcagg(chatsvcagg.token);
+        await persistChatsvcagg(chatsvcagg.token, chatsvcagg.region);
       } else {
         logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
         lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
@@ -328,8 +370,8 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       if (!captured.ok) {
         return err({ type: 'auth_failed', message: recoverableChatsvcaggFailureMessage(captured.reason) });
       }
-      await persistChatsvcagg(captured.token);
-      logger.info('auth.chatsvcagg.recaptured');
+      await persistChatsvcagg(captured.token, captured.region);
+      logger.info('auth.chatsvcagg.recaptured', { region: captured.region });
       return ok(captured.token);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -364,6 +406,16 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     return recaptureChatsvcaggShared();
   };
 
+  const getChatsvcaggRegion = async (): Promise<string> => {
+    // Region MUST be paired with a live chatsvcagg bearer — the substrate
+    // routes per region, and a mismatched region produces an immediate 404.
+    // Trigger the token path first so a freshly-captured region lands in
+    // cache before we read it (no-op when the cached token is still warm).
+    await getChatsvcaggAccessToken();
+    const cached = await readCache();
+    return cached?.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION;
+  };
+
   const logout = async (): Promise<Result<void, AuthError>> => {
     try {
       await fs.deleteIfExists(cachePath);
@@ -390,7 +442,18 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
   const getLastElevatedOutcome = (): ElevatedOutcome | null => lastElevatedOutcome;
   const getLastChatsvcaggOutcome = (): ElevatedOutcome | null => lastChatsvcaggOutcome;
 
-  return { getAccessToken, getElevatedAccessToken, getChatsvcaggAccessToken, logout, getLastElevatedOutcome, getLastChatsvcaggOutcome };
+  const traceChatsvcaggUrls = (durationSeconds: number): Promise<ChatsvcaggTraceResult> => browserAuth.traceChatsvcaggUrls(durationSeconds);
+
+  return {
+    getAccessToken,
+    getElevatedAccessToken,
+    getChatsvcaggAccessToken,
+    getChatsvcaggRegion,
+    logout,
+    getLastElevatedOutcome,
+    getLastChatsvcaggOutcome,
+    traceChatsvcaggUrls,
+  };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());

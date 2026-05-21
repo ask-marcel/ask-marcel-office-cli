@@ -24,13 +24,14 @@ const fakeBrowserAuth = (config?: {
   elevatedFailure?: ElevatedFailureReason;
   elevatedSequence?: ReadonlyArray<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>;
   chatsvcaggResult?: AccessToken | null;
+  chatsvcaggRegion?: string;
   chatsvcaggFailure?: ElevatedFailureReason;
   chatsvcaggError?: Error;
-  chatsvcaggSequence?: ReadonlyArray<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>;
+  chatsvcaggSequence?: ReadonlyArray<{ ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason }>;
 }): BrowserAuth => {
   let elevatedCallCount = 0;
   let chatsvcaggCallCount = 0;
-  const chatsvcaggResult = (): { ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason } => {
+  const chatsvcaggResult = (): { ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason } => {
     if (config?.chatsvcaggSequence !== undefined) {
       const value = config.chatsvcaggSequence[chatsvcaggCallCount] ?? config.chatsvcaggSequence[config.chatsvcaggSequence.length - 1];
       chatsvcaggCallCount += 1;
@@ -39,7 +40,7 @@ const fakeBrowserAuth = (config?: {
     if (config?.chatsvcaggFailure !== undefined) return { ok: false as const, reason: config.chatsvcaggFailure };
     const v = config?.chatsvcaggResult;
     if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
-    return { ok: true as const, token: v };
+    return { ok: true as const, token: v, region: config?.chatsvcaggRegion ?? 'emea' };
   };
   return {
     acquireToken: async () => {
@@ -78,6 +79,7 @@ const fakeBrowserAuth = (config?: {
       if (config?.chatsvcaggError) throw config.chatsvcaggError;
       return chatsvcaggResult();
     },
+    traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
     close: async () => {},
   };
 };
@@ -204,6 +206,7 @@ describe('auth manager recovery ladder', () => {
         throw 'edge process killed';
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -343,6 +346,7 @@ describe('auth manager recovery ladder', () => {
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw 'edge crashed during close';
       },
@@ -370,6 +374,7 @@ describe('auth manager recovery ladder', () => {
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw new Error('close failed');
       },
@@ -541,6 +546,7 @@ describe('auth manager elevated token', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -587,6 +593,7 @@ describe('auth manager elevated token', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(elevatedFailed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -707,6 +714,7 @@ describe('auth manager elevated token', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(failed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -746,6 +754,7 @@ describe('auth manager elevated token', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -774,6 +783,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -802,6 +812,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         return { teams: futureToken(), elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -836,6 +847,7 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -974,10 +986,11 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
       }),
       acquireChatsvcaggToken: async () => {
         chatsvcaggCallCount += 1;
-        return new Promise<{ ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason }>((resolve) => {
-          resolveRef.current = (v) => resolve({ ok: true, token: v });
+        return new Promise<{ ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason }>((resolve) => {
+          resolveRef.current = (v) => resolve({ ok: true, token: v, region: 'emea' });
         });
       },
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -990,6 +1003,72 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     expect(resA.ok).toBe(true);
     expect(resB.ok).toBe(true);
     expect(chatsvcaggCallCount).toBe(1);
+  });
+
+  it('getChatsvcaggRegion returns the cached region when a chatsvcagg token + region were persisted at login', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const token = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'unused', expires_on: future, refresh_token: 'r', chatsvcagg_access_token: token, chatsvcagg_expires_on: future, chatsvcagg_region: 'amer' })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    expect(await auth.getChatsvcaggRegion()).toBe('amer');
+  });
+
+  it('getChatsvcaggRegion falls back to "emea" when the cached chatsvcagg entry has no region (pre-2026-05 cache)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const token = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    // No `chatsvcagg_region` field — emulates a cache written before the
+    // 2026-05 substrate migration. The auth-manager should still produce a
+    // working region rather than refusing the call.
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: future, refresh_token: 'r', chatsvcagg_access_token: token, chatsvcagg_expires_on: future }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    expect(await auth.getChatsvcaggRegion()).toBe('emea');
+  });
+
+  it('traceChatsvcaggUrls is a thin passthrough to BrowserAuth.traceChatsvcaggUrls (covers the lifecycle wiring)', async () => {
+    // The auth-manager doesn't add cache/refresh logic to the trace path —
+    // it's a diagnostic helper, not part of the token ladder. This test
+    // pins the passthrough so a future "wrap with retry" refactor would
+    // have to update the test deliberately.
+    const observed: number[] = [];
+    const tracingBrowser: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      traceChatsvcaggUrls: async (seconds) => {
+        observed.push(seconds);
+        return { ok: true as const, urls: ['https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me'] };
+      },
+      close: async () => {},
+    };
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(tracingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.traceChatsvcaggUrls(90);
+    expect(observed).toEqual([90]);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.urls).toEqual(['https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me']);
+  });
+
+  it('getChatsvcaggRegion triggers re-capture when the cached token is stale, then returns the freshly-captured region', async () => {
+    const past = Math.floor(Date.now() / 1000) - 60;
+    const fresh = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'warm-cookies');
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: past, chatsvcagg_region: 'emea' })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh, chatsvcaggRegion: 'apac' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    expect(await auth.getChatsvcaggRegion()).toBe('apac');
   });
 
   it('getLastChatsvcaggOutcome returns null before any browser step has run', async () => {

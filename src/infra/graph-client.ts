@@ -28,13 +28,18 @@ type GraphClient = {
    */
   getElevated: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
-   * JSON-GET against the Teams chat-aggregator
-   * (`chatsvcagg.teams.microsoft.com/api/v2/...`). Signs the request
-   * with the chatsvcagg-audience bearer captured at login — same Teams
-   * web client identity as `get`, different audience. Used by commands
-   * that need to read chat message BODIES (which the basic Graph token
-   * cannot — `Chat.Read*` scopes are missing). `path` is the chatsvcagg
-   * path starting with `/api/v2/...`.
+   * JSON-GET against the Teams chat substrate (post-2026-05:
+   * `teams.microsoft.com/api/csa/<region>/api/v{N}/...` — see
+   * `gotcha_chatsvcagg_substrate_moved` in memory for the migration
+   * away from `chatsvcagg.teams.microsoft.com`). Signs the request
+   * with the chatsvcagg-audience bearer captured at login (same Teams
+   * web client identity as `get`, different audience), and injects the
+   * cached substrate region between the host and `path`. Used by
+   * commands that need to read chat message BODIES, which the basic
+   * Graph token cannot reach (`Chat.Read*` scopes are missing).
+   *
+   * `path` MUST start with `/api/v{N}/...` — the host + `/api/csa/<region>`
+   * prefix are added by this client.
    */
   teamsChat: (path: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
@@ -155,7 +160,16 @@ const truncateScopeDump = (message: string): string => {
   return `${match[1]} Run \`ask-marcel scopes-check\` to see granted scopes, or \`ask-marcel help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
 };
 
-const apiErrorFrom = async (res: Response): Promise<GraphError> => {
+// HTTP/2 servers (chatsvcagg, Kestrel-fronted Teams substrates) routinely
+// answer non-2xx with content-length: 0 AND an empty statusText. With no JSON
+// error body to format AND no statusText to fall back to, the previous
+// implementation surfaced `message: ''` — the CLI then printed bare `error: `
+// with nothing after, leaving the LLM consumer no signal to act on. Synthesize
+// a `HTTP <status> @ <pathname>` line so the failure is at least diagnosable.
+const synthesizeEmptyBodyMessage = (status: number, url: string): string =>
+  `HTTP ${status} with no error body (path: ${new URL(url).pathname}; the endpoint may have moved — see the command's "best-effort" note in --help)`;
+
+const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
@@ -182,7 +196,15 @@ const apiErrorFrom = async (res: Response): Promise<GraphError> => {
   if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
     return { type: 'api_error', status: res.status, message: truncateScopeDump(`${tag}: ${message}`), ...(code ? { code } : {}) };
   }
-  return { type: 'api_error', status: res.status, message: truncateScopeDump(message ?? res.statusText), ...(code ? { code } : {}) };
+  // `res.url` is empty when the Response was constructed manually (Bun's
+  // fakeFetch test pattern) — fall back to the URL the caller just hit.
+  const effectiveUrl = res.url !== '' ? res.url : fallbackUrl;
+  const pickFallback = (): string => {
+    if (typeof message === 'string' && message !== '') return message;
+    if (res.statusText !== '') return res.statusText;
+    return synthesizeEmptyBodyMessage(res.status, effectiveUrl);
+  };
+  return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}) };
 };
 
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
@@ -199,14 +221,15 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const headers = await authHeaders();
     if (!headers.ok) return headers;
 
+    const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
-      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+      const res = await fetchFn(url, {
         method,
         headers: { ...headers.value, 'content-type': 'application/json', ...(extraHeaders ?? {}) },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, method, path, 'json'));
@@ -225,24 +248,26 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   const getElevated = async (path: string): Promise<Result<unknown, GraphError>> => {
     const headers = await elevatedAuthHeaders();
     if (!headers.ok) return headers;
+    const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
-      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+      const res = await fetchFn(url, {
         method: 'GET',
         headers: { ...headers.value, 'content-type': 'application/json' },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (elevated)`, 'json'));
     }
   };
 
-  // Teams chatsvcagg path — same Teams web client identity as `get`, but the
-  // bearer is issued for `chatsvcagg.teams.microsoft.com` instead of Graph.
-  // The Teams web client mints this token automatically; we piggy-back the
-  // captured bearer to read chat message bodies (Graph's `Chat.Read*`-gated
-  // endpoints can't reach them with the scopes the basic Teams token carries).
+  // Teams chat substrate. Same Teams web client identity as `get`, but the
+  // bearer is issued for `chatsvcagg.teams.microsoft.com` (audience claim
+  // only — the actual API now lives on `teams.microsoft.com/api/csa/<region>/`
+  // since the 2026-05 substrate move). We piggy-back the captured bearer to
+  // read chat message bodies — Graph's `Chat.Read*`-gated endpoints can't
+  // reach them with the scopes the basic Teams token carries.
   const chatsvcaggAuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
     const tokenResult = await auth.getChatsvcaggAccessToken();
     if (!tokenResult.ok) {
@@ -255,13 +280,15 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   const teamsChat = async (path: string): Promise<Result<unknown, GraphError>> => {
     const headers = await chatsvcaggAuthHeaders();
     if (!headers.ok) return headers;
+    const region = await auth.getChatsvcaggRegion();
+    const url = `https://teams.microsoft.com/api/csa/${region}${path}`;
     try {
-      const res = await fetchFn(`https://chatsvcagg.teams.microsoft.com${path}`, {
+      const res = await fetchFn(url, {
         method: 'GET',
         headers: { ...headers.value, accept: 'application/json' },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (chatsvcagg)`, 'json'));
@@ -269,8 +296,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
 
   const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
+    const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
-      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+      const res = await fetchFn(url, {
         method: 'GET',
         headers: signedHeaders,
         redirect: 'manual',
@@ -280,7 +308,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         const location = res.headers.get('location');
         if (location !== null) return ok({ '@microsoft.graph.downloadUrl': location });
       }
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       const contentType = res.headers.get('content-type');
       if (isJson(contentType)) return ok(await res.json());
       if (isText(contentType)) {
@@ -328,7 +356,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         headers: { accept: 'text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8' },
         signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       const contentType = res.headers.get('content-type');
       if (isJson(contentType)) return ok(await res.json());
       if (isText(contentType)) {
@@ -350,14 +378,15 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   const simplePut = async (path: string, body: Uint8Array, contentType?: string): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
     if (!headers.ok) return headers;
+    const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
-      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+      const res = await fetchFn(url, {
         method: 'PUT',
         headers: { ...headers.value, 'content-type': contentType ?? 'application/octet-stream' },
         body: body as unknown as BodyInit,
         signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'PUT', path, 'binary'));
@@ -435,13 +464,14 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   const deleteResource = async (path: string): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
     if (!headers.ok) return headers;
+    const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
-      const res = await fetchFn(`https://graph.microsoft.com/v1.0${path}`, {
+      const res = await fetchFn(url, {
         method: 'DELETE',
         headers: headers.value,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res));
+      if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(undefined);
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'DELETE', path, 'json'));
