@@ -94,7 +94,6 @@ const fakeBrowserAuth = (config?: {
       if (config?.ic3Error) throw config.ic3Error;
       return ic3Result();
     },
-    traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
     close: async () => {},
   };
 };
@@ -222,7 +221,6 @@ describe('auth manager recovery ladder', () => {
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -364,7 +362,6 @@ describe('auth manager recovery ladder', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
         ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw 'edge crashed during close';
       },
@@ -394,7 +391,6 @@ describe('auth manager recovery ladder', () => {
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
         ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
         throw new Error('close failed');
       },
@@ -568,7 +564,6 @@ describe('auth manager elevated token', () => {
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(throwingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -617,7 +612,6 @@ describe('auth manager elevated token', () => {
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(elevatedFailed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -740,7 +734,6 @@ describe('auth manager elevated token', () => {
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(failed, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -782,7 +775,6 @@ describe('auth manager elevated token', () => {
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(stringThrower, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -817,7 +809,6 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -852,7 +843,6 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -889,7 +879,6 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -1034,7 +1023,6 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
         });
       },
       acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -1071,37 +1059,6 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: future, refresh_token: 'r', chatsvcagg_access_token: token, chatsvcagg_expires_on: future }));
     const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     expect(await auth.getChatsvcaggRegion()).toBe('emea');
-  });
-
-  it('traceChatsvcaggUrls is a thin passthrough to BrowserAuth.traceChatsvcaggUrls (covers the lifecycle wiring)', async () => {
-    // The auth-manager doesn't add cache/refresh logic to the trace path —
-    // it's a diagnostic helper, not part of the token ladder. This test
-    // pins the passthrough so a future "wrap with retry" refactor would
-    // have to update the test deliberately.
-    const observed: number[] = [];
-    const tracingBrowser: BrowserAuth = {
-      acquireToken: async () => null,
-      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
-      acquireBothTokens: async () => ({
-        teams: null,
-        elevated: { ok: false as const, reason: 'sso_timeout' as const },
-        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
-        ic3: { ok: false as const, reason: 'sso_timeout' as const },
-      }),
-      traceChatsvcaggUrls: async (seconds) => {
-        observed.push(seconds);
-        return { ok: true as const, urls: ['https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me'] };
-      },
-      close: async () => {},
-    };
-    const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(tracingBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
-    const result = await auth.traceChatsvcaggUrls(90);
-    expect(observed).toEqual([90]);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.urls).toEqual(['https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me']);
   });
 
   it('getChatsvcaggRegion triggers re-capture when the cached token is stale, then returns the freshly-captured region', async () => {
@@ -1271,7 +1228,6 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
           resolveRef.current = (v) => resolve({ ok: true, token: v, region: 'emea' });
         });
       },
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
     const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);

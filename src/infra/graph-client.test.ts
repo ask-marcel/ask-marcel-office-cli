@@ -12,7 +12,6 @@ const fakeAuth = (): AuthManager => ({
   getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -58,7 +57,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     });
@@ -117,7 +115,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -473,7 +470,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -690,7 +686,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -739,7 +734,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -786,7 +780,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -806,7 +799,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -854,7 +846,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -874,7 +865,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -909,7 +899,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -933,7 +922,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -955,7 +943,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -973,7 +960,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -997,7 +983,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1026,7 +1011,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'chatsvcagg token capture timed out' } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1044,7 +1028,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1066,7 +1049,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1090,7 +1072,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1123,7 +1104,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };
@@ -1154,7 +1134,6 @@ describe('graph client', () => {
       getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
       getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
       getChatsvcaggRegion: async () => 'emea',
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => null,
     };

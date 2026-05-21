@@ -5,7 +5,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { BrowserAuth, ChatsvcaggTraceResult, ElevatedFailureReason } from './browser-auth.ts';
+import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
@@ -113,15 +113,6 @@ type AuthManager = {
    * as `getLastElevatedOutcome`.
    */
   getLastChatsvcaggOutcome: () => ElevatedOutcome | null;
-  /**
-   * Diagnostic — passthrough to `BrowserAuth.traceChatsvcaggUrls`. Opens
-   * a headed browser, lets the user interact with `teams.microsoft.com`
-   * for `durationSeconds`, and returns every chatsvcagg-bearer URL the
-   * page emitted. Used by the `debug-chatsvcagg` lifecycle command to
-   * help discover new substrate routes (today: chat-history scrollback,
-   * search) Microsoft hasn't published.
-   */
-  traceChatsvcaggUrls: (durationSeconds: number) => Promise<ChatsvcaggTraceResult>;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
@@ -544,8 +535,6 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
   const getLastElevatedOutcome = (): ElevatedOutcome | null => lastElevatedOutcome;
   const getLastChatsvcaggOutcome = (): ElevatedOutcome | null => lastChatsvcaggOutcome;
 
-  const traceChatsvcaggUrls = (durationSeconds: number): Promise<ChatsvcaggTraceResult> => browserAuth.traceChatsvcaggUrls(durationSeconds);
-
   return {
     getAccessToken,
     getElevatedAccessToken,
@@ -555,7 +544,6 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     logout,
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,
-    traceChatsvcaggUrls,
   };
 };
 

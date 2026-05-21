@@ -335,7 +335,6 @@ const fakeAuth = (): AuthManager => ({
   getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
-  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });

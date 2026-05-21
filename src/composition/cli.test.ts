@@ -32,7 +32,6 @@ const okAuth = (): AuthManager => ({
   getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -44,7 +43,6 @@ const cancelledAuth = (): AuthManager => ({
   getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -56,7 +54,6 @@ const failedAuth = (): AuthManager => ({
   getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
 });
@@ -112,7 +109,6 @@ describe('buildCli command surface', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => ({ captured: true }),
     };
@@ -131,7 +127,6 @@ describe('buildCli command surface', () => {
       getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
       getChatsvcaggRegion: async () => 'emea',
       getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       getLastChatsvcaggOutcome: () => null,
       getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }),
     };
@@ -885,85 +880,5 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1']));
     expect(out).toBe('binary: application/pdf, 12345 bytes — use --output-path to save\n');
-  });
-
-  describe('debug-chatsvcagg diagnostic command', () => {
-    // Override the standard fake auth to return a successful trace result so
-    // the command's happy path is exercised. The fakes return a small URL list
-    // so the JSON envelope assertion is deterministic.
-    const tracingAuth = (result: Awaited<ReturnType<AuthManager['traceChatsvcaggUrls']>>): AuthManager => ({
-      ...okAuth(),
-      traceChatsvcaggUrls: async () => result,
-    });
-
-    it('renders the captured URL list as a JSON envelope when the trace succeeds', async () => {
-      const auth = tracingAuth({
-        ok: true,
-        urls: ['https://teams.microsoft.com/api/csa/emea/api/v1/chats/X/messages?syncState=Y', 'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me'],
-      });
-      const logger = createLoggerFake();
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'debug-chatsvcagg', '--duration', '1']));
-      const envelope = JSON.parse(out.trim()) as { ok: boolean; data: { durationSeconds: number; urlCount: number; urls: string[] } };
-      expect(envelope.ok).toBe(true);
-      expect(envelope.data.durationSeconds).toBe(1);
-      expect(envelope.data.urlCount).toBe(2);
-      expect(envelope.data.urls).toContain('https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me');
-    });
-
-    it('rejects a non-positive-integer --duration with an InvalidArgumentError envelope (not a thrown crash)', async () => {
-      const auth = tracingAuth({ ok: false, reason: 'sso_timeout' });
-      const logger = createLoggerFake();
-      let exited = false;
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake(), onCommandError: () => (exited = true) });
-      const out = await captureStream('stdout', async () => {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'debug-chatsvcagg', '--duration', '0']).catch(() => undefined);
-      });
-      const envelope = JSON.parse(out.trim()) as { ok: boolean; error: string };
-      expect(envelope.ok).toBe(false);
-      expect(envelope.error).toContain('must be a positive integer');
-      expect(exited).toBe(true);
-    });
-
-    it('surfaces a specific message when the diagnostic window expired with no traffic (sso_timeout)', async () => {
-      const auth = tracingAuth({ ok: false, reason: 'sso_timeout' });
-      const logger = createLoggerFake();
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'debug-chatsvcagg', '--duration', '1']));
-      expect(out).toContain('without observing any chatsvcagg traffic');
-      expect(out).toContain('(1s)');
-    });
-
-    it('surfaces a specific message when the browser launch hung (launch_timeout)', async () => {
-      const auth = tracingAuth({ ok: false, reason: 'launch_timeout' });
-      const logger = createLoggerFake();
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'debug-chatsvcagg']));
-      expect(out).toContain('browser launch timed out');
-      expect(out).toContain('ask-marcel logout');
-    });
-
-    it('surfaces a specific message when navigation to teams.microsoft.com failed (navigation_failed)', async () => {
-      const auth = tracingAuth({ ok: false, reason: 'navigation_failed' });
-      const logger = createLoggerFake();
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'debug-chatsvcagg']));
-      expect(out).toContain('navigation to teams.microsoft.com did not complete');
-    });
-
-    it('uses the default 120-second duration when --duration is omitted', async () => {
-      const received: number[] = [];
-      const auth: AuthManager = {
-        ...okAuth(),
-        traceChatsvcaggUrls: async (seconds: number) => {
-          received.push(seconds);
-          return { ok: true as const, urls: [] };
-        },
-      };
-      const logger = createLoggerFake();
-      const cli = buildCli({ auth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'debug-chatsvcagg']));
-      expect(received).toEqual([120]);
-    });
   });
 });

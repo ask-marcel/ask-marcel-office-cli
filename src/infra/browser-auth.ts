@@ -131,26 +131,8 @@ type BrowserAuth = {
    * the partial success.
    */
   acquireBothTokens: (scopes: string[], teamsUrl: string) => Promise<BothTokensResult>;
-  /**
-   * Diagnostic — opens a HEADED browser session against
-   * `teams.microsoft.com/v2/` (reusing the persistent profile so silent
-   * SSO carries us in) and records every URL a chatsvcagg-audience
-   * bearer rides on for `durationSeconds`. The user is meant to drive
-   * the UI manually during the session (scroll up in a chat to discover
-   * the pagination cursor; type in the search bar to discover the
-   * search endpoint; etc.). Returns the deduped list of URLs observed.
-   *
-   * Same browser-launch failure modes as `acquireChatsvcaggToken`. A
-   * `launch_timeout` or `navigation_failed` returns the union shape; the
-   * `sso_timeout` reason from the failure type is reused for "browser
-   * launched but no chatsvcagg traffic was observed" — by definition
-   * the diagnostic produced zero data.
-   */
-  traceChatsvcaggUrls: (durationSeconds: number) => Promise<ChatsvcaggTraceResult>;
   close: () => Promise<void>;
 };
-
-type ChatsvcaggTraceResult = { readonly ok: true; readonly urls: ReadonlyArray<string> } | { readonly ok: false; readonly reason: ElevatedFailureReason };
 
 type ResponseLike = {
   url(): string;
@@ -1087,98 +1069,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const acquireChatsvcaggToken = (): Promise<ChatsvcaggTokenResult> => acquireSubstrateToken('chatsvcagg', CHATSVCAGG_AUD);
   const acquireIc3Token = (): Promise<Ic3TokenResult> => acquireSubstrateToken('ic3', IC3_AUD);
 
-  const traceChatsvcaggUrls = async (durationSeconds: number): Promise<ChatsvcaggTraceResult> => {
-    // Diagnostic for the post-2026-05 substrate: the v1/chats/{id}/messages
-    // route caps at 200 messages with no working pagination cursor, and we
-    // haven't found a substrate search endpoint either. Both must exist —
-    // Teams web scrolls back through chat history and supports search — so
-    // this command opens a HEADED browser, lets the user interact with the
-    // Teams UI, and dumps every chatsvcagg-bearer URL we see. The user runs
-    // it once when a missing endpoint surfaces; the captured URLs reveal the
-    // route shape so the use-case can be updated.
-    trace('[DEBUG] traceChatsvcaggUrls: ENTER\n');
-    await cleanupSingletonLocks(profileDir, fs);
-
-    let ctx: ContextLike;
-    let p: PageLike;
-    try {
-      ctx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] trace: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('chatsvcagg_trace_launch_timeout', { ms: elevatedLaunchTimeoutMs });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
-    }
-    try {
-      p = await withLaunchTimeout(ctx.newPage(), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      try {
-        await ctx.close();
-      } catch {
-        // ignore
-      }
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] trace: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('chatsvcagg_trace_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
-    }
-
-    const seen = new Set<string>();
-    p.on('request', (req) => {
-      const auth = req.headers()['authorization'];
-      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
-      const claims = decodeJwtPayload(auth.slice('Bearer '.length));
-      if (claims['aud'] !== CHATSVCAGG_AUD) return;
-      const url = req.url();
-      if (seen.has(url)) return;
-      seen.add(url);
-      logger.info('chatsvcagg_request', { url });
-      trace(`[DEBUG] chatsvcagg_request: ${url}\n`);
-    });
-
-    logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: 'chatsvcagg_trace' });
-    trace(`[DEBUG] trace: navigating to ${TEAMS_WEB_URL}\n`);
-    let navigationFailed = false;
-    try {
-      await p.goto(TEAMS_WEB_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] trace nav error: ${msg}\n`);
-      navigationFailed = true;
-    }
-
-    if (navigationFailed) {
-      await closeBrowserSession(p, ctx);
-      logger.info('chatsvcagg_trace_navigation_failed');
-      return { ok: false, reason: 'navigation_failed' };
-    }
-
-    // Stay open for the full duration so the user can interact with the
-    // UI (scroll a chat, use the search bar, etc.). No early exit on
-    // capture — the whole point is to record every URL during this
-    // window.
-    await sleep(durationSeconds * 1000);
-    await closeBrowserSession(p, ctx);
-
-    const urls = Array.from(seen).toSorted((a, b) => a.localeCompare(b));
-    logger.info('chatsvcagg_trace_complete', { urlCount: urls.length });
-    if (urls.length === 0) {
-      trace('[DEBUG] trace: window expired without observing any chatsvcagg traffic\n');
-      return { ok: false, reason: 'sso_timeout' };
-    }
-    return { ok: true, urls };
-  };
-
   const close = async (): Promise<void> => {
     logger.info('browser_auth_close');
     await cleanup();
   };
 
-  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireIc3Token, acquireBothTokens, traceChatsvcaggUrls, close };
+  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireIc3Token, acquireBothTokens, close };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
@@ -1215,7 +1111,6 @@ export type {
   BrowserAuthConfig,
   BrowserTokenResult,
   ChatsvcaggTokenResult,
-  ChatsvcaggTraceResult,
   Ic3TokenResult,
   ChromiumLike,
   ContextLike,

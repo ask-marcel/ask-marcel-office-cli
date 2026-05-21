@@ -279,47 +279,6 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
-  const debugChatsvcaggCmd = program
-    .command('debug-chatsvcagg')
-    .description(
-      'Diagnostic — open a headed browser at `teams.microsoft.com/v2/` and record every chat-substrate URL the page emits while you interact with it. Use when a chat-content command stops working (e.g. pagination, search): scroll up in a chat to find the cursor URL, type in the search bar to find the search URL, etc. The captured list goes into the standard `{ok, data}` envelope so you can pipe it to a file. Reuses the persistent profile, so silent SSO carries you in — no fresh sign-in needed if your `ask-marcel login` is still warm.'
-    )
-    .option(
-      '--duration <seconds>',
-      'How long to keep the browser open (positive integer; default 120). The browser auto-closes when the window elapses, then the recorded URLs are printed.',
-      (value: string): string => {
-        if (!/^[1-9]\d*$/.test(value)) throw new InvalidArgumentError('must be a positive integer');
-        return value;
-      }
-    )
-    .action(async (opts: { duration?: string }) => {
-      const durationSeconds = opts.duration !== undefined ? Number(opts.duration) : 120;
-      const result = await auth.traceChatsvcaggUrls(durationSeconds);
-      if (!result.ok) {
-        const failureMessage = (): string => {
-          if (result.reason === 'launch_timeout') {
-            return 'debug-chatsvcagg: browser launch timed out — likely a corrupt persistent profile. Run `ask-marcel logout && ask-marcel login` and retry.';
-          }
-          if (result.reason === 'navigation_failed') {
-            return 'debug-chatsvcagg: navigation to teams.microsoft.com did not complete — network or corp-proxy issue.';
-          }
-          return `debug-chatsvcagg: window elapsed (${durationSeconds}s) without observing any chatsvcagg traffic — make sure you signed in AND interacted with the Teams UI during the window.`;
-        };
-        fail(failureMessage());
-        return;
-      }
-      renderOut({ durationSeconds, urlCount: result.urls.length, urls: result.urls });
-    });
-  debugChatsvcaggCmd.addHelpText(
-    'after',
-    [
-      '',
-      'Example:       ask-marcel debug-chatsvcagg --duration 90',
-      'Use when:      a chat-content command (list-teams-chat-messages, get-teams-chat-message, etc.) misses pagination or search. Scroll back / search inside the headed browser to provoke the substrate routes; the captured URLs reveal the shape.',
-      'Side effects:  opens a visible browser window; no token cache changes; safe to interrupt with Ctrl+C (the browser is cleaned up).',
-    ].join('\n  ')
-  );
-
   const docsCmd = program
     .command('docs')
     .description(
