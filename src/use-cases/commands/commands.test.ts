@@ -94,6 +94,7 @@ import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
 import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
+import * as listTeamsChatHistory from './list-teams-chat-history.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
@@ -250,6 +251,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'get-chat': getChat,
   'list-teams-chats-with-messages': listTeamsChatsWithMessages,
   'list-teams-chat-messages': listTeamsChatMessages,
+  'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,
@@ -328,6 +330,7 @@ const fakeAuth = (): AuthManager => ({
   logout: async () => ok(undefined),
   getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
   getChatsvcaggRegion: async () => 'emea',
+  getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
   traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
   getLastChatsvcaggOutcome: () => null,
   getLastElevatedOutcome: () => null,
@@ -3420,6 +3423,189 @@ describe('chatsvcagg-tier commands call the Teams substrate aggregator', () => {
   it('get-teams-chat-message URI-encodes both chat id AND message id in the path', async () => {
     const url = await capturedUrl('get-teams-chat-message', { chatId: '19:abc@thread.v2', messageId: 'm/with/slashes' });
     expect(url).toContain('/chats/19%3Aabc%40thread.v2/messages/m%2Fwith%2Fslashes');
+  });
+});
+
+// list-teams-chat-history is the IC3-substrate deep-history command — it
+// follows the server-provided `_metadata.syncState` URL backward through
+// history, capped by `--max-pages`. Sibling of list-teams-chat-messages
+// but bypasses the 200-cap (IC3 has a real cursor; chatsvcagg doesn't).
+describe('list-teams-chat-history follows syncState URLs through IC3 history', () => {
+  // Stateful fakeFetch — returns a different page per call, mimicking the
+  // IC3 server's response sequence. Tracks every URL hit so tests can
+  // assert on the cursor flow.
+  type Page = { messages: Array<{ id: string; sequenceId: number }>; _metadata?: { syncState?: string } };
+  const sequencedFetch = (pages: ReadonlyArray<Page>): FakeFetch => {
+    let calls = 0;
+    let lastUrl: string | null = null;
+    const urls: string[] = [];
+    const fn = async (url: string): Promise<Response> => {
+      lastUrl = url;
+      urls.push(url);
+      const page = pages[Math.min(calls, pages.length - 1)] ?? { messages: [] };
+      calls += 1;
+      return new Response(JSON.stringify(page), { headers: { 'content-type': 'application/json' } });
+    };
+    Object.defineProperty(fn, 'lastUrl', { get: () => lastUrl });
+    Object.defineProperty(fn, 'lastBody', { get: () => null });
+    Object.defineProperty(fn, 'urls', { get: () => urls });
+    return fn as FakeFetch & { urls: string[] };
+  };
+
+  // Helper: build a syncState absolute URL (server-emitted shape) pointing
+  // at the next page. The use-case strips the host+region prefix and uses
+  // only the relative path on the next call.
+  const syncUrl = (cursor: string): string =>
+    `https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/X/messages?startTime=1&syncState=${cursor}&pageSize=100&view=msnp24Equivalent`;
+
+  it('returns a single page and hasMore:false when the first response has no _metadata.syncState (end of history)', async () => {
+    const fetchFn = sequencedFetch([{ messages: [{ id: 'm1', sequenceId: 1 }] }]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { chatId: '19:abc@thread.v2' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { messages: unknown[]; hasMore: boolean; nextSyncState?: string };
+      expect(v.messages).toHaveLength(1);
+      expect(v.hasMore).toBe(false);
+      expect(v.nextSyncState).toBeUndefined();
+    }
+  });
+
+  it('follows _metadata.syncState across pages until the server stops emitting one (end of history)', async () => {
+    // 3 pages: first two carry syncState pointing at the next page; third
+    // omits syncState (end of history reached).
+    const fetchFn = sequencedFetch([
+      {
+        messages: [
+          { id: 'm9', sequenceId: 9 },
+          { id: 'm8', sequenceId: 8 },
+          { id: 'm7', sequenceId: 7 },
+        ],
+        _metadata: { syncState: syncUrl('cursor-2') },
+      },
+      {
+        messages: [
+          { id: 'm6', sequenceId: 6 },
+          { id: 'm5', sequenceId: 5 },
+          { id: 'm4', sequenceId: 4 },
+        ],
+        _metadata: { syncState: syncUrl('cursor-3') },
+      },
+      {
+        messages: [
+          { id: 'm3', sequenceId: 3 },
+          { id: 'm2', sequenceId: 2 },
+          { id: 'm1', sequenceId: 1 },
+        ],
+      }, // no _metadata.syncState
+    ]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { chatId: 'c', pageSize: '3', maxPages: '10' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { messages: Array<{ id: string }>; hasMore: boolean; nextSyncState?: string; pagesFetched: number };
+      expect(v.messages.map((m) => m.id)).toEqual(['m9', 'm8', 'm7', 'm6', 'm5', 'm4', 'm3', 'm2', 'm1']);
+      expect(v.hasMore).toBe(false);
+      expect(v.nextSyncState).toBeUndefined();
+      expect(v.pagesFetched).toBe(3);
+    }
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls).toHaveLength(3);
+    // Second call should use the syncState cursor from page 1.
+    expect(urls[1]).toContain('syncState=cursor-2');
+    expect(urls[2]).toContain('syncState=cursor-3');
+  });
+
+  it('stops at --max-pages and sets hasMore:true (chains via nextSyncState) when the server keeps offering more', async () => {
+    const fullPage = (cursor: string): Page => ({
+      messages: [
+        { id: 'a', sequenceId: 1 },
+        { id: 'b', sequenceId: 2 },
+      ],
+      _metadata: { syncState: syncUrl(cursor) },
+    });
+    const fetchFn = sequencedFetch([fullPage('c2'), fullPage('c3'), fullPage('c4')]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { chatId: 'c', pageSize: '2', maxPages: '2' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { messages: unknown[]; hasMore: boolean; nextSyncState: string; pagesFetched: number };
+      expect(v.messages).toHaveLength(4); // 2 pages × 2 messages
+      expect(v.hasMore).toBe(true);
+      expect(v.nextSyncState).toContain('syncState=c3');
+      expect(v.pagesFetched).toBe(2);
+    }
+    expect((fetchFn as unknown as { urls: string[] }).urls).toHaveLength(2);
+  });
+
+  it('terminates on a zero-message page (server returned the syncState URL but it produced no rows)', async () => {
+    // Edge case: server emits syncState but the next call comes back empty.
+    // This can happen when the cursor points past the earliest message.
+    const fetchFn = sequencedFetch([{ messages: [{ id: 'm1', sequenceId: 1 }], _metadata: { syncState: syncUrl('past-end') } }, { messages: [] }]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { chatId: 'c', pageSize: '5', maxPages: '10' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { messages: unknown[]; hasMore: boolean; nextSyncState?: string };
+      expect(v.messages).toHaveLength(1);
+      expect(v.hasMore).toBe(false);
+      expect(v.nextSyncState).toBeUndefined();
+    }
+    expect((fetchFn as unknown as { urls: string[] }).urls).toHaveLength(2);
+  });
+
+  it('uses --sync-state as the initial cursor (continues from a prior invocation)', async () => {
+    const fetchFn = sequencedFetch([{ messages: [{ id: 'older', sequenceId: 50 }] }]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    await cmd.execute(graph, { chatId: 'c', syncState: syncUrl('continue-here') });
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls[0]).toContain('syncState=continue-here');
+    // Should NOT include the default startTime=1 (we're using a server-provided cursor).
+    // Actually the syncState URL DOES include startTime=1 because that's what the server bakes in.
+    expect(urls[0]).toContain('startTime=1');
+  });
+
+  it('rejects --sync-state that is not a URL (validation_error before any fetch)', async () => {
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c', syncState: 'not-a-url' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  it('returns an error result when --sync-state URL does not match the expected substrate shape (server response format changed)', async () => {
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    // Valid URL but wrong host/path — should surface as a thrown error
+    // (not a silent miscall against an unrelated endpoint).
+    await expect(cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { chatId: 'c', syncState: 'https://example.com/something' })).rejects.toThrow(
+      'unexpected syncState URL shape'
+    );
+  });
+
+  it('URI-encodes the chat id and routes via /api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages (first-call shape, no syncState)', async () => {
+    const fetchFn = sequencedFetch([{ messages: [] }]);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    await cmd.execute(graph, { chatId: '19:abc@thread.v2' });
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls[0]).toContain('https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Aabc%40thread.v2/messages');
+    expect(urls[0]).toContain('startTime=1');
+    expect(urls[0]).toContain('pageSize=100');
+    // The `|` separator in the view param is sent literally — matches what
+    // Teams web emits (probed 2026-05-21 via Playwright bearer-trace).
+    expect(urls[0]).toContain('view=msnp24Equivalent|supportsMessageProperties');
   });
 });
 

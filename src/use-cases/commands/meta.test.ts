@@ -68,6 +68,11 @@ describe('command meta — invariants on every registered command', () => {
           // post-2026-05 substrate pagination cursor for
           // list-teams-chat-messages.
           'message-token',
+          // IC3 pagination flags for `list-teams-chat-history` — all three
+          // are runtime-additive (the server-emitted syncState URL carries
+          // its own startTime + cursor token); not path placeholders.
+          'sync-state',
+          'max-pages',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

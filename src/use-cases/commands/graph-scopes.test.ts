@@ -13,6 +13,7 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
   // captured Teams client identity, not on delegated Graph scopes.
   'list-teams-chats-with-messages',
   'list-teams-chat-messages',
+  'list-teams-chat-history',
   'get-teams-chat-message',
 ]);
 

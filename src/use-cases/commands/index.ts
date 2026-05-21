@@ -85,6 +85,7 @@ import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
 import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
+import * as listTeamsChatHistory from './list-teams-chat-history.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
@@ -243,6 +244,7 @@ const commands: Record<string, Command> = {
   'get-chat': getChat,
   'list-teams-chats-with-messages': listTeamsChatsWithMessages,
   'list-teams-chat-messages': listTeamsChatMessages,
+  'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,

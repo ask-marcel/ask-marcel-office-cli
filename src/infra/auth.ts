@@ -42,8 +42,20 @@ type CachedToken = {
    * Captured from the first `/api/csa/<region>/` URL the chatsvcagg
    * bearer rides on during login. Absent in caches written before the
    * migration; readers fall back to `DEFAULT_CHATSVCAGG_REGION`.
+   * Shared by both chatsvcagg and IC3 paths (regions match per tenant).
    */
   chatsvcagg_region?: string;
+  /**
+   * IC3-audience bearer (Teams web client appid, aud
+   * `https://ic3.teams.office.com`). Used by `list-teams-chat-history`
+   * to walk the paginated chat-message substrate at
+   * `teams.microsoft.com/api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages`,
+   * unlocking reads beyond the 200-message chatsvcagg cap. Same
+   * lifecycle / refresh model as chatsvcagg: cache → silent re-capture
+   * via the persistent profile.
+   */
+  ic3_access_token?: string;
+  ic3_expires_on?: number;
 };
 type AuthError = { type: 'auth_failed'; message: string } | { type: 'auth_cancelled' };
 /**
@@ -80,6 +92,13 @@ type AuthManager = {
    * available immediately after login.
    */
   getChatsvcaggRegion: () => Promise<string>;
+  /**
+   * Returns an IC3-audience bearer (Teams web client identity, aud
+   * `https://ic3.teams.office.com`). Falls through cache → re-capture
+   * via headless Playwright. Used by `list-teams-chat-history` to walk
+   * paginated chat-message history beyond the 200-message chatsvcagg cap.
+   */
+  getIc3AccessToken: () => Promise<Result<AccessToken, AuthError>>;
   logout: () => Promise<Result<void, AuthError>>;
   /**
    * Inspect the elevated-capture outcome from the most recent
@@ -163,6 +182,22 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     await writeCache(next);
   };
 
+  const persistIc3 = async (ic3: AccessToken, region: string): Promise<void> => {
+    const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
+    const claims = decodeJwtPayload(ic3);
+    const exp = claims.exp as number | undefined;
+    const next: CachedToken = {
+      ...existing,
+      ic3_access_token: ic3,
+      ic3_expires_on: exp ?? 0,
+      // IC3 shares the chatsvcagg region (regions match per tenant). Persist
+      // it whether or not a chatsvcagg capture also produced a region — this
+      // path may run standalone (e.g. cached IC3 expired but chatsvcagg fine).
+      chatsvcagg_region: region,
+    };
+    await writeCache(next);
+  };
+
   const refreshToken = async (cached: CachedToken): Promise<Result<AccessToken, AuthError>> => {
     const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: cached.refresh_token, scope: SCOPES });
     let res: Response;
@@ -215,7 +250,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
+      const { teams: result, elevated, chatsvcagg, ic3 } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
       if (!result) return err({ type: 'auth_cancelled' });
       const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
       if (elevated.ok) {
@@ -233,6 +268,12 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       } else {
         logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
         lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
+      }
+      if (ic3.ok) {
+        logger.info('auth.ic3.captured_at_login', { region: ic3.region });
+        await persistIc3(ic3.token, ic3.region);
+      } else {
+        logger.info('auth.ic3.skipped_at_login', { reason: ic3.reason });
       }
       logger.info('auth.ladder.rung', { rung: 'browser' });
       return ok(result.accessToken);
@@ -416,6 +457,67 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     return cached?.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION;
   };
 
+  // IC3 shares the same expiry buffer / recovery shape as chatsvcagg: no
+  // refresh token, silent re-capture rides on the persistent profile cookies.
+  // Region is reused from the chatsvcagg slot.
+  const freshIc3Token = (cached: CachedToken | null): string | undefined => {
+    if (!cached?.ic3_access_token || !cached.ic3_expires_on) return undefined;
+    if (Date.now() / 1000 >= cached.ic3_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
+    return cached.ic3_access_token;
+  };
+
+  const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
+    if (reason === 'launch_timeout') {
+      return 'ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chat-history.)';
+    }
+    if (reason === 'navigation_failed') {
+      return 'ic3 capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
+    }
+    return 'ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chat-history.)';
+  };
+
+  const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => {
+    try {
+      const captured = await browserAuth.acquireIc3Token();
+      if (!captured.ok) {
+        return err({ type: 'auth_failed', message: recoverableIc3FailureMessage(captured.reason) });
+      }
+      await persistIc3(captured.token, captured.region);
+      logger.info('auth.ic3.recaptured', { region: captured.region });
+      return ok(captured.token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `ic3 capture threw: ${msg}` });
+    }
+  };
+
+  let inFlightIc3Recapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureIc3Shared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightIc3Recapture !== null) {
+      logger.info('auth.ic3.shared_in_flight');
+      return inFlightIc3Recapture;
+    }
+    const launched = recaptureIc3();
+    inFlightIc3Recapture = launched.finally(() => {
+      inFlightIc3Recapture = null;
+    });
+    return inFlightIc3Recapture;
+  };
+
+  const getIc3AccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
+    // IC3 tokens carry `aud=https://ic3.teams.office.com`, not Graph — the
+    // `accessToken()` validator's `isGraphToken` check would reject every
+    // cached IC3 token and force a recapture on every call. `freshIc3Token`
+    // validates expiry from the JWT payload, which is the only thing we
+    // need at this boundary.
+    const fresh = freshIc3Token(await readCache());
+    if (fresh !== undefined && fresh.startsWith('eyJ')) {
+      logger.info('auth.ic3.cache_hit');
+      return ok(accessTokenUnsafe(fresh));
+    }
+    return recaptureIc3Shared();
+  };
+
   const logout = async (): Promise<Result<void, AuthError>> => {
     try {
       await fs.deleteIfExists(cachePath);
@@ -449,6 +551,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
     getElevatedAccessToken,
     getChatsvcaggAccessToken,
     getChatsvcaggRegion,
+    getIc3AccessToken,
     logout,
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,

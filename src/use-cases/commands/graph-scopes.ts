@@ -201,6 +201,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   // not graph.microsoft.com).
   'list-teams-chats-with-messages': [],
   'list-teams-chat-messages': [],
+  'list-teams-chat-history': [],
   'get-teams-chat-message': [],
 
   // — Places (rooms) —

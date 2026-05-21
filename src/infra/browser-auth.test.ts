@@ -1191,6 +1191,64 @@ describe('browser auth — chatsvcagg capture (Teams substrate audience)', () =>
     if (result.chatsvcagg.ok) expect(result.chatsvcagg.region).toBe('apac');
   });
 
+  it('acquireIc3Token (standalone) captures an IC3-audience bearer from a single navigation and returns the parsed region', async () => {
+    // The standalone path is invoked when the cached IC3 token expires
+    // between commands — same Playwright session shape as
+    // `acquireChatsvcaggToken`, just a different aud + log prefix.
+    const ic3Jwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://ic3.teams.office.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const ic3Request: RequestLike = {
+      url: () => 'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/X/messages',
+      headers: () => ({ authorization: `Bearer ${ic3Jwt}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        requestsPerGoto: [[ic3Request]],
+        urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig());
+    const result = await browser.acquireIc3Token();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.token as unknown as string).toBe(ic3Jwt);
+      expect(result.region).toBe('emea');
+    }
+  });
+
+  it('captures an IC3-audience Bearer + region in acquireBothTokens (the chat-history substrate path; covers the IC3 branch of the unified listener)', async () => {
+    // Sibling of the chatsvcagg/region tests above, but for IC3. The IC3
+    // bearer rides on `teams.microsoft.com/api/chatsvc/<region>/v1/...`
+    // (different path prefix from chatsvcagg's `/api/csa/<region>/`); the
+    // unified listener has a separate branch for `aud=ic3.teams.office.com`.
+    const ic3Jwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://ic3.teams.office.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const ic3Request: RequestLike = {
+      url: () => 'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Aabc/messages?pageSize=200',
+      headers: () => ({ authorization: `Bearer ${ic3Jwt}` }),
+    };
+    const { api } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
+        requestsPerGoto: [[ic3Request], []],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
+    const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(result.ic3.ok).toBe(true);
+    if (result.ic3.ok) {
+      expect(result.ic3.token as unknown as string).toBe(ic3Jwt);
+      expect(result.ic3.region).toBe('emea');
+    }
+  });
+
   it('captures the regional segment from a `/api/csa/<region>/` URL the chatsvcagg bearer rides on', async () => {
     // Post-2026-05 substrate migration: chatsvcagg moved from a dedicated
     // host to `teams.microsoft.com/api/csa/<region>/api/v{N}/...`. The

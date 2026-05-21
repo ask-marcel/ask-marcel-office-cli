@@ -38,23 +38,38 @@ type ElevatedTokenResult = { readonly ok: true; readonly token: AccessToken } | 
 type ChatsvcaggTokenResult = { readonly ok: true; readonly token: AccessToken; readonly region: string } | { readonly ok: false; readonly reason: ElevatedFailureReason };
 
 /**
- * Combined outcome of capturing all three tokens (Teams basic / M365
- * elevated / chatsvcagg substrate) inside one browser session. Login-fix
- * round-2 introduced this for the basic+elevated pair to fix the "second
- * browser asks me to log in again" symptom on federated tenants
- * (ExampleCorp / ThirdPartyIdP) — capturing both in one context kept the federated
- * cookie chain live in memory. The substrate (chatsvcagg) capture rides
- * on the SAME teams.microsoft.com session that emits the basic Teams
- * token, so adding a third capture leg is essentially free.
+ * IC3 capture result. The "next-gen" Teams chat-message substrate at
+ * `teams.microsoft.com/api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages`
+ * — the path Teams web actually uses for chat scrollback (the existing
+ * chatsvcagg substrate at `/api/csa/<region>/api/v1/chats/{id}/messages`
+ * is the chat-list aggregator and caps at the 200 most recent messages
+ * with no working pagination cursor). The IC3 path supports `syncState`
+ * + `startTime` pagination, unlocking arbitrary-depth chat history.
  *
- * The chatsvcagg slot reuses `ElevatedTokenResult` directly — same
- * three failure modes apply (launch hang / navigation failure / silent
- * SSO timeout), no new discriminants needed.
+ * Bearer audience: `https://ic3.teams.office.com`. Standard `Bearer`
+ * authorization (NOT the purple-teams-documented `skype_token X`
+ * header — those forks predate Teams' move to OAuth bearer on this
+ * surface). Empirically discovered 2026-05-21 by widening the
+ * Playwright capture listener.
+ */
+type Ic3TokenResult = { readonly ok: true; readonly token: AccessToken; readonly region: string } | { readonly ok: false; readonly reason: ElevatedFailureReason };
+
+/**
+ * Combined outcome of capturing all four tokens (Teams basic / M365
+ * elevated / chatsvcagg substrate / IC3 substrate) inside one browser
+ * session. Login-fix round-2 introduced this for the basic+elevated
+ * pair; chatsvcagg was added next; IC3 is the most recent leg, capturing
+ * the bearer Teams web uses for unbounded chat-history reads.
+ *
+ * All four legs ride on the SAME `teams.microsoft.com` session, so
+ * adding capture legs is essentially free — MSAL multiplexes the
+ * audience-scoped bearers via silent acquisition.
  */
 type BothTokensResult = {
   readonly teams: BrowserTokenResult | null;
   readonly elevated: ElevatedTokenResult;
   readonly chatsvcagg: ChatsvcaggTokenResult;
+  readonly ic3: Ic3TokenResult;
 };
 
 type BrowserAuth = {
@@ -92,6 +107,15 @@ type BrowserAuth = {
    * reuse the same auto-heal logic.
    */
   acquireChatsvcaggToken: () => Promise<ChatsvcaggTokenResult>;
+  /**
+   * Capture an IC3-audience bearer (aud `https://ic3.teams.office.com`,
+   * same basic Teams appid). The bearer Teams web client uses to call
+   * `teams.microsoft.com/api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages`
+   * — the chat-message substrate with proper `syncState` pagination,
+   * enabling reads beyond the 200-message chatsvcagg cap. Same failure
+   * modes as `acquireChatsvcaggToken`.
+   */
+  acquireIc3Token: () => Promise<Ic3TokenResult>;
   /**
    * Login-fix round-2: capture BOTH tokens inside ONE browser session.
    * After the Teams response listener intercepts the Teams token,
@@ -247,6 +271,15 @@ const BASIC_TEAMS_APP_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const CHATSVCAGG_AUD = 'https://chatsvcagg.teams.microsoft.com';
 
 /**
+ * Bearer audience Teams web uses for the IC3 (next-gen messaging)
+ * substrate at `teams.microsoft.com/api/chatsvc/<region>/v1/...`. The
+ * appid is the same basic Teams web client identity as the chatsvcagg
+ * bearer; only the audience differs. Empirically confirmed 2026-05-21
+ * via Playwright bearer-trace.
+ */
+const IC3_AUD = 'https://ic3.teams.office.com';
+
+/**
  * Fallback region used when no `/api/csa/<region>/` URL was observed
  * during a chatsvcagg capture (e.g. the bearer rode on a request to a
  * different host or a path that pre-dates the 2026-05 substrate move).
@@ -266,7 +299,11 @@ const DEFAULT_CHATSVCAGG_REGION = 'emea';
  * the substrate, which happens during early sign-in handshakes).
  */
 const parseChatsvcaggRegion = (url: string): string | null => {
-  const match = /^https:\/\/teams\.microsoft\.com\/api\/csa\/([a-z0-9-]+)\//i.exec(url);
+  // Matches both substrate path prefixes — chatsvcagg uses `/api/csa/<region>/`
+  // and IC3 uses `/api/chatsvc/<region>/`. Both ride on `teams.microsoft.com`
+  // and emit the same regional segment per tenant, so a single match unlocks
+  // region resolution for both.
+  const match = /^https:\/\/teams\.microsoft\.com\/api\/(?:csa|chatsvc)\/([a-z0-9-]+)\//i.exec(url);
   return match ? match[1].toLowerCase() : null;
 };
 
@@ -675,6 +712,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     let capturedElevated: AccessToken | null = null;
     let capturedChatsvcagg: AccessToken | null = null;
     let capturedChatsvcaggRegion: string | null = null;
+    let capturedIc3: AccessToken | null = null;
 
     let elevatedCtx: ContextLike;
     let elevatedPage: PageLike;
@@ -683,7 +721,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     } catch (e) {
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: launch timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' }, chatsvcagg: { ok: false, reason: 'launch_timeout' } };
+        return {
+          teams: null,
+          elevated: { ok: false, reason: 'launch_timeout' },
+          chatsvcagg: { ok: false, reason: 'launch_timeout' },
+          ic3: { ok: false, reason: 'launch_timeout' },
+        };
       }
       throw e;
     }
@@ -697,7 +740,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       }
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return { teams: null, elevated: { ok: false, reason: 'launch_timeout' }, chatsvcagg: { ok: false, reason: 'launch_timeout' } };
+        return {
+          teams: null,
+          elevated: { ok: false, reason: 'launch_timeout' },
+          chatsvcagg: { ok: false, reason: 'launch_timeout' },
+          ic3: { ok: false, reason: 'launch_timeout' },
+        };
       }
       throw e;
     }
@@ -748,7 +796,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // rides on so the next substrate migration is self-diagnosable.
     const seenChatsvcaggRoutes = new Set<string>();
     activePage.on('request', (req) => {
-      if (capturedElevated && capturedChatsvcagg && capturedChatsvcaggRegion) return;
+      if (capturedElevated && capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -785,6 +833,28 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
             capturedChatsvcaggRegion = region;
             logger.info('chatsvcagg_region_captured', { region });
             trace(`[DEBUG] chatsvcagg region captured: ${region}\n`);
+          }
+        }
+      }
+      if (appid === BASIC_TEAMS_APP_ID && aud === IC3_AUD && !capturedIc3) {
+        // IC3 bearer — same identity as chatsvcagg, different audience.
+        // Used by Teams web for `/api/chatsvc/<region>/v1/...` calls which
+        // include the paginated chat-history endpoint. Same JWT-validator
+        // skip rationale as chatsvcagg (aud is not Graph).
+        if (raw.startsWith('eyJ') && isTokenFresh(raw)) {
+          capturedIc3 = accessTokenUnsafe(raw);
+          logger.info('ic3_token_captured', { len: raw.length });
+          trace(`[DEBUG] acquireBothTokens: ic3 token captured len=${raw.length}\n`);
+        }
+        // Region also resolvable from `/api/chatsvc/<region>/` URLs the IC3
+        // bearer rides on — feeds the same `capturedChatsvcaggRegion` slot
+        // (regions match per tenant; the parser handles both prefixes).
+        if (!capturedChatsvcaggRegion) {
+          const region = parseChatsvcaggRegion(req.url());
+          if (region !== null) {
+            capturedChatsvcaggRegion = region;
+            logger.info('chatsvcagg_region_captured', { region });
+            trace(`[DEBUG] region captured via ic3 url: ${region}\n`);
           }
         }
       }
@@ -844,7 +914,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     if (!capturedAccess) {
       trace('[DEBUG] acquireBothTokens: Teams token deadline expired\n');
       await cleanup();
-      return { teams: null, elevated: { ok: false, reason: 'sso_timeout' }, chatsvcagg: { ok: false, reason: 'sso_timeout' } };
+      return { teams: null, elevated: { ok: false, reason: 'sso_timeout' }, chatsvcagg: { ok: false, reason: 'sso_timeout' }, ic3: { ok: false, reason: 'sso_timeout' } };
     }
 
     // Teams token captured. The chatsvcagg bearer fires from teams.microsoft.com
@@ -856,7 +926,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // token mint, so a token-only exit would persist with the fallback
     // region — worse for AMER/APAC tenants.
     const chatsvcaggSettleDeadline = Date.now() + postReloginSettleMs;
-    while (Date.now() < chatsvcaggSettleDeadline && !(capturedChatsvcagg && capturedChatsvcaggRegion)) {
+    while (Date.now() < chatsvcaggSettleDeadline && !(capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3)) {
       await sleep(pollIntervalMs);
     }
 
@@ -891,6 +961,9 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     const chatsvcaggResult: ChatsvcaggTokenResult = capturedChatsvcagg
       ? { ok: true, token: capturedChatsvcagg, region: capturedChatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION }
       : { ok: false, reason: 'sso_timeout' };
+    const ic3Result: Ic3TokenResult = capturedIc3
+      ? { ok: true, token: capturedIc3, region: capturedChatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION }
+      : { ok: false, reason: 'sso_timeout' };
     if (!capturedElevated) {
       trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
       logger.info('elevated_token_capture_timeout');
@@ -899,11 +972,19 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       trace('[DEBUG] acquireBothTokens: chatsvcagg settle expired, Teams kept\n');
       logger.info('chatsvcagg_token_capture_timeout');
     }
-    return { teams: teamsResult, elevated: elevatedResult, chatsvcagg: chatsvcaggResult };
+    if (!capturedIc3) {
+      trace('[DEBUG] acquireBothTokens: ic3 settle expired, Teams kept\n');
+      logger.info('ic3_token_capture_timeout');
+    }
+    return { teams: teamsResult, elevated: elevatedResult, chatsvcagg: chatsvcaggResult, ic3: ic3Result };
   };
 
-  const acquireChatsvcaggToken = async (): Promise<ChatsvcaggTokenResult> => {
-    trace('[DEBUG] acquireChatsvcaggToken: ENTER\n');
+  // Shared standalone-recapture path for chatsvcagg/IC3 — both ride on the
+  // same `teams.microsoft.com/v2/` session and only differ in JWT audience.
+  // `kind` parameterizes log/trace strings so a future capture-failure
+  // diagnostic can tell the substrates apart without grep gymnastics.
+  const acquireSubstrateToken = async (kind: 'chatsvcagg' | 'ic3', targetAud: string): Promise<ChatsvcaggTokenResult> => {
+    trace(`[DEBUG] acquire${kind}Token: ENTER\n`);
     await cleanupSingletonLocks(profileDir, fs);
 
     let captured: AccessToken | null = null;
@@ -915,8 +996,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       ctx = await withLaunchTimeout(launchContext(true), elevatedLaunchTimeoutMs);
     } catch (e) {
       if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] chatsvcagg capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('chatsvcagg_token_launch_timeout', { ms: elevatedLaunchTimeoutMs });
+        trace(`[DEBUG] ${kind} capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info(`${kind}_token_launch_timeout`, { ms: elevatedLaunchTimeoutMs });
         return { ok: false, reason: 'launch_timeout' };
       }
       throw e;
@@ -930,8 +1011,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
         // ignore
       }
       if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] chatsvcagg capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('chatsvcagg_token_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
+        trace(`[DEBUG] ${kind} capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+        logger.info(`${kind}_token_launch_timeout`, { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
         return { ok: false, reason: 'launch_timeout' };
       }
       throw e;
@@ -945,32 +1026,32 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       const claims = decodeJwtPayload(raw);
       const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
       const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
-      if (appid !== BASIC_TEAMS_APP_ID || aud !== CHATSVCAGG_AUD) return;
-      // Same as acquireBothTokens: chatsvcagg-audience tokens can't use
-      // the Graph-audience validator.
+      if (appid !== BASIC_TEAMS_APP_ID || aud !== targetAud) return;
+      // Substrate-audience tokens can't use the Graph-audience validator
+      // (audience is intentionally NOT graph.microsoft.com).
       if (!captured && raw.startsWith('eyJ') && isTokenFresh(raw)) {
         captured = accessTokenUnsafe(raw);
-        logger.info('chatsvcagg_token_captured', { len: raw.length });
-        trace(`[DEBUG] chatsvcagg token captured len=${raw.length}\n`);
+        logger.info(`${kind}_token_captured`, { len: raw.length });
+        trace(`[DEBUG] ${kind} token captured len=${raw.length}\n`);
       }
       if (!capturedRegion) {
         const region = parseChatsvcaggRegion(req.url());
         if (region !== null) {
           capturedRegion = region;
-          logger.info('chatsvcagg_region_captured', { region });
-          trace(`[DEBUG] chatsvcagg region captured: ${region}\n`);
+          logger.info(`${kind}_region_captured`, { region });
+          trace(`[DEBUG] ${kind} region captured: ${region}\n`);
         }
       }
     });
 
-    logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: 'chatsvcagg' });
-    trace(`[DEBUG] chatsvcagg capture: navigating to ${TEAMS_WEB_URL}\n`);
+    logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: kind });
+    trace(`[DEBUG] ${kind} capture: navigating to ${TEAMS_WEB_URL}\n`);
     let navigationFailed = false;
     try {
       await p.goto(TEAMS_WEB_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] chatsvcagg nav error: ${msg}\n`);
+      trace(`[DEBUG] ${kind} nav error: ${msg}\n`);
       navigationFailed = true;
     }
 
@@ -981,27 +1062,30 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       // Keep waiting until BOTH are captured, OR the deadline expires —
       // at which point we ship what we have (token + 'emea' fallback).
       if (captured && capturedRegion) {
-        trace('[DEBUG] chatsvcagg capture: token + region found, closing\n');
+        trace(`[DEBUG] ${kind} capture: token + region found, closing\n`);
         await closeBrowserSession(p, ctx);
         return { ok: true, token: captured, region: capturedRegion };
       }
       await sleep(pollIntervalMs);
     }
     if (captured) {
-      trace(`[DEBUG] chatsvcagg capture: token captured but no region URL within budget; falling back to ${DEFAULT_CHATSVCAGG_REGION}\n`);
+      trace(`[DEBUG] ${kind} capture: token captured but no region URL within budget; falling back to ${DEFAULT_CHATSVCAGG_REGION}\n`);
       await closeBrowserSession(p, ctx);
       return { ok: true, token: captured, region: DEFAULT_CHATSVCAGG_REGION };
     }
 
     await closeBrowserSession(p, ctx);
     if (navigationFailed) {
-      logger.info('chatsvcagg_token_navigation_failed');
+      logger.info(`${kind}_token_navigation_failed`);
       return { ok: false, reason: 'navigation_failed' };
     }
-    trace('[DEBUG] chatsvcagg capture: deadline expired\n');
-    logger.info('chatsvcagg_token_capture_timeout');
+    trace(`[DEBUG] ${kind} capture: deadline expired\n`);
+    logger.info(`${kind}_token_capture_timeout`);
     return { ok: false, reason: 'sso_timeout' };
   };
+
+  const acquireChatsvcaggToken = (): Promise<ChatsvcaggTokenResult> => acquireSubstrateToken('chatsvcagg', CHATSVCAGG_AUD);
+  const acquireIc3Token = (): Promise<Ic3TokenResult> => acquireSubstrateToken('ic3', IC3_AUD);
 
   const traceChatsvcaggUrls = async (durationSeconds: number): Promise<ChatsvcaggTraceResult> => {
     // Diagnostic for the post-2026-05 substrate: the v1/chats/{id}/messages
@@ -1094,7 +1178,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     await cleanup();
   };
 
-  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireBothTokens, traceChatsvcaggUrls, close };
+  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireIc3Token, acquireBothTokens, traceChatsvcaggUrls, close };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
@@ -1132,6 +1216,7 @@ export type {
   BrowserTokenResult,
   ChatsvcaggTokenResult,
   ChatsvcaggTraceResult,
+  Ic3TokenResult,
   ChromiumLike,
   ContextLike,
   ElevatedFailureReason,

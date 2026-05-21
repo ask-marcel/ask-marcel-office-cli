@@ -28,6 +28,10 @@ const fakeBrowserAuth = (config?: {
   chatsvcaggFailure?: ElevatedFailureReason;
   chatsvcaggError?: Error;
   chatsvcaggSequence?: ReadonlyArray<{ ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason }>;
+  ic3Result?: AccessToken | null;
+  ic3Region?: string;
+  ic3Failure?: ElevatedFailureReason;
+  ic3Error?: Error;
 }): BrowserAuth => {
   let elevatedCallCount = 0;
   let chatsvcaggCallCount = 0;
@@ -41,6 +45,12 @@ const fakeBrowserAuth = (config?: {
     const v = config?.chatsvcaggResult;
     if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
     return { ok: true as const, token: v, region: config?.chatsvcaggRegion ?? 'emea' };
+  };
+  const ic3Result = (): { ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason } => {
+    if (config?.ic3Failure !== undefined) return { ok: false as const, reason: config.ic3Failure };
+    const v = config?.ic3Result;
+    if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
+    return { ok: true as const, token: v, region: config?.ic3Region ?? 'emea' };
   };
   return {
     acquireToken: async () => {
@@ -64,20 +74,25 @@ const fakeBrowserAuth = (config?: {
     // `acquireResult` and `elevatedFailure`.
     acquireBothTokens: async () => {
       if (config?.acquireError) throw config.acquireError;
+      const ic3 = ic3Result();
       const teams = config?.acquireResult ?? null;
-      if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult() };
+      if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
       const v = config?.elevatedResult;
       if (config?.elevatedFailure !== undefined) {
-        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure }, chatsvcagg: chatsvcaggResult() };
+        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure }, chatsvcagg: chatsvcaggResult(), ic3 };
       }
       if (v === undefined || v === null) {
-        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult() };
+        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
       }
-      return { teams, elevated: { ok: true as const, token: v }, chatsvcagg: chatsvcaggResult() };
+      return { teams, elevated: { ok: true as const, token: v }, chatsvcagg: chatsvcaggResult(), ic3 };
     },
     acquireChatsvcaggToken: async () => {
       if (config?.chatsvcaggError) throw config.chatsvcaggError;
       return chatsvcaggResult();
+    },
+    acquireIc3Token: async () => {
+      if (config?.ic3Error) throw config.ic3Error;
+      return ic3Result();
     },
     traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
     close: async () => {},
@@ -206,6 +221,7 @@ describe('auth manager recovery ladder', () => {
         throw 'edge process killed';
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -341,10 +357,12 @@ describe('auth manager recovery ladder', () => {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireBothTokens: async () => ({
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
@@ -369,10 +387,12 @@ describe('auth manager recovery ladder', () => {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireBothTokens: async () => ({
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {
@@ -544,8 +564,10 @@ describe('auth manager elevated token', () => {
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -591,8 +613,10 @@ describe('auth manager elevated token', () => {
         teams,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -712,8 +736,10 @@ describe('auth manager elevated token', () => {
         teams,
         elevated: { ok: false as const, reason: 'navigation_failed' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -752,8 +778,10 @@ describe('auth manager elevated token', () => {
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -780,9 +808,15 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         const teams = await new Promise<BrowserTokenResult>((resolve) => {
           resolveLoginRef.current = resolve;
         });
-        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
+        return {
+          teams,
+          elevated: { ok: false as const, reason: 'sso_timeout' as const },
+          chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+          ic3: { ok: false as const, reason: 'sso_timeout' as const },
+        };
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -809,9 +843,15 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireBothTokens: async () => {
         acquireCallCount += 1;
-        return { teams: futureToken(), elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const } };
+        return {
+          teams: futureToken(),
+          elevated: { ok: false as const, reason: 'sso_timeout' as const },
+          chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+          ic3: { ok: false as const, reason: 'sso_timeout' as const },
+        };
       },
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -845,8 +885,10 @@ describe('auth manager concurrent-call serialization (audit round-5 #3)', () => 
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -983,6 +1025,7 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       acquireChatsvcaggToken: async () => {
         chatsvcaggCallCount += 1;
@@ -990,6 +1033,7 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
           resolveRef.current = (v) => resolve({ ok: true, token: v, region: 'emea' });
         });
       },
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       close: async () => {},
     };
@@ -1039,10 +1083,12 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
       acquireToken: async () => null,
       acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
       acquireBothTokens: async () => ({
         teams: null,
         elevated: { ok: false as const, reason: 'sso_timeout' as const },
         chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
       }),
       traceChatsvcaggUrls: async (seconds) => {
         observed.push(seconds);
@@ -1104,5 +1150,161 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getChatsvcaggAccessToken();
     expect(result).toEqual(ok(fresh));
+  });
+});
+
+// IC3 substrate — the bearer Teams web uses for chat-history scrollback.
+// Same Teams web client identity as chatsvcagg, different audience
+// (`https://ic3.teams.office.com`). Same lifecycle/recovery shape — cache hit,
+// silent re-capture, distinct failure-mode messages — so tests mirror the
+// chatsvcagg-tier set one-for-one.
+const futureIc3 = (): AccessToken => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const header = btoa(JSON.stringify({ alg: 'RS256' }));
+  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://ic3.teams.office.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' }));
+  return accessTokenUnsafe(`${header}.${payload}.sig`);
+};
+
+describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
+  it('returns the cached IC3 token when it is fresh (cache hit, no browser recapture)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const token = futureIc3();
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: future, refresh_token: 'r', ic3_access_token: token, ic3_expires_on: future }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result).toEqual(ok(token));
+  });
+
+  it('triggers silent re-capture when the cached IC3 token is expired and the persistent profile cookies are still warm', async () => {
+    const past = Math.floor(Date.now() / 1000) - 60;
+    const fresh = futureIc3();
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'warm-cookies');
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', ic3_access_token: 'stale', ic3_expires_on: past }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result).toEqual(ok(fresh));
+    const cached = await fs.readJson<{ ic3_access_token?: string; chatsvcagg_region?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.ic3_access_token).toBe(fresh);
+    expect(cached.ok && cached.value.chatsvcagg_region).toBe('emea');
+  });
+
+  it('reports the launch_timeout-specific message when the IC3 re-capture browser launch times out', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('ic3 browser launch timed out');
+      expect(result.error.message).toContain('list-teams-chat-history');
+    }
+  });
+
+  it('reports the navigation_failed-specific message when the IC3 re-capture cannot reach teams.microsoft.com', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('navigation to teams.microsoft.com did not complete');
+      expect(result.error.message).toContain('corp-proxy');
+    }
+  });
+
+  it('reports the sso_timeout fallback message when the IC3 re-capture is silently denied by stale profile cookies', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'sso_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('ic3 token capture timed out');
+      expect(result.error.message).toContain('persistent browser-profile cookies are likely expired');
+    }
+  });
+
+  it('surfaces the underlying thrown message when the IC3 re-capture throws non-Result', async () => {
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Error: new Error('playwright crashed') }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toBe('ic3 capture threw: playwright crashed');
+    }
+  });
+
+  it('persists the IC3 token at login when both Teams + IC3 captures succeed in the same session', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
+    const ic3 = futureIc3();
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), ic3Result: ic3, ic3Region: 'amer' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs
+    );
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    const cached = await fs.readJson<{ ic3_access_token?: string; chatsvcagg_region?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.ic3_access_token).toBe(ic3);
+    expect(cached.ok && cached.value.chatsvcagg_region).toBe('amer');
+  });
+
+  it('two concurrent getIc3AccessToken calls share one re-capture (same serialization as the chatsvcagg path)', async () => {
+    let ic3CallCount = 0;
+    const resolveRef: { current: ((v: AccessToken) => void) | null } = { current: null };
+    const fs = createFileSystemFake();
+    const slowBrowser: BrowserAuth = {
+      acquireToken: async () => null,
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => ({
+        teams: null,
+        elevated: { ok: false as const, reason: 'sso_timeout' as const },
+        chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+        ic3: { ok: false as const, reason: 'sso_timeout' as const },
+      }),
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => {
+        ic3CallCount += 1;
+        return new Promise<{ ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason }>((resolve) => {
+          resolveRef.current = (v) => resolve({ ok: true, token: v, region: 'emea' });
+        });
+      },
+      traceChatsvcaggUrls: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      close: async () => {},
+    };
+    const auth = createAuthManagerFromApi(slowBrowser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const a = auth.getIc3AccessToken();
+    const b = auth.getIc3AccessToken();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ic3CallCount).toBe(1);
+    if (resolveRef.current) resolveRef.current(futureIc3());
+    const [resA, resB] = await Promise.all([a, b]);
+    expect(resA.ok).toBe(true);
+    expect(resB.ok).toBe(true);
+    expect(ic3CallCount).toBe(1);
+  });
+
+  it('treats an IC3 token whose exp falls inside the 60s expiry buffer as stale and re-captures (covers freshIc3Token boundary)', async () => {
+    const almostExpired = Math.floor(Date.now() / 1000) + 30;
+    const fresh = futureIc3();
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: almostExpired, refresh_token: 'r', ic3_access_token: 'stale', ic3_expires_on: almostExpired }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result).toEqual(ok(fresh));
+  });
+
+  it('persists ic3 alongside an empty Teams token slot when the cache file does not exist yet (covers persistIc3 default-merge branch)', async () => {
+    const fs = createFileSystemFake();
+    const ic3 = futureIc3();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: ic3, ic3Region: 'apac' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getIc3AccessToken();
+    expect(result.ok).toBe(true);
+    const cached = await fs.readJson<{ access_token?: string; ic3_access_token?: string; chatsvcagg_region?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.ic3_access_token).toBe(ic3);
+    expect(cached.ok && cached.value.access_token).toBe('');
+    expect(cached.ok && cached.value.chatsvcagg_region).toBe('apac');
   });
 });

@@ -42,6 +42,21 @@ type GraphClient = {
    * prefix are added by this client.
    */
   teamsChat: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * JSON-GET against the Teams IC3 chat-message substrate at
+   * `teams.microsoft.com/api/chatsvc/<region>/v1/...`. Same host as
+   * `teamsChat` but a DIFFERENT path prefix AND a different bearer
+   * audience (`https://ic3.teams.office.com` instead of
+   * `https://chatsvcagg.teams.microsoft.com`). The path supports
+   * `syncState` + `startTime` pagination — unlocking arbitrary-depth
+   * chat-history reads beyond the chatsvcagg 200-message cap (see
+   * `gotcha_chatsvcagg_substrate_moved` in memory). Used by
+   * `list-teams-chat-history`.
+   *
+   * `path` MUST start with `/v1/...` (e.g. `/v1/users/ME/conversations/{id}/messages?startTime=...`)
+   * — the host + `/api/chatsvc/<region>` prefix are added here.
+   */
+  teamsChatIc3: (path: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
@@ -295,6 +310,40 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     }
   };
 
+  // IC3 substrate — same host as teamsChat (teams.microsoft.com) but a
+  // different path prefix (`/api/chatsvc/<region>/` vs `/api/csa/<region>/`)
+  // and a different bearer audience (`https://ic3.teams.office.com` vs
+  // `https://chatsvcagg.teams.microsoft.com`). The IC3 substrate is the one
+  // Teams web actually uses for chat-message scrollback — it supports
+  // `syncState` + `startTime` pagination that chatsvcagg lacks. See
+  // `gotcha_chatsvcagg_substrate_moved` in memory for the discovery.
+  const ic3AuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
+    const tokenResult = await auth.getIc3AccessToken();
+    if (!tokenResult.ok) {
+      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
+      return err({ type: 'auth_failed', message: msg });
+    }
+    return ok({ Authorization: `Bearer ${tokenResult.value}` });
+  };
+
+  const teamsChatIc3 = async (path: string): Promise<Result<unknown, GraphError>> => {
+    const headers = await ic3AuthHeaders();
+    if (!headers.ok) return headers;
+    const region = await auth.getChatsvcaggRegion();
+    const url = `https://teams.microsoft.com/api/chatsvc/${region}${path}`;
+    try {
+      const res = await fetchFn(url, {
+        method: 'GET',
+        headers: { ...headers.value, accept: 'application/json' },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return err(await apiErrorFrom(res, url));
+      return ok(await res.json());
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${path} (ic3)`, 'json'));
+    }
+  };
+
   const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
     const url = `https://graph.microsoft.com/v1.0${path}`;
     try {
@@ -498,6 +547,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
     getElevated,
     teamsChat,
+    teamsChatIc3,
     post: (path, body) => request('POST', path, body),
     getBinary,
     getBinaryElevated,

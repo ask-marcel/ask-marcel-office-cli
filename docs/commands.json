@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-21T04:01:27.007Z",
+  "generatedAt": "2026-05-21T07:39:48.177Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -5688,6 +5688,42 @@
       "example": "ask-marcel list-team-installed-apps --team-id 'tm1'",
       "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
       "pagination": true
+    },
+    {
+      "name": "list-teams-chat-history",
+      "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 100 * 10 = 1000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-list",
+      "options": [
+        {
+          "name": "chat-id",
+          "key": "chatId",
+          "required": true,
+          "description": "Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`."
+        },
+        {
+          "name": "sync-state",
+          "key": "syncState",
+          "required": false,
+          "description": "Opaque pagination URL returned in the prior response's `nextSyncState` field. Pass it back to continue paging backward from where the previous invocation stopped. Omit on the first call."
+        },
+        {
+          "name": "page-size",
+          "key": "pageSize",
+          "required": false,
+          "description": "Messages per IC3 page (positive integer; default 100, same value Teams web uses for scrollback). Server may silently cap."
+        },
+        {
+          "name": "max-pages",
+          "key": "maxPages",
+          "required": false,
+          "description": "Safety cap on the backward walk (positive integer; default 10). Each page can return up to `--page-size` messages, so default ceiling is ~1000 messages or ~1 MB inline JSON per invocation. Raise carefully — response is buffered fully before returning."
+        }
+      ],
+      "example": "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
+      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string }`. IC3 substrate message shape (camelCase, matches the chat substrate envelope): `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**"
     },
     {
       "name": "list-teams-chat-messages",
