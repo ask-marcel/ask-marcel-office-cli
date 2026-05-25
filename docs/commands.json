@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-25T01:26:16.332Z",
+  "generatedAt": "2026-05-25T01:37:35.691Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -251,7 +251,7 @@
     },
     {
       "name": "find-chats-with-user",
-      "summary": "Find every Microsoft Teams chat that includes a member matching `--name` (case-insensitive substring across display-name, email, given-name, surname, MRI, and object-id). Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical \"all conversations with person X\" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. Accent-insensitivity is NOT applied: `--name Alex` will not match a member named \"Alex\"; pass the accented form.",
+      "summary": "Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `JANE` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical \"all conversations with person X\" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "https://teams.microsoft.com/api/csa/{region}/api/v3/teams/users/me/chats",
@@ -261,7 +261,7 @@
           "name": "name",
           "key": "name",
           "required": true,
-          "description": "Case-insensitive substring to search across each chat member's `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Use the full name or an unambiguous fragment (\"Alex Kim\" or \"alex.kim\"). Quoted multi-word values match on the joined substring, not per-token."
+          "description": "Substring to search across each chat member's `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Both the query and each field are NFD-normalized + diacritics-stripped + lowercased before comparison, so `Alex` ↔ `Alex` ↔ `JANE` are equivalent and a query for the accented name still matches a member whose displayName is the un-accented email. Use the full name or an unambiguous fragment. Quoted multi-word values match on the joined substring, not per-token."
         },
         {
           "name": "max-pages",

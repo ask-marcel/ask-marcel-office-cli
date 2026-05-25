@@ -3598,6 +3598,89 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     }
   });
 
+  // Audit Alex-session §D follow-up — the live failure mode that the
+  // synthetic dual-identity test above DID NOT cover: the corporate-MRI
+  // member entry's `displayName` is the email itself (no accent), while
+  // the guest-MRI entry's displayName carries the accented form. A search
+  // for `Alex` used to return ONLY the guest chat because `é` and `e`
+  // are different bytes — the corporate 1:1 (843 chats deep) was invisible.
+  // Diacritic-folding both sides at compare time fixes it.
+  it('surfaces dual-identity when the corporate identity stores its displayName as the un-accented email and the guest identity stores the accented name (Audit Alex-session §D)', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          {
+            id: '19:42c44e51-corp@unq.gbl.spaces',
+            chatType: 'oneOnOne',
+            // The live shape that fooled the pre-fix predicate: displayName
+            // is literally the email, no "Alex" anywhere.
+            members: [{ mri: '8:orgid:42c44e51-aaaa-bbbb-cccc-dddddddddddd', displayName: 'alex.kim@example.com', email: 'alex.kim@example.com', userSubType: 'Member' }],
+          },
+          {
+            id: '19:a1bb71fb-guest@unq.gbl.spaces',
+            chatType: 'oneOnOne',
+            members: [{ mri: '8:orgid:a1bb71fb-aaaa-bbbb-cccc-dddddddddddd', displayName: 'Alex Kim', email: 'alex.kim@external.example.com', userSubType: 'Guest' }],
+          },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Alex' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; matches: Array<{ chatId: string; matchedMembers: Array<{ mri?: string; userSubType?: string }> }> };
+      expect(v.matchCount).toBe(2);
+      const mris = v.matches.flatMap((m) => m.matchedMembers.map((mm) => mm.mri));
+      expect(mris).toContain('8:orgid:42c44e51-aaaa-bbbb-cccc-dddddddddddd');
+      expect(mris).toContain('8:orgid:a1bb71fb-aaaa-bbbb-cccc-dddddddddddd');
+    }
+  });
+
+  it('the inverse of the §D fix: an un-accented query (`Alex`) ALSO surfaces a member whose only matchable text is the accented displayName (`Alex Kim`)', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          {
+            id: '19:guest@unq.gbl.spaces',
+            chatType: 'oneOnOne',
+            // Email and MRI deliberately don't contain "alex" — only the
+            // accented displayName does, so the fold has to work on the
+            // candidate side as well as the query side.
+            members: [{ mri: '8:orgid:zz-no-match-in-mri', displayName: 'Alex Kim', email: 'j.d@external.example.com', userSubType: 'Guest' }],
+          },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Alex' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number }).matchCount).toBe(1);
+  });
+
+  it('folding handles other Latin-1 diacritics too (ç ↔ c, ñ ↔ n) — regression guard against narrowly fixing only `é`', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          { id: '19:ç@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '8:orgid:1', displayName: 'François Niçoise' }] },
+          { id: '19:ñ@unq.gbl.spaces', chatType: 'oneOnOne', members: [{ mri: '8:orgid:2', displayName: 'Niño Pequeño' }] },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const francois = await cmd.execute(graph, { name: 'francois nicoise' });
+    expect(francois.ok).toBe(true);
+    if (francois.ok) expect((francois.value as { matchCount: number }).matchCount).toBe(1);
+    const nino = await cmd.execute(graph, { name: 'nino' });
+    expect(nino.ok).toBe(true);
+    if (nino.ok) expect((nino.value as { matchCount: number }).matchCount).toBe(1);
+  });
+
   it('matches on email even when display-name is absent (anonymized/system entries)', async () => {
     const fetchFn = sequencedFetch([
       {

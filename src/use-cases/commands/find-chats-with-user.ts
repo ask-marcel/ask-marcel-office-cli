@@ -25,8 +25,19 @@ const schema = z.object({
 const QUERY_BASE = 'enableMembershipSummary=true&supportsAdditionalSystemGeneratedFolders=true&supportsSliceItems=true&enableEngageCommunities=false';
 
 // Match a query against a member by checking every text-bearing field for a
-// case-insensitive substring. Accents are NOT normalized — that's a known
-// limitation; users searching for "Alex" won't match "Alex". Document.
+// substring, after folding both sides:
+//   - Unicode NFD normalization, then stripping combining-mark codepoints
+//     (so `é` ↔ `e`, `ç` ↔ `c`, etc.).
+//   - Lowercasing.
+//
+// Audit Alex-session §D follow-up: a real dual-identity user had the
+// CORPORATE-MRI member entry's displayName populated as the email
+// (`alex.kim@example.com`, no accent) while the GUEST-MRI entry's
+// displayName carried the accented "Alex Kim". A search for `Alex`
+// returned only the guest chat; the corporate 1:1 was invisible because
+// `é`.toLowerCase() and `e` are different bytes. Folding diacritics on
+// both sides makes `Alex` ↔ `Alex` ↔ `JANE` ↔ `alex.kim@example.com`
+// all match against the same query.
 type Member = {
   readonly mri?: string;
   readonly objectId?: string;
@@ -39,7 +50,13 @@ type Member = {
   readonly userSubType?: string;
 };
 
-const memberMatches = (member: Member, queryLower: string): boolean => {
+const fold = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+
+const memberMatches = (member: Member, queryFolded: string): boolean => {
   const haystacks: ReadonlyArray<string | undefined> = [
     member.displayName,
     member.email,
@@ -50,7 +67,7 @@ const memberMatches = (member: Member, queryLower: string): boolean => {
     member.objectId,
     member.jobTitle,
   ];
-  return haystacks.some((h) => typeof h === 'string' && h.toLowerCase().includes(queryLower));
+  return haystacks.some((h) => typeof h === 'string' && fold(h).includes(queryFolded));
 };
 
 type Chat = {
@@ -94,7 +111,7 @@ const projectMember = (m: Member): MatchedMember => {
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const queryLower = parsed.data.name.toLowerCase();
+  const queryFolded = fold(parsed.data.name);
   const pageSize = parsed.data.pageSize ?? '100';
   const maxPages = Number(parsed.data.maxPages ?? '10');
 
@@ -119,7 +136,7 @@ const execute: Command['execute'] = async (graph, params) => {
     for (const chat of chats) {
       if (chat.id === undefined || seenChatIds.has(chat.id)) continue;
       const members = chat.members ?? [];
-      const matchedMembers = members.filter((m) => memberMatches(m, queryLower));
+      const matchedMembers = members.filter((m) => memberMatches(m, queryFolded));
       if (matchedMembers.length === 0) continue;
       seenChatIds.add(chat.id);
       matched.push({
@@ -152,7 +169,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Find every Microsoft Teams chat that includes a member matching `--name` (case-insensitive substring across display-name, email, given-name, surname, MRI, and object-id). Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. Accent-insensitivity is NOT applied: `--name Alex` will not match a member named "Alex"; pass the accented form.',
+    'Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `JANE` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.',
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/csa/{region}/api/v3/teams/users/me/chats',
@@ -163,7 +180,7 @@ const meta: CommandMeta = {
       key: 'name',
       required: true,
       description:
-        'Case-insensitive substring to search across each chat member\'s `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Use the full name or an unambiguous fragment ("Alex Kim" or "alex.kim"). Quoted multi-word values match on the joined substring, not per-token.',
+        "Substring to search across each chat member's `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Both the query and each field are NFD-normalized + diacritics-stripped + lowercased before comparison, so `Alex` ↔ `Alex` ↔ `JANE` are equivalent and a query for the accented name still matches a member whose displayName is the un-accented email. Use the full name or an unambiguous fragment. Quoted multi-word values match on the joined substring, not per-token.",
     },
     {
       name: 'max-pages',
