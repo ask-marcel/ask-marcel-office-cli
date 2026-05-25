@@ -1,6 +1,6 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { CommandCategory, Command } from './command-types.ts';
+import type { CommandCategory, Command, CommandMeta } from './command-types.ts';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
 import { CATEGORY_LABELS, renderCommandMarkdown } from './docs-render.ts';
 import { lookupScopes } from './graph-scopes.ts';
@@ -12,13 +12,15 @@ export type DocsError = { type: 'unknown_command'; readonly name: string; readon
  * (i.e. "does this CLI do X?"). Drops `options`, `example`, `graphPathTemplate`,
  * `graphDocsUrl`, `responseShape`, `bodyTemplate`, `paginationStrategy`,
  * `scopesRequired` — everything the LLM only needs once it's already decided
- * to invoke. Audit Alex-session §B: `help-json --terse` is the discovery
- * surface; `help-json` (full) is the per-command reference.
+ * to invoke. `stability` is kept (it's a discovery-time concern: LLMs prefer
+ * stable siblings when they exist, so they need to see the tag at discovery
+ * time, not after a second full-manifest fetch). Audit Alex-session §B/§6.
  */
 export type TerseManifestEntry = {
   readonly name: string;
   readonly summary: string;
   readonly category: CommandCategory;
+  readonly stability?: CommandMeta['stability'];
 };
 
 export type TerseManifest = {
@@ -161,7 +163,12 @@ export const buildTerseManifest = (registry: Readonly<Record<string, Command>>, 
   package: packageName,
   version,
   generatedAt: now().toISOString(),
-  commands: buildEntries(registry).map((e) => ({ name: e.name, summary: e.summary, category: e.category })),
+  commands: buildEntries(registry).map((e) => ({
+    name: e.name,
+    summary: e.summary,
+    category: e.category,
+    ...(e.stability ? { stability: e.stability } : {}),
+  })),
 });
 
 /**

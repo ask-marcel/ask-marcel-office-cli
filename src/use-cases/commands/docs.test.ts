@@ -76,6 +76,18 @@ describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () =>
     for (const lifecycle of LIFECYCLE_NAMES) expect(names).toContain(lifecycle);
   });
 
+  it('keeps the `stability` tag on terse entries so an LLM sees the experimental marker at discovery time (Audit Alex-session §6 — no second full-manifest fetch needed)', () => {
+    const registry: Readonly<Record<string, Command>> = {
+      'list-stable-thing': fakeCmd(),
+      'list-experimental-thing': fakeCmd({ stability: 'experimental' }),
+    };
+    const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1');
+    const stable = manifest.commands.find((c) => c.name === 'list-stable-thing');
+    const experimental = manifest.commands.find((c) => c.name === 'list-experimental-thing');
+    expect(stable?.stability).toBeUndefined();
+    expect(experimental?.stability).toBe('experimental');
+  });
+
   it('shrinks the wire payload substantially versus the full manifest (regression guard on the discovery-view contract)', () => {
     const registry: Readonly<Record<string, Command>> = Object.fromEntries(
       Array.from({ length: 50 }, (_, i) => [`list-thing-${i}`, fakeCmd({ summary: 'x'.repeat(400), responseShape: 'y'.repeat(400), bodyTemplate: 'z'.repeat(400) })])
