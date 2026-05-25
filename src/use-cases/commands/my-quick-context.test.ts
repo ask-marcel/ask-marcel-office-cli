@@ -29,11 +29,15 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
 // Audit round-7 Wave H: my-quick-context is partial-result. Each sub-call is
 // optional except `/me` (load-bearing); failures of the others produce
 // `undefined` fields rather than aborting the whole command.
+//
+// Post-v1.3.0 audit: the Microsoft To Do lists endpoint was dropped from
+// the fan-out — the per-list `{id, displayName, wellknownListName}` array
+// crowded the envelope. Microsoft To Do discovery now goes through the
+// dedicated sibling command on demand.
 const FULL_RESPONSES: Record<string, Result<unknown, GraphError>> = {
-  '/me': ok({ id: 'u1', displayName: 'Alice', userPrincipalName: 'alice@contoso.com', mail: 'alice@contoso.com' }),
+  '/me': ok({ id: 'u1', displayName: 'Alice', userPrincipalName: 'alice@contoso.com', mail: 'alice@contoso.com', jobTitle: 'Engineering Manager' }),
   '/me/drive': ok({ id: 'b!1234' }),
   '/me/mailFolders/inbox': ok({ id: 'AAMk-inbox' }),
-  '/me/todo/lists': ok({ value: [{ id: 'l1', displayName: 'Tasks', wellknownListName: 'defaultList' }] }),
   '/me/calendar': ok({ id: 'cal1' }),
   '/me/planner/plans?$top=1&$select=id,title': ok({ value: [{ id: 'plan-1', title: 'Q3 Planning' }] }),
   '/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault': ok({ value: [{ id: 'nb-1', displayName: 'Work', isDefault: true }] }),
@@ -47,7 +51,7 @@ const FULL_RESPONSES: Record<string, Result<unknown, GraphError>> = {
 };
 
 describe('my-quick-context', () => {
-  it('issues ten parallel Graph calls covering every discovery surface plus tenant timezone via /me/mailboxSettings', async () => {
+  it('issues nine parallel Graph calls covering every discovery surface plus tenant timezone via /me/mailboxSettings — `/me/todo/lists` is intentionally NOT in the fan-out (post-v1.3.0 simplification — Microsoft To Do discovery goes through `list-todo-task-lists` on demand)', async () => {
     const { graph, calls } = buildGraph(FULL_RESPONSES);
 
     await execute(graph, {});
@@ -62,21 +66,26 @@ describe('my-quick-context', () => {
       '/me/mailFolders/inbox',
       '/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault',
       '/me/planner/plans?$top=1&$select=id,title',
-      '/me/todo/lists',
     ]);
+    // Defensive: the Microsoft To Do lists endpoint must NOT be issued —
+    // the audit dropped it because the array of
+    // {id, displayName, wellknownListName} entries crowded the envelope.
+    expect(calls).not.toContain('/me/todo/lists');
   });
 
-  it('returns the aggregated quick-context object — including the tenant timezone, locale, and working-hours — when every sub-call succeeds', async () => {
+  it('returns the aggregated quick-context object — including the tenant timezone, locale, working-hours, AND the user `jobTitle` — when every sub-call succeeds', async () => {
     const { graph } = buildGraph(FULL_RESPONSES);
 
     const result = await execute(graph, {});
 
     expect(result).toEqual(
       ok({
-        user: { id: 'u1', displayName: 'Alice', userPrincipalName: 'alice@contoso.com', mail: 'alice@contoso.com' },
+        // `jobTitle` added on user request — surfaces the user's role on
+        // first contact so an LLM can answer "who am I working with"
+        // questions without a second `get-current-user` call.
+        user: { id: 'u1', displayName: 'Alice', userPrincipalName: 'alice@contoso.com', mail: 'alice@contoso.com', jobTitle: 'Engineering Manager' },
         primaryDriveId: 'b!1234',
         inboxId: 'AAMk-inbox',
-        todoLists: [{ id: 'l1', displayName: 'Tasks', wellknownListName: 'defaultList' }],
         primaryCalendarId: 'cal1',
         primaryPlannerPlanId: 'plan-1',
         defaultNotebookId: 'nb-1',
@@ -87,6 +96,20 @@ describe('my-quick-context', () => {
         tenantWorkingHours: { start: '09:00:00.0000000', end: '18:00:00.0000000', timeZone: 'Romance Standard Time' },
       })
     );
+  });
+
+  it("leaves user.jobTitle undefined when /me doesn't carry it (some tenants don't populate the field) — every other field still ships", async () => {
+    const { graph } = buildGraph({ ...FULL_RESPONSES, '/me': ok({ id: 'u1', displayName: 'Alice', userPrincipalName: 'alice@contoso.com', mail: 'alice@contoso.com' }) });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { user: { id?: string; jobTitle?: string }; primaryDriveId?: string };
+      expect(v.user.jobTitle).toBeUndefined();
+      expect(v.user.id).toBe('u1');
+      expect(v.primaryDriveId).toBe('b!1234');
+    }
   });
 
   it('leaves tenant timezone/locale/workingHours undefined when /me/mailboxSettings fails — partial-result mode (Audit Alex-session §5.2)', async () => {
