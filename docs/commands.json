@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-25T01:37:35.691Z",
+  "generatedAt": "2026-05-25T03:28:17.543Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -277,7 +277,8 @@
         }
       ],
       "example": "ask-marcel find-chats-with-user --name 'Alex Kim'",
-      "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, hasMore, nextContinuationToken? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`)."
+      "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, hasMore, nextContinuationToken? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
+      "stability": "experimental"
     },
     {
       "name": "get-calendar-event",
@@ -1681,7 +1682,8 @@
         }
       ],
       "example": "ask-marcel get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
-      "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**"
+      "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**",
+      "stability": "experimental"
     },
     {
       "name": "get-todo-task",
@@ -5777,7 +5779,8 @@
         }
       ],
       "example": "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
-      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**"
+      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
+      "stability": "experimental"
     },
     {
       "name": "list-teams-chat-messages",
@@ -5795,7 +5798,8 @@
         }
       ],
       "example": "ask-marcel list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
-      "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.**"
+      "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
+      "stability": "experimental"
     },
     {
       "name": "list-teams-chats-with-messages",
@@ -5819,7 +5823,8 @@
         }
       ],
       "example": "ask-marcel list-teams-chats-with-messages --page-size 100",
-      "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member's `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**"
+      "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member's `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
+      "stability": "experimental"
     },
     {
       "name": "list-todo-linked-resources",
@@ -6154,14 +6159,14 @@
     },
     {
       "name": "my-quick-context",
-      "summary": "One-shot discovery for the IDs every other command needs. Issues nine Graph calls in parallel and returns the IDs each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc.",
+      "summary": "One-shot discovery for the IDs every other command needs, plus the tenant timezone / locale / working-hours. Issues 10 Graph calls in parallel and returns what each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc. Audit Alex-session §5.2: `tenantTimeZone` lets an LLM stop treating every datetime as UTC on first contact.",
       "category": "meta",
       "graphMethod": "GET",
-      "graphPathTemplate": "(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent",
+      "graphPathTemplate": "(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent, /me/mailboxSettings",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
       "options": [],
       "example": "ask-marcel my-quick-context",
-      "responseShape": "{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId?, inboxId?, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId? } — every ID except `user.id` is optional and absent when its source call failed."
+      "responseShape": "`{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId?, inboxId?, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `tenantTimeZone` is the Outlook timezone string (e.g. \"Romance Standard Time\", \"Pacific Standard Time\"); `tenantLocale` is the IETF tag (e.g. \"en-US\")."
     },
     {
       "name": "next-page",
@@ -6204,14 +6209,14 @@
     },
     {
       "name": "scopes-check",
-      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff).",
+      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field (added Alex-session §4) lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "(meta) cached-token introspection — no Graph endpoint",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
       "options": [],
       "example": "ask-marcel scopes-check",
-      "responseShape": "{ scopes: string[], audience: string, expiresAt: string (ISO 8601) }"
+      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`)."
     },
     {
       "name": "search-mail-messages",

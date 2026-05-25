@@ -162,4 +162,17 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('## Positional arguments');
     expect(md).toContain('| `<command>` | yes | Name of the command to show docs for. |');
   });
+
+  it('renders a Stability line when the entry is flagged experimental — surfaces the "may break without notice" warning structurally (Audit Alex-session §6)', () => {
+    const experimental: CommandManifestEntry = { ...listDrives, stability: 'experimental' };
+    const md = renderCommandMarkdown(experimental);
+    expect(md).toContain('**Stability:** `experimental`');
+    expect(md).toContain('Microsoft-internal substrate');
+    expect(md).toContain('Prefer a `stable` sibling');
+  });
+
+  it('omits the Stability line when the entry is stable (default) — keeps stable commands quiet so the field carries signal only when it matters', () => {
+    const md = renderCommandMarkdown(listDrives);
+    expect(md).not.toContain('**Stability:**');
+  });
 });

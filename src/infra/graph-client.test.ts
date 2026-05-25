@@ -909,6 +909,11 @@ describe('graph client', () => {
       expect(result.value.scopes).toEqual(['Mail.Read', 'Files.Read', 'User.Read']);
       expect(result.value.audience).toBe('https://graph.microsoft.com');
       expect(result.value.expiresAt).toBe(new Date(1893456000 * 1000).toISOString());
+      // expiresInSeconds = exp - now. Bounded check: must be positive (the
+      // exp is Jan 1 2030) and within (1893456000 - now) ± a few seconds.
+      const expected = 1893456000 - Math.floor(Date.now() / 1000);
+      expect(result.value.expiresInSeconds).toBeGreaterThan(expected - 2);
+      expect(result.value.expiresInSeconds).toBeLessThan(expected + 2);
     }
   });
 
@@ -932,6 +937,7 @@ describe('graph client', () => {
       expect(result.value.scopes).toEqual([]);
       expect(result.value.audience).toBeUndefined();
       expect(result.value.expiresAt).toBeUndefined();
+      expect(result.value.expiresInSeconds).toBeUndefined();
     }
   });
 

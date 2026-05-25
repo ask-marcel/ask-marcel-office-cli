@@ -199,6 +199,7 @@ const meta: CommandMeta = {
   example: "ask-marcel find-chats-with-user --name 'Alex Kim'",
   responseShape:
     "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, hasMore, nextContinuationToken? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
+  stability: 'experimental',
 };
 
 export { execute, meta, schema };

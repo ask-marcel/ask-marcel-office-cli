@@ -84,6 +84,72 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(JSON.parse(out.trim())).toEqual({ ok: false, error: 'Authentication cancelled' });
   });
 
+  // Audit Alex-session §2 — structured-error path. The hint table maps the
+  // high-frequency Graph errors (InvalidIdMalformed, MissingScope, …) to a
+  // one-line remedy + a source classifier ('graph' | 'cli' | 'validation').
+  // The envelope is additive — old consumers keying on `error: string` still
+  // work; new consumers branch on `hint` / `source`.
+  it('attaches { hint, source } to the JSON envelope when the errorCode matches a known Graph error (e.g. ErrorInvalidIdMalformed)', async () => {
+    const out = await captureStream('stdout', () => renderError('ErrorInvalidIdMalformed: Id is malformed.', 'json', 'ErrorInvalidIdMalformed'));
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string; errorCode: string; hint?: string; source?: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.errorCode).toBe('ErrorInvalidIdMalformed');
+    expect(parsed.hint).toContain('Source IDs from a sibling');
+    expect(parsed.source).toBe('graph');
+  });
+
+  it('omits hint/source from the JSON envelope when nothing in the hint table matches (preserves the historical shape for unknown errors)', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'json', 'WeirdNewCode'));
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string; errorCode: string; hint?: string; source?: string };
+    expect(parsed.hint).toBeUndefined();
+    expect(parsed.source).toBeUndefined();
+  });
+
+  it('appends `hint:` and `source:` lines to text-mode errors so an LLM matching on `error:` still works but ALSO gets the remedy', async () => {
+    const out = await captureStream('stdout', () => renderError('ErrorInvalidIdMalformed: Id is malformed.', 'text', 'ErrorInvalidIdMalformed'));
+    const lines = out.trim().split('\n');
+    expect(lines[0]).toBe('error: ErrorInvalidIdMalformed: Id is malformed.');
+    expect(lines[1]).toMatch(/^hint: The ID you passed isn't valid for this endpoint/);
+    expect(lines[2]).toBe('source: graph');
+  });
+
+  it('text-mode errors keep the single-line shape when nothing matches the hint table (back-compat)', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'text', 'WeirdNewCode'));
+    expect(out).toBe('error: Some weird new failure mode\n');
+  });
+
+  // Audit Alex-session §3 — sizeHint when the rendered envelope crosses
+  // 50 KB. Generic remedy (presenter has no idea which command produced the
+  // data) — `--select` / `--top` / `--output-path`.
+  it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB', async () => {
+    const logger = createLoggerFake();
+    // 60 KB of dummy data — well over the 50 KB threshold and the hint
+    // itself can't push the borderline case over (additive guard in
+    // renderJson measures the initial envelope size, not the post-hint one).
+    const big = { value: Array.from({ length: 600 }, (_, i) => ({ id: `item-${i}`, payload: 'x'.repeat(100) })) };
+    const out = await captureStream('stdout', () => render(big, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; sizeHint?: string };
+    expect(parsed.sizeHint).toBeDefined();
+    expect(parsed.sizeHint).toContain('--select');
+    expect(parsed.sizeHint).toContain('--output-path');
+  });
+
+  it('omits `sizeHint` when the rendered envelope fits inside 50 KB (no warning churn on small responses)', async () => {
+    const logger = createLoggerFake();
+    const small = { value: [{ id: '1', subject: 'hi' }] };
+    const out = await captureStream('stdout', () => render(small, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; sizeHint?: string };
+    expect(parsed.sizeHint).toBeUndefined();
+  });
+
+  it('text-mode renders prepend a `sizeHint:` line above the body when the body exceeds 50 KB so the LLM sees the warning before scrolling', async () => {
+    const logger = createLoggerFake();
+    const big = { value: Array.from({ length: 600 }, (_, i) => ({ id: `item-${i}`, payload: 'x'.repeat(100) })) };
+    const out = await captureStream('stdout', () => render(big, logger, 'text'));
+    expect(out.startsWith('sizeHint: Response is ')).toBe(true);
+    expect(out).toContain('> 50 KB threshold');
+  });
+
   it('writes nothing to stderr when an error is rendered', async () => {
     const out = await captureStream('stderr', () => renderError('Boom', 'json'));
     expect(out).toBe('');
@@ -250,9 +316,9 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     expect(out).toBe('status: authenticated\n');
   });
 
-  it('renders an error as a single "error: <message>" line without the JSON envelope so an LLM can read the failure directly', async () => {
-    const out = await captureStream('stdout', () => renderError('missing scope: Calendars.Read', 'text'));
-    expect(out).toBe('error: missing scope: Calendars.Read\n');
+  it('renders an unrecognised error as a single "error: <message>" line (no hint/source appended when the hint table does not match)', async () => {
+    const out = await captureStream('stdout', () => renderError('some unmapped failure with no recognisable pattern', 'text'));
+    expect(out).toBe('error: some unmapped failure with no recognisable pattern\n');
   });
 
   it('writes nothing to stderr when a text-mode error is rendered (single-stream contract)', async () => {

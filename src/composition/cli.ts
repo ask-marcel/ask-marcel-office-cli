@@ -124,7 +124,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   program
     .name('ask-marcel')
-    .description('Microsoft Graph CLI')
+    .description(
+      'Microsoft Graph CLI. READ-ONLY: this CLI cannot send mail, modify or create calendar items, write files, or perform any mutating action — there is no send-mail / create-event / upload-file command. 164 GET endpoints + 1 POST (microsoft-search-query, which is a search). Safe default for LLM autonomy.'
+    )
     .version(version ?? '0.0.0')
     // Audit Alex-session §B: override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
@@ -227,7 +229,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers. Pass `--terse` for a 95%-smaller `{name, summary, category}` projection (the discovery view) or `--category mail` (or any category from CATEGORY_LABELS) to filter to a single category; the two compose.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~370 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~62 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta.'
     )
     .option(
       '--terse',
@@ -417,6 +419,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
       const helpLines = [
         `\nGraph endpoint: ${cmd.meta.graphMethod} ${cmd.meta.graphPathTemplate}`,
         `Microsoft Learn: ${cmd.meta.graphDocsUrl}`,
+        ...(cmd.meta.stability === 'experimental'
+          ? [
+              '\nStability: experimental — rides a Microsoft-internal substrate (chatsvcagg / IC3) that is not in the public Graph API and can break on a Teams web-client update. Prefer a stable sibling when one exists.',
+            ]
+          : []),
         ...(cmd.meta.pagination ? [`\nPagination: ${PAGINATION_HINT}`] : []),
         ...(cmd.meta.bodyTemplate ? [`\nRequest body:\n  ${cmd.meta.bodyTemplate}`] : []),
         `\nExample:\n  ${cmd.meta.example}`,

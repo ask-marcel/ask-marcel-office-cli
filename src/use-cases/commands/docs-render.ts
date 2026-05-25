@@ -17,6 +17,7 @@ export type CommandManifestEntry = {
   readonly scopesRequired?: CommandMeta['scopesRequired'];
   readonly needsElevatedToken?: CommandMeta['needsElevatedToken'];
   readonly producesBytes?: CommandMeta['producesBytes'];
+  readonly stability?: CommandMeta['stability'];
 };
 
 export const PAGINATION_HINT =
@@ -112,6 +113,11 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.needsElevatedToken) {
     lines.push(
       '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `ask-marcel login` to retry the capture.'
+    );
+  }
+  if (entry.stability === 'experimental') {
+    lines.push(
+      '- **Stability:** `experimental` — rides a Microsoft-internal substrate that is not in the public Graph API and can break without notice on a Teams web-client update. Prefer a `stable` sibling when one exists.'
     );
   }
   if (entry.positionalArguments !== undefined && entry.positionalArguments.length > 0) {

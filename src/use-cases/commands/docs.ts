@@ -58,6 +58,7 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     ...(scopesRequired && scopesRequired.length > 0 ? { scopesRequired } : {}),
     ...(cmd.meta.needsElevatedToken ? { needsElevatedToken: cmd.meta.needsElevatedToken } : {}),
     ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
+    ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
   };
 };
 
@@ -130,7 +131,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'help-json',
     summary:
-      'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `ask-marcel --help`, which is ~40 KB. Includes lifecycle commands (login/logout/update/docs/help-json) under category `lifecycle`.',
+      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~12 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}`. Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders the in-process command manifest',

@@ -23,7 +23,7 @@ const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
 
-  const [meRes, driveRes, inboxRes, listsRes, calendarRes, plannerRes, notebooksRes, teamsRes, recentRes] = await Promise.all([
+  const [meRes, driveRes, inboxRes, listsRes, calendarRes, plannerRes, notebooksRes, teamsRes, recentRes, mailboxRes] = await Promise.all([
     graph.get('/me'),
     graph.get('/me/drive'),
     graph.get('/me/mailFolders/inbox'),
@@ -33,6 +33,11 @@ const execute: Command['execute'] = async (graph, params) => {
     graph.get('/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault'),
     graph.get('/me/joinedTeams?$top=1&$select=id,displayName'),
     graph.get('/me/drive/recent?$top=1&$select=id,name,lastModifiedDateTime'),
+    // Audit Alex-session §5.2: tenant timezone needed on first-contact so the
+    // LLM stops treating every datetime as UTC. `mailboxSettings.timeZone` is
+    // the closest thing Graph exposes (Outlook setting; matches the tz the
+    // user sees in Outlook/Teams). $select keeps the payload small.
+    graph.get('/me/mailboxSettings?$select=timeZone,language,workingHours'),
   ]);
   if (!meRes.ok) return meRes;
 
@@ -45,6 +50,9 @@ const execute: Command['execute'] = async (graph, params) => {
   const notebooks = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; displayName?: string; isDefault?: boolean }> }>(notebooksRes);
   const teams = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; displayName?: string }> }>(teamsRes);
   const recent = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; name?: string; lastModifiedDateTime?: string }> }>(recentRes);
+  const mailbox = valueOrUndefined<{ timeZone?: string; language?: { locale?: string }; workingHours?: { startTime?: string; endTime?: string; timeZone?: { name?: string } } }>(
+    mailboxRes
+  );
 
   return ok({
     user: { id: me.id, displayName: me.displayName, userPrincipalName: me.userPrincipalName, mail: me.mail },
@@ -56,21 +64,27 @@ const execute: Command['execute'] = async (graph, params) => {
     defaultNotebookId: notebooks?.value?.find((n) => n.isDefault === true)?.id ?? notebooks?.value?.[0]?.id,
     firstJoinedTeamId: teams?.value?.[0]?.id,
     recentDriveItemId: recent?.value?.[0]?.id,
+    tenantTimeZone: mailbox?.timeZone,
+    tenantLocale: mailbox?.language?.locale,
+    tenantWorkingHours:
+      mailbox?.workingHours?.startTime !== undefined && mailbox.workingHours.endTime !== undefined
+        ? { start: mailbox.workingHours.startTime, end: mailbox.workingHours.endTime, timeZone: mailbox.workingHours.timeZone?.name }
+        : undefined,
   });
 };
 
 const meta: CommandMeta = {
   summary:
-    "One-shot discovery for the IDs every other command needs. Issues nine Graph calls in parallel and returns the IDs each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc.",
+    "One-shot discovery for the IDs every other command needs, plus the tenant timezone / locale / working-hours. Issues 10 Graph calls in parallel and returns what each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-todo-tasks`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc. Audit Alex-session §5.2: `tenantTimeZone` lets an LLM stop treating every datetime as UTC on first contact.",
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate:
-    '(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent',
+    '(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent, /me/mailboxSettings',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get',
   options: [],
   example: 'ask-marcel my-quick-context',
   responseShape:
-    '{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId?, inboxId?, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId? } — every ID except `user.id` is optional and absent when its source call failed.',
+    '`{ user: { id, displayName, userPrincipalName, mail }, primaryDriveId?, inboxId?, todoLists: [{ id, displayName, wellknownListName }], primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `tenantTimeZone` is the Outlook timezone string (e.g. "Romance Standard Time", "Pacific Standard Time"); `tenantLocale` is the IETF tag (e.g. "en-US").',
 };
 
 export { execute, meta, schema };

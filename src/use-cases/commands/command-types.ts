@@ -128,6 +128,17 @@ type CommandMeta = {
    * as a string literal. Audit round-8 Wave E2.
    */
   readonly producesBytes?: true;
+  /**
+   * Stability tier of the command. Omitted from manifest entries when the
+   * command is `'stable'` (the implicit default), surfaced only on
+   * `'experimental'` commands so an LLM can prefer stable siblings when they
+   * exist. `'experimental'` today means the command rides a Microsoft-internal
+   * substrate (chatsvcagg / IC3) that is not in the public Graph API and can
+   * break on a Teams web-client update — the docstring "Best-effort, may break
+   * on Microsoft client updates" warnings now have a structured pair.
+   * Audit Alex-session §6.
+   */
+  readonly stability?: 'experimental';
 };
 
 type Command = {

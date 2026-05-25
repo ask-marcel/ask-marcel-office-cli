@@ -21,7 +21,7 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
     fetchUrl: async () => ok({}),
     put: async () => ok({}),
     delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
   };
   return { graph, calls };
 };
@@ -39,10 +39,15 @@ const FULL_RESPONSES: Record<string, Result<unknown, GraphError>> = {
   '/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault': ok({ value: [{ id: 'nb-1', displayName: 'Work', isDefault: true }] }),
   '/me/joinedTeams?$top=1&$select=id,displayName': ok({ value: [{ id: 'team-1', displayName: 'Engineering' }] }),
   '/me/drive/recent?$top=1&$select=id,name,lastModifiedDateTime': ok({ value: [{ id: 'di-1', name: 'budget.xlsx', lastModifiedDateTime: '2026-05-17T00:00:00Z' }] }),
+  '/me/mailboxSettings?$select=timeZone,language,workingHours': ok({
+    timeZone: 'Romance Standard Time',
+    language: { locale: 'fr-FR' },
+    workingHours: { startTime: '09:00:00.0000000', endTime: '18:00:00.0000000', timeZone: { name: 'Romance Standard Time' } },
+  }),
 };
 
 describe('my-quick-context', () => {
-  it('issues nine parallel Graph calls covering every discovery surface (/me, /me/drive, /me/mailFolders/inbox, /me/todo/lists, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent)', async () => {
+  it('issues ten parallel Graph calls covering every discovery surface plus tenant timezone via /me/mailboxSettings', async () => {
     const { graph, calls } = buildGraph(FULL_RESPONSES);
 
     await execute(graph, {});
@@ -53,6 +58,7 @@ describe('my-quick-context', () => {
       '/me/drive',
       '/me/drive/recent?$top=1&$select=id,name,lastModifiedDateTime',
       '/me/joinedTeams?$top=1&$select=id,displayName',
+      '/me/mailboxSettings?$select=timeZone,language,workingHours',
       '/me/mailFolders/inbox',
       '/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault',
       '/me/planner/plans?$top=1&$select=id,title',
@@ -60,7 +66,7 @@ describe('my-quick-context', () => {
     ]);
   });
 
-  it('returns the aggregated quick-context object when every sub-call succeeds', async () => {
+  it('returns the aggregated quick-context object — including the tenant timezone, locale, and working-hours — when every sub-call succeeds', async () => {
     const { graph } = buildGraph(FULL_RESPONSES);
 
     const result = await execute(graph, {});
@@ -76,8 +82,27 @@ describe('my-quick-context', () => {
         defaultNotebookId: 'nb-1',
         firstJoinedTeamId: 'team-1',
         recentDriveItemId: 'di-1',
+        tenantTimeZone: 'Romance Standard Time',
+        tenantLocale: 'fr-FR',
+        tenantWorkingHours: { start: '09:00:00.0000000', end: '18:00:00.0000000', timeZone: 'Romance Standard Time' },
       })
     );
+  });
+
+  it('leaves tenant timezone/locale/workingHours undefined when /me/mailboxSettings fails — partial-result mode (Audit Alex-session §5.2)', async () => {
+    const apiError: GraphError = { type: 'api_error', status: 403, message: 'tenant disabled mailboxSettings' };
+    const { graph } = buildGraph({ ...FULL_RESPONSES, '/me/mailboxSettings?$select=timeZone,language,workingHours': err(apiError) });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { tenantTimeZone?: string; tenantLocale?: string; tenantWorkingHours?: unknown; primaryDriveId?: string };
+      expect(v.tenantTimeZone).toBeUndefined();
+      expect(v.tenantLocale).toBeUndefined();
+      expect(v.tenantWorkingHours).toBeUndefined();
+      expect(v.primaryDriveId).toBe('b!1234');
+    }
   });
 
   it('returns the Graph error of /me when /me fails (load-bearing — every other sub-call uses the same identity)', async () => {

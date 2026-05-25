@@ -15,7 +15,7 @@ const fakeGraphReturning = (response: Result<unknown, GraphError>): GraphClient 
   fetchUrl: async () => ok({}),
   put: async () => ok({}),
   delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
 });
 
 describe('get-my-manager', () => {

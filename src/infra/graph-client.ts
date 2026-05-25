@@ -97,6 +97,14 @@ type TokenInfo = {
   readonly scopes: ReadonlyArray<string>;
   readonly audience: string | undefined;
   readonly expiresAt: string | undefined;
+  /**
+   * Seconds remaining until the cached token's `exp` claim — derived from
+   * `expiresAt - now`. Negative when the token has already expired. Absent
+   * when the JWT did not carry an `exp` claim. Audit Alex-session §4: lets
+   * an LLM decide pre-emptively to run `ask-marcel login` (re-auth typically
+   * worth doing under ~5 minutes) without parsing the ISO string itself.
+   */
+  readonly expiresInSeconds: number | undefined;
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -540,7 +548,8 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const audience = typeof audRaw === 'string' ? audRaw : undefined;
     const expRaw = claims['exp'];
     const expiresAt = typeof expRaw === 'number' ? new Date(expRaw * 1000).toISOString() : undefined;
-    return ok({ scopes, audience, expiresAt });
+    const expiresInSeconds = typeof expRaw === 'number' ? Math.floor(expRaw - Date.now() / 1000) : undefined;
+    return ok({ scopes, audience, expiresAt, expiresInSeconds });
   };
 
   return {

@@ -69,7 +69,7 @@ const okGraph = (value: unknown): GraphClient => ({
   fetchUrl: async () => ({ ok: true, value }),
   put: async () => ({ ok: true, value }),
   delete: async () => ({ ok: true, value }),
-  getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
+  getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
 });
 
 const errGraph = (error: GraphError): GraphClient => ({
@@ -245,7 +245,7 @@ describe('buildCli command surface', () => {
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
       delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
@@ -265,7 +265,7 @@ describe('buildCli command surface', () => {
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
       delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
@@ -475,7 +475,7 @@ describe('buildCli command surface', () => {
       fetchUrl: async () => ({ ok: true, value: {} }),
       put: async () => ({ ok: true, value: {} }),
       delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined } }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });

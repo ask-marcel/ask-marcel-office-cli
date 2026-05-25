@@ -15,7 +15,7 @@ const fakeGraph: GraphClient = {
   fetchUrl: async () => ok({}),
   put: async () => ok({}),
   delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
 };
 
 describe('buildCommand', () => {
@@ -45,7 +45,7 @@ describe('buildCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildCommand((p) => `/items/${p.id}`, z.object({ id: z.string() }));
     const result = await cmd.execute(graph, { id: '42' });
@@ -81,7 +81,7 @@ describe('buildElevatedCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildElevatedCommand((p) => `/chats/${p.id}`, z.object({ id: z.string() }));
     const result = await cmd.execute(graph, { id: '19:abc' });
@@ -107,7 +107,7 @@ describe('buildListCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildListCommand(() => '/me/messages', z.object({}));
     await cmd.execute(graph, { top: '5' });
@@ -130,7 +130,7 @@ describe('buildListCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildListCommand(() => '/me/messages', z.object({}));
     const result = await cmd.execute(graph, { top: 'lots' });
@@ -170,7 +170,7 @@ describe('buildElevatedListCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildElevatedListCommand(() => '/me/chats', z.object({}));
     await cmd.execute(graph, { top: '3', filter: "topic eq 'project'" });
@@ -195,7 +195,7 @@ describe('buildElevatedPickODataListCommand', () => {
       fetchUrl: async () => ok({}),
       put: async () => ok({}),
       delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined }),
+      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
     };
     const cmd = buildElevatedPickODataListCommand(() => '/me/chats', z.object({}), ['top', 'select']);
     await cmd.execute(graph, { top: '3', orderby: 'lastUpdatedDateTime desc', select: 'id,topic', expand: 'members' });

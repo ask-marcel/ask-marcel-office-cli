@@ -60,6 +60,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel list-teams-chats-with-messages --page-size 100',
   responseShape:
     '`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member\'s `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token "$(jq -r .data.continuationToken <prev>)"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**',
+  stability: 'experimental',
 };
 
 export { execute, meta, schema };
