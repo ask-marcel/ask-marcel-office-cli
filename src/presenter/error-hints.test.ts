@@ -88,6 +88,20 @@ describe('findErrorHint — CLI-side rewrites and rejections', () => {
     expect(result?.hint).toContain('list-mail-messages --filter');
     expect(result?.hint).toContain('KQL query string');
   });
+
+  it('matches `cli_reject_calendar_link_on_mail_resolver` with a hint pointing at the right sibling (`resolve-calendar-link`) instead of generic validation boilerplate', () => {
+    const result = findErrorHint('--url looks like an Outlook calendar link, not a mail message link.', 'cli_reject_calendar_link_on_mail_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-calendar-link');
+    expect(result?.hint).toContain('eventId');
+  });
+
+  it('matches the inverse `cli_reject_mail_link_on_calendar_resolver` with a hint pointing at `resolve-mail-link`', () => {
+    const result = findErrorHint('--url looks like an Outlook mail message link, not a calendar item link.', 'cli_reject_mail_link_on_calendar_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-mail-link');
+    expect(result?.hint).toContain('messageId');
+  });
 });
 
 describe('findErrorHint — Commander.js parser errors (Audit Alex-session §2 follow-up)', () => {

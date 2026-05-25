@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "1.2.0",
-  "generatedAt": "2026-05-25T07:56:34.754Z",
+  "version": "1.3.0",
+  "generatedAt": "2026-05-25T09:06:16.339Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6200,6 +6200,60 @@
       ],
       "example": "ask-marcel next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
       "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level."
+    },
+    {
+      "name": "resolve-calendar-link",
+      "summary": "Parse a Microsoft Outlook calendar item link (the URL emitted by the \"Copy link\" / share action on a calendar event) into its `eventId`. Pure transformation — no Graph call. Pipe the result into `get-calendar-event` to fetch the event body. For Outlook mail message links use `resolve-mail-link` instead — this command rejects them with a pointer.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "{url}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/event-get",
+      "options": [
+        {
+          "name": "url",
+          "key": "url",
+          "required": true,
+          "description": "Outlook web URL for a single calendar item. Accepted hosts: `outlook.office.com`, `outlook.office365.com`, `outlook.live.com`. Accepted shapes: path-style (`/calendar/item/AAMkA...`) and OWA query-style with calendar path (`/owa/?itemid=AAMkA...&path=/calendar/item`). Mail links (`/mail/...` or `/owa/?itemid=...` without `path=/calendar`) are rejected with `cli_reject_mail_link_on_calendar_resolver` — use `resolve-mail-link` for those."
+        }
+      ],
+      "example": "ask-marcel resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
+      "responseShape": "`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`."
+    },
+    {
+      "name": "resolve-drive-share-link",
+      "summary": "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-onedrive-file-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "{url}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/shares-get",
+      "options": [
+        {
+          "name": "url",
+          "key": "url",
+          "required": true,
+          "description": "A OneDrive / SharePoint sharing URL — the address from the \"Copy link\" / \"Share\" action in the OneDrive or SharePoint UI. Examples: `https://contoso.sharepoint.com/:b:/s/sitename/EaB1cD...`, `https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/file.pdf`, `https://1drv.ms/b/s!AbCdEfGh...`. The CLI does not follow the redirect on `1drv.ms` links — the short URL itself is encoded as the share token (Graph resolves it on the server side)."
+        }
+      ],
+      "example": "ask-marcel resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
+      "responseShape": "`{ shareToken: string, graphPath: string, originalUrl: string }`. `shareToken` is the `u!<base64url>` form. `graphPath` is the ready-to-use `/shares/{token}/driveItem` URL — pass it to `ask-marcel next-page --url <link>` for a one-shot driveItem fetch, or feed the `shareToken` into any future `/shares/{token}/...` endpoint. `originalUrl` is echoed back for round-trip confirmation."
+    },
+    {
+      "name": "resolve-mail-link",
+      "summary": "Parse a Microsoft Outlook web mail link (the URL emitted by the \"Copy link\" / address-bar share of an email) into its `messageId`. Pure transformation — no Graph call. Pipe the result into `get-mail-message` to fetch the body, or `convert-mail-to-markdown` to render it. For Outlook calendar links use `resolve-calendar-link` instead — this command rejects them with a pointer.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "{url}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-get",
+      "options": [
+        {
+          "name": "url",
+          "key": "url",
+          "required": true,
+          "description": "Outlook web URL for a single mail message. Accepted hosts: `outlook.office.com`, `outlook.office365.com`, `outlook.live.com`. Accepted shapes: OWA query-style (`/owa/?itemid=AAMkA...` or `/owa/?ItemID=AAMkA...`), modern path-style (`/mail/inbox/id/AAMkA...`), legacy short (`/mail/AAMkA...`). Calendar links (`/calendar/item/...` or `?path=/calendar/item`) are rejected with `cli_reject_calendar_link_on_mail_resolver` — use `resolve-calendar-link` for those."
+        }
+      ],
+      "example": "ask-marcel resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
+      "responseShape": "`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`."
     },
     {
       "name": "resolve-teams-link",

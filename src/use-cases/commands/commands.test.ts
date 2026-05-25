@@ -96,6 +96,9 @@ import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts
 import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
 import * as listTeamsChatHistory from './list-teams-chat-history.ts';
 import * as resolveTeamsLink from './resolve-teams-link.ts';
+import * as resolveMailLink from './resolve-mail-link.ts';
+import * as resolveDriveShareLink from './resolve-drive-share-link.ts';
+import * as resolveCalendarLink from './resolve-calendar-link.ts';
 import * as findChatsWithUser from './find-chats-with-user.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
@@ -256,6 +259,9 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
   'resolve-teams-link': resolveTeamsLink,
+  'resolve-mail-link': resolveMailLink,
+  'resolve-drive-share-link': resolveDriveShareLink,
+  'resolve-calendar-link': resolveCalendarLink,
   'find-chats-with-user': findChatsWithUser,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,
@@ -2980,6 +2986,9 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-teams-chat-messages', params: { chatId: '19:abc@thread.v2' } },
   { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2', messageId: 'm1' } },
   { name: 'resolve-teams-link', params: { url: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000000?ctx=chat' } },
+  { name: 'resolve-mail-link', params: { url: 'https://outlook.office.com/mail/inbox/id/AAMkAGI2Test' } },
+  { name: 'resolve-drive-share-link', params: { url: 'https://contoso.sharepoint.com/:b:/s/team/EaBcDef123' } },
+  { name: 'resolve-calendar-link', params: { url: 'https://outlook.office.com/calendar/item/AAMkAGI2Cal' } },
   { name: 'find-chats-with-user', params: { name: 'nobody' } },
   { name: 'get-chat', params: { chatId: 'ch1' } },
   { name: 'list-my-direct-reports', params: {} },
@@ -3127,6 +3136,9 @@ describe('command schema rejection', () => {
     { name: 'list-teams-chat-messages', params: {} },
     { name: 'get-teams-chat-message', params: { chatId: '19:abc@thread.v2' } },
     { name: 'resolve-teams-link', params: {} },
+    { name: 'resolve-mail-link', params: {} },
+    { name: 'resolve-drive-share-link', params: {} },
+    { name: 'resolve-calendar-link', params: {} },
     { name: 'find-chats-with-user', params: {} },
   ];
 
@@ -3860,6 +3872,194 @@ describe('resolve-teams-link parses copy-link URLs into structured ids', () => {
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'not-a-url' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+});
+
+// Outlook web mail links → messageId. Mirrors resolve-teams-link's shape;
+// rejects calendar URLs with a pointer to resolve-calendar-link so an LLM
+// never silently treats a calendar invite as a mail message.
+describe('resolve-mail-link parses Outlook web mail URLs into messageId', () => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { messageId: string }; error?: { type: string; message: string; code?: string } }> => {
+    const cmd = cmdMap['resolve-mail-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
+    return r.ok ? { ok: true, value: r.value as { messageId: string } } : { ok: false, error: r.error as { type: string; message: string; code?: string } };
+  };
+
+  it('extracts messageId from the modern path-style URL (`/mail/<folder>/id/<id>`)', async () => {
+    const r = await exec('https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS_modern_path');
+    expect(r.ok).toBe(true);
+    expect(r.value?.messageId).toBe('AAMkAGI2THVS_modern_path');
+  });
+
+  it('extracts messageId from the OWA query-style URL with lowercase `itemid`', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMkAGI2THVS_owa_lower&exvsurl=1&path=/mail/inbox');
+    expect(r.ok).toBe(true);
+    expect(r.value?.messageId).toBe('AAMkAGI2THVS_owa_lower');
+  });
+
+  it('extracts messageId from the OWA query-style URL with capitalised `ItemID` (legacy emit)', async () => {
+    const r = await exec('https://outlook.office365.com/owa/?ItemID=AAMkAGI2THVS_owa_capital&exvsurl=1&viewmodel=ReadMessageItem');
+    expect(r.ok).toBe(true);
+    expect(r.value?.messageId).toBe('AAMkAGI2THVS_owa_capital');
+  });
+
+  it('URL-decodes the extracted id so percent-encoded ids round-trip correctly', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMk%2BFoo%2FBar%3D');
+    expect(r.ok).toBe(true);
+    expect(r.value?.messageId).toBe('AAMk+Foo/Bar=');
+  });
+
+  it('rejects a calendar OWA link (path=/calendar/item) with a structured code pointing at resolve-calendar-link', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMkAGI2_calendar&exvsurl=1&path=/calendar/item');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_calendar_link_on_mail_resolver');
+    expect(r.error?.message).toContain('calendar');
+  });
+
+  it('rejects a calendar path-style link (`/calendar/item/...`) with the same structured code', async () => {
+    const r = await exec('https://outlook.office.com/calendar/item/AAMkAGI2_calendar_path');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_calendar_link_on_mail_resolver');
+  });
+
+  it('rejects an unrelated host (example.com) with a generic "not an Outlook mail link" message', async () => {
+    const r = await exec('https://example.com/mail/AAMkAGI2');
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('not an Outlook mail link');
+  });
+
+  it('rejects a non-URL string at the Zod layer before parsing runs', async () => {
+    const r = await exec('not-a-url');
+    expect(r.ok).toBe(false);
+    expect(r.error?.type).toBe('validation_error');
+  });
+
+  it('rejects an outlook.office.com URL with no extractable id (e.g. a bare `/mail/inbox` folder URL)', async () => {
+    const r = await exec('https://outlook.office.com/mail/inbox');
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('not an Outlook mail link');
+  });
+});
+
+// SharePoint / OneDrive sharing URLs → Graph share token (`u!<base64url>`).
+// Pure encoding via the existing `buildShareToken` helper; the test only
+// needs to verify the round-trip + the accepted-host gate.
+describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{token}', () => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { shareToken: string; graphPath: string; originalUrl: string }; error?: { type: string; message: string } }> => {
+    const cmd = cmdMap['resolve-drive-share-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
+    return r.ok
+      ? { ok: true, value: r.value as { shareToken: string; graphPath: string; originalUrl: string } }
+      : { ok: false, error: r.error as { type: string; message: string } };
+  };
+
+  it('encodes a tenant SharePoint share URL as `u!<base64url>` and emits the `/shares/{token}/driveItem` Graph path ready for the next call', async () => {
+    const url = 'https://contoso.sharepoint.com/:b:/s/team/EaBcDef123_xyz';
+    const r = await exec(url);
+    expect(r.ok).toBe(true);
+    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
+    expect(r.value?.graphPath).toBe(`/shares/${r.value?.shareToken}/driveItem`);
+    expect(r.value?.originalUrl).toBe(url);
+  });
+
+  it('accepts a personal OneDrive (-my.sharepoint.com subdomain) URL via the .sharepoint.com suffix match', async () => {
+    const url = 'https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/report.pdf';
+    const r = await exec(url);
+    expect(r.ok).toBe(true);
+    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
+  });
+
+  it('accepts a 1drv.ms short-link URL', async () => {
+    const url = 'https://1drv.ms/b/s!AbCdEfGh_xyz';
+    const r = await exec(url);
+    expect(r.ok).toBe(true);
+    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
+  });
+
+  it('rejects an unrelated host (graph.microsoft.com) with a clear validation_error', async () => {
+    const r = await exec('https://graph.microsoft.com/v1.0/me/drive');
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('not a recognised OneDrive / SharePoint sharing URL');
+  });
+
+  it('rejects a non-URL string at the Zod layer', async () => {
+    const r = await exec('not-a-url');
+    expect(r.ok).toBe(false);
+    expect(r.error?.type).toBe('validation_error');
+  });
+
+  it('the encoded shareToken is base64url (no `+`, `/`, or `=` padding) per the Graph /shares/{token} contract', async () => {
+    const url = 'https://contoso.sharepoint.com/:b:/s/team/with+plus/and/slash?e=stuff';
+    const r = await exec(url);
+    expect(r.ok).toBe(true);
+    const token = r.value?.shareToken ?? '';
+    expect(token.startsWith('u!')).toBe(true);
+    expect(token.slice(2)).not.toContain('+');
+    expect(token.slice(2)).not.toContain('/');
+    expect(token.slice(2)).not.toContain('=');
+  });
+});
+
+// Outlook calendar item URLs → eventId. Mirrors resolve-mail-link's shape
+// inversely — rejects mail URLs with a pointer to resolve-mail-link.
+describe('resolve-calendar-link parses Outlook calendar item URLs into eventId', () => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { eventId: string }; error?: { type: string; message: string; code?: string } }> => {
+    const cmd = cmdMap['resolve-calendar-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
+    return r.ok ? { ok: true, value: r.value as { eventId: string } } : { ok: false, error: r.error as { type: string; message: string; code?: string } };
+  };
+
+  it('extracts eventId from the modern path-style URL (`/calendar/item/<id>`)', async () => {
+    const r = await exec('https://outlook.office.com/calendar/item/AAMkAGI2CalPath');
+    expect(r.ok).toBe(true);
+    expect(r.value?.eventId).toBe('AAMkAGI2CalPath');
+  });
+
+  it('extracts eventId from the OWA query-style calendar URL (`/owa/?itemid=...&path=/calendar/item`)', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMkAGI2CalOwa&exvsurl=1&path=/calendar/item');
+    expect(r.ok).toBe(true);
+    expect(r.value?.eventId).toBe('AAMkAGI2CalOwa');
+  });
+
+  it('URL-decodes the extracted id so percent-encoded ids round-trip correctly', async () => {
+    const r = await exec('https://outlook.office.com/calendar/item/AAMk%2BCal%3D');
+    expect(r.ok).toBe(true);
+    expect(r.value?.eventId).toBe('AAMk+Cal=');
+  });
+
+  it('rejects a mail OWA link (no `path=/calendar`) with a structured code pointing at resolve-mail-link', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMkAGI2Mail&exvsurl=1&viewmodel=ReadMessageItem');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_mail_link_on_calendar_resolver');
+    expect(r.error?.message).toContain('mail');
+  });
+
+  it('rejects a mail path-style link (`/mail/...`) with the same structured code', async () => {
+    const r = await exec('https://outlook.office.com/mail/inbox/id/AAMkAGI2Mail');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_mail_link_on_calendar_resolver');
+  });
+
+  it('rejects an unrelated host with a generic "not an Outlook calendar item link" message', async () => {
+    const r = await exec('https://example.com/calendar/item/AAMkAGI2');
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('not an Outlook calendar item link');
+  });
+
+  it('rejects a non-URL string at the Zod layer', async () => {
+    const r = await exec('not-a-url');
+    expect(r.ok).toBe(false);
+    expect(r.error?.type).toBe('validation_error');
+  });
+
+  it('falls through to the generic unknown-link error for an OWA URL whose `path` query is neither `/mail` nor `/calendar` (e.g. `path=/people` — covers the isMailLink negative branch)', async () => {
+    const r = await exec('https://outlook.office.com/owa/?itemid=AAMkAGI2_other&path=/people');
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('not an Outlook calendar item link');
+    expect(r.error?.code).toBeUndefined();
   });
 });
 

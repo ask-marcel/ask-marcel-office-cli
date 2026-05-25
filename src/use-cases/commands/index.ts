@@ -88,6 +88,9 @@ import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
 import * as listTeamsChatHistory from './list-teams-chat-history.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as resolveTeamsLink from './resolve-teams-link.ts';
+import * as resolveMailLink from './resolve-mail-link.ts';
+import * as resolveDriveShareLink from './resolve-drive-share-link.ts';
+import * as resolveCalendarLink from './resolve-calendar-link.ts';
 import * as findChatsWithUser from './find-chats-with-user.ts';
 import * as listMyDirectReports from './list-my-direct-reports.ts';
 import * as listUserDirectReports from './list-user-direct-reports.ts';
@@ -249,6 +252,9 @@ const commands: Record<string, Command> = {
   'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
   'resolve-teams-link': resolveTeamsLink,
+  'resolve-mail-link': resolveMailLink,
+  'resolve-drive-share-link': resolveDriveShareLink,
+  'resolve-calendar-link': resolveCalendarLink,
   'find-chats-with-user': findChatsWithUser,
   'list-my-direct-reports': listMyDirectReports,
   'list-user-direct-reports': listUserDirectReports,

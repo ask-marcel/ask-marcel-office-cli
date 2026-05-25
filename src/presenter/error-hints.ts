@@ -53,6 +53,20 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     matchCode: (c) => c === 'cli_reject_search_with_filter',
     hint: 'Use `ask-marcel list-mail-messages --filter ...` for OData filtering, or drop `--filter` here and rely on the KQL query string alone. Graph rejects `$search` + `$filter` together on /me/messages.',
   },
+  // Audit Alex-session §B (resolver siblings): the two cross-rejection codes
+  // emitted by resolve-mail-link and resolve-calendar-link when handed the
+  // wrong link type. Both point at the correct sibling so the LLM gets the
+  // remedy in `hint` instead of generic validation boilerplate.
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_calendar_link_on_mail_resolver',
+    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a mail message link. The returned `eventId` feeds `get-calendar-event`; the mail equivalent is `messageId` from `resolve-mail-link`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_mail_link_on_calendar_resolver',
+    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a calendar item link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+  },
   {
     source: 'cli',
     matchCode: (c) => c.startsWith('cli_rewrite_'),
