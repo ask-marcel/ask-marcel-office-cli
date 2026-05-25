@@ -230,6 +230,26 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}) };
 };
 
+/**
+ * Tag an api_error returned from a Microsoft-internal chat substrate
+ * (chatsvcagg `/api/csa/<region>/...` or IC3 `/api/chatsvc/<region>/...`)
+ * with a `substrateHttp{status}_{substrate}` code so the presenter's hint
+ * table can match it and add the "best-effort substrate may have moved"
+ * actionable hint plus `source: "substrate"` classifier. Audit Alex-session
+ * §2 follow-up: prior shape left substrate errors with whatever code (or
+ * none) Graph returned, indistinguishable from regular Graph errors and
+ * without the experimental-substrate context an LLM needs to decide whether
+ * to retry, switch substrates, or surface the failure to the user.
+ *
+ * Non-api_error inputs (auth_failed, validation_error, network errors) pass
+ * through unchanged — those are upstream-of-substrate failures and the
+ * existing classifier handles them.
+ */
+const asSubstrateError = (e: GraphError, substrate: 'chatsvcagg' | 'ic3'): GraphError => {
+  if (e.type !== 'api_error') return e;
+  return { ...e, code: `substrateHttp${e.status}_${substrate}` };
+};
+
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
   const authHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
     const tokenResult = await auth.getAccessToken();
@@ -311,7 +331,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         headers: { ...headers.value, accept: 'application/json' },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
+      if (!res.ok) return err(asSubstrateError(await apiErrorFrom(res, url), 'chatsvcagg'));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (chatsvcagg)`, 'json'));
@@ -345,7 +365,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         headers: { ...headers.value, accept: 'application/json' },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
+      if (!res.ok) return err(asSubstrateError(await apiErrorFrom(res, url), 'ic3'));
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (ic3)`, 'json'));

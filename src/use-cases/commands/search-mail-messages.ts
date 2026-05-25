@@ -14,10 +14,15 @@ const inner = buildListCommand((p) => `/me/messages?$search="${p.query}"`, baseS
 // Graph code.
 const execute: Command['execute'] = async (graph, params) => {
   if (typeof params['filter'] === 'string' && params['filter'].length > 0) {
+    // Audit Alex-session §2 follow-up: short `error` headline, with the
+    // actionable remedy carried by the matching `hint` rule in
+    // src/presenter/error-hints.ts (matched by `code`). Prior shape packed
+    // both diagnosis AND remedy into `message`, leaving the generic
+    // validation hint as boilerplate noise.
     return err({
       type: 'validation_error',
-      message:
-        '--filter is incompatible with $search on /me/messages (Graph rejects the combination with `SearchWithFilter`). Use `list-mail-messages --filter ...` for OData filtering, or drop `--filter` here and rely on the KQL query string.',
+      message: '--filter is incompatible with $search on /me/messages — Graph rejects the combination with `SearchWithFilter`.',
+      code: 'cli_reject_search_with_filter',
     });
   }
   return inner.execute(graph, params);

@@ -60,11 +60,79 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
   });
 });
 
-describe('findErrorHint — CLI-side rewrites', () => {
+describe('findErrorHint — CLI-side rewrites and rejections', () => {
   it('matches errorCodes starting with `cli_rewrite_` and tags them as source=cli (the LLM should read the message text for the remedy, since the CLI already inlined it there)', () => {
     const result = findErrorHint('The --event-id is not a recurring series — find a seriesMaster ...', 'cli_rewrite_expand_series_not_recurring');
     expect(result?.source).toBe('cli');
     expect(result?.hint).toContain('read past the headline');
+  });
+
+  it('matches the search-mail-messages --filter+--query rejection (`cli_reject_search_with_filter`) with the actionable remedy in `hint`, not duplicated in `error` (Audit Alex-session §2 field-inversion fix)', () => {
+    const result = findErrorHint('--filter is incompatible with $search on /me/messages — Graph rejects the combination with `SearchWithFilter`.', 'cli_reject_search_with_filter');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('list-mail-messages --filter');
+    expect(result?.hint).toContain('KQL query string');
+  });
+});
+
+describe('findErrorHint — Commander.js parser errors (Audit Alex-session §2 follow-up)', () => {
+  it('maps `commander.unknownOption` to an actionable hint pointing at `<command> --help` and the terse manifest', () => {
+    const result = findErrorHint("unknown option '--notarealflag'", 'commander.unknownOption');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel <command> --help');
+    expect(result?.hint).toContain('help-json --terse --category');
+  });
+
+  it('maps `commander.missingMandatoryOptionValue` to a "required flag missing — re-read --help" hint', () => {
+    const result = findErrorHint("required option '--message-id <value>' not specified", 'commander.missingMandatoryOptionValue');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('required CLI flag is missing');
+  });
+
+  it('maps `commander.optionMissingArgument` (same shape as missingMandatoryOptionValue but Commander emits it differently for --foo with no value) to the same hint family', () => {
+    const result = findErrorHint("option '--message-id <value>' argument missing", 'commander.optionMissingArgument');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('required CLI flag is missing');
+  });
+
+  it('maps `commander.missingArgument` (positional) to a hint about positional args (mainly `docs <command>` / `help <command>`)', () => {
+    const result = findErrorHint("missing required argument 'command'", 'commander.missingArgument');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('positional argument');
+  });
+
+  it('maps `commander.unknownCommand` to discovery-surface advice (`help-json --terse --category mail`)', () => {
+    const result = findErrorHint("unknown command 'discover-person'", 'commander.unknownCommand');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('help-json --terse');
+  });
+
+  it('maps `commander.invalidArgument` (typed-value validation failure, e.g. --top abc) to an expected-shape hint', () => {
+    const result = findErrorHint("Invalid argument 'abc' for option '--top'", 'commander.invalidArgument');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('value shape per flag');
+  });
+});
+
+describe('findErrorHint — substrate errors (Audit Alex-session §2 follow-up)', () => {
+  it('maps any `substrateHttp{status}_chatsvcagg` code to the experimental-substrate hint with the structured `source: "substrate"` classifier', () => {
+    const result = findErrorHint('BadRequest', 'substrateHttp400_chatsvcagg');
+    expect(result?.source).toBe('substrate');
+    expect(result?.hint).toContain('chatsvcagg');
+    expect(result?.hint).toContain('experimental');
+    expect(result?.hint).toContain('ask-marcel login');
+  });
+
+  it('maps `substrateHttp{status}_ic3` codes through the same rule (single hint covers both substrate identities)', () => {
+    const result = findErrorHint('Forbidden', 'substrateHttp403_ic3');
+    expect(result?.source).toBe('substrate');
+    expect(result?.hint).toContain('substrate');
+  });
+
+  it('substrate 5xx still routes through the substrate hint (transient — retry once)', () => {
+    const result = findErrorHint('InternalServerError', 'substrateHttp503_chatsvcagg');
+    expect(result?.source).toBe('substrate');
+    expect(result?.hint).toContain('5xx is typically transient');
   });
 });
 

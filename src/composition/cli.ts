@@ -92,7 +92,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
     // redundant prefix so consumers don't see `{"ok":false,"error":"error: ..."}`.
     const stripped = err.message.startsWith('error: ') ? err.message.slice('error: '.length) : err.message;
-    fail(stripped);
+    // Audit Alex-session §2 follow-up: pass Commander's structured code
+    // (`commander.unknownOption`, `commander.missingMandatoryOptionValue`,
+    // etc.) through to the error renderer so the hint table can match it and
+    // surface `hint:` / `source:` for the CLI-input failure cases too. Prior
+    // behaviour dropped the code, leaving Commander errors as bare
+    // `{ok:false,error}` envelopes — inconsistent with the Graph error shape.
+    fail(stripped, err.code);
     throw err;
   });
 

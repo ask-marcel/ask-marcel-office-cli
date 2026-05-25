@@ -4236,8 +4236,14 @@ describe('search-mail-messages rejects --filter client-side', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
+      // Audit Alex-session §2 follow-up: error is now the short DIAGNOSIS
+      // ("--filter is incompatible..."); the actionable remedy (`list-mail-messages
+      // --filter ...`) lives in the matching `hint` rule keyed by `code` so
+      // the LLM gets remedy-in-hint, not diagnosis-and-remedy-in-error.
       expect(result.error.message).toContain('--filter');
-      expect(result.error.message).toContain('list-mail-messages');
+      expect(result.error.message).toContain('SearchWithFilter');
+      expect(result.error.message).not.toContain('list-mail-messages');
+      if (result.error.type === 'validation_error') expect(result.error.code).toBe('cli_reject_search_with_filter');
     }
     expect(fetchFn.lastUrl).toBeNull();
   });
