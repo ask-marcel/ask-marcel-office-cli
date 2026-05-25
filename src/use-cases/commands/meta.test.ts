@@ -73,6 +73,11 @@ describe('command meta — invariants on every registered command', () => {
           // its own startTime + cursor token); not path placeholders.
           'sync-state',
           'max-pages',
+          // Audit Alex-session §A: projection knobs on `list-teams-chat-history`
+          // — both are post-fetch processing flags (slim default + content-
+          // truncation cap), not URL placeholders.
+          'full',
+          'max-content-chars',
           // chatsvcagg paginated chat-list cursor for the post-2026-05-21
           // `list-teams-chats-with-messages` rewrite — runtime-additive.
           'continuation-token',

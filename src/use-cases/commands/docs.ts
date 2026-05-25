@@ -1,11 +1,34 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { Command } from './command-types.ts';
+import type { CommandCategory, Command } from './command-types.ts';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
-import { renderCommandMarkdown } from './docs-render.ts';
+import { CATEGORY_LABELS, renderCommandMarkdown } from './docs-render.ts';
 import { lookupScopes } from './graph-scopes.ts';
 
 export type DocsError = { type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
+
+/**
+ * Terse manifest entry — only the fields an LLM needs to *discover* a command
+ * (i.e. "does this CLI do X?"). Drops `options`, `example`, `graphPathTemplate`,
+ * `graphDocsUrl`, `responseShape`, `bodyTemplate`, `paginationStrategy`,
+ * `scopesRequired` — everything the LLM only needs once it's already decided
+ * to invoke. Audit Alex-session §B: `help-json --terse` is the discovery
+ * surface; `help-json` (full) is the per-command reference.
+ */
+export type TerseManifestEntry = {
+  readonly name: string;
+  readonly summary: string;
+  readonly category: CommandCategory;
+};
+
+export type TerseManifest = {
+  readonly package: string;
+  readonly version: string;
+  readonly generatedAt: string;
+  readonly commands: ReadonlyArray<TerseManifestEntry>;
+};
+
+export type ManifestFilterError = { readonly type: 'unknown_category'; readonly category: string; readonly available: ReadonlyArray<string> };
 
 const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
   // Default every `pagination: true` command to `nextLink` strategy when the
@@ -127,6 +150,36 @@ export const buildManifest = (registry: Readonly<Record<string, Command>>, packa
   generatedAt: now().toISOString(),
   commands: buildEntries(registry),
 });
+
+/**
+ * Terse manifest — `{ name, summary, category }` per command. Roughly 95%
+ * smaller than the full manifest (no options/example/Graph endpoint per entry).
+ * Use `help-json --terse` to surface this to an LLM as the discovery view.
+ */
+export const buildTerseManifest = (registry: Readonly<Record<string, Command>>, packageName: string, version: string, now: () => Date = () => new Date()): TerseManifest => ({
+  package: packageName,
+  version,
+  generatedAt: now().toISOString(),
+  commands: buildEntries(registry).map((e) => ({ name: e.name, summary: e.summary, category: e.category })),
+});
+
+/**
+ * Filter a `CommandManifest` (or terse variant) down to a single category.
+ * Returns `err({ type: 'unknown_category', ... })` if the requested category
+ * isn't a known one — the CLI surfaces this through the standard error
+ * envelope rather than silently returning an empty list.
+ */
+export const filterManifestByCategory = <M extends { readonly commands: ReadonlyArray<{ readonly category: CommandCategory }> }>(
+  manifest: M,
+  category: string
+): Result<M, ManifestFilterError> => {
+  const knownCategories = Object.keys(CATEGORY_LABELS).toSorted((a, b) => a.localeCompare(b));
+  if (!knownCategories.includes(category)) {
+    return err({ type: 'unknown_category', category, available: knownCategories });
+  }
+  const filtered = manifest.commands.filter((c) => c.category === category);
+  return ok({ ...manifest, commands: filtered });
+};
 
 const findLifecycleEntry = (name: string): CommandManifestEntry | undefined => LIFECYCLE_ENTRIES.find((entry) => entry.name === name);
 

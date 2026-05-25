@@ -34,12 +34,45 @@ const schema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
     .optional(),
+  // Audit Alex-session §A: default response is ~108 KB for 200 messages
+  // because every message carries the full IC3 envelope (annotations, threads,
+  // properties.policyViolation, etc.). Project to a slim default and truncate
+  // long `content` bodies to keep the payload LLM-tractable; users that need
+  // the full IC3 shape opt in via `--full true`.
+  full: z.enum(['true', 'false']).optional(),
+  maxContentChars: z
+    .string()
+    .regex(/^[1-9]\d*$/, 'must be a positive integer')
+    .optional(),
 });
 
-type Ic3Message = { readonly id?: string; readonly sequenceId?: number };
+type Ic3MessageRaw = Readonly<Record<string, unknown>>;
 type Ic3MessagesResponse = {
-  readonly messages?: ReadonlyArray<Ic3Message>;
+  readonly messages?: ReadonlyArray<Ic3MessageRaw>;
   readonly _metadata?: { readonly syncState?: string };
+};
+
+// Default projection — covers the "who said what, when" question without the
+// IC3 envelope noise. Override by passing `--full true`.
+const PROJECTED_KEYS = ['id', 'sequenceId', 'composetime', 'originalarrivaltime', 'messagetype', 'from', 'imdisplayname', 'content'] as const;
+const DEFAULT_MAX_CONTENT_CHARS = 4096;
+
+type ProjectedMessage = Readonly<Record<string, unknown>>;
+
+const projectMessage = (raw: Ic3MessageRaw, maxContentChars: number): ProjectedMessage => {
+  const out: Record<string, unknown> = {};
+  for (const key of PROJECTED_KEYS) {
+    const value = raw[key];
+    if (value === undefined) continue;
+    if (key === 'content' && typeof value === 'string' && value.length > maxContentChars) {
+      out.content = value.slice(0, maxContentChars);
+      out.truncated = true;
+      out.originalContentChars = value.length;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
 };
 
 // Strip the absolute-URL prefix from a syncState so the relative path can
@@ -58,8 +91,10 @@ const execute: Command['execute'] = async (graph, params) => {
   const { chatId } = parsed.data;
   const pageSize = parsed.data.pageSize ?? '200';
   const maxPages = Number(parsed.data.maxPages ?? '20');
+  const fullMode = parsed.data.full === 'true';
+  const maxContentChars = Number(parsed.data.maxContentChars ?? String(DEFAULT_MAX_CONTENT_CHARS));
 
-  const accumulated: Array<Ic3Message> = [];
+  const accumulated: Array<Ic3MessageRaw> = [];
   let nextRelativePath: string =
     parsed.data.syncState !== undefined
       ? toRelativePath(parsed.data.syncState)
@@ -84,17 +119,21 @@ const execute: Command['execute'] = async (graph, params) => {
     nextSyncState = syncStateUrl;
   }
 
+  // Apply slim projection unless caller explicitly opted into the raw IC3 shape.
+  const projectedMessages: ReadonlyArray<ProjectedMessage | Ic3MessageRaw> = fullMode ? accumulated : accumulated.map((m) => projectMessage(m, maxContentChars));
+
   return ok({
-    messages: accumulated,
+    messages: projectedMessages,
     hasMore: nextSyncState !== undefined,
     pagesFetched,
     nextSyncState,
+    projection: fullMode ? 'full' : 'slim',
   });
 };
 
 const meta: CommandMeta = {
   summary:
-    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages',
@@ -126,10 +165,24 @@ const meta: CommandMeta = {
       description:
         'Safety cap on the backward walk (positive integer; default 20). Each page can return up to `--page-size` messages, so default ceiling is ~4000 messages or ~4 MB inline JSON per invocation. Raise carefully — response is buffered fully before returning.',
     },
+    {
+      name: 'full',
+      key: 'full',
+      required: false,
+      description:
+        "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` — covering 'who said what, when' without the IC3 envelope noise.",
+    },
+    {
+      name: 'max-content-chars',
+      key: 'maxContentChars',
+      required: false,
+      description:
+        'When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set.',
+    },
   ],
   example: "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
   responseShape:
-    "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string }`. IC3 substrate message shape (camelCase, matches the chat substrate envelope): `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
+    "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
 };
 
 export { execute, meta, schema };

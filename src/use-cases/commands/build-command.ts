@@ -17,6 +17,23 @@ import {
 
 type NoSkipParams = Omit<ODataQueryParams, 'skip'>;
 
+/**
+ * Options accepted by every builder that knows about `$select` (i.e. every
+ * builder except `buildCommand` / `buildElevatedCommand`, which take no OData
+ * passthroughs at all). `defaultSelect`, when set and the user did NOT pass
+ * `--select`, is injected into the OData query string so default invocations
+ * return a slim projection instead of a 50 KB resource. User-supplied
+ * `--select` always wins. Audit Alex-session §A: pairs the `list-mail-attachments`
+ * pattern with the builder layer so the 6 heaviest endpoints stop returning
+ * the full Graph resource by default.
+ */
+type SelectDefaults = { readonly defaultSelect?: string };
+
+const withDefaultSelect = <T extends { readonly select?: string }>(data: T, defaultSelect: string | undefined): T => {
+  if (defaultSelect === undefined || data.select !== undefined) return data;
+  return { ...data, select: defaultSelect };
+};
+
 const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = schema.safeParse(params);
@@ -39,13 +56,14 @@ const buildElevatedCommand = (pathFn: (params: Record<string, string>) => string
 
 const buildListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
-  schema: z.ZodObject<Shape>
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(odataQuerySchema.shape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams;
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
     return graph.get(path);
   };
@@ -54,13 +72,14 @@ const buildListCommand = <Shape extends z.ZodRawShape>(
 
 const buildElevatedListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
-  schema: z.ZodObject<Shape>
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(odataQuerySchema.shape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams;
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
     return graph.getElevated(path);
   };
@@ -77,15 +96,40 @@ const buildElevatedListCommand = <Shape extends z.ZodRawShape>(
  */
 const buildSelectableCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
-  schema: z.ZodObject<Shape>
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(selectExpandSchema.shape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams;
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
     return graph.get(path);
+  };
+  return { schema: merged, execute };
+};
+
+/**
+ * Elevated-token twin of `buildSelectableCommand`. Use for single-resource
+ * GETs on endpoints that require the M365ChatClient identity (e.g. `/chats/{id}`)
+ * AND benefit from `$select`/`$expand` projection. The basic `buildElevatedCommand`
+ * builder takes no OData passthroughs — use this when the endpoint honours
+ * field projection, so an LLM can avoid pulling the whole resource just to
+ * read a topic or chatType.
+ */
+const buildElevatedSelectableCommand = <Shape extends z.ZodRawShape>(
+  pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
+): Pick<Command, 'schema' | 'execute'> => {
+  const merged = schema.extend(selectExpandSchema.shape);
+  const execute: Command['execute'] = async (graph, params) => {
+    const parsed = merged.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams, options?.defaultSelect);
+    const path = appendOData(pathFn(data), data);
+    return graph.getElevated(path);
   };
   return { schema: merged, execute };
 };
@@ -98,13 +142,14 @@ const buildSelectableCommand = <Shape extends z.ZodRawShape>(
  */
 const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
-  schema: z.ZodObject<Shape>
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(filterSelectSchema.shape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = parsed.data as z.infer<z.ZodObject<Shape>> & FilterSelectParams;
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & FilterSelectParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
     return graph.get(path);
   };
@@ -120,13 +165,14 @@ const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
  */
 const buildNoSkipListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
-  schema: z.ZodObject<Shape>
+  schema: z.ZodObject<Shape>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(noSkipShape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = parsed.data as z.infer<z.ZodObject<Shape>> & NoSkipParams;
+    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & NoSkipParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
     return graph.get(path);
   };
@@ -144,13 +190,15 @@ const buildNoSkipListCommand = <Shape extends z.ZodRawShape>(
 const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataKey>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
-  keys: ReadonlyArray<K>
+  keys: ReadonlyArray<K>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(pickODataShape(keys));
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data);
+    const data = withDefaultSelect(parsed.data as { readonly select?: string } & Record<string, unknown>, options?.defaultSelect);
+    const path = appendOData(pathFn(data as z.infer<z.ZodObject<Shape>>), data);
     return graph.get(path);
   };
   return { schema: merged, execute };
@@ -165,13 +213,15 @@ const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataK
 const buildElevatedPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataKey>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
-  keys: ReadonlyArray<K>
+  keys: ReadonlyArray<K>,
+  options?: SelectDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(pickODataShape(keys));
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const path = appendOData(pathFn(parsed.data as z.infer<z.ZodObject<Shape>>), parsed.data);
+    const data = withDefaultSelect(parsed.data as { readonly select?: string } & Record<string, unknown>, options?.defaultSelect);
+    const path = appendOData(pathFn(data as z.infer<z.ZodObject<Shape>>), data);
     return graph.getElevated(path);
   };
   return { schema: merged, execute };
@@ -182,6 +232,7 @@ export {
   buildElevatedCommand,
   buildElevatedListCommand,
   buildElevatedPickODataListCommand,
+  buildElevatedSelectableCommand,
   buildFilterSelectListCommand,
   buildListCommand,
   buildNoSkipListCommand,

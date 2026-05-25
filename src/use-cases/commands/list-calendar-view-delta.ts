@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { topOnlyOptions, topOnlyShape } from './odata-query.ts';
 
 const baseSchema = z.object({
-  startDateTime: z.string().min(1),
-  endDateTime: z.string().min(1),
+  startDateTime: isoDateTimeField,
+  endDateTime: isoDateTimeField,
 });
 
 const schema = baseSchema.extend(topOnlyShape);
@@ -35,13 +36,13 @@ const meta: CommandMeta = {
       name: 'start-date-time',
       key: 'startDateTime',
       required: true,
-      description: 'ISO 8601 lower bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes.',
+      description: `Lower bound (required on the first call only — the deltaLink token encodes it for resumes). ${RELATIVE_DATE_DESCRIPTION}`,
     },
     {
       name: 'end-date-time',
       key: 'endDateTime',
       required: true,
-      description: 'ISO 8601 upper bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes.',
+      description: `Upper bound (required on the first call only — the deltaLink token encodes it for resumes). ${RELATIVE_DATE_DESCRIPTION}`,
     },
     ...topOnlyOptions,
   ],

@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({
   calendarId: z.string().min(1),
-  startDateTime: z.string().min(1),
-  endDateTime: z.string().min(1),
+  startDateTime: isoDateTimeField,
+  endDateTime: isoDateTimeField,
 });
 
 const isWellKnownDefault = (id: string): boolean => {
@@ -36,18 +37,8 @@ const meta: CommandMeta = {
       required: true,
       description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
     },
-    {
-      name: 'start-date-time',
-      key: 'startDateTime',
-      required: true,
-      description: 'ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it.',
-    },
-    {
-      name: 'end-date-time',
-      key: 'endDateTime',
-      required: true,
-      description: 'ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it.',
-    },
+    { name: 'start-date-time', key: 'startDateTime', required: true, description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
+    { name: 'end-date-time', key: 'endDateTime', required: true, description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
   example: "ask-marcel list-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",

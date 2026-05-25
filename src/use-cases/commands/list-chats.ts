@@ -15,20 +15,25 @@ import { pickODataOptions } from './odata-query.ts';
 // QueryOptions to order by 'lastUpdatedDateTime' is not supported` and
 // hangs for 60s on `$expand=members`. Advertise only the subset Graph
 // actually honours.
+// Audit Alex-session §A: same slim default as `get-chat` — full `/me/chats`
+// pages carry `viewpoint`, `webUrl`, `onlineMeetingInfo`, etc. on every entry.
+// Ship a slim default; user `--select` always wins.
+const DEFAULT_SELECT = 'id,topic,chatType,createdDateTime,lastUpdatedDateTime';
+
 const baseSchema = z.object({}).strict();
 const CHATS_ODATA_KEYS = ['top', 'skip', 'select', 'filter'] as const;
-const { execute, schema } = buildElevatedPickODataListCommand(() => '/me/chats', baseSchema, CHATS_ODATA_KEYS);
+const { execute, schema } = buildElevatedPickODataListCommand(() => '/me/chats', baseSchema, CHATS_ODATA_KEYS, { defaultSelect: DEFAULT_SELECT });
 
 const meta: CommandMeta = {
   summary:
-    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
+    "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). The CLI ships a slim default `--select=id,topic,chatType,createdDateTime,lastUpdatedDateTime`; pass `--select id,topic,webUrl,...` to widen. Returns chat metadata only — reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
   category: 'chats',
   graphMethod: 'GET',
   graphPathTemplate: '/me/chats',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chat-list',
   options: [...pickODataOptions(CHATS_ODATA_KEYS)],
   example: 'ask-marcel list-chats',
-  responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`',
+  responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).',
   pagination: true,
   needsElevatedToken: true,
 };

@@ -307,6 +307,130 @@ describe('buildCli command surface', () => {
     expect(out).toContain('"commands"');
   });
 
+  // Audit Alex-session §B — compact default `--help` + `--verbose` opt-out +
+  // help-json projections (--terse / --category). These tests fix the
+  // discoverability gap an LLM hits today: `--help` returns ~60 KB so the
+  // model is forced to truncate or dump-to-disk before it can read the
+  // listing; `help-json` returns 370 KB unfiltered.
+  //
+  // Notes on test mechanics:
+  // - Triggering Commander's `--help` flag directly would call `process.exit(0)`
+  //   even with `exitOverride` (the override returns, Commander then calls
+  //   `process.exit(exitCode)`), killing the test process. The custom `help`
+  //   subcommand goes through `program.outputHelp()` which renders without
+  //   exiting, so we use it for assertion. Production behaviour for `--help`
+  //   is exercised by the bare-args test at the bottom of this file.
+  // - The `--verbose` toggle is detected by an argv scan (so it works in either
+  //   flag order relative to `--help`); the test mutates `process.argv` for
+  //   the duration of the verbose case.
+  it('compact default help listing truncates each subcommand description to its first sentence', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
+    // get-mail-message has a multi-sentence summary post-§A; the compact
+    // help should carry only the first sentence. The post-first-sentence
+    // "ships a slim default" prose is the marker that we successfully cut.
+    expect(out).toContain('Get a single Outlook message by ID.');
+    expect(out).not.toContain('ships a slim default');
+    // Footer must point at the discovery surfaces.
+    expect(out).toContain('help-json [--terse] [--category mail]');
+    expect(out).toContain('re-run with --verbose');
+  });
+
+  it('--verbose opt-out keeps the full multi-sentence summary in the help listing', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const originalArgv = process.argv;
+    process.argv = ['node', 'ask-marcel', '--verbose', 'help'];
+    try {
+      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']));
+      // The post-first-sentence "ships a slim default" prose survives.
+      expect(out).toContain('ships a slim default');
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('compact help listing is materially smaller than the verbose form (byte-count regression guard)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
+    const originalArgv = process.argv;
+    process.argv = ['node', 'ask-marcel', '--verbose', 'help'];
+    try {
+      const verboseCli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+      const verbose = await captureStream('stdout', () => verboseCli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']));
+      // Compact form should be at least 40% smaller — first-sentence
+      // truncation drops most of the per-command tail prose.
+      expect(compact.length).toBeLessThan(verbose.length * 0.6);
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('help-json --terse strips per-command heavy fields (no options/example/graphPathTemplate/responseShape)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--terse']);
+      } catch {
+        /* commander exits */
+      }
+    });
+    expect(out).toContain('"commands"');
+    expect(out).not.toContain('"graphPathTemplate"');
+    expect(out).not.toContain('"responseShape"');
+    expect(out).not.toContain('"options"');
+  });
+
+  it('help-json --category mail filters the manifest down to the mail category', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--category', 'mail']);
+      } catch {
+        /* commander exits */
+      }
+    });
+    expect(out).toContain('"get-mail-message"');
+    // get-current-user is in the `user` category, must not leak in.
+    expect(out).not.toContain('"get-current-user"');
+  });
+
+  it('help-json --terse --category mail composes: terse projection within a single category', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--terse', '--category', 'mail']);
+      } catch {
+        /* commander exits */
+      }
+    });
+    expect(out).toContain('"get-mail-message"');
+    expect(out).not.toContain('"options"');
+    expect(out).not.toContain('"graphPathTemplate"');
+  });
+
+  it('help-json --category with an unknown name surfaces a structured `ok:false` envelope listing the valid categories', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
+      } catch {
+        /* commander exits */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('Unknown --category "notarealcategory"');
+    expect(parsed.error).toContain('mail');
+    expect(parsed.error).toContain('drive');
+  });
+
   it('rejects a duplicate --output flag (audit round-8 Wave G2)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({ id: 'u1' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });

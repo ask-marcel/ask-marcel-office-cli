@@ -3,7 +3,7 @@ import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
-import { buildManifest, renderSingleCommand } from '../use-cases/commands/docs.ts';
+import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
@@ -96,10 +96,48 @@ const buildCli = (deps: BuildCliDeps): Command => {
     throw err;
   });
 
+  // Audit Alex-session §B: previous default `--help` ran ~60 KB because the
+  // top-level subcommand listing rendered each command's full summary (often
+  // 2-3 sentences). The new default truncates each subcommand description to
+  // its first sentence in the top-level listing (~6 KB total); `--verbose`
+  // reinstates the full summary. Per-command `ask-marcel <cmd> --help` is
+  // never compacted — it always shows the full description plus the
+  // `addHelpText` block. Detected via argv scan so the toggle works
+  // regardless of where `--verbose` appears relative to `--help`.
+  const verboseHelpRequested = (): boolean => process.argv.includes('--verbose');
+
+  // Compact a subcommand's description to its first sentence (everything up
+  // to the first period followed by a space, or the first newline). Returns
+  // the full text untouched when no sensible cut-point exists, so we never
+  // produce a less-readable result than the original. The cut keeps the
+  // trailing period for natural reading.
+  const compactSummary = (full: string): string => {
+    const newlineIdx = full.indexOf('\n');
+    const periodIdx = full.search(/\. /);
+    const candidates = [newlineIdx, periodIdx].filter((i) => i > 0);
+    if (candidates.length === 0) return full;
+    const cut = Math.min(...candidates);
+    // Keep the period itself when cutting on `. ` so the line ends naturally;
+    // strip a stray period for the newline case.
+    return full.charAt(cut) === '.' ? full.slice(0, cut + 1) : full.slice(0, cut);
+  };
+
   program
     .name('ask-marcel')
     .description('Microsoft Graph CLI')
     .version(version ?? '0.0.0')
+    // Audit Alex-session §B: override the help-formatter's subcommand
+    // description renderer to compact long summaries down to their first
+    // sentence in the TOP-LEVEL `ask-marcel --help` listing. Per-subcommand
+    // `ask-marcel <cmd> --help` is untouched — Commander only consults
+    // `subcommandDescription` when formatting parent's child list.
+    .configureHelp({
+      subcommandDescription: (cmd) => (verboseHelpRequested() ? cmd.description() : compactSummary(cmd.description())),
+    })
+    .option(
+      '--verbose',
+      'When paired with `--help`, render every command with its full multi-sentence summary. Default `--help` truncates each command to its first sentence to stay LLM-token-friendly (~6 KB vs ~60 KB).'
+    )
     .option(
       '--output-path <path>',
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
@@ -131,6 +169,22 @@ const buildCli = (deps: BuildCliDeps): Command => {
           });
       })()
     );
+
+  // Audit Alex-session §B: explicit pointers to the verbose form and the
+  // machine-readable manifest. Without this, an LLM that hits the compact
+  // help has no in-band signal that the verbose form or `help-json` even
+  // exist. Always render this footer (the compact pointer is useful in
+  // verbose mode too, since `--verbose` doesn't shrink `help-json`'s payload).
+  program.addHelpText(
+    'after',
+    [
+      '',
+      'For full per-command help:   ask-marcel <command> --help',
+      'For machine-readable docs:   ask-marcel help-json [--terse] [--category mail]',
+      'For per-command Markdown:    ask-marcel docs <command>',
+      'For multi-sentence summaries in this listing: re-run with --verbose',
+    ].join('\n  ')
+  );
 
   // Audit v1.0.0 §2.3: bare `ask-marcel` (no subcommand) used to silently
   // exit 1 with zero output. We intercept that case BEFORE Commander parses
@@ -173,9 +227,17 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the full machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers.'
+      'Print the machine-readable command manifest as JSON to stdout (same content as `docs/commands.json`). Token-friendly alternative to `--help` for LLM consumers. Pass `--terse` for a 95%-smaller `{name, summary, category}` projection (the discovery view) or `--category mail` (or any category from CATEGORY_LABELS) to filter to a single category; the two compose.'
     )
-    .action(async () => {
+    .option(
+      '--terse',
+      'Strip per-command options/example/graphPathTemplate/responseShape/etc., emitting only `{ name, summary, category }`. Roughly 95% smaller than the full manifest — use for command discovery, switch to the full manifest once you know which command to invoke.'
+    )
+    .option(
+      '--category <name>',
+      'Filter the manifest to a single category (one of: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta). Composes with `--terse`. Unknown categories return a structured `{ ok: false, error }` envelope.'
+    )
+    .action(async (opts: { readonly terse?: boolean; readonly category?: string }) => {
       // Audit round-8 Wave G1: --output text was silently honored on
       // help-json, contradicting the global flag's contract. The manifest IS
       // JSON; serializing as text has no use case. Reject only when the user
@@ -188,8 +250,23 @@ const buildCli = (deps: BuildCliDeps): Command => {
         );
         return;
       }
-      const manifest = JSON.stringify(buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0'));
-      await writeOrPrintText(manifest, 'application/json', 'help-json');
+      // Audit Alex-session §B: --terse projects to `{name, summary, category}`;
+      // --category filters to a single category (validated against
+      // CATEGORY_LABELS). Both flags compose.
+      const fullOrTerse =
+        opts.terse === true
+          ? buildTerseManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0')
+          : buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0');
+      if (opts.category !== undefined) {
+        const filtered = filterManifestByCategory(fullOrTerse, opts.category);
+        if (!filtered.ok) {
+          fail(`Unknown --category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`);
+          return;
+        }
+        await writeOrPrintText(JSON.stringify(filtered.value), 'application/json', 'help-json');
+        return;
+      }
+      await writeOrPrintText(JSON.stringify(fullOrTerse), 'application/json', 'help-json');
     });
 
   program.commandsGroup('Lifecycle:');

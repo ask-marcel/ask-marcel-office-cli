@@ -3208,11 +3208,22 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-planner-task-details', params: { plannerTaskId: 't1' }, expectedPath: '/planner/tasks/t1/details' },
   { name: 'list-plan-buckets', params: { plannerPlanId: 'p1' }, expectedPath: '/planner/plans/p1/buckets' },
   { name: 'get-planner-bucket', params: { plannerBucketId: 'b1' }, expectedPath: '/planner/buckets/b1' },
-  { name: 'list-mail-messages', params: {}, expectedPath: '/me/messages' },
+  {
+    name: 'list-mail-messages',
+    params: {},
+    expectedPath: '/me/messages?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview',
+  },
+  // Audit Alex-session §A: explicit --select wins over the slim default.
+  { name: 'list-mail-messages', params: { select: 'id,subject' }, expectedPath: '/me/messages?$select=id%2Csubject' },
   { name: 'list-mail-folders', params: {}, expectedPath: '/me/mailFolders' },
   { name: 'list-mail-child-folders', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/childFolders' },
   { name: 'list-mail-folder-messages', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messages' },
-  { name: 'get-mail-message', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
+  {
+    name: 'get-mail-message',
+    params: { messageId: 'm1' },
+    expectedPath: '/me/messages/m1?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview',
+  },
+  { name: 'get-mail-message', params: { messageId: 'm1', select: 'id,subject' }, expectedPath: '/me/messages/m1?$select=id%2Csubject' },
   {
     name: 'list-mail-attachments',
     params: { messageId: 'm1' },
@@ -3231,7 +3242,12 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-onenote-page-content', params: { onenotePageId: 'p1' }, expectedPath: '/me/onenote/pages/p1/content' },
   { name: 'get-onenote-page-as-markdown', params: { onenotePageId: 'p1' }, expectedPath: '/me/onenote/pages/p1/content' },
   { name: 'search-onenote-pages', params: { titleSubstring: 'meeting' }, expectedPath: "/me/onenote/pages?$filter=contains(title,'meeting')" },
-  { name: 'get-current-user', params: {}, expectedPath: '/me' },
+  {
+    name: 'get-current-user',
+    params: {},
+    expectedPath: '/me?$select=id%2CdisplayName%2Cmail%2CuserPrincipalName%2CjobTitle%2CofficeLocation%2CmobilePhone',
+  },
+  { name: 'get-current-user', params: { select: 'id,displayName' }, expectedPath: '/me?$select=id%2CdisplayName' },
   { name: 'get-my-profile-photo', params: {}, expectedPath: '/me/photo/$value' },
   { name: 'list-calendar-events', params: {}, expectedPath: '/me/events' },
   { name: 'get-calendar-event', params: { eventId: 'e1' }, expectedPath: '/me/events/e1' },
@@ -3277,8 +3293,10 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-team', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1' },
   { name: 'list-team-channels', params: { teamId: 'tm1' }, expectedPath: '/teams/tm1/channels' },
   { name: 'get-team-channel', params: { teamId: 'tm1', channelId: 'ch1' }, expectedPath: '/teams/tm1/channels/ch1' },
-  { name: 'list-chats', params: {}, expectedPath: '/me/chats' },
-  { name: 'get-chat', params: { chatId: 'ch1' }, expectedPath: '/chats/ch1' },
+  { name: 'list-chats', params: {}, expectedPath: '/me/chats?$select=id%2Ctopic%2CchatType%2CcreatedDateTime%2ClastUpdatedDateTime' },
+  { name: 'list-chats', params: { select: 'id,topic' }, expectedPath: '/me/chats?$select=id%2Ctopic' },
+  { name: 'get-chat', params: { chatId: 'ch1' }, expectedPath: '/chats/ch1?$select=id%2Ctopic%2CchatType%2CcreatedDateTime%2ClastUpdatedDateTime' },
+  { name: 'get-chat', params: { chatId: 'ch1', select: 'id,topic' }, expectedPath: '/chats/ch1?$select=id%2Ctopic' },
   { name: 'list-my-direct-reports', params: {}, expectedPath: '/me/directReports' },
   { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice@contoso.com/directReports' },
   { name: 'list-my-memberships', params: {}, expectedPath: '/me/memberOf' },
@@ -3931,6 +3949,120 @@ describe('list-teams-chat-history follows syncState URLs through IC3 history', (
     // The `|` separator in the view param is sent literally — matches what
     // Teams web emits (probed 2026-05-21 via Playwright bearer-trace).
     expect(urls[0]).toContain('view=msnp24Equivalent|supportsMessageProperties');
+  });
+});
+
+// Audit Alex-session §A: a default `list-teams-chat-history` invocation used
+// to return ~108 KB for 200 messages because every message carried the full
+// IC3 envelope (annotations, threads, properties.policyViolation, etc.). The
+// slim default projects each message to id/sequenceId/composetime/
+// originalarrivaltime/messagetype/from/imdisplayname/content and truncates
+// long content; callers that need the raw shape pass `--full true`.
+describe('list-teams-chat-history applies slim projection by default', () => {
+  // Use a fetch fake that returns the literal shape we care about — the
+  // upstream IC3 substrate carries far more fields than the use-case keeps.
+  const richMessageFetch = (messages: ReadonlyArray<Record<string, unknown>>): ((url: string) => Promise<Response>) => {
+    let calls = 0;
+    return async () => {
+      calls += 1;
+      const body = calls === 1 ? { messages } : { messages: [] };
+      return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+    };
+  };
+
+  it('projects each message down to id/sequenceId/composetime/originalarrivaltime/messagetype/from/imdisplayname/content by default', async () => {
+    const richMessage = {
+      id: 'm1',
+      sequenceId: 42,
+      composetime: '2026-05-20T10:00:00Z',
+      originalarrivaltime: '2026-05-20T10:00:00.001Z',
+      messagetype: 'Text',
+      from: '8:orgid:user-a',
+      imdisplayname: 'Alice',
+      content: 'hello world',
+      // The fields below are present on every IC3 message but should NOT
+      // appear in the slim projection.
+      annotations: [{ kind: 'urgent' }],
+      threadId: '19:abc@thread.v2',
+      conversationLink: 'https://teams.microsoft.com/...',
+      'properties.policyViolation': null,
+    };
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), richMessageFetch([richMessage]));
+    const result = await cmd.execute(graph, { chatId: '19:abc@thread.v2' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { messages: Array<Record<string, unknown>>; projection: string };
+    expect(v.projection).toBe('slim');
+    expect(v.messages).toHaveLength(1);
+    expect(v.messages[0]).toEqual({
+      id: 'm1',
+      sequenceId: 42,
+      composetime: '2026-05-20T10:00:00Z',
+      originalarrivaltime: '2026-05-20T10:00:00.001Z',
+      messagetype: 'Text',
+      from: '8:orgid:user-a',
+      imdisplayname: 'Alice',
+      content: 'hello world',
+    });
+  });
+
+  it('truncates content longer than --max-content-chars and marks the entry truncated:true with the original length', async () => {
+    const longContent = 'a'.repeat(10_000);
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), richMessageFetch([{ id: 'm1', content: longContent }]));
+    const result = await cmd.execute(graph, { chatId: 'c' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { messages: Array<Record<string, unknown>> };
+    const msg = v.messages[0] ?? {};
+    expect(typeof msg.content).toBe('string');
+    expect((msg.content as string).length).toBe(4096);
+    expect(msg.truncated).toBe(true);
+    expect(msg.originalContentChars).toBe(10_000);
+  });
+
+  it('honors --max-content-chars override (cuts at the smaller cap)', async () => {
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), richMessageFetch([{ id: 'm1', content: 'abcdef' }]));
+    const result = await cmd.execute(graph, { chatId: 'c', maxContentChars: '3' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { messages: Array<Record<string, unknown>> };
+    const msg = v.messages[0] ?? {};
+    expect(msg.content).toBe('abc');
+    expect(msg.truncated).toBe(true);
+    expect(msg.originalContentChars).toBe(6);
+  });
+
+  it('--full true returns the raw IC3 shape unchanged and reports projection:"full"', async () => {
+    const richMessage = {
+      id: 'm1',
+      content: 'a'.repeat(10_000),
+      annotations: [{ kind: 'urgent' }],
+      threadId: '19:abc@thread.v2',
+    };
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), richMessageFetch([richMessage]));
+    const result = await cmd.execute(graph, { chatId: 'c', full: 'true' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { messages: Array<Record<string, unknown>>; projection: string };
+    expect(v.projection).toBe('full');
+    expect(v.messages[0]).toEqual(richMessage);
+  });
+
+  it('rejects --full values other than true/false as a validation_error', async () => {
+    const cmd = cmdMap['list-teams-chat-history'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch({ messages: [] }));
+    const result = await cmd.execute(graph, { chatId: 'c', full: 'yes' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
 });
 

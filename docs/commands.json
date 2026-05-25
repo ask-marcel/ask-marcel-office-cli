@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.0.0",
-  "generatedAt": "2026-05-21T12:04:58.221Z",
+  "generatedAt": "2026-05-25T01:26:16.332Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -347,7 +347,7 @@
     },
     {
       "name": "get-chat",
-      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). Returns `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. — not the messages (which need `Chat.Read*`). Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
+      "summary": "Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). The CLI ships a slim default `--select=id,topic,chatType,createdDateTime,lastUpdatedDateTime`; pass `--select id,topic,webUrl,onlineMeetingInfo` (or any other comma-separated field list) to widen. Pass `--expand members` to inline membership. Returns metadata only — not the messages (which need `Chat.Read*`). Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/chats/{chat-id}",
@@ -358,14 +358,26 @@
           "key": "chatId",
           "required": true,
           "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Returned by `list-chats`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
       "example": "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
-      "responseShape": "single Microsoft Graph `chat` resource"
+      "responseShape": "single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array."
     },
     {
       "name": "get-current-user",
-      "summary": "Return the signed-in user’s Microsoft Graph profile (id, displayName, mail, jobTitle, etc.). Pass `--select id,displayName,mail` to slim the payload to just the fields you need.",
+      "summary": "Return the signed-in user's Microsoft Graph profile. The CLI ships a slim default `--select=id,displayName,mail,userPrincipalName,jobTitle,officeLocation,mobilePhone` covering the common identity fields. Pass `--select id,displayName,givenName,surname,preferredLanguage,...` to widen, or `--select '*'` for everything Graph returns.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me",
@@ -384,8 +396,8 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-current-user --select id,displayName,mail",
-      "responseShape": "single Microsoft Graph `user` resource (or projection of the requested `--select` fields)"
+      "example": "ask-marcel get-current-user",
+      "responseShape": "single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)"
     },
     {
       "name": "get-drive-delta",
@@ -892,7 +904,7 @@
     },
     {
       "name": "get-mail-message",
-      "summary": "Get a single Outlook message by ID, including subject, sender, body, and flags. Pass `--select id,subject,from,receivedDateTime` to fetch only the fields the LLM needs (a full message body can be 50+ KB; the audit found this swelling LLM context unnecessarily).",
+      "summary": "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -917,8 +929,8 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel get-mail-message --message-id 'AAMkAGI2...' --select id,subject,from,receivedDateTime",
-      "responseShape": "single Microsoft Graph `message` resource (or projection of the requested `--select` fields)"
+      "example": "ask-marcel get-mail-message --message-id 'AAMkAGI2...'",
+      "responseShape": "single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML."
     },
     {
       "name": "get-mail-message-mime",
@@ -1833,13 +1845,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -2056,7 +2068,7 @@
     },
     {
       "name": "list-calendar-view",
-      "summary": "List the signed-in user’s default-calendar events with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph.",
+      "summary": "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -2066,13 +2078,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -2111,7 +2123,7 @@
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
         }
       ],
-      "example": "ask-marcel list-calendar-view --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+      "example": "ask-marcel list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
@@ -2126,13 +2138,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 lower bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes."
+          "description": "Lower bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 upper bound (UTC). Required on the first call only — the deltaLink token encodes it for resumes."
+          "description": "Upper bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -2233,7 +2245,7 @@
     },
     {
       "name": "list-chats",
-      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). Returns chat metadata only — `id`, `topic`, `chatType`, `lastUpdatedDateTime`, etc. Reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
+      "summary": "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). The CLI ships a slim default `--select=id,topic,chatType,createdDateTime,lastUpdatedDateTime`; pass `--select id,topic,webUrl,...` to widen. Returns chat metadata only — reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/chats",
@@ -2265,7 +2277,7 @@
         }
       ],
       "example": "ask-marcel list-chats",
-      "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`",
+      "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).",
       "pagination": true
     },
     {
@@ -3105,13 +3117,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 start (e.g. `2026-04-01T00:00:00Z`). Recurrences are expanded across the window."
+          "description": "Start of the window (recurrences are expanded across it). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 end (e.g. `2026-05-01T00:00:00Z`)."
+          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -3881,7 +3893,7 @@
     },
     {
       "name": "list-mail-messages",
-      "summary": "List the most recent messages from across the signed-in user’s entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
+      "summary": "List the most recent messages from across the signed-in user's entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` so a page of 25 messages stays ~30-60 KB instead of ~1 MB. Pass `--select id,subject,body` (or any other comma-separated field list) to override. Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages",
@@ -3925,7 +3937,7 @@
         }
       ],
       "example": "ask-marcel list-mail-messages",
-      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
       "pagination": true
     },
     {
@@ -4754,13 +4766,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 start of the window."
+          "description": "Start of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 end of the window."
+          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -5622,13 +5634,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "ISO 8601 lower bound (UTC). Example: `2026-04-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "ISO 8601 upper bound (UTC). Example: `2026-05-01T00:00:00Z`. Required by Graph; the request fails without it."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "top",
@@ -5721,7 +5733,7 @@
     },
     {
       "name": "list-teams-chat-history",
-      "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+      "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages",
@@ -5750,10 +5762,22 @@
           "key": "maxPages",
           "required": false,
           "description": "Safety cap on the backward walk (positive integer; default 20). Each page can return up to `--page-size` messages, so default ceiling is ~4000 messages or ~4 MB inline JSON per invocation. Raise carefully — response is buffered fully before returning."
+        },
+        {
+          "name": "full",
+          "key": "full",
+          "required": false,
+          "description": "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` — covering 'who said what, when' without the IC3 envelope noise."
+        },
+        {
+          "name": "max-content-chars",
+          "key": "maxContentChars",
+          "required": false,
+          "description": "When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set."
         }
       ],
       "example": "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
-      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string }`. IC3 substrate message shape (camelCase, matches the chat substrate envelope): `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**"
+      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**"
     },
     {
       "name": "list-teams-chat-messages",
