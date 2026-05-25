@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "1.1.0",
-  "generatedAt": "2026-05-25T04:50:59.177Z",
+  "version": "1.2.0",
+  "generatedAt": "2026-05-25T07:56:34.754Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -806,7 +806,7 @@
     },
     {
       "name": "get-excel-used-range",
-      "summary": "Return the worksheet's used range — the bounding box of every non-empty cell — as a single Excel range. Avoids fetching the entire 1M × 16K-cell sheet when only a small data island is populated.",
+      "summary": "Return the worksheet's used range — the bounding box of every non-empty cell — as a single Excel range. The CLI ships a slim default that strips the redundant `text` / `numberFormat` / `formulas` 2D arrays Graph returns (mostly `\"General\"` repeated cell-by-cell), keeping `address` / `rowCount` / `columnCount` / `values`. Pass `--full true` to return the raw four-array Graph shape. `--max-cells` (default 50 000) caps the size of the projected `values[]`; oversize ranges drop `values` and surface a hint pointing at `get-excel-range` for band-by-band reads. Avoids fetching the entire 1M × 16K-cell sheet when only a small data island is populated.",
       "category": "excel",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/usedRange()",
@@ -832,10 +832,22 @@
           "argumentHint": {
             "kind": "idOrName"
           }
+        },
+        {
+          "name": "full",
+          "key": "full",
+          "required": false,
+          "description": "Pass `--full true` to return the raw Graph `workbookRange` shape with all four 2D arrays (`values`, `text`, `numberFormat`, `formulas`). Default (`--full false`, or omitted) drops the three redundant arrays and ships only `values`. The raw shape on a 3×148 sheet is ~125 KB (most of it duplicated `\"General\"` numberFormat strings); the slim default is ~5-15 KB."
+        },
+        {
+          "name": "max-cells",
+          "key": "maxCells",
+          "required": false,
+          "description": "Cap (positive integer; default 50 000) on the size of the projected `values[]` in slim mode. When the used-range exceeds the cap, the response keeps `address` / `rowCount` / `columnCount` but drops `values[]` and adds `truncated: true` plus a hint pointing at `get-excel-range` for band-by-band reads. Ignored when `--full true` is set (the caller has opted into the full payload regardless of size)."
         }
       ],
       "example": "ask-marcel get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
-      "responseShape": "single Microsoft Graph `workbookRange` resource (`address`, `rowCount`, `columnCount`, `values`, `formulas`, etc.)"
+      "responseShape": "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`)."
     },
     {
       "name": "get-group",
@@ -5716,7 +5728,7 @@
     },
     {
       "name": "list-team-installed-apps",
-      "summary": "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
+      "summary": "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects user-supplied OData query parameters on this endpoint (`Query option 'Top' is not allowed`) — so the standard OData flags are intentionally NOT exposed here. The response itself is still server-paginated via `@odata.nextLink` when the team has many installed apps; chain with `next-page` to walk subsequent pages.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/installedApps?$expand=teamsAppDefinition",

@@ -1,4 +1,4 @@
-import type { CommandCategory, CommandMeta } from './command-types.ts';
+import type { CommandCategory, CommandMeta, PaginationStrategy } from './command-types.ts';
 
 export type CommandManifestEntry = {
   readonly name: string;
@@ -20,8 +20,35 @@ export type CommandManifestEntry = {
   readonly stability?: CommandMeta['stability'];
 };
 
-export const PAGINATION_HINT =
-  'Paginated by Microsoft Graph. The CLI hoists `@odata.nextLink` out of `data` to the **top-level `nextLink`** field of the response envelope (and `@odata.deltaLink` to top-level `deltaLink` for delta commands). Pass that URL to `next-page --url <link>` and repeat until the field is absent. Do NOT look for `data["@odata.nextLink"]` — the presenter strips it from `data` so the cursor is always at envelope level.';
+// Audit Alex-session §5 follow-up: PAGINATION_HINT used to be one
+// `nextLink`-shaped string applied to every paginated command, including the
+// 5 deltaLink and 2 preferMaxPageSize commands where the cursor and the
+// `--top` semantics differ. `paginationHintFor` returns the right variant
+// per strategy so an LLM reading `--help` no longer sees self-contradictory
+// pagination advice (the audit caught this on `list-calendar-view-delta`
+// and `list-team-installed-apps`).
+const PAGINATION_HINT_NEXT_LINK =
+  'Paginated by Microsoft Graph. The CLI hoists `@odata.nextLink` out of `data` to the **top-level `nextLink`** field of the response envelope. Pass that URL to `next-page --url <link>` and repeat until the field is absent. Do NOT look for `data["@odata.nextLink"]` — the presenter strips it from `data` so the cursor is always at envelope level.';
+
+const PAGINATION_HINT_NEXT_LINK_NO_SKIP = `${PAGINATION_HINT_NEXT_LINK} (Graph rejects \`$skip\` on this endpoint with \`invalidRequest: $skip is not supported on this API.\` — the CLI also omits \`--skip\` from this command's option set. Use \`--top\` + the \`nextLink\` cursor only.)`;
+
+const PAGINATION_HINT_DELTA_LINK =
+  'Delta-paginated. While paging, the CLI hoists `@odata.nextLink` to the top-level `nextLink` field — use it with `next-page --url <link>`. On the FINAL page Graph emits `@odata.deltaLink` instead; the CLI hoists that to the top-level **`deltaLink`** field. Stash that delta token and pass it back as the URL on the next invocation to resume the delta from where it left off (the response will contain only resources changed since then). Both cursors sit at envelope level — `data["@odata.nextLink"]` / `data["@odata.deltaLink"]` are stripped.';
+
+const PAGINATION_HINT_PREFER_MAX_PAGE_SIZE =
+  'Paginated, with a quirk: Graph rejects `$top` as a query parameter on this endpoint (`ErrorInvalidUrlQuery`). The CLI translates `--top <N>` into a `Prefer: odata.maxpagesize=<N>` request header internally — semantically equivalent, just routed differently. The cursor itself is the standard `@odata.nextLink` → top-level `nextLink` envelope field (and `@odata.deltaLink` → top-level `deltaLink` on the final page when this endpoint is also a delta); feed it back to `next-page --url <link>`. Other OData passthroughs (`$select` / `$filter` / `$orderby` / `$skip`) are silently ignored by Graph on this endpoint, so the CLI does not advertise them either.';
+
+export const paginationHintFor = (strategy: PaginationStrategy | undefined): string => {
+  if (strategy === 'nextLinkNoSkip') return PAGINATION_HINT_NEXT_LINK_NO_SKIP;
+  if (strategy === 'deltaLink') return PAGINATION_HINT_DELTA_LINK;
+  if (strategy === 'preferMaxPageSize') return PAGINATION_HINT_PREFER_MAX_PAGE_SIZE;
+  // 'nextLink' (default when paginationStrategy is omitted on a paginated command)
+  return PAGINATION_HINT_NEXT_LINK;
+};
+
+// Back-compat alias for any external readers of `PAGINATION_HINT`; new code
+// should use `paginationHintFor(strategy)`.
+export const PAGINATION_HINT = PAGINATION_HINT_NEXT_LINK;
 
 export type CommandManifest = {
   readonly package: string;
@@ -30,8 +57,13 @@ export type CommandManifest = {
   readonly commands: ReadonlyArray<CommandManifestEntry>;
 };
 
+// Audit Alex-session §4 follow-up: `auth` and `contacts` were declared here
+// but no command ever set `category: 'auth' | 'contacts'` — they surfaced
+// as bogus options in the unknown-category error from `help-json --category
+// <bad>`, misleading LLMs into burning round-trips on empty categories.
+// Removed both AND from the `CommandCategory` union in command-types.ts so
+// the type system enforces "no command can ever claim a dead category".
 const CATEGORY_LABELS: Readonly<Record<CommandCategory, string>> = {
-  auth: 'Authentication',
   drive: 'OneDrive Files',
   excel: 'Excel (workbook files)',
   sharepoint: 'SharePoint Sites',
@@ -40,28 +72,13 @@ const CATEGORY_LABELS: Readonly<Record<CommandCategory, string>> = {
   notes: 'Notes (OneNote)',
   user: 'User',
   calendar: 'Calendar',
-  contacts: 'Contacts',
   chats: 'Chats',
   teams: 'Teams',
   meta: 'Meta / Pagination',
   lifecycle: 'Lifecycle',
 };
 
-const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
-  'lifecycle',
-  'drive',
-  'excel',
-  'sharepoint',
-  'tasks',
-  'mail',
-  'notes',
-  'user',
-  'calendar',
-  'contacts',
-  'chats',
-  'teams',
-  'meta',
-];
+const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = ['lifecycle', 'drive', 'excel', 'sharepoint', 'tasks', 'mail', 'notes', 'user', 'calendar', 'chats', 'teams', 'meta'];
 
 const sortByName = (a: CommandManifestEntry, b: CommandManifestEntry): number => a.name.localeCompare(b.name);
 
@@ -105,7 +122,7 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
     `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
   ];
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
-  if (entry.pagination) lines.push(`- **Pagination:** ${PAGINATION_HINT}`);
+  if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
     const tagged = entry.scopesRequired.map((s) => `\`${s}\``).join(', ');
     lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel scopes-check\` to verify before invoking.`);

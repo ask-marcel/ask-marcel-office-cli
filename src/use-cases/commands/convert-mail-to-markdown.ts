@@ -23,7 +23,20 @@ const schema = z.object({ messageId: z.string().min(1) });
 
 const INLINE_IMAGE_SIZE_LIMIT_BYTES = 2_000_000;
 
-const ATTACHMENT_METADATA_SELECT = '$select=id,name,contentType,size,isInline,contentId';
+// Audit Alex-session §2 follow-up: `contentId` only exists on the
+// `microsoft.graph.fileAttachment` subtype, NOT on the base
+// `microsoft.graph.attachment`. The `/me/messages/{id}/attachments`
+// endpoint returns polymorphic entries (fileAttachment | itemAttachment |
+// referenceAttachment); requesting `contentId` bare returns
+// `Could not find a property named contentId on type microsoft.graph.attachment`
+// and Graph fails the whole list-fetch. The CLI used to swallow this in
+// a `note` field, dropping every attachment's metadata.
+//
+// Graph's polymorphic-cast syntax for $select on derived types is
+// `microsoft.graph.<derived-type>/<field>` — the cast applies the field
+// projection only to entries of that subtype, leaving other subtypes
+// unaffected. Documented in Graph OData / cast operator reference.
+const ATTACHMENT_METADATA_SELECT = '$select=id,name,contentType,size,isInline,microsoft.graph.fileAttachment/contentId';
 
 // Single predicate replacing the `typeof x === 'string' && x !== ''` pattern
 // that was repeated across attachment field checks. Collapses ~5 separate

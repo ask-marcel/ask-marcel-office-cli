@@ -13,7 +13,7 @@ const { execute } = buildCommand((p) => `/teams/${p.teamId}/installedApps?$expan
 
 const meta: CommandMeta = {
   summary:
-    "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects standard OData query parameters on this endpoint (`Query option 'Top' is not allowed`); the OData passthrough is intentionally NOT exposed.",
+    "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects user-supplied OData query parameters on this endpoint (`Query option 'Top' is not allowed`) — so the standard OData flags are intentionally NOT exposed here. The response itself is still server-paginated via `@odata.nextLink` when the team has many installed apps; chain with `next-page` to walk subsequent pages.",
   category: 'teams',
   graphMethod: 'GET',
   graphPathTemplate: '/teams/{team-id}/installedApps?$expand=teamsAppDefinition',

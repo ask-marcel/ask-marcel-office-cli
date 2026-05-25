@@ -74,10 +74,11 @@ describe('command meta — invariants on every registered command', () => {
           'sync-state',
           'max-pages',
           // Audit Alex-session §A: projection knobs on `list-teams-chat-history`
-          // — both are post-fetch processing flags (slim default + content-
-          // truncation cap), not URL placeholders.
+          // AND `get-excel-used-range` — all four are post-fetch processing
+          // flags (slim default + size cap), not URL placeholders.
           'full',
           'max-content-chars',
+          'max-cells',
           // chatsvcagg paginated chat-list cursor for the post-2026-05-21
           // `list-teams-chats-with-messages` rewrite — runtime-additive.
           'continuation-token',

@@ -15,6 +15,21 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
     expect(result?.hint).toContain('well-formed but the resource is missing');
   });
 
+  it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — Audit Alex-session §8 follow-up', () => {
+    const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('inbox');
+    expect(result?.hint).toContain('sentitems');
+    expect(result?.hint).toContain('list-mail-folders');
+    expect(result?.hint).not.toContain('list-mail-messages,');
+  });
+
+  it('still routes the generic `ErrorInvalidIdMalformed` (no URL context) to the catch-all "source IDs from a list-* command" hint', () => {
+    const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('Source IDs from a sibling');
+  });
+
   it('detects "Missing scope" anywhere in the message (not just as a structured code) and points at scopes-check + the appid scope ceiling', () => {
     const result = findErrorHint("Missing scope permissions on the request. API: 'Read.All' on resource '/me/...'", 'Forbidden');
     expect(result?.source).toBe('graph');
@@ -103,6 +118,12 @@ describe('findErrorHint — Commander.js parser errors (Audit Alex-session §2 f
 
   it('maps `commander.unknownCommand` to discovery-surface advice (`help-json --terse --category mail`)', () => {
     const result = findErrorHint("unknown command 'discover-person'", 'commander.unknownCommand');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('help-json --terse');
+  });
+
+  it('maps the CLI-side `cli_unknown_command` code (emitted by `docs <unknown>` and `help <unknown>`) through the same rule — single envelope shape across all three unknown-subcommand paths (Audit Alex-session §6 follow-up)', () => {
+    const result = findErrorHint('Unknown command "discover-person". Run `ask-marcel --help` to list every command.', 'cli_unknown_command');
     expect(result?.source).toBe('cli');
     expect(result?.hint).toContain('help-json --terse');
   });

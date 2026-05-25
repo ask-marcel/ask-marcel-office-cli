@@ -4,7 +4,7 @@ import type { GraphClient } from '../infra/graph-client.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
-import { CATEGORY_LABELS, CATEGORY_ORDER, PAGINATION_HINT } from '../use-cases/commands/docs-render.ts';
+import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
@@ -229,7 +229,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
         process.stdout.write(`${result.value}\n`);
         return;
       }
-      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
+      // Audit Alex-session §6 follow-up: pass an explicit `cli_unknown_command`
+      // code so error-hints can match it structurally — gives the same
+      // envelope shape as Commander's own `commander.unknownCommand` path.
+      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`, 'cli_unknown_command');
     });
 
   program
@@ -373,7 +376,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .action(async (commandName: string) => {
       const result = renderSingleCommand(cmdRegistry, commandName);
       if (!result.ok) {
-        fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`);
+        // Audit Alex-session §6 follow-up: structured `cli_unknown_command`
+        // code so the envelope matches the `help <unknown>` and
+        // `commander.unknownCommand` paths — single branch for LLM consumers.
+        fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`, 'cli_unknown_command');
         return;
       }
       await writeOrPrintText(result.value, 'text/markdown', 'docs');
@@ -430,7 +436,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
               '\nStability: experimental — rides a Microsoft-internal substrate (chatsvcagg / IC3) that is not in the public Graph API and can break on a Teams web-client update. Prefer a stable sibling when one exists.',
             ]
           : []),
-        ...(cmd.meta.pagination ? [`\nPagination: ${PAGINATION_HINT}`] : []),
+        ...(cmd.meta.pagination ? [`\nPagination: ${paginationHintFor(cmd.meta.paginationStrategy)}`] : []),
         ...(cmd.meta.bodyTemplate ? [`\nRequest body:\n  ${cmd.meta.bodyTemplate}`] : []),
         `\nExample:\n  ${cmd.meta.example}`,
       ];

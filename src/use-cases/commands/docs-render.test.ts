@@ -110,6 +110,32 @@ describe('renderCommandMarkdown', () => {
     expect(md).not.toContain('**Pagination:**');
   });
 
+  // Audit Alex-session §5 follow-up: PAGINATION_HINT used to be one string
+  // for every paginated command, including the 5 deltaLink and 2
+  // preferMaxPageSize ones where the cursor + `--top` semantics differ.
+  // `paginationHintFor(strategy)` returns the matching variant.
+  it('renders the nextLinkNoSkip pagination hint with the explicit $skip-rejection clause when paginationStrategy is set accordingly', () => {
+    const paginated: CommandManifestEntry = { ...listDrives, pagination: true, paginationStrategy: 'nextLinkNoSkip' };
+    const md = renderCommandMarkdown(paginated);
+    expect(md).toContain('Graph rejects `$skip` on this endpoint');
+    expect(md).toContain('--top');
+  });
+
+  it('renders the deltaLink pagination hint pointing at `@odata.deltaLink` (NOT `nextLink`) for the final-page cursor', () => {
+    const paginated: CommandManifestEntry = { ...listDrives, pagination: true, paginationStrategy: 'deltaLink' };
+    const md = renderCommandMarkdown(paginated);
+    expect(md).toContain('@odata.deltaLink');
+    expect(md).toContain('deltaLink');
+    expect(md).toContain('Delta-paginated');
+  });
+
+  it('renders the preferMaxPageSize pagination hint explaining the `--top` → `Prefer: odata.maxpagesize` header translation (Graph rejects $top as a query param on these endpoints)', () => {
+    const paginated: CommandManifestEntry = { ...listDrives, pagination: true, paginationStrategy: 'preferMaxPageSize' };
+    const md = renderCommandMarkdown(paginated);
+    expect(md).toContain('Prefer: odata.maxpagesize');
+    expect(md).toContain('rejects `$top` as a query parameter');
+  });
+
   it('appends an _(aliases: ...)_ suffix on options with aliases so the markdown surface matches the manifest (audit v1.0.0 §3.2)', () => {
     const aliased: CommandManifestEntry = {
       ...calendarEvent,

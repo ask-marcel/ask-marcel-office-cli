@@ -96,6 +96,43 @@ describe('graph client', () => {
     }
   });
 
+  // Audit Alex-session §8 follow-up: when an `ErrorInvalidIdMalformed`
+  // happens against a `/mailFolders/` URL, the infra layer suffixes the
+  // code with `_mailFolders` so the presenter's hint table can recommend
+  // the well-known folder names (inbox, sentitems, …) instead of the
+  // generic "use a list-* command" advice.
+  it('contextualises `ErrorInvalidIdMalformed` to `ErrorInvalidIdMalformed_mailFolders` when the failing URL is on the /mailFolders/ path (Audit Alex-session §8)', async () => {
+    const fetchFn = fakeFetch([
+      {
+        match: (url) => url.includes('/mailFolders/'),
+        body: { error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } },
+        status: 400,
+      },
+    ]);
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/mailFolders/not-a-folder/messages');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.code).toBe('ErrorInvalidIdMalformed_mailFolders');
+    }
+  });
+
+  it('leaves `ErrorInvalidIdMalformed` unsuffixed when the failing URL is NOT on /mailFolders/ (generic path keeps the generic code)', async () => {
+    const fetchFn = fakeFetch([
+      {
+        match: (url) => url.includes('/messages/'),
+        body: { error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } },
+        status: 400,
+      },
+    ]);
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/messages/not-a-message');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.code).toBe('ErrorInvalidIdMalformed');
+    }
+  });
+
   it('falls back to the response status text when the error body is not parseable JSON', async () => {
     const fetchFn: FetchFn = async () => new Response('not-json-at-all', { status: 503, statusText: 'Service Unavailable' });
     const client = createGraphClient(fakeAuth(), fetchFn);

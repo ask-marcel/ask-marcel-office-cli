@@ -192,6 +192,20 @@ const truncateScopeDump = (message: string): string => {
 const synthesizeEmptyBodyMessage = (status: number, url: string): string =>
   `HTTP ${status} with no error body (path: ${new URL(url).pathname}; the endpoint may have moved — see the command's "best-effort" note in --help)`;
 
+// Audit Alex-session §8 follow-up: when an `ErrorInvalidIdMalformed`
+// happens against a `/mailFolders/` URL, surface a more specific code so
+// the presenter's hint table can recommend the well-known folder names
+// (inbox, sentitems, drafts, …) instead of the generic "use a list-*
+// command" advice. The Graph error message itself doesn't carry the URL,
+// so the URL → code suffix happens here at the infra boundary where the
+// URL IS still in scope (`res.url` / `fallbackUrl`). Pattern is the same
+// idea as `asSubstrateError` but for path-aware error refinement.
+const contextualizeCode = (code: string | undefined, url: string): string | undefined => {
+  if (code !== 'ErrorInvalidIdMalformed' && code !== 'InvalidIdMalformed') return code;
+  if (!url.includes('/mailFolders/') && !url.includes('mailFolders%2F')) return code;
+  return `${code}_mailFolders`;
+};
+
 const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphError> => {
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
@@ -199,7 +213,9 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   // Audit round-7 Wave G: surface the Graph error code as a structured field
   // so LLM consumers can branch on `errorCode === "itemNotFound"` etc.
   // instead of substring-matching the human message.
-  const code = typeof tag === 'string' && tag !== '' ? tag : undefined;
+  const rawCode = typeof tag === 'string' && tag !== '' ? tag : undefined;
+  const effectiveUrlForCode = res.url !== '' ? res.url : fallbackUrl;
+  const code = contextualizeCode(rawCode, effectiveUrlForCode);
 
   if (typeof tag === 'string' && tag === 'UnknownError' && looksEmpty(message)) {
     return {

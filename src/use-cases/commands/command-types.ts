@@ -5,7 +5,11 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 type CommandSchema = z.ZodType;
 type CommandExecute = (graph: GraphClient, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
 
-type CommandCategory = 'auth' | 'drive' | 'excel' | 'sharepoint' | 'tasks' | 'mail' | 'notes' | 'user' | 'calendar' | 'contacts' | 'chats' | 'teams' | 'meta' | 'lifecycle';
+// Audit Alex-session §4 follow-up: `'auth'` and `'contacts'` were declared
+// but no command ever used them — removed so the type system enforces "no
+// command can ever claim a dead category" and `help-json --category <bad>`
+// no longer advertises them as valid.
+type CommandCategory = 'drive' | 'excel' | 'sharepoint' | 'tasks' | 'mail' | 'notes' | 'user' | 'calendar' | 'chats' | 'teams' | 'meta' | 'lifecycle';
 
 type CommandHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 

@@ -76,7 +76,11 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   },
   {
     source: 'cli',
-    matchCode: (c) => c === 'commander.unknownCommand',
+    // Audit Alex-session §6 follow-up: `cli_unknown_command` is emitted by
+    // the CLI's own `docs <unknown>` and `help <unknown>` paths so the
+    // envelope shape matches Commander's `commander.unknownCommand`. Same
+    // hint — both are the "this subcommand doesn't exist" surface.
+    matchCode: (c) => c === 'commander.unknownCommand' || c === 'cli_unknown_command',
     hint: 'Unknown ask-marcel subcommand. Run `ask-marcel help-json --terse` (~62 KB across all categories) or `ask-marcel help-json --terse --category mail` (~12 KB for one category) to discover the right command.',
   },
   {
@@ -91,6 +95,16 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The 5 commands flagged `stability: experimental` in `help-json` all surface this code.',
   },
   // ─── Graph: ID malformed / item not found ────────────────────────────────
+  // Audit Alex-session §8 follow-up: when the failing URL was against
+  // `/mailFolders/`, the infra layer (`contextualizeCode` in graph-client.ts)
+  // tags the code with `_mailFolders` so the hint can specifically recommend
+  // well-known folder names. This rule must run BEFORE the generic
+  // `InvalidIdMalformed` rule (rule order is "first match wins").
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'ErrorInvalidIdMalformed_mailFolders' || c === 'InvalidIdMalformed_mailFolders',
+    hint: 'The `--mail-folder-id` value is malformed. Well-known folder names ALSO work — try `inbox`, `sentitems`, `drafts`, `outbox`, `deleteditems`, `archive`, `junkemail`. For a tenant-specific folder, source the ID via `ask-marcel list-mail-folders` or `ask-marcel list-mail-child-folders --mail-folder-id inbox`.',
+  },
   {
     source: 'graph',
     matchCode: (c) => c === 'ErrorInvalidIdMalformed' || c === 'InvalidIdMalformed',

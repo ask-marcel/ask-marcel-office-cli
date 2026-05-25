@@ -2136,7 +2136,7 @@ describe('commands', () => {
     expect(messageIdOption?.required).toBe(true);
   });
 
-  it('convert-mail-to-markdown attachments-list URL uses the metadata-only $select (id,name,contentType,size,isInline,contentId) — kills mutation on ATTACHMENT_METADATA_SELECT (the whole point of the staged-fetch fix is to NEVER pull contentBytes here)', async () => {
+  it('convert-mail-to-markdown attachments-list URL uses the metadata-only $select with the polymorphic-cast for contentId (microsoft.graph.fileAttachment/contentId) — kills mutation on ATTACHMENT_METADATA_SELECT AND prevents the regression where bare `contentId` failed against the base attachment type with `Could not find a property named contentId`', async () => {
     const urls: string[] = [];
     const fetchFn: FetchFn = async (url) => {
       urls.push(url);
@@ -2149,16 +2149,23 @@ describe('commands', () => {
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     await cmd.execute(graph, { messageId: 'mUrl' });
-    const attachmentsUrl = urls.find((u) => u.includes('/attachments?'));
-    expect(attachmentsUrl).toBeDefined();
-    expect(attachmentsUrl ?? '').toContain('$select=');
-    expect(attachmentsUrl ?? '').toContain('id');
-    expect(attachmentsUrl ?? '').toContain('name');
-    expect(attachmentsUrl ?? '').toContain('contentType');
-    expect(attachmentsUrl ?? '').toContain('size');
-    expect(attachmentsUrl ?? '').toContain('isInline');
-    expect(attachmentsUrl ?? '').toContain('contentId');
-    expect(attachmentsUrl ?? '').not.toContain('contentBytes');
+    const attachmentsUrl = urls.find((u) => u.includes('/attachments?')) ?? '';
+    expect(attachmentsUrl).not.toBe('');
+    expect(attachmentsUrl).toContain('$select=');
+    expect(attachmentsUrl).toContain('id');
+    expect(attachmentsUrl).toContain('name');
+    expect(attachmentsUrl).toContain('contentType');
+    expect(attachmentsUrl).toContain('size');
+    expect(attachmentsUrl).toContain('isInline');
+    expect(attachmentsUrl).not.toContain('contentBytes');
+    // Decode percent-encoding so the bare-`contentId` and cast-form variants
+    // can be distinguished by literal substring. The bare form (which Graph
+    // rejects on the base attachment type) would appear as `,contentId,` or
+    // `,contentId&` after decoding; the cast form carries the
+    // `microsoft.graph.fileAttachment/` prefix.
+    const decoded = decodeURIComponent(attachmentsUrl);
+    expect(decoded).toContain('microsoft.graph.fileAttachment/contentId');
+    expect(decoded).not.toMatch(/[,=]contentId([,&]|$)/);
   });
 
   it('convert-mail-to-markdown skips the **Subject:** line when the message has no subject field — kills the `if (m.subject !== undefined)` → `if (true)` mutant which would otherwise push `**Subject:** undefined`', async () => {
@@ -4146,6 +4153,141 @@ describe('list-teams-chat-history applies slim projection by default', () => {
     const result = await cmd.execute(graph, { chatId: 'c', full: 'yes' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+});
+
+// Audit Alex-session §3 follow-up — get-excel-used-range slim projection.
+// Raw Graph payload for usedRange() includes four parallel 2D arrays
+// (values / text / numberFormat / formulas); the audit measured a 3×148
+// sheet at 125 KB, mostly duplicate `"General"` numberFormat strings. The
+// slim default ships `address` / `rowCount` / `columnCount` / `values` only;
+// `--full true` opts back into the raw shape; `--max-cells` caps `values[]`
+// size before the projection step.
+describe('get-excel-used-range applies slim projection by default', () => {
+  const richUsedRange = {
+    address: 'Sheet1!A1:C3',
+    rowCount: 3,
+    columnCount: 3,
+    values: [
+      ['Q1', 'Q2', 'Q3'],
+      [10, 20, 30],
+      [40, 50, 60],
+    ],
+    text: [
+      ['Q1', 'Q2', 'Q3'],
+      ['10', '20', '30'],
+      ['40', '50', '60'],
+    ],
+    // The audit's smoking gun — 9 cells of duplicated "General".
+    numberFormat: [
+      ['General', 'General', 'General'],
+      ['General', 'General', 'General'],
+      ['General', 'General', 'General'],
+    ],
+    formulas: [
+      ['Q1', 'Q2', 'Q3'],
+      [10, 20, 30],
+      [40, 50, 60],
+    ],
+  };
+
+  it("strips text/numberFormat/formulas by default, keeps address/rowCount/columnCount/values, reports projection:'slim'", async () => {
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch(richUsedRange));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as Record<string, unknown>;
+    expect(v.projection).toBe('slim');
+    expect(v.address).toBe('Sheet1!A1:C3');
+    expect(v.rowCount).toBe(3);
+    expect(v.columnCount).toBe(3);
+    expect(v.values).toEqual(richUsedRange.values);
+    expect(v.text).toBeUndefined();
+    expect(v.numberFormat).toBeUndefined();
+    expect(v.formulas).toBeUndefined();
+  });
+
+  it("`--full true` returns the raw Graph workbookRange shape (all four arrays) with projection:'full'", async () => {
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch(richUsedRange));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', full: 'true' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as Record<string, unknown>;
+    expect(v.projection).toBe('full');
+    expect(v.text).toEqual(richUsedRange.text);
+    expect(v.numberFormat).toEqual(richUsedRange.numberFormat);
+    expect(v.formulas).toEqual(richUsedRange.formulas);
+  });
+
+  it('drops `values[]` and surfaces a hint when usedRange exceeds --max-cells (regression guard against the 125 KB bloat case)', async () => {
+    const giantSheet = { address: 'Sheet1!A1:Z2000', rowCount: 2000, columnCount: 26, values: Array.from({ length: 2000 }, () => Array.from({ length: 26 }, (_, i) => i)) };
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch(giantSheet));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', maxCells: '1000' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as Record<string, unknown>;
+    expect(v.projection).toBe('slim');
+    expect(v.truncated).toBe(true);
+    expect(v.rowCount).toBe(2000);
+    expect(v.columnCount).toBe(26);
+    expect(v.values).toBeUndefined();
+    expect((v.hint as string | undefined) ?? '').toContain('get-excel-range');
+    expect((v.hint as string | undefined) ?? '').toContain('--full true');
+  });
+
+  it('--full true bypasses --max-cells (caller has opted into the full payload regardless of size)', async () => {
+    const giantSheet = { address: 'Sheet1!A1:Z2000', rowCount: 2000, columnCount: 26, values: Array.from({ length: 2000 }, () => Array.from({ length: 26 }, () => 1)) };
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch(giantSheet));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', full: 'true', maxCells: '1' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as Record<string, unknown>;
+    expect(v.projection).toBe('full');
+    expect(v.values).toBeDefined();
+    expect(v.truncated).toBeUndefined();
+  });
+
+  it('rejects --full values other than true/false', async () => {
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch({}));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', full: 'yes' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  it('rejects non-positive --max-cells', async () => {
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch({}));
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', maxCells: '0' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  it('still translates WAC errors through mapWacError when the underlying item is not a workbook (excel-error.ts integration preserved)', async () => {
+    const cmd = cmdMap['get-excel-used-range'];
+    if (!cmd) throw new Error('command not found');
+    // Return a 403 with the WAC needle in the body — mapWacError should rewrite it.
+    const wacErrorFetch: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'AccessDenied', message: 'AccessDenied: Could not obtain a WAC access token.' } }), {
+        status: 403,
+        headers: { 'content-type': 'application/json' },
+      });
+    const graph = createGraphClient(fakeAuth(), wacErrorFetch);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain('not an accessible Excel workbook');
+    }
   });
 });
 
