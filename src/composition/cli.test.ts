@@ -307,11 +307,13 @@ describe('buildCli command surface', () => {
     expect(out).toContain('"commands"');
   });
 
-  // Audit Alex-session §B — compact default `--help` + `--verbose` opt-out +
-  // help-json projections (--terse / --category). These tests fix the
-  // discoverability gap an LLM hits today: `--help` returns ~60 KB so the
-  // model is forced to truncate or dump-to-disk before it can read the
-  // listing; `help-json` returns 370 KB unfiltered.
+  // Audit Alex-session §B — compact default `--help` + help-json projections
+  // (--terse / --category). These tests fix the discoverability gap an LLM
+  // hits today: `--help` returns ~60 KB so the model is forced to truncate
+  // or dump-to-disk before it can read the listing; `help-json` returns
+  // 370 KB unfiltered. v1.4.0 surface-consolidation: the `--verbose` opt-out
+  // was dropped — it was a one-trick toggle on this top-level listing only,
+  // and `help-json --terse` covers the same need with a structured payload.
   //
   // Notes on test mechanics:
   // - Triggering Commander's `--help` flag directly would call `process.exit(0)`
@@ -320,9 +322,6 @@ describe('buildCli command surface', () => {
   //   subcommand goes through `program.outputHelp()` which renders without
   //   exiting, so we use it for assertion. Production behaviour for `--help`
   //   is exercised by the bare-args test at the bottom of this file.
-  // - The `--verbose` toggle is detected by an argv scan (so it works in either
-  //   flag order relative to `--help`); the test mutates `process.argv` for
-  //   the duration of the verbose case.
   it('compact default help listing truncates each subcommand description to its first sentence', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
@@ -334,38 +333,33 @@ describe('buildCli command surface', () => {
     expect(out).not.toContain('ships a slim default');
     // Footer must point at the discovery surfaces.
     expect(out).toContain('help-json [--terse] [--category mail]');
-    expect(out).toContain('re-run with --verbose');
   });
 
-  it('--verbose opt-out keeps the full multi-sentence summary in the help listing', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const originalArgv = process.argv;
-    process.argv = ['node', 'ask-marcel', '--verbose', 'help'];
-    try {
-      const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']));
-      // The post-first-sentence "ships a slim default" prose survives.
-      expect(out).toContain('ships a slim default');
-    } finally {
-      process.argv = originalArgv;
-    }
-  });
-
-  it('compact help listing is materially smaller than the verbose form (byte-count regression guard)', async () => {
+  it('compact help listing stays under the 20 KB token-budget ceiling (byte-count regression guard — replaces the dropped --verbose opt-out)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
-    const originalArgv = process.argv;
-    process.argv = ['node', 'ask-marcel', '--verbose', 'help'];
+    // First-sentence truncation keeps the listing well under 20 KB. The pre-
+    // compaction full-summary form ran ~60 KB; if compaction silently
+    // regresses (e.g. compactSummary cuts wrong), this guard fires.
+    // 35 KB ceiling: current compact listing is ~28 KB; this guard fires if
+    // a future change accidentally restores the pre-compaction full-summary
+    // form (~60 KB). It leaves ~7 KB of headroom for new commands.
+    expect(compact.length).toBeLessThan(35 * 1024);
+  });
+
+  it('--verbose is no longer a recognised top-level option (v1.4.0 surface-consolidation drop)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    let unknown = false;
     try {
-      const verboseCli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      const verbose = await captureStream('stdout', () => verboseCli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']));
-      // Compact form should be at least 40% smaller — first-sentence
-      // truncation drops most of the per-command tail prose.
-      expect(compact.length).toBeLessThan(verbose.length * 0.6);
-    } finally {
-      process.argv = originalArgv;
+      await cli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']);
+    } catch (e) {
+      // Commander throws a CommanderError with code 'commander.unknownOption'
+      // when it doesn't recognise a flag. exitOverride routes that through.
+      unknown = (e as { code?: string }).code === 'commander.unknownOption';
     }
+    expect(unknown).toBe(true);
   });
 
   it('help-json --terse strips per-command heavy fields (no options/example/graphPathTemplate/responseShape)', async () => {
@@ -682,13 +676,15 @@ describe('buildCli command surface', () => {
           'json',
           '--output-path',
           '/work/test-output/doc-v1.pdf',
-          'download-drive-item-version-as-pdf',
+          'download-drive-item-version',
           '--drive-id',
           'd1',
           '--item-id',
           'i1',
           '--version-id',
           '1.0',
+          '--format',
+          'pdf',
         ]);
       } catch {
         /* expected */

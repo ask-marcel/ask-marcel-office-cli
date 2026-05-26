@@ -33,7 +33,7 @@ type SuccessEnvelope = {
 const SIZE_HINT_THRESHOLD_BYTES = 50_000;
 
 const buildSizeHint = (bytes: number): string =>
-  `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold). Trim with \`--select id,...\` if the command supports OData projection, lower \`--top\`, or use the global \`--output-path <file>\` flag to write bytes to disk instead of inlining them.`;
+  `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold). Universal remedy: \`--output-path <file>\` writes bytes to disk and keeps the envelope compact (works on every command). Per-item slimming via \`--select id,subject,...\` and item-count reduction via \`--top N\` work ONLY when the command's \`--help\` advertises those flags — endpoints like \`list-shared-with-me\`, \`microsoft-search-query\`, and the delta family silently ignore them.`;
 
 const SELECT_HINT =
   "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel docs <command>`.";

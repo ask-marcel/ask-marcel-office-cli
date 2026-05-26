@@ -388,12 +388,12 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
 
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
-      return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message.)';
+      return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
     }
     if (reason === 'navigation_failed') {
       return 'chatsvcagg capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
     }
-    return 'chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message.)';
+    return 'chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
   };
 
   const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => {

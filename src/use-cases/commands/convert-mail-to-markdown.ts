@@ -7,7 +7,17 @@ import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
 
-const schema = z.object({ messageId: z.string().min(1) });
+// Audit v1.4.0 fresh-pass #6: `--inline-images false` opts out of the
+// per-image bytes-fetch + base64 embedding. An LLM that just wants the text
+// body of an email with several inline images was paying ~36 KB for a 6 KB
+// body. With `--inline-images false`, the body is rendered with the raw
+// `cid:<contentId>` references preserved (no `data:` URIs); the file-
+// attachments list still surfaces the inline images so the caller knows
+// they exist. Default stays `true` for backward compatibility.
+const schema = z.object({
+  messageId: z.string().min(1),
+  inlineImages: z.enum(['true', 'false']).optional(),
+});
 
 // Audit v1.0.0 — multi-MB attachments timeout fix. `?$expand=attachments`
 // inlines every attachment's `contentBytes` (base64) into the message
@@ -148,8 +158,13 @@ const renderOversizePlaceholders = (html: string, embeds: ReadonlyArray<EmbedFet
   return out;
 };
 
-const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>): string => {
-  const fileAttachments = attachments.filter((a) => !isInlineImage(a) && nonEmpty(a.name));
+// `includeInlineImages` is set when CMtM is in `--inline-images false` mode:
+// the body keeps raw `cid:<contentId>` refs (no data-URI embedding), so the
+// caller would lose visibility of inline images entirely if the attachment
+// list still filtered them out. Surface them alongside regular file
+// attachments so the LLM can decide whether to fetch the bytes separately.
+const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>, includeInlineImages: boolean = false): string => {
+  const fileAttachments = attachments.filter((a) => (includeInlineImages || !isInlineImage(a)) && nonEmpty(a.name));
   if (fileAttachments.length === 0) return '';
   const items = fileAttachments.map((a) => {
     const size = typeof a.size === 'number' ? ` (${formatBytes(a.size)}` : '';
@@ -164,6 +179,10 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId } = parsed.data;
+  // Default `true` keeps backward compat: existing callers see the same
+  // base64-embedded output. Pass `--inline-images false` to skip the per-
+  // image bytes fetch + embedding (cheaper for an LLM that just wants text).
+  const embedInlineImagesEnabled = parsed.data.inlineImages !== 'false';
 
   const fetched = await graph.get(`/me/messages/${messageId}`);
   if (!fetched.ok) return fetched;
@@ -194,7 +213,12 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     }
   }
 
-  const inlineImageCandidates = attachments.filter(isInlineImage);
+  // When inline-image embedding is disabled, skip the per-image bytes
+  // fetch AND the oversize-placeholder pass — the body keeps its raw
+  // `cid:<contentId>` references, and the file-attachments list (rendered
+  // below) still surfaces the inline images by name + id so the caller
+  // knows they exist.
+  const inlineImageCandidates = embedInlineImagesEnabled ? attachments.filter(isInlineImage) : [];
   const embedResults = await Promise.all(inlineImageCandidates.map((meta) => fetchInlineImageBytes(graph, messageId, meta)));
   const inlineImages = embedResults.flatMap((r) => (r.inline ? [r.inline] : []));
 
@@ -210,7 +234,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   } else {
     bodyMd = inlined;
   }
-  const fileList = renderFileAttachmentsList(attachments);
+  const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled);
   const text = [headers, bodyMd, fileList].filter((s) => s !== '').join('\n\n');
 
   // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
@@ -225,12 +249,21 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. Inline images attached with `isInline:true` and an `image/*` content-type (size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (Hardening #1: non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). File attachments are listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
+    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default, inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). For LLM callers that only want the text body, pass `--inline-images false` to skip the per-image bytes fetch entirely — the body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list so you can decide whether to fetch them separately via `get-mail-attachment`. File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-get',
-  options: [{ name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' }],
+  options: [
+    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' },
+    {
+      name: 'inline-images',
+      key: 'inlineImages',
+      required: false,
+      description:
+        'Pass `--inline-images false` to skip the per-image bytes fetch + base64 embedding. Default is `true` (embed). Disabling cuts the response size dramatically on emails with several inline images (a 6 KB body with 6 inline images shipped at ~36 KB by default; with `--inline-images false` it stays close to 6 KB). The body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list instead, so the LLM caller can still see what is there and fetch any specific image via `get-mail-attachment` on demand.',
+    },
+  ],
   example: "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded.',

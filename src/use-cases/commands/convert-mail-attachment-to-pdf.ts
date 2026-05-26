@@ -80,7 +80,22 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
   const converted = tagPdfPassthrough(await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
+  // Audit v1.4.0 fresh-pass #7: the temp `.ask-marcel-temp` parent folder
+  // used to linger at OneDrive root because we only deleted the file. Now
+  // check `--top=1` children; if empty (our file was the last), delete the
+  // folder too. Race: a concurrent invocation could upload between the
+  // check and the delete — its file would survive (Graph `DELETE` on a
+  // path with content does a 412 / 409). Ignore errors either way.
+  await cleanupTempFolderIfEmpty(graph);
   return converted;
+};
+
+const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
+  const children = await graph.get('/me/drive/root:/.ask-marcel-temp:/children?$top=1&$select=id');
+  if (!children.ok) return;
+  const body = children.value as { readonly value?: ReadonlyArray<unknown> };
+  if ((body.value ?? []).length > 0) return;
+  await graph.delete('/me/drive/root:/.ask-marcel-temp');
 };
 
 const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {

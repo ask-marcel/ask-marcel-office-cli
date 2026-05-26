@@ -1,9 +1,7 @@
 import type { Command } from './command-types.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
-import * as downloadDriveItemVersionAsMarkdown from './download-drive-item-version-as-markdown.ts';
-import * as downloadDriveItemVersionAsPdf from './download-drive-item-version-as-pdf.ts';
-import * as downloadDriveItemVersionContent from './download-drive-item-version-content.ts';
+import * as downloadDriveItemVersion from './download-drive-item-version.ts';
 import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
 import * as getCalendarEvent from './get-calendar-event.ts';
 import * as getCalendarView from './get-calendar-view.ts';
@@ -171,11 +169,9 @@ const commands: Record<string, Command> = {
   'get-drive-item': getDriveItem,
   'list-drive-item-permissions': listDriveItemPermissions,
   'list-drive-item-versions': listDriveItemVersions,
-  'download-drive-item-version-content': downloadDriveItemVersionContent,
+  'download-drive-item-version': downloadDriveItemVersion,
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
-  'download-drive-item-version-as-pdf': downloadDriveItemVersionAsPdf,
-  'download-drive-item-version-as-markdown': downloadDriveItemVersionAsMarkdown,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
   'get-excel-range': getExcelRange,

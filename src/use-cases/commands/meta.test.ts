@@ -79,6 +79,16 @@ describe('command meta — invariants on every registered command', () => {
           'full',
           'max-content-chars',
           'max-cells',
+          // v1.4.0 fresh-pass #6: `convert-mail-to-markdown --inline-images
+          // false` is a post-fetch processing knob (skip the per-image bytes
+          // fetch + base64 embedding), not a URL placeholder.
+          'inline-images',
+          // v1.4.0 surface-consolidation: `download-drive-item-version
+          // --format <original|pdf|markdown>` dispatches to one of three
+          // fetch pipelines (replaces the 3 separate -content / -as-pdf /
+          // -as-markdown commands). It's a runtime branch selector, not a
+          // URL placeholder.
+          'format',
           // chatsvcagg paginated chat-list cursor for the post-2026-05-21
           // `list-teams-chats-with-messages` rewrite — runtime-additive.
           'continuation-token',

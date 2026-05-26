@@ -175,6 +175,36 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     matchMessage: (m) => /An identifier was expected at position 0/i.test(m),
     hint: 'KQL parse error — usually means `--query` was wrapped in extra double-quotes. The CLI already wraps the value in `"..."` on the wire; pass the raw KQL (`subject:invoice from:alice`), not `"subject:invoice"`.',
   },
+  // ─── Graph: invalid $orderby column ──────────────────────────────────────
+  // v1.4.0 fresh-pass #5: covers `Invalid orderby property 'foo' for resource 'message'`
+  // and variants. The remedy is always "use a column that actually exists".
+  {
+    source: 'graph',
+    matchMessage: (m) => /Invalid orderby property/i.test(m),
+    hint: 'The `--orderby` column is not a valid sort key on this resource. Run `ask-marcel docs <command>` and use a column that appears in `responseShape`. Common gotchas: `subject` and `body` are not sortable on `message`; `displayName` is rarely sortable on `chat`. Stick to id/dateTime/numeric fields.',
+  },
+  // ─── Graph: $filter parse error / OData quoting ──────────────────────────
+  // Covers `The expression '...' is not valid` and similar OData parse failures.
+  {
+    source: 'graph',
+    matchMessage: (m) => /expression\s+'.+'\s+is not valid|InvalidFilterClause|filter expression must be/i.test(m),
+    hint: "The `--filter` value is not valid OData. Quoting rules: string literals MUST use single quotes (`subject eq 'invoice'`), NOT double quotes. Embed a single quote by doubling it (`O''Brien`). Booleans/numbers/dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`).",
+  },
+  // ─── Graph: calendarView date inversion ──────────────────────────────────
+  {
+    source: 'graph',
+    matchMessage: (m) => /end date time must be greater than the start date time|endDateTime.*start|invalid.*time range/i.test(m),
+    hint: 'Calendar window is inverted: `--end-date-time` must be strictly after `--start-date-time`. The CLI accepts relative shapes — for "the next 7 days" use `--start-date-time today --end-date-time +7d`; for "the last 7 days" use `--start-date-time 7d --end-date-time now`.',
+  },
+  // ─── Graph / OneNote: 5K library cap ─────────────────────────────────────
+  // The recurring tenant gotcha — every OneNote read blocks once the
+  // OneDrive doc library backing the user's notebooks exceeds 5000 items.
+  // See `gotcha_onenote_5k_limit` in project memory.
+  {
+    source: 'graph',
+    matchMessage: (m) => /OneNote service can't access the OneDrive document library|exceeds the 5,?000 item limit|library has too many items/i.test(m),
+    hint: "Tenant-level gotcha (not a CLI bug): Graph blocks every OneNote read once the OneDrive document library backing the user's notebooks exceeds 5000 items. There is no per-request workaround — the tenant admin must move OneNote content into a separate document library or archive items. See project memory `gotcha_onenote_5k_limit`.",
+  },
   // ─── Graph: $skip not supported ──────────────────────────────────────────
   {
     source: 'graph',

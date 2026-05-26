@@ -113,7 +113,7 @@ export const inlineBinary = async (graph: GraphClient, contentPath: string, opts
  * reference-attachment edge cases) Graph silently falls back to returning
  * the raw source bytes — same envelope shape, but contentType is the
  * source MIME (or `application/octet-stream`). The audit (round-5 #2)
- * caught this happening on `download-drive-item-version-as-pdf` for v79
+ * caught this happening on `download-drive-item-version --format pdf` for v79
  * of a pptx: the response said `contentType: "application/octet-stream"`
  * with the exact source byte size, and an LLM that saved it as `.pdf`
  * would have had a corrupt file.

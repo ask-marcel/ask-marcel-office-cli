@@ -133,7 +133,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'help-json',
     summary:
-      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~12 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}`. Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta.',
+      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~12 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}`. Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders the in-process command manifest',

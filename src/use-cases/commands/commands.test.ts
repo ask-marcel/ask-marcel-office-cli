@@ -10,9 +10,7 @@ import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
-import * as downloadDriveItemVersionAsMarkdown from './download-drive-item-version-as-markdown.ts';
-import * as downloadDriveItemVersionAsPdf from './download-drive-item-version-as-pdf.ts';
-import * as downloadDriveItemVersionContent from './download-drive-item-version-content.ts';
+import * as downloadDriveItemVersion from './download-drive-item-version.ts';
 import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
 import * as getCalendarEvent from './get-calendar-event.ts';
 import * as getCalendarView from './get-calendar-view.ts';
@@ -178,11 +176,9 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'get-drive-item': getDriveItem,
   'list-drive-item-permissions': listDriveItemPermissions,
   'list-drive-item-versions': listDriveItemVersions,
-  'download-drive-item-version-content': downloadDriveItemVersionContent,
+  'download-drive-item-version': downloadDriveItemVersion,
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
-  'download-drive-item-version-as-pdf': downloadDriveItemVersionAsPdf,
-  'download-drive-item-version-as-markdown': downloadDriveItemVersionAsMarkdown,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
   'get-excel-range': getExcelRange,
@@ -1024,7 +1020,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-content inlines the historical-version bytes via the M365ChatClient-elevated path', async () => {
+  it('download-drive-item-version (default --format original) inlines the historical-version bytes via the M365ChatClient-elevated path', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/versions/3.0/content',
@@ -1037,8 +1033,8 @@ describe('commands', () => {
         response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-content'];
-    if (!cmd) throw new Error('download-drive-item-version-content not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0' });
     expect(result.ok).toBe(true);
@@ -1157,7 +1153,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf converts a non-current version through Graph ?format=pdf and inlines the PDF bytes (CDN redirect followed via the M365ChatClient-elevated path)', async () => {
+  it('download-drive-item-version --format pdf converts a non-current version through Graph ?format=pdf and inlines the PDF bytes (CDN redirect followed via the M365ChatClient-elevated path)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1', method: 'GET', response: Response.json({ name: 'budget.xlsx' }) },
       {
@@ -1171,10 +1167,10 @@ describe('commands', () => {
         response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-pdf'];
-    if (!cmd) throw new Error('download-drive-item-version-as-pdf not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0', format: 'pdf' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; base64: string };
@@ -1183,7 +1179,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-markdown converts a non-current xlsx version via the local sheetjs pipeline', async () => {
+  it('download-drive-item-version --format markdown converts a non-current xlsx version via the local sheetjs pipeline', async () => {
     const xlsxBytes = buildSampleXlsx();
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/i1', method: 'GET', response: Response.json({ name: 'budget.xlsx' }) },
@@ -1193,10 +1189,10 @@ describe('commands', () => {
         response: () => new Response(xlsxBytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-markdown'];
-    if (!cmd) throw new Error('download-drive-item-version-as-markdown not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', versionId: '3.0', format: 'markdown' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -1204,7 +1200,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-markdown short-circuits to raw download for plain-text source extensions', async () => {
+  it('download-drive-item-version --format markdown short-circuits to raw download for plain-text source extensions', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'notes.md' }) },
       {
@@ -1213,10 +1209,10 @@ describe('commands', () => {
         response: () => new Response('# v2', { status: 200, headers: { 'content-type': 'text/markdown' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-markdown'];
-    if (!cmd) throw new Error('download-drive-item-version-as-markdown not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText', versionId: '2.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText', versionId: '2.0', format: 'markdown' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -1224,7 +1220,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf short-circuits to a raw bytes download for plain-text source extensions (re-encodes text body as base64)', async () => {
+  it('download-drive-item-version --format pdf short-circuits to a raw bytes download for plain-text source extensions (re-encodes text body as base64)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'log.log' }) },
       {
@@ -1233,10 +1229,10 @@ describe('commands', () => {
         response: () => new Response('line', { status: 200, headers: { 'content-type': 'text/plain' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-pdf'];
-    if (!cmd) throw new Error('download-drive-item-version-as-pdf not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText', versionId: '2.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText', versionId: '2.0', format: 'pdf' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; base64: string };
@@ -1271,7 +1267,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf short-circuits to raw download for a pdf source (same reason as the non-versioned variant) and inlines the bytes', async () => {
+  it('download-drive-item-version --format pdf short-circuits to raw download for a pdf source (same reason as the non-versioned variant) and inlines the bytes', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'archive.pdf' }) },
       {
@@ -1285,10 +1281,10 @@ describe('commands', () => {
         response: () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-pdf'];
-    if (!cmd) throw new Error('download-drive-item-version-as-pdf not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf', versionId: '2.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf', versionId: '2.0', format: 'pdf' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; base64: string };
@@ -1297,7 +1293,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-version-as-pdf propagates an err from the metadata pre-fetch unchanged', async () => {
+  it('download-drive-item-version --format pdf propagates an err from the metadata pre-fetch unchanged', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iMissing',
@@ -1305,17 +1301,17 @@ describe('commands', () => {
         response: () => new Response(JSON.stringify({ error: { message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-pdf'];
-    if (!cmd) throw new Error('download-drive-item-version-as-pdf not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iMissing', versionId: '2.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iMissing', versionId: '2.0', format: 'pdf' });
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(404);
     }
   });
 
-  it('download-drive-item-version-as-markdown propagates an err from the metadata pre-fetch unchanged', async () => {
+  it('download-drive-item-version --format markdown propagates an err from the metadata pre-fetch unchanged', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iMissing',
@@ -1323,10 +1319,10 @@ describe('commands', () => {
         response: () => new Response(JSON.stringify({ error: { message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } }),
       },
     ]);
-    const cmd = cmdMap['download-drive-item-version-as-markdown'];
-    if (!cmd) throw new Error('download-drive-item-version-as-markdown not registered');
+    const cmd = cmdMap['download-drive-item-version'];
+    if (!cmd) throw new Error('download-drive-item-version not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iMissing', versionId: '2.0' });
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iMissing', versionId: '2.0', format: 'markdown' });
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(404);
@@ -2228,6 +2224,78 @@ describe('commands', () => {
     expect(v.text ?? '').toContain('forwarded.msg');
   });
 
+  it("convert-mail-to-markdown --inline-images false skips the per-image bytes fetch entirely (no /attachments/{id} requests) and surfaces inline images in the file-attachments list so the LLM caller doesn't lose visibility (v1.4.0 fresh-pass #6)", async () => {
+    const urls: string[] = [];
+    const fetchFn: FetchFn = async (url) => {
+      urls.push(url);
+      if (url.includes('/attachments?')) {
+        // Two inline image attachments.
+        return Response.json({
+          value: [
+            { id: 'img1', name: 'logo.png', contentType: 'image/png', size: 1024, isInline: true, contentId: 'logo@cid' },
+            { id: 'img2', name: 'banner.jpg', contentType: 'image/jpeg', size: 2048, isInline: true, contentId: 'banner@cid' },
+          ],
+        });
+      }
+      // Body references both inline images via cid:.
+      return Response.json({
+        subject: 'newsletter',
+        body: { contentType: 'html', content: '<p>Hello</p><img src="cid:logo@cid"/><img src="cid:banner@cid"/>' },
+        hasAttachments: true,
+      });
+    };
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mInlineSkip', inlineImages: 'false' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { text: string };
+    // No per-image bytes fetch happened — `/attachments/{id}` was never hit.
+    const perImageFetches = urls.filter((u) => /\/attachments\/img\d/.test(u));
+    expect(perImageFetches).toEqual([]);
+    // Inline images are now LISTED in the Attachments section (instead of
+    // hidden because they were silently embedded).
+    expect(v.text).toContain('logo.png');
+    expect(v.text).toContain('banner.jpg');
+    // Body keeps the raw cid: references (no data: URI substitution).
+    expect(v.text).toContain('cid:logo@cid');
+    expect(v.text).not.toContain('data:image/png;base64,');
+  });
+
+  it('convert-mail-to-markdown default (omitted flag) preserves the historical embedding behaviour — per-image bytes are fetched and data: URIs replace cid: refs', async () => {
+    const urls: string[] = [];
+    const fetchFn: FetchFn = async (url) => {
+      urls.push(url);
+      if (url.endsWith('/attachments/img1')) {
+        return Response.json({ contentBytes: Buffer.from('fake-png-bytes').toString('base64') });
+      }
+      if (url.includes('/attachments?')) {
+        return Response.json({ value: [{ id: 'img1', name: 'logo.png', contentType: 'image/png', size: 1024, isInline: true, contentId: 'logo@cid' }] });
+      }
+      return Response.json({ subject: 's', body: { contentType: 'html', content: '<img src="cid:logo@cid"/>' }, hasAttachments: true });
+    };
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mInlineDefault' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { text: string };
+    // Per-image fetch happened — backward compat preserved.
+    expect(urls.some((u) => u.endsWith('/attachments/img1'))).toBe(true);
+    expect(v.text).toContain('data:image/png;base64,');
+  });
+
+  it('convert-mail-to-markdown rejects --inline-images values other than true/false as a validation_error', async () => {
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fakeFetch({ subject: 's', body: { contentType: 'text', content: 'b' }, hasAttachments: false }));
+    const result = await cmd.execute(graph, { messageId: 'mBadFlag', inlineImages: 'yes' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
   it('convert-mail-to-markdown skips the **Subject:** line when the message has no subject field — kills the `if (m.subject !== undefined)` → `if (true)` mutant which would otherwise push `**Subject:** undefined`', async () => {
     const fetchFn = stagedFetch([
       {
@@ -2364,6 +2432,75 @@ describe('commands', () => {
     }
     expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
     expect(calls.some((c) => c.url.endsWith('/content?format=pdf'))).toBe(true);
+  });
+
+  it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (v1.4.0 fresh-pass #7: folder used to linger at OneDrive root)', async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchFn: FetchFn = async (url, init) => {
+      calls.push({ url, method: init?.method });
+      if (url.endsWith('/attachments/aPdf')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') });
+      }
+      if (url.includes(':/content') && init?.method === 'PUT') {
+        return Response.json({ id: 'temp-i7', name: 'plan-temp' });
+      }
+      if (url.endsWith('/content?format=pdf')) {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      }
+      if (url.endsWith('/items/temp-i7') && init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      // Cleanup: children GET returns empty → folder delete fires.
+      if (url.includes('/.ask-marcel-temp:/children')) {
+        return Response.json({ value: [] });
+      }
+      if (url.endsWith('/.ask-marcel-temp') && init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm7', attachmentId: 'aPdf' });
+    expect(result.ok).toBe(true);
+    // Both the file delete AND the folder delete happened.
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/items/temp-i7'))).toBe(true);
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/.ask-marcel-temp'))).toBe(true);
+    // The cleanup probed children first.
+    expect(calls.some((c) => c.url.includes('/.ask-marcel-temp:/children'))).toBe(true);
+  });
+
+  it('convert-mail-attachment-to-pdf does NOT delete the parent folder when it still contains other files (concurrent invocation safety)', async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchFn: FetchFn = async (url, init) => {
+      calls.push({ url, method: init?.method });
+      if (url.endsWith('/attachments/aPdf2')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'b.docx', contentBytes: btoa('docx') });
+      }
+      if (url.includes(':/content') && init?.method === 'PUT') {
+        return Response.json({ id: 'temp-i8', name: 'b-temp' });
+      }
+      if (url.endsWith('/content?format=pdf')) {
+        return new Response(new Uint8Array([0x25, 0x50]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      }
+      if (url.endsWith('/items/temp-i8') && init?.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      // Cleanup: children GET returns one other file → folder delete must NOT fire.
+      if (url.includes('/.ask-marcel-temp:/children')) {
+        return Response.json({ value: [{ id: 'other-concurrent-upload' }] });
+      }
+      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm8', attachmentId: 'aPdf2' });
+    expect(result.ok).toBe(true);
+    // File delete happened, but the folder delete did NOT — concurrent file survives.
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/items/temp-i8'))).toBe(true);
+    expect(calls.every((c) => !(c.method === 'DELETE' && c.url.endsWith('/.ask-marcel-temp')))).toBe(true);
   });
 
   it('convert-mail-attachment-to-pdf short-circuits to a raw-bytes envelope for plain-text source extensions', async () => {
@@ -2959,16 +3096,11 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' } },
   {
-    name: 'download-drive-item-version-content',
+    name: 'download-drive-item-version',
     params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
     responseBody: { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' },
   },
   { name: 'download-drive-item-as-pdf', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } },
-  {
-    name: 'download-drive-item-version-as-pdf',
-    params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
-    responseBody: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' },
-  },
   { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'report' } },
   { name: 'search-my-documents', params: { query: 'budget' } },
   { name: 'get-excel-range', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1' } },
@@ -3140,11 +3272,9 @@ describe('command schema rejection', () => {
     { name: 'list-team-channels', params: {} },
     { name: 'get-team-channel', params: { teamId: 'tm1' } },
     { name: 'download-onedrive-file-content', params: { driveId: 'd1' } },
-    { name: 'download-drive-item-version-content', params: { driveId: 'd1', itemId: 'i1' } },
+    { name: 'download-drive-item-version', params: { driveId: 'd1', itemId: 'i1' } },
     { name: 'download-drive-item-as-pdf', params: { driveId: 'd1' } },
     { name: 'download-drive-item-as-markdown', params: { driveId: 'd1' } },
-    { name: 'download-drive-item-version-as-pdf', params: { driveId: 'd1', itemId: 'i1' } },
-    { name: 'download-drive-item-version-as-markdown', params: { driveId: 'd1', itemId: 'i1' } },
     { name: 'get-onenote-page-as-markdown', params: {} },
     { name: 'search-mail-messages', params: {} },
     { name: 'extract-sharepoint-links-in-mail', params: {} },
@@ -3215,7 +3345,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/permissions' },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/versions' },
   {
-    name: 'download-drive-item-version-content',
+    name: 'download-drive-item-version',
     params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
     expectedPath: '/drives/d1/items/i1/versions/3.0/content',
   },
@@ -3229,17 +3359,6 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     params: { driveId: 'd1', itemId: 'i1' },
     // No-extension metadata response from fakeFetch makes the dispatcher fall into the unsupported branch
     // before any /content fetch — so the LAST URL hit is the metadata GET.
-    expectedPath: '/drives/d1/items/i1',
-  },
-  {
-    name: 'download-drive-item-version-as-pdf',
-    params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
-    expectedPath: '/drives/d1/items/i1/versions/3.0/content?format=pdf',
-  },
-  {
-    name: 'download-drive-item-version-as-markdown',
-    params: { driveId: 'd1', itemId: 'i1', versionId: '3.0' },
-    // Same as above — no-extension metadata short-circuits in the dispatcher.
     expectedPath: '/drives/d1/items/i1',
   },
   { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'report' }, expectedPath: "/drives/d1/search(q='report')" },
@@ -3305,7 +3424,16 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-mail-attachment', params: { messageId: 'm1', attachmentId: 'a1' }, expectedPath: '/me/messages/m1/attachments/a1' },
   { name: 'list-mail-rules', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messageRules' },
   { name: 'get-mailbox-settings', params: {}, expectedPath: '/me/mailboxSettings' },
-  { name: 'search-mail-messages', params: { query: 'invoice' }, expectedPath: '/me/messages?$search="invoice"' },
+  // v1.4.0 fresh-pass #4: search-mail-messages now mirrors list-mail-messages'
+  // slim default. The path always carries the inlined $select.
+  {
+    name: 'search-mail-messages',
+    params: { query: 'invoice' },
+    expectedPath:
+      '/me/messages?$search="invoice"&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview',
+  },
+  // Explicit --select wins over the slim default.
+  { name: 'search-mail-messages', params: { query: 'invoice', select: 'id,subject' }, expectedPath: '/me/messages?$search="invoice"&$select=id%2Csubject' },
   { name: 'extract-sharepoint-links-in-mail', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1?$select=subject,body' },
   { name: 'convert-mail-to-markdown', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
   { name: 'list-onenote-notebooks', params: {}, expectedPath: '/me/onenote/notebooks' },
@@ -4644,9 +4772,11 @@ describe('search-mail-messages rejects --filter client-side', () => {
     expect(fetchFn.lastUrl).toBeNull();
   });
 
-  it('still works when only --query is supplied (no regression on the happy path)', async () => {
+  it('still works when only --query is supplied (no regression on the happy path) — URL carries the slim default $select alongside $search', async () => {
     const url = await capturedUrl('search-mail-messages', { query: 'invoice' });
-    expect(url).toBe('https://graph.microsoft.com/v1.0/me/messages?$search="invoice"');
+    expect(url).toBe(
+      'https://graph.microsoft.com/v1.0/me/messages?$search="invoice"&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview'
+    );
   });
 
   it("on an empty `--filter ''` the client-side guard does NOT fire — the rejection guard checks for a non-empty filter, so the message comes from the downstream Zod min-1 check, not the `$search`-conflict pointer (boundary on params['filter'].length > 0)", async () => {

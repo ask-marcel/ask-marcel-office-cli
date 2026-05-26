@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-25T10:03:46.177Z",
+  "generatedAt": "2026-05-26T06:54:44.963Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -53,7 +53,7 @@
     },
     {
       "name": "convert-mail-to-markdown",
-      "summary": "Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. Inline images attached with `isInline:true` and an `image/*` content-type (size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (Hardening #1: non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). File attachments are listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.",
+      "summary": "Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default, inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). For LLM callers that only want the text body, pass `--inline-images false` to skip the per-image bytes fetch entirely — the body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list so you can decide whether to fetch them separately via `get-mail-attachment`. File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -64,6 +64,12 @@
           "key": "messageId",
           "required": true,
           "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`."
+        },
+        {
+          "name": "inline-images",
+          "key": "inlineImages",
+          "required": false,
+          "description": "Pass `--inline-images false` to skip the per-image bytes fetch + base64 embedding. Default is `true` (embed). Disabling cuts the response size dramatically on emails with several inline images (a 6 KB body with 6 inline images shipped at ~36 KB by default; with `--inline-images false` it stays close to 6 KB). The body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list instead, so the LLM caller can still see what is there and fetch any specific image via `get-mail-attachment` on demand."
         }
       ],
       "example": "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
@@ -118,68 +124,8 @@
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs."
     },
     {
-      "name": "download-drive-item-version-as-markdown",
-      "summary": "Download a *historical version* of a OneDrive / SharePoint file converted to markdown. Same local conversion pipeline as `download-drive-item-as-markdown`: docx via mammoth, xlsx via sheetjs (markdown tables per sheet), csv as a markdown table, plus plain-text passthrough. Uses an elevated Graph token (captured at login from m365.cloud.microsoft / M365ChatClient) for the bytes-fetch, since the Teams web client token cannot fetch historical-version stream content (returns 403 logicalPermissionAccessDenied). For pptx use `download-drive-item-version-as-pdf`. Loop/Fluid/Whiteboard use Graph `?format=html` (the four inputs Microsoft documents).",
-      "category": "drive",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=html",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitemversion-get-content",
-      "options": [
-        {
-          "name": "drive-id",
-          "key": "driveId",
-          "required": true,
-          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
-        },
-        {
-          "name": "item-id",
-          "key": "itemId",
-          "required": true,
-          "description": "driveItem ID of the file. Returned by `list-folder-files` or `search-onedrive-files`."
-        },
-        {
-          "name": "version-id",
-          "key": "versionId",
-          "required": true,
-          "description": "driveItemVersion ID. Returned by `ask-marcel list-drive-item-versions`. Pick a non-current version (the first entry is the live file and Graph rejects this endpoint for it)."
-        }
-      ],
-      "example": "ask-marcel download-drive-item-version-as-markdown --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions."
-    },
-    {
-      "name": "download-drive-item-version-as-pdf",
-      "summary": "Convert a *historical version* of a OneDrive / SharePoint file to PDF and return the bytes inline. Same shape as `download-drive-item-as-pdf` plus a `--version-id`. The CLI uses an ODSP-elevated token (M365ChatClient identity captured at login) for both the Graph call and the CDN-redirect follow, so the LLM never has to fetch an external URL. Plain-text source extensions and `pdf` sources short-circuit to a raw-bytes return. Note: Graph's `?format=pdf` sometimes serves the *current* version through this endpoint, but not reliably — audit v1.0.0 §D4 saw it fall back to raw source bytes (`passthrough: true`) even for the current version on the test tenant. For the current version always use `download-drive-item-as-pdf` so you don't depend on this quirk. When the response carries `passthrough: true`, the bytes are the source file (not a PDF); save them with the source extension, not `.pdf` — the global output-path flag refuses the mismatch (audit §B4).",
-      "category": "drive",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content?format=pdf",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitemversion-get-content",
-      "options": [
-        {
-          "name": "drive-id",
-          "key": "driveId",
-          "required": true,
-          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
-        },
-        {
-          "name": "item-id",
-          "key": "itemId",
-          "required": true,
-          "description": "driveItem ID of the file. Returned by `list-folder-files` or `search-onedrive-files`."
-        },
-        {
-          "name": "version-id",
-          "key": "versionId",
-          "required": true,
-          "description": "driveItemVersion ID. Returned by `ask-marcel list-drive-item-versions`. Pick a non-current version — the first entry (e.g. `12.0`) is the live file and Graph rejects this endpoint for it; use `value[1]` or older."
-        }
-      ],
-      "example": "ask-marcel download-drive-item-version-as-pdf --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the historical-version PDF bytes, inlined. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape with `passthrough: true` + a `note` so the caller can tell conversion was deliberately skipped. **If Graph silently falls back to raw bytes** (some historical versions of pptx/docx — verified live), the response also carries `passthrough: true` + a sharp note saying the bytes are the source, NOT a PDF — save them with the source extension, not `.pdf`. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`."
-    },
-    {
-      "name": "download-drive-item-version-content",
-      "summary": "Download the bytes of a *non-current* historical version of a OneDrive / SharePoint file, inlined. Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\" — for the current version use `download-onedrive-file-content`. The CLI follows the SharePoint streamContent redirect internally using an M365ChatClient-elevated token (captured at login) so the LLM never has to fetch an external URL.",
+      "name": "download-drive-item-version",
+      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-onedrive-file-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Audit v1.0.0 §D4 caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content",
@@ -202,10 +148,24 @@
           "key": "versionId",
           "required": true,
           "description": "driveItemVersion ID. Returned by `ask-marcel list-drive-item-versions`. Use the `id` field of an entry under `value[]`. Pick a non-current version — the first entry (e.g. `12.0`) is the live file and Graph rejects this endpoint for it; use `value[1]` or older."
+        },
+        {
+          "name": "format",
+          "key": "format",
+          "required": false,
+          "description": "Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/plain-text). All formats inline the bytes; pair with the global `--output-path` to land them on disk.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "original",
+              "pdf",
+              "markdown"
+            ]
+          }
         }
       ],
-      "example": "ask-marcel download-drive-item-version-content --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0'",
-      "responseShape": "`{ contentType, size, base64 }` — the historical-version bytes, inlined. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace `base64` with `savedTo` for multi-MB versions."
+      "example": "ask-marcel download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
+      "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions."
     },
     {
       "name": "download-onedrive-file-content",
@@ -2449,7 +2409,7 @@
     },
     {
       "name": "list-drive-item-versions",
-      "summary": "List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version's `id` is a stringified float like `\"79.0\"` (NOT an integer like `79`) — pass it literally to sibling commands such as `download-drive-item-version-content` / `-as-pdf` / `-as-markdown`; numeric coercion silently fails because Graph rejects `79` against a path templated as `{version-id}`.",
+      "summary": "List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version's `id` is a stringified float like `\"79.0\"` (NOT an integer like `79`) — pass it literally to the `download-drive-item-version` command (it accepts an `original | pdf | markdown` format selector); numeric coercion silently fails because Graph rejects `79` against a path templated for stringified floats.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions",
@@ -6286,7 +6246,7 @@
     },
     {
       "name": "search-mail-messages",
-      "summary": "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query 'subject:invoice from:alice'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `\"...\"` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `\"...\"` on the wire.",
+      "summary": "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` (same as `list-mail-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query 'subject:invoice from:alice'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `\"...\"` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `\"...\"` on the wire.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages?$search=\"{query}\"",
@@ -6336,7 +6296,7 @@
         }
       ],
       "example": "ask-marcel search-mail-messages --query 'from:alice subject:Q3'",
-      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance",
+      "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
       "pagination": true
     },
     {

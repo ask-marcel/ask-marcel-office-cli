@@ -104,13 +104,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   // Audit Alex-session §B: previous default `--help` ran ~60 KB because the
   // top-level subcommand listing rendered each command's full summary (often
-  // 2-3 sentences). The new default truncates each subcommand description to
-  // its first sentence in the top-level listing (~6 KB total); `--verbose`
-  // reinstates the full summary. Per-command `ask-marcel <cmd> --help` is
-  // never compacted — it always shows the full description plus the
-  // `addHelpText` block. Detected via argv scan so the toggle works
-  // regardless of where `--verbose` appears relative to `--help`.
-  const verboseHelpRequested = (): boolean => process.argv.includes('--verbose');
+  // 2-3 sentences). Default `--help` now truncates each subcommand description
+  // to its first sentence in the top-level listing (~6 KB total). Per-command
+  // `ask-marcel <cmd> --help` is never compacted — it always shows the full
+  // description plus the `addHelpText` block, and `help-json` ships the full
+  // summary unchanged. v1.4.0 surface-consolidation: the `--verbose` opt-out
+  // was dropped (it was a one-trick toggle on this top-level listing only;
+  // `help-json --terse` covers the same need with a structured payload).
 
   // Compact a subcommand's description to its first sentence (everything up
   // to the first period followed by a space, or the first newline). Returns
@@ -140,12 +140,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // `ask-marcel <cmd> --help` is untouched — Commander only consults
     // `subcommandDescription` when formatting parent's child list.
     .configureHelp({
-      subcommandDescription: (cmd) => (verboseHelpRequested() ? cmd.description() : compactSummary(cmd.description())),
+      subcommandDescription: (cmd) => compactSummary(cmd.description()),
     })
-    .option(
-      '--verbose',
-      'When paired with `--help`, render every command with its full multi-sentence summary. Default `--help` truncates each command to its first sentence to stay LLM-token-friendly (~6 KB vs ~60 KB).'
-    )
     .option(
       '--output-path <path>',
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
@@ -178,11 +174,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
       })()
     );
 
-  // Audit Alex-session §B: explicit pointers to the verbose form and the
+  // Audit Alex-session §B: explicit pointers to per-command help and the
   // machine-readable manifest. Without this, an LLM that hits the compact
-  // help has no in-band signal that the verbose form or `help-json` even
-  // exist. Always render this footer (the compact pointer is useful in
-  // verbose mode too, since `--verbose` doesn't shrink `help-json`'s payload).
+  // top-level help has no in-band signal that `help-json` even exists.
   program.addHelpText(
     'after',
     [
@@ -190,7 +184,6 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'For full per-command help:   ask-marcel <command> --help',
       'For machine-readable docs:   ask-marcel help-json [--terse] [--category mail]',
       'For per-command Markdown:    ask-marcel docs <command>',
-      'For multi-sentence summaries in this listing: re-run with --verbose',
     ].join('\n  ')
   );
 
@@ -238,7 +231,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~370 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~62 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~370 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~62 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',
@@ -246,7 +239,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     )
     .option(
       '--category <name>',
-      'Filter the manifest to a single category (one of: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, contacts, chats, teams, meta). Composes with `--terse`. Unknown categories return a structured `{ ok: false, error }` envelope.'
+      'Filter the manifest to a single category (one of: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta). Composes with `--terse`. Unknown categories return a structured `{ ok: false, error }` envelope.'
     )
     .action(async (opts: { readonly terse?: boolean; readonly category?: string }) => {
       // Audit round-8 Wave G1: --output text was silently honored on

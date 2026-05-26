@@ -121,7 +121,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
   // Audit Alex-session §3 — sizeHint when the rendered envelope crosses
   // 50 KB. Generic remedy (presenter has no idea which command produced the
   // data) — `--select` / `--top` / `--output-path`.
-  it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB', async () => {
+  it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB and frames the universal remedy (--output-path) ahead of the conditional remedies (--select / --top, which some endpoints ignore)', async () => {
     const logger = createLoggerFake();
     // 60 KB of dummy data — well over the 50 KB threshold and the hint
     // itself can't push the borderline case over (additive guard in
@@ -132,6 +132,13 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.sizeHint).toBeDefined();
     expect(parsed.sizeHint).toContain('--select');
     expect(parsed.sizeHint).toContain('--output-path');
+    // Audit v1.4.0 fresh-pass #3: the hint used to say "Trim with --select"
+    // unconditionally; some endpoints (list-shared-with-me,
+    // microsoft-search-query, delta family) silently drop $select. The
+    // reworded hint puts the universal remedy first and names the
+    // endpoints where the conditional remedies don't apply.
+    expect(parsed.sizeHint).toContain('Universal remedy');
+    expect(parsed.sizeHint).toContain('list-shared-with-me');
   });
 
   it('omits `sizeHint` when the rendered envelope fits inside 50 KB (no warning churn on small responses)', async () => {

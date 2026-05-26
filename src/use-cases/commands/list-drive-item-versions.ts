@@ -8,7 +8,7 @@ const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/
 
 const meta: CommandMeta = {
   summary:
-    'List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version\'s `id` is a stringified float like `"79.0"` (NOT an integer like `79`) — pass it literally to sibling commands such as `download-drive-item-version-content` / `-as-pdf` / `-as-markdown`; numeric coercion silently fails because Graph rejects `79` against a path templated as `{version-id}`.',
+    'List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version\'s `id` is a stringified float like `"79.0"` (NOT an integer like `79`) — pass it literally to the `download-drive-item-version` command (it accepts an `original | pdf | markdown` format selector); numeric coercion silently fails because Graph rejects `79` against a path templated for stringified floats.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions',

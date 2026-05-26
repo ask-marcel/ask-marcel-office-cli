@@ -37,6 +37,37 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
     expect(result?.hint).toContain('list-joined-teams');
   });
 
+  // v1.4.0 fresh-pass #5 — uneven error-envelope coverage. The CLI used to
+  // ship bare `error:` envelopes for these four common Graph parse failures,
+  // even though the remedy is well-defined per category.
+  it("detects invalid `$orderby` syntax (e.g. `Invalid orderby property 'foo'`) and points at $orderby-supporting columns of the listed responseShape", () => {
+    const result = findErrorHint("BadRequest: Invalid orderby property 'foo' for resource 'message'.", 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--orderby');
+    expect(result?.hint).toContain('responseShape');
+  });
+
+  it('detects invalid `$filter` parse errors (e.g. `Invalid filter clause`) and points at OData quoting rules', () => {
+    const result = findErrorHint("BadRequest: The expression 'subject eq foo' is not valid.", 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--filter');
+    expect(result?.hint).toContain('single quotes');
+  });
+
+  it('detects calendar-view date inversion (`endDateTime is before startDateTime`)', () => {
+    const result = findErrorHint('BadRequest: The end date time must be greater than the start date time.', 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--end-date-time');
+    expect(result?.hint).toContain('--start-date-time');
+  });
+
+  it('detects the OneNote 5K library cap (the recurring tenant gotcha — every OneNote read blocks once the OneDrive doc library exceeds 5000 items)', () => {
+    const result = findErrorHint("The OneNote service can't access the OneDrive document library because it contains too many items.", 'GenericError');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('5');
+    expect(result?.hint).toContain('tenant');
+  });
+
   it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — Audit Alex-session §8 follow-up', () => {
     const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
     expect(result?.source).toBe('graph');
