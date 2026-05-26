@@ -40,13 +40,29 @@ const SELECT_HINT =
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-// "Telltale bogus-select" detector: a `value[]` with N>0 entries where every
-// entry is a plain object whose only key (if any) is `@odata.etag`. A
-// legitimately-empty collection has `value: []` (N=0) and does NOT trigger.
-// A response with no `value[]` at all (single-resource GET) does NOT trigger.
+// "Telltale bogus-select" detector. Two shapes both indicate the same trap
+// (user passed `--select` with field names Graph silently dropped):
+//
+//   Collection: `{ value: [{@odata.etag}, {@odata.etag}, ...] }`
+//     — N>0 entries, each empty after stripping `@odata.etag`.
+//
+//   Single resource: `{ "@odata.context": "..." }`
+//     — top-level object with no keys other than `@odata.*` metadata.
+//     Example: `get-current-user --select aaaaaaaa,bbbbbbbb`.
+//
+// Negatives: legitimately empty collection (`value: []`, N=0); single
+// resource carrying real fields alongside `@odata.context` (the normal
+// happy path); non-object data (string / number / null) — none trigger.
+const isMeaningfulKey = (key: string): boolean => !key.startsWith('@odata.');
+
 const looksLikeBogusSelectResponse = (data: unknown): boolean => {
   if (!isPlainRecord(data)) return false;
   const value = data['value'];
+  if (value === undefined) {
+    // Single-resource shape. Bogus when only `@odata.*` keys remain.
+    return Object.keys(data).every((k) => !isMeaningfulKey(k));
+  }
+  // Collection shape. Bogus when N>0 entries are all empty-after-etag.
   if (!Array.isArray(value) || value.length === 0) return false;
   return value.every((entry) => {
     if (!isPlainRecord(entry)) return false;

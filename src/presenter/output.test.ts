@@ -187,10 +187,31 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.selectHint).toBeUndefined();
   });
 
-  it('omits `selectHint` when the response has no `value[]` at all (single-resource GET responses, where the bogus-select trap does not apply in the same shape)', async () => {
+  it('omits `selectHint` when the response has no `value[]` and carries real fields (single-resource GET — the most common shape, `get-current-user` etc.)', async () => {
     const logger = createLoggerFake();
     const single = { id: 'u1', displayName: 'Alice' };
     const out = await captureStream('stdout', () => render(single, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeUndefined();
+  });
+
+  // The audit's specific case: `get-current-user --select aaaaaaaa,bbbbbbbb`
+  // returns `{ "@odata.context": "..." }` — a single-resource GET with no
+  // non-metadata keys. Same trap as the collection-shape variant, different
+  // wire shape.
+  it('also fires `selectHint` for the single-resource-GET bogus-select shape — top-level object with only @odata.* keys (e.g. `get-current-user --select bogus` returns just `{@odata.context}`)', async () => {
+    const logger = createLoggerFake();
+    const bogusSingle = { '@odata.context': 'https://graph.microsoft.com/v1.0/$metadata#users(aaaaaaaa,bbbbbbbb)/$entity' };
+    const out = await captureStream('stdout', () => render(bogusSingle, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeDefined();
+    expect(parsed.selectHint).toContain('--select');
+  });
+
+  it('omits `selectHint` for the response with @odata.context AND real fields (the normal happy-path single-resource shape — context is always returned by Graph)', async () => {
+    const logger = createLoggerFake();
+    const normalSingle = { '@odata.context': 'https://graph.microsoft.com/v1.0/$metadata#users/$entity', id: 'u1', displayName: 'Alice' };
+    const out = await captureStream('stdout', () => render(normalSingle, logger, 'json'));
     const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
     expect(parsed.selectHint).toBeUndefined();
   });
