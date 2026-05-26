@@ -151,10 +151,56 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     hint: "The cached token doesn't include the required scope. Run `ask-marcel scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling (see memory.decision_teams_token_scopes) so missing scopes can't be added without a different Azure registration.",
   },
   // ─── Graph: generic access denied / forbidden ────────────────────────────
+  // v1.4.0 fresh-pass #5 (round 2): user reported `ErrorAccessDenied` as a
+  // bare-envelope case. Add it to the same rule — semantically identical.
   {
     source: 'graph',
-    matchCode: (c) => c === 'accessDenied' || c === 'Forbidden' || c === 'AccessDenied',
-    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel login` to refresh.",
+    matchCode: (c) => c === 'accessDenied' || c === 'Forbidden' || c === 'AccessDenied' || c === 'ErrorAccessDenied',
+    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel login` to refresh. Also run `ask-marcel scopes-check` to confirm the cached token actually includes the scope this endpoint needs.",
+  },
+  // ─── Graph: unknown $select / $orderby field (RequestBroker--ParseUri) ───
+  // v1.4.0 fresh-pass #5 (round 2): pattern-matched on errorCode because the
+  // RequestBroker-- prefix is Graph's structural OData parser signature —
+  // every unknown-field rejection lands here regardless of message wording.
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'RequestBroker--ParseUri',
+    hint: 'OData parser rejected the URL — usually because a field name passed to `--select` or `--orderby` (or referenced in `--filter`) does not exist on this resource type. Look up the valid field names in `ask-marcel docs <command>` (the `responseShape` section); Graph silently DROPS unknown fields from `--select` but REJECTS them from `--orderby` and `--filter`.',
+  },
+  // ─── Graph: ErrorInvalidUser (bad UPN / object ID on shared-mailbox & friends) ─
+  // v1.4.0 fresh-pass #5 (round 2): /users/{upn-or-id} family. The bad
+  // identifier is usually a typo'd email or a guest-user upn that doesn't
+  // exist in this tenant.
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'ErrorInvalidUser' || c === 'Request_ResourceNotFound',
+    hint: 'User principal name or object ID not found in this tenant. Source a real one via `ask-marcel list-relevant-people --select id,userPrincipalName,displayName`, `ask-marcel get-current-user` (for the signed-in user), or `ask-marcel list-groups --select id,displayName` (when you wanted a group, not a user). Guest UPNs use the `_` form: `alice_contoso.com#EXT#@yourtenant.onmicrosoft.com`, not `alice@contoso.com`.',
+  },
+  // ─── Graph: ErrorInvalidParameter (Excel & calendar-view families) ───────
+  // v1.4.0 fresh-pass #5 (round 2): two rules — the specific calendar
+  // date-inversion message wins first (pure message-pattern, no code-match
+  // so it doesn't gate on the code label); the generic `ErrorInvalidParameter`
+  // code rule catches the rest. `ruleMatches` is OR-semantic — keeping the
+  // specific rule message-only avoids it firing the date-inversion hint on
+  // every ErrorInvalidParameter case.
+  {
+    source: 'graph',
+    matchMessage: (m) => /StartDateTime should be earlier|StartDateTime.*EndDateTime|EndDateTime.*Start/i.test(m),
+    hint: 'Calendar window is inverted: `--start-date-time` must be earlier than (or equal to) `--end-date-time`. The CLI accepts relative shapes — for "the next 7 days" use `--start-date-time today --end-date-time +7d`; for "the last 7 days" use `--start-date-time 7d --end-date-time now`. Swap the values if you typed them in the wrong order.',
+  },
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'ErrorInvalidParameter',
+    hint: 'An input parameter to this endpoint is invalid. Re-read `ask-marcel <command> --help` for the exact value shapes (calendar windows want ISO-8601 or relative dates; Excel ranges want A1-style addresses; user/group references want GUIDs or UPNs). The Graph error message names the offending parameter — read past the `ErrorInvalidParameter:` prefix for the specifics.',
+  },
+  // ─── Graph: invalidArgument (Excel range malformed is the canonical case) ─
+  // v1.4.0 fresh-pass #5 (round 2): /workbook/range, /workbook/tables/...,
+  // and a few /me/calendar paths emit `invalidArgument` for parameter shape
+  // failures. The Excel-range case is the high-frequency one an LLM hits.
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'invalidArgument',
+    hint: 'A request argument has the wrong shape. The most common case is an Excel `--address` that is not A1-style — valid forms are `A1`, `A1:C5`, `Sheet1!A1:C5`, or a defined-name from `ask-marcel list-excel-defined-names`. For other endpoints, the Graph message text names the offending parameter — read past the `invalidArgument:` prefix for the specifics.',
   },
   // ─── Graph: auth token expired ───────────────────────────────────────────
   {
@@ -184,11 +230,14 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     hint: 'The `--orderby` column is not a valid sort key on this resource. Run `ask-marcel docs <command>` and use a column that appears in `responseShape`. Common gotchas: `subject` and `body` are not sortable on `message`; `displayName` is rarely sortable on `chat`. Stick to id/dateTime/numeric fields.',
   },
   // ─── Graph: $filter parse error / OData quoting ──────────────────────────
-  // Covers `The expression '...' is not valid` and similar OData parse failures.
+  // v1.4.0 fresh-pass #5 (round 2): broadened the regex to catch the spaced
+  // form `Invalid filter clause: Syntax error at position N` (the
+  // RequestBroker emits this on bare `iswhatever 12` etc.) on top of the
+  // older `The expression '...' is not valid` shape.
   {
     source: 'graph',
-    matchMessage: (m) => /expression\s+'.+'\s+is not valid|InvalidFilterClause|filter expression must be/i.test(m),
-    hint: "The `--filter` value is not valid OData. Quoting rules: string literals MUST use single quotes (`subject eq 'invoice'`), NOT double quotes. Embed a single quote by doubling it (`O''Brien`). Booleans/numbers/dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`).",
+    matchMessage: (m) => /expression\s+'.+'\s+is not valid|invalid\s*filter\s*clause|filter expression must be|Syntax error at position/i.test(m),
+    hint: "The `--filter` value is not valid OData. Quoting rules: string literals MUST use single quotes (`subject eq 'invoice'`), NOT double quotes. Embed a single quote by doubling it (`O''Brien`). Booleans/numbers/dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Operator names are `eq ne gt ge lt le and or not contains startswith endswith` — there is no `iswhatever` / `isin` / `like`.",
   },
   // ─── Graph: calendarView date inversion ──────────────────────────────────
   {

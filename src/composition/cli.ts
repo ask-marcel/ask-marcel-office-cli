@@ -1,6 +1,7 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
-import type { GraphClient } from '../infra/graph-client.ts';
+import type { GraphClient, GraphError } from '../infra/graph-client.ts';
+import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
@@ -36,9 +37,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return raw === 'json' ? 'json' : 'text';
   };
   const renderOut = (data: unknown): void => render(data, logger, getFormat());
-  const fail = (message: string, code?: string): void => {
-    renderError(message, getFormat(), code);
+  const fail = (message: string, code?: string, source?: ErrorSource): void => {
+    renderError(message, getFormat(), code, source);
     deps.onCommandError?.();
+  };
+
+  // v1.4.0 fresh-pass #5 (round 2): map the discriminated GraphError type to
+  // the presenter's ErrorSource. `api_error` and `network_error` both surface
+  // Graph endpoint failures (the latter is "couldn't even reach Graph"), so
+  // both classify as `graph`. `validation_error` is Zod / use-case-side
+  // schema rejection. `auth_failed` is a CLI-side concern (the remedy is
+  // `ask-marcel login`, not a Graph operation). When the hint table matches
+  // a more specific source (e.g. `substrate` for chatsvcagg-coded errors),
+  // the hint's source wins — this explicit source is just the fallback so
+  // bare envelopes still carry the classifier.
+  const sourceFromGraphError = (error: GraphError): ErrorSource => {
+    if (error.type === 'validation_error') return 'validation';
+    if (error.type === 'auth_failed') return 'cli';
+    return 'graph';
   };
 
   // Audit round-8 Wave E2: manifest-driven --output-path-supporting list.
@@ -98,7 +114,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // surface `hint:` / `source:` for the CLI-input failure cases too. Prior
     // behaviour dropped the code, leaving Commander errors as bare
     // `{ok:false,error}` envelopes — inconsistent with the Graph error shape.
-    fail(stripped, err.code);
+    // v1.4.0 fresh-pass #5 (round 2): also stamp `source: 'cli'` explicitly
+    // so the envelope shape stays stable even if a future Commander error
+    // code variant doesn't have a matching rule yet.
+    fail(stripped, err.code, 'cli');
     throw err;
   });
 
@@ -456,7 +475,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
           for (const [canonical, alias] of Object.entries(aliasUsedFor)) {
             message = message.replaceAll(`--${canonical}`, `--${alias}`);
           }
-          fail(message, result.error.code);
+          fail(message, result.error.code, sourceFromGraphError(result.error));
           return;
         }
         const outputPath = program.opts<{ outputPath?: string }>().outputPath;

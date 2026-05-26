@@ -147,7 +147,7 @@ describe('buildCli command surface', () => {
     expect(out).not.toContain('"elevated"');
   });
 
-  it('renders a Graph error message as a plain "error: <message>" line by default (no JSON envelope)', async () => {
+  it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — v1.4.0 fresh-pass #5 round 2 — stamps the source even when the hint table did not match)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
       auth: okAuth(),
@@ -157,7 +157,11 @@ describe('buildCli command surface', () => {
       fs: createFileSystemFake(),
     });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
-    expect(out).toBe('error: not found\n');
+    // The api_error → 'graph' mapping in `sourceFromGraphError` makes `source`
+    // present on every Graph-originating failure, hint-matched or not. The
+    // 404 message "not found" has no rule match → no `hint:` line → but the
+    // `source: graph` line IS stamped from the explicit fallback.
+    expect(out).toBe('error: not found\nsource: graph\n');
   });
 
   it('renders an Authentication cancelled error when the user closes the browser', async () => {

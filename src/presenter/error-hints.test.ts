@@ -68,6 +68,67 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
     expect(result?.hint).toContain('tenant');
   });
 
+  // v1.4.0 fresh-pass #5 (round 2) — the 5 bare-envelope error codes the
+  // user reported in side-by-side testing. Each one used to ship with
+  // `{ok, error, errorCode}` and no `hint`/`source`; the rule table now
+  // covers them so an LLM gets the same envelope shape across every Graph
+  // failure.
+  it('maps `RequestBroker--ParseUri` (unknown `--select` / `--orderby` field) to a hint pointing at the responseShape lookup', () => {
+    const result = findErrorHint("RequestBroker--ParseUri: Could not find a property named 'garbage' on type 'microsoft.graph.message'.", 'RequestBroker--ParseUri');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('responseShape');
+    expect(result?.hint).toContain('--select');
+    expect(result?.hint).toContain('--orderby');
+  });
+
+  it('catches the spaced `Invalid filter clause: Syntax error at position N` shape (the RequestBroker variant of $filter parse failure)', () => {
+    const result = findErrorHint("BadRequest: Invalid filter clause: Syntax error at position 13 in 'iswhatever 12'.", 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--filter');
+    expect(result?.hint).toContain('single quotes');
+    // The new broader hint enumerates valid operators so an LLM that typed
+    // `iswhatever` learns the actual operator vocabulary.
+    expect(result?.hint).toContain('eq ne gt ge lt le');
+  });
+
+  it('maps `ErrorInvalidParameter` with the `StartDateTime should be earlier` date-inversion message to the calendar-window-swap hint', () => {
+    const result = findErrorHint('ErrorInvalidParameter: StartDateTime should be earlier or equal to EndDateTime.', 'ErrorInvalidParameter');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--start-date-time');
+    expect(result?.hint).toContain('--end-date-time');
+    expect(result?.hint).toContain('inverted');
+  });
+
+  it('maps bare `ErrorInvalidParameter` (no date-inversion message — falls through to the generic rule) to a per-endpoint "re-read --help" hint', () => {
+    const result = findErrorHint('ErrorInvalidParameter: The argument is invalid.', 'ErrorInvalidParameter');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('input parameter');
+    expect(result?.hint).toContain('ask-marcel <command> --help');
+  });
+
+  it('maps `invalidArgument` (Excel range malformed is the canonical case) to an A1-syntax explainer', () => {
+    const result = findErrorHint('invalidArgument: The argument is invalid or missing or has an incorrect format.', 'invalidArgument');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('A1-style');
+    expect(result?.hint).toContain('list-excel-defined-names');
+  });
+
+  it('maps `ErrorInvalidUser` (bad UPN or object ID on shared-mailbox / /users/ endpoints) to a sibling-lookup hint that names the right discovery commands', () => {
+    const result = findErrorHint("ErrorInvalidUser: The requested user 'nobody@example.com' is invalid.", 'ErrorInvalidUser');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('list-relevant-people');
+    expect(result?.hint).toContain('userPrincipalName');
+    // Guest-UPN shape is the high-frequency gotcha for cross-tenant lookups.
+    expect(result?.hint).toContain('#EXT#');
+  });
+
+  it('extends the existing `accessDenied` rule to also cover `ErrorAccessDenied` (Outlook / EWS spelling) so both share the same scopes-check + login hint', () => {
+    const result = findErrorHint('ErrorAccessDenied: Access is denied.', 'ErrorAccessDenied');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('scopes-check');
+    expect(result?.hint).toContain('ask-marcel login');
+  });
+
   it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — Audit Alex-session §8 follow-up', () => {
     const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
     expect(result?.source).toBe('graph');

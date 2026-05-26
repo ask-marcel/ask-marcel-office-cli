@@ -1,4 +1,5 @@
 import type { Logger } from '../use-cases/ports/logger.ts';
+import type { ErrorSource } from './error-hints.ts';
 import { findErrorHint } from './error-hints.ts';
 import { renderTextOutput } from './output-text.ts';
 
@@ -134,7 +135,7 @@ const render = (data: unknown, logger: Logger, format: OutputFormat): void => {
   else renderText(data);
 };
 
-const renderError = (message: string, format: OutputFormat, errorCode?: string): void => {
+const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource): void => {
   // Audit round-7 Wave G: `errorCode` is an additive field — old consumers
   // keying on `error: string` continue to work; new consumers can branch on
   // the structured code (`itemNotFound`, `InvalidIdMalformed`, `MissingScope`,
@@ -145,22 +146,34 @@ const renderError = (message: string, format: OutputFormat, errorCode?: string):
   // the central table in `error-hints.ts`. Surfaced in both formats so an
   // LLM in text mode no longer has to guess what `ErrorInvalidIdMalformed`
   // means.
+  //
+  // v1.4.0 fresh-pass #5 (round 2): asymmetry between hint-matched and
+  // bare-Graph errors was a real problem — an LLM that branched on
+  // `response.source` saw `{ok, error, errorCode}` for half its Graph
+  // failures and `{ok, error, errorCode, hint, source}` for the other half.
+  // The fix: `explicitSource` lets the call site (cli.ts action handler)
+  // stamp `source: 'graph'` from the `result.error.type` discriminator
+  // regardless of whether a hint rule matched. The hint's source (when
+  // matched) still wins because it's curated; the explicit source is the
+  // typed fallback. End-result envelope: `{ok, error, errorCode?, hint?,
+  // source?}` where only `hint` is conditional — `source` is always present
+  // when the caller knew the failure category.
   const hint = findErrorHint(message, errorCode);
+  const source = hint?.source ?? explicitSource;
   if (format === 'json') {
     const payload = {
       ok: false,
       error: message,
       ...(errorCode ? { errorCode } : {}),
-      ...(hint ? { hint: hint.hint, source: hint.source } : {}),
+      ...(hint ? { hint: hint.hint } : {}),
+      ...(source ? { source } : {}),
     };
     process.stdout.write(`${JSON.stringify(payload)}\n`);
     return;
   }
   const lines = [`error: ${message}`];
-  if (hint) {
-    lines.push(`hint: ${hint.hint}`);
-    lines.push(`source: ${hint.source}`);
-  }
+  if (hint) lines.push(`hint: ${hint.hint}`);
+  if (source) lines.push(`source: ${source}`);
   process.stdout.write(`${lines.join('\n')}\n`);
 };
 

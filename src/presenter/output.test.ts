@@ -98,11 +98,48 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.source).toBe('graph');
   });
 
-  it('omits hint/source from the JSON envelope when nothing in the hint table matches (preserves the historical shape for unknown errors)', async () => {
+  it('omits hint/source from the JSON envelope when nothing in the hint table matches AND no explicit source was supplied (preserves the historical 3-arg back-compat shape)', async () => {
     const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'json', 'WeirdNewCode'));
     const parsed = JSON.parse(out.trim()) as { ok: false; error: string; errorCode: string; hint?: string; source?: string };
     expect(parsed.hint).toBeUndefined();
     expect(parsed.source).toBeUndefined();
+  });
+
+  // v1.4.0 fresh-pass #5 (round 2) — envelope-shape stability fix. The user
+  // reported 5 bare-Graph error codes that lacked `source` even though every
+  // CLI-side validation error carries it. The fix: callers that know the
+  // failure category (cli.ts maps the GraphError discriminated-union type to
+  // an `ErrorSource`) pass it explicitly; the presenter stamps it even when
+  // no hint rule matched. End-result envelope is `{ok, error, errorCode?,
+  // hint?, source?}` where only `hint` is conditional.
+  it('emits `source` from the explicit 4th-arg even when no hint rule matched — closes the bare-Graph-error envelope asymmetry', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new Graph failure', 'json', 'WeirdNewCode', 'graph'));
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string; errorCode: string; hint?: string; source?: string };
+    expect(parsed.hint).toBeUndefined();
+    expect(parsed.source).toBe('graph');
+  });
+
+  it('hint-table source wins over the explicit 4th-arg when both are available (curated rule beats discriminator-derived fallback)', async () => {
+    // Caller asserts `source: 'graph'` but the rule table classifies
+    // `cli_reject_search_with_filter` as `cli` — the hint's source wins.
+    const out = await captureStream('stdout', () =>
+      renderError(
+        '--filter is incompatible with $search on /me/messages — Graph rejects the combination with `SearchWithFilter`.',
+        'json',
+        'cli_reject_search_with_filter',
+        'graph'
+      )
+    );
+    const parsed = JSON.parse(out.trim()) as { ok: false; source?: string };
+    expect(parsed.source).toBe('cli');
+  });
+
+  it('text-mode also stamps the explicit `source:` line when no hint matched (envelope symmetry across both formats)', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new Graph failure', 'text', 'WeirdNewCode', 'graph'));
+    const lines = out.trim().split('\n');
+    expect(lines[0]).toBe('error: Some weird new Graph failure');
+    expect(lines[1]).toBe('source: graph');
+    expect(lines.length).toBe(2);
   });
 
   it('appends `hint:` and `source:` lines to text-mode errors so an LLM matching on `error:` still works but ALSO gets the remedy', async () => {
@@ -113,7 +150,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(lines[2]).toBe('source: graph');
   });
 
-  it('text-mode errors keep the single-line shape when nothing matches the hint table (back-compat)', async () => {
+  it('text-mode errors keep the single-line shape when nothing matches the hint table AND no explicit source was supplied (back-compat for the 3-arg form)', async () => {
     const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'text', 'WeirdNewCode'));
     expect(out).toBe('error: Some weird new failure mode\n');
   });
