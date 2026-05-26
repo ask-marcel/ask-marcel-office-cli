@@ -129,6 +129,33 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
     expect(result?.hint).toContain('ask-marcel login');
   });
 
+  // v1.4.0 re-audit Nit 2 — three malformed-ID surfaces that fell
+  // through every existing rule and shipped bare envelopes. Now each
+  // points at the matching discovery command.
+  it('maps `Request_BadRequest: Invalid object identifier ...` (groups / directory family) to a list-groups + list-relevant-people discovery hint', () => {
+    const result = findErrorHint("Request_BadRequest: Invalid object identifier '12345-not-real'.", 'Request_BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('list-groups');
+    expect(result?.hint).toContain('list-relevant-people');
+    expect(result?.hint).toContain('GUID');
+  });
+
+  it('maps `BadRequest: channelId is not valid.` to a list-team-channels discovery hint that also mentions the upstream list-joined-teams call for the team-id', () => {
+    const result = findErrorHint('BadRequest: channelId is not valid.', 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('list-team-channels');
+    expect(result?.hint).toContain('list-joined-teams');
+  });
+
+  it('catches the bare `The requested item is not found.` message (Planner emits this with code:"" — the existing ResourceNotFound code-rule cannot match) and points at the Planner + To-Do discovery commands', () => {
+    // Planner emits this with code:"" so the GraphError carries no `code`
+    // field; the rule has to match by message-pattern alone.
+    const result = findErrorHint('The requested item is not found.', undefined);
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('list-planner-plans');
+    expect(result?.hint).toContain('list-todo-task-lists');
+  });
+
   it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — Audit Alex-session §8 follow-up', () => {
     const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
     expect(result?.source).toBe('graph');
@@ -215,6 +242,60 @@ describe('findErrorHint — CLI-side rewrites and rejections', () => {
     expect(result?.source).toBe('cli');
     expect(result?.hint).toContain('ask-marcel resolve-mail-link');
     expect(result?.hint).toContain('messageId');
+  });
+
+  // v1.4.0 re-audit Nit 1 — 7 new cross-pointer hints close the
+  // mail/calendar/drive-share/teams matrix. The audit flagged 5 gaps
+  // explicitly; resolve-drive-share-link + outlook split into mail/calendar
+  // for tighter pointing, and resolve-teams-link added the symmetric
+  // outlook detections for parity.
+  it('maps `cli_reject_teams_link_on_mail_resolver` to a hint pointing at `resolve-teams-link`', () => {
+    const result = findErrorHint('--url looks like a Teams message link, not an Outlook mail message link.', 'cli_reject_teams_link_on_mail_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-teams-link');
+    expect(result?.hint).toContain('chatId');
+  });
+
+  it('maps `cli_reject_mail_link_on_drive_share_resolver` to a hint pointing at `resolve-mail-link`', () => {
+    const result = findErrorHint('--url looks like an Outlook mail message link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_mail_link_on_drive_share_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-mail-link');
+    expect(result?.hint).toContain('messageId');
+  });
+
+  it('maps `cli_reject_calendar_link_on_drive_share_resolver` to a hint pointing at `resolve-calendar-link`', () => {
+    const result = findErrorHint('--url looks like an Outlook calendar item link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_calendar_link_on_drive_share_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-calendar-link');
+    expect(result?.hint).toContain('eventId');
+  });
+
+  it('maps `cli_reject_teams_link_on_drive_share_resolver` to a hint pointing at `resolve-teams-link`', () => {
+    const result = findErrorHint('--url looks like a Teams message link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_teams_link_on_drive_share_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-teams-link');
+    expect(result?.hint).toContain('chatId');
+  });
+
+  it('maps `cli_reject_drive_share_link_on_teams_resolver` to a hint pointing at `resolve-drive-share-link` and mentioning the /shares/{token}/driveItem path', () => {
+    const result = findErrorHint('--url looks like a OneDrive / SharePoint sharing URL, not a Teams message link.', 'cli_reject_drive_share_link_on_teams_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-drive-share-link');
+    expect(result?.hint).toContain('graphPath');
+  });
+
+  it('maps `cli_reject_mail_link_on_teams_resolver` to a hint pointing at `resolve-mail-link`', () => {
+    const result = findErrorHint('--url looks like an Outlook mail message link, not a Teams message link.', 'cli_reject_mail_link_on_teams_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-mail-link');
+    expect(result?.hint).toContain('messageId');
+  });
+
+  it('maps `cli_reject_calendar_link_on_teams_resolver` to a hint pointing at `resolve-calendar-link`', () => {
+    const result = findErrorHint('--url looks like an Outlook calendar item link, not a Teams message link.', 'cli_reject_calendar_link_on_teams_resolver');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('ask-marcel resolve-calendar-link');
+    expect(result?.hint).toContain('eventId');
   });
 });
 

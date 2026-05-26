@@ -67,6 +67,46 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     matchCode: (c) => c === 'cli_reject_mail_link_on_calendar_resolver',
     hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a calendar item link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
   },
+  // v1.4.0 re-audit Nit 1 — cross-resolver pointer completeness. Five
+  // gaps in the mail/calendar/drive-share/teams pointer matrix close with
+  // the four new `cli_reject_*` codes below, each pointing at the
+  // correct sibling resolver in the same style as the existing
+  // mail↔calendar pair.
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_teams_link_on_mail_resolver',
+    hint: 'Re-run with `ask-marcel resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not an Outlook mail message link. The returned `chatId` + `messageId` feed `get-teams-chat-message` or `list-teams-chat-history`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_mail_link_on_drive_share_resolver',
+    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a OneDrive / SharePoint sharing URL. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_calendar_link_on_drive_share_resolver',
+    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a OneDrive / SharePoint sharing URL. The returned `eventId` feeds `get-calendar-event`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_teams_link_on_drive_share_resolver',
+    hint: 'Re-run with `ask-marcel resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not a OneDrive / SharePoint sharing URL. The returned `chatId` + `messageId` feed `get-teams-chat-message`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_drive_share_link_on_teams_resolver',
+    hint: 'Re-run with `ask-marcel resolve-drive-share-link --url <same-url>` — the URL is a OneDrive / SharePoint share link (`*.sharepoint.com` or `1drv.ms`), not a Teams message link. The returned `graphPath` (`/shares/{token}/driveItem`) feeds `get-drive-item`, `download-onedrive-file-content`, or the conversion siblings.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_mail_link_on_teams_resolver',
+    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a Teams message link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+  },
+  {
+    source: 'cli',
+    matchCode: (c) => c === 'cli_reject_calendar_link_on_teams_resolver',
+    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a Teams message link. The returned `eventId` feeds `get-calendar-event`.',
+  },
   {
     source: 'cli',
     matchCode: (c) => c.startsWith('cli_rewrite_'),
@@ -140,6 +180,34 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     source: 'graph',
     matchMessage: (m) => /needs to be a valid GUID/i.test(m),
     hint: 'The ID needs to be a 36-character GUID (e.g. `19a8c4f0-1234-5678-90ab-cdef01234567`), not a short alias or display name. Source it from a sibling `list-*` command: `list-joined-teams` for team IDs, `list-groups` for group IDs, `list-relevant-people` / `get-current-user` for user IDs. Pass the `id` field verbatim, never the `displayName`.',
+  },
+  // v1.4.0 re-audit Nit 2 — three malformed-ID surfaces that don't trip
+  // the `needs to be a valid GUID` predicate but emit equally opaque
+  // bare envelopes. One rule per family, each pointing at the matching
+  // discovery command.
+  //
+  // 1. Groups directory: `Request_BadRequest` + "Invalid object identifier"
+  //    (`get-group --group-id 12345-not-real` etc.)
+  {
+    source: 'graph',
+    matchMessage: (m) => /Invalid object identifier/i.test(m),
+    hint: 'The directory object ID is malformed. For groups, source a valid one via `ask-marcel list-groups --select id,displayName`. For users, via `ask-marcel list-relevant-people --select id,userPrincipalName,displayName` or `ask-marcel get-current-user` (for the signed-in user). IDs are 36-character GUIDs (e.g. `19a8c4f0-1234-5678-90ab-cdef01234567`), not display names.',
+  },
+  // 2. Teams channels: `BadRequest: channelId is not valid.`
+  //    (`get-team-channel --channel-id x` etc.)
+  {
+    source: 'graph',
+    matchMessage: (m) => /channelId is not valid|invalid channel id/i.test(m),
+    hint: 'The Teams channel ID is not valid. Source it via `ask-marcel list-team-channels --team-id <team-id>` and pass the `id` field of the channel verbatim — Graph rejects display names and short aliases. The team ID itself comes from `ask-marcel list-joined-teams`.',
+  },
+  // 3. Planner / generic resource-not-found bare message: `The requested
+  //    item is not found.` Planner notably emits this with `code: ""` so
+  //    the existing `itemNotFound | ResourceNotFound` code-rule cannot
+  //    match — message-pattern fallback is the only path.
+  {
+    source: 'graph',
+    matchMessage: (m) => /requested item is not found/i.test(m),
+    hint: 'Resource missing — the ID may have been deleted, moved, or never existed in this tenant. For Planner: re-fetch via `list-planner-plans` (plans), `list-plan-buckets --planner-plan-id <id>` (buckets), or `list-planner-tasks` (tasks). For To-Do: `list-todo-task-lists` then `list-todo-tasks --todo-task-list-id <id>`. For Outlook mail / calendar / SharePoint: re-fetch via the relevant `list-*` command before retrying.',
   },
   // ─── Graph: scope missing (matched first so it wins over the generic ────
   // Forbidden / accessDenied rule below — Graph emits MissingScope as a

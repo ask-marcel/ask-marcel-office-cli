@@ -4055,6 +4055,51 @@ describe('resolve-teams-link parses copy-link URLs into structured ids', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.type).toBe('validation_error');
   });
+
+  // v1.4.0 re-audit Nit 1 — three cross-resolver pointers for the
+  // teams resolver. Drive-share covers both `*.sharepoint.com` and
+  // `1drv.ms` hosts (one detector handles both). Outlook URLs split
+  // into mail vs calendar for the tightest cross-pointer.
+  it('rejects a SharePoint share URL with a structured cli_reject_drive_share_link_on_teams_resolver code (Nit 1 cross-pointer)', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://contoso.sharepoint.com/:b:/s/team/EaBcDef123_xyz' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.code).toBe('cli_reject_drive_share_link_on_teams_resolver');
+      expect(r.error.message).toContain('OneDrive / SharePoint');
+    }
+  });
+
+  it('also rejects a 1drv.ms short-link URL with the same drive-share cross-pointer code (one detector covers both *.sharepoint.com and 1drv.ms)', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://1drv.ms/b/s!AbCdEfGh_xyz' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.code).toBe('cli_reject_drive_share_link_on_teams_resolver');
+    }
+  });
+
+  it('rejects an Outlook mail URL with a structured cli_reject_mail_link_on_teams_resolver code (Nit 1 cross-pointer; splits mail vs calendar)', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://outlook.office.com/mail/inbox/id/AAMkAGI2_mail_on_teams' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.code).toBe('cli_reject_mail_link_on_teams_resolver');
+    }
+  });
+
+  it('rejects an Outlook calendar URL with a structured cli_reject_calendar_link_on_teams_resolver code (Nit 1 cross-pointer)', async () => {
+    const cmd = cmdMap['resolve-teams-link'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url: 'https://outlook.office.com/calendar/item/AAMkAGI2_calendar_on_teams' });
+    expect(r.ok).toBe(false);
+    if (!r.ok && r.error.type === 'validation_error') {
+      expect(r.error.code).toBe('cli_reject_calendar_link_on_teams_resolver');
+    }
+  });
 });
 
 // Outlook web mail links → messageId. Mirrors resolve-teams-link's shape;
@@ -4122,6 +4167,17 @@ describe('resolve-mail-link parses Outlook web mail URLs into messageId', () => 
     expect(r.ok).toBe(false);
     expect(r.error?.message).toContain('not an Outlook mail link');
   });
+
+  // v1.4.0 re-audit Nit 1 — cross-resolver pointer for the teams case.
+  // A Teams /l/message link wrongly passed used to fall through to the
+  // generic "not an Outlook mail link" rejection; now emits a structured
+  // code the hint table maps to "Re-run with resolve-teams-link".
+  it('rejects a Teams `/l/message/...` URL with a structured cli_reject_teams_link_on_mail_resolver code (Nit 1 cross-pointer)', async () => {
+    const r = await exec('https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000000');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_teams_link_on_mail_resolver');
+    expect(r.error?.message).toContain('Teams message link');
+  });
 });
 
 // SharePoint / OneDrive sharing URLs → Graph share token (`u!<base64url>`).
@@ -4179,6 +4235,30 @@ describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{toke
     expect(token.slice(2)).not.toContain('+');
     expect(token.slice(2)).not.toContain('/');
     expect(token.slice(2)).not.toContain('=');
+  });
+
+  // v1.4.0 re-audit Nit 1 — three cross-resolver pointers for the
+  // drive-share resolver. Outlook URLs split into mail vs calendar so
+  // the cross-pointer goes to the tightest sibling.
+  it('rejects an Outlook mail URL with a structured cli_reject_mail_link_on_drive_share_resolver code (Nit 1 cross-pointer)', async () => {
+    const r = await exec('https://outlook.office.com/mail/inbox/id/AAMkAGI2_mail_on_drive');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_mail_link_on_drive_share_resolver');
+    expect(r.error?.message).toContain('Outlook mail');
+  });
+
+  it('rejects an Outlook calendar URL with a structured cli_reject_calendar_link_on_drive_share_resolver code (Nit 1 cross-pointer; splits mail vs calendar so the LLM gets the tightest sibling)', async () => {
+    const r = await exec('https://outlook.office.com/calendar/item/AAMkAGI2_calendar_on_drive');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_calendar_link_on_drive_share_resolver');
+    expect(r.error?.message).toContain('Outlook calendar');
+  });
+
+  it('rejects a Teams `/l/message/...` URL with a structured cli_reject_teams_link_on_drive_share_resolver code (Nit 1 cross-pointer)', async () => {
+    const r = await exec('https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/1700000000000');
+    expect(r.ok).toBe(false);
+    expect(r.error?.code).toBe('cli_reject_teams_link_on_drive_share_resolver');
+    expect(r.error?.message).toContain('Teams message link');
   });
 });
 

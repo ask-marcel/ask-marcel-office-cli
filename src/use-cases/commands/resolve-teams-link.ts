@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { detectSiblingResolver } from './link-shape.ts';
 
 // Deep-link parser for Microsoft Teams message links of the shape:
 //   https://teams.microsoft.com/l/message/<url-encoded-chat-id>/<message-id>?<query>
@@ -58,6 +59,33 @@ const parse = (raw: string): Resolved | null => {
 const execute: Command['execute'] = async (_graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  // v1.4.0 re-audit Nit 1 (drive-share + sharepoint + outlook gaps): a
+  // OneDrive / SharePoint share URL or an Outlook web URL wrongly passed
+  // to resolve-teams-link used to fall through to the generic "not a
+  // Teams message link" rejection. Detect them early and emit a
+  // cross-pointer so the LLM lands on the right sibling resolver.
+  const sibling = detectSiblingResolver(parsed.data.url);
+  if (sibling === 'drive-share') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like a OneDrive / SharePoint sharing URL, not a Teams message link.',
+      code: 'cli_reject_drive_share_link_on_teams_resolver',
+    });
+  }
+  if (sibling === 'mail') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like an Outlook mail message link, not a Teams message link.',
+      code: 'cli_reject_mail_link_on_teams_resolver',
+    });
+  }
+  if (sibling === 'calendar') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like an Outlook calendar item link, not a Teams message link.',
+      code: 'cli_reject_calendar_link_on_teams_resolver',
+    });
+  }
   const resolved = parse(parsed.data.url);
   if (resolved === null) {
     return err({

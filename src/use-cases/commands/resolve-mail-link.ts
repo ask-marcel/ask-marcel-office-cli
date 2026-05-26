@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { detectSiblingResolver } from './link-shape.ts';
 
 // Deep-link parser for Microsoft Outlook web links. Outlook emits several
 // URL shapes for a single message depending on which client surfaced the
@@ -30,7 +31,7 @@ type Resolved = {
   readonly messageId: string;
 };
 
-type ParseOutcome = { readonly kind: 'ok'; readonly value: Resolved } | { readonly kind: 'calendar' } | { readonly kind: 'unknown' };
+type ParseOutcome = { readonly kind: 'ok'; readonly value: Resolved } | { readonly kind: 'calendar' } | { readonly kind: 'teams' } | { readonly kind: 'unknown' };
 
 // Extract the ID from either an OWA-style query (`?itemid=` / `?ItemID=`)
 // or a modern path-style (`/mail/.../id/<id>` or `/mail/<id>`).
@@ -71,6 +72,12 @@ const parse = (raw: string): ParseOutcome => {
   // validated the URL format before this parser runs, so `new URL(raw)`
   // cannot throw. Also keeps the file try/catch-free per atelier rule
   // (try/catch is restricted to `src/infra/**`).
+  //
+  // v1.4.0 re-audit Nit 1 (teams gap): a Teams `/l/message/...` link
+  // wrongly passed to resolve-mail-link used to fall through to the
+  // generic "not an Outlook mail link" rejection. Detect it early and
+  // emit a cross-pointer so the LLM lands on `resolve-teams-link`.
+  if (detectSiblingResolver(raw) === 'teams') return { kind: 'teams' };
   const url = new URL(raw);
   if (!OUTLOOK_HOSTS.includes(url.hostname)) return { kind: 'unknown' };
   if (isCalendarLink(url)) return { kind: 'calendar' };
@@ -94,6 +101,13 @@ const execute: Command['execute'] = async (_graph, params) => {
       type: 'validation_error',
       message: '--url looks like an Outlook calendar link, not a mail message link.',
       code: 'cli_reject_calendar_link_on_mail_resolver',
+    });
+  }
+  if (outcome.kind === 'teams') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like a Teams message link, not an Outlook mail message link.',
+      code: 'cli_reject_teams_link_on_mail_resolver',
     });
   }
   return err({

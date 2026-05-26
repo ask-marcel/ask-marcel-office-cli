@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { detectSiblingResolver } from './link-shape.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 
 // Encoder for Microsoft Graph's `/shares/{token}` resolver. Takes any
@@ -55,6 +56,33 @@ const parse = (raw: string): Resolved | null => {
 const execute: Command['execute'] = async (_graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  // v1.4.0 re-audit Nit 1 (outlook + teams gaps): an Outlook web URL or
+  // a Teams `/l/message/...` link wrongly passed to resolve-drive-share-link
+  // used to fall through to the generic "not a recognised sharing URL"
+  // rejection. Detect them early and emit a cross-pointer so the LLM
+  // lands on the right sibling resolver.
+  const sibling = detectSiblingResolver(parsed.data.url);
+  if (sibling === 'mail') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like an Outlook mail message link, not a OneDrive / SharePoint sharing URL.',
+      code: 'cli_reject_mail_link_on_drive_share_resolver',
+    });
+  }
+  if (sibling === 'calendar') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like an Outlook calendar item link, not a OneDrive / SharePoint sharing URL.',
+      code: 'cli_reject_calendar_link_on_drive_share_resolver',
+    });
+  }
+  if (sibling === 'teams') {
+    return err({
+      type: 'validation_error',
+      message: '--url looks like a Teams message link, not a OneDrive / SharePoint sharing URL.',
+      code: 'cli_reject_teams_link_on_drive_share_resolver',
+    });
+  }
   const resolved = parse(parsed.data.url);
   if (resolved === null) {
     return err({
