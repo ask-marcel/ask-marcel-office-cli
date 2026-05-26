@@ -4061,11 +4061,11 @@ describe('resolve-teams-link parses copy-link URLs into structured ids', () => {
 // rejects calendar URLs with a pointer to resolve-calendar-link so an LLM
 // never silently treats a calendar invite as a mail message.
 describe('resolve-mail-link parses Outlook web mail URLs into messageId', () => {
-  const exec = async (url: string): Promise<{ ok: boolean; value?: { messageId: string }; error?: { type: string; message: string; code?: string } }> => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { messageId: string }; error?: GraphError }> => {
     const cmd = cmdMap['resolve-mail-link'];
     if (!cmd) throw new Error('command not found');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
-    return r.ok ? { ok: true, value: r.value as { messageId: string } } : { ok: false, error: r.error as { type: string; message: string; code?: string } };
+    return r.ok ? { ok: true, value: r.value as { messageId: string } } : { ok: false, error: r.error };
   };
 
   it('extracts messageId from the modern path-style URL (`/mail/<folder>/id/<id>`)', async () => {
@@ -4128,13 +4128,11 @@ describe('resolve-mail-link parses Outlook web mail URLs into messageId', () => 
 // Pure encoding via the existing `buildShareToken` helper; the test only
 // needs to verify the round-trip + the accepted-host gate.
 describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{token}', () => {
-  const exec = async (url: string): Promise<{ ok: boolean; value?: { shareToken: string; graphPath: string; originalUrl: string }; error?: { type: string; message: string } }> => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { shareToken: string; graphPath: string; originalUrl: string }; error?: GraphError }> => {
     const cmd = cmdMap['resolve-drive-share-link'];
     if (!cmd) throw new Error('command not found');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
-    return r.ok
-      ? { ok: true, value: r.value as { shareToken: string; graphPath: string; originalUrl: string } }
-      : { ok: false, error: r.error as { type: string; message: string } };
+    return r.ok ? { ok: true, value: r.value as { shareToken: string; graphPath: string; originalUrl: string } } : { ok: false, error: r.error };
   };
 
   it('encodes a tenant SharePoint share URL as `u!<base64url>` and emits the `/shares/{token}/driveItem` Graph path ready for the next call', async () => {
@@ -4187,11 +4185,11 @@ describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{toke
 // Outlook calendar item URLs → eventId. Mirrors resolve-mail-link's shape
 // inversely — rejects mail URLs with a pointer to resolve-mail-link.
 describe('resolve-calendar-link parses Outlook calendar item URLs into eventId', () => {
-  const exec = async (url: string): Promise<{ ok: boolean; value?: { eventId: string }; error?: { type: string; message: string; code?: string } }> => {
+  const exec = async (url: string): Promise<{ ok: boolean; value?: { eventId: string }; error?: GraphError }> => {
     const cmd = cmdMap['resolve-calendar-link'];
     if (!cmd) throw new Error('command not found');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
-    return r.ok ? { ok: true, value: r.value as { eventId: string } } : { ok: false, error: r.error as { type: string; message: string; code?: string } };
+    return r.ok ? { ok: true, value: r.value as { eventId: string } } : { ok: false, error: r.error };
   };
 
   it('extracts eventId from the modern path-style URL (`/calendar/item/<id>`)', async () => {

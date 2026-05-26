@@ -25,7 +25,7 @@ import { formatZodError } from './format-zod-error.ts';
 //                 messages, OR `--max-pages` cap is hit.
 const schema = z.object({
   chatId: z.string().min(1),
-  syncState: z.string().url().optional(),
+  syncState: z.url().optional(),
   pageSize: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')

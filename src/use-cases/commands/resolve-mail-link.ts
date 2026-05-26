@@ -21,7 +21,7 @@ import { formatZodError } from './format-zod-error.ts';
 // command rejects those with a pointer to `resolve-calendar-link` so the
 // LLM never silently treats a calendar invite as a mail message.
 const schema = z.object({
-  url: z.string().min(1).url(),
+  url: z.url(),
 });
 
 const OUTLOOK_HOSTS: ReadonlyArray<string> = ['outlook.office.com', 'outlook.office365.com', 'outlook.live.com'];

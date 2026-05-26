@@ -18,7 +18,7 @@ import { formatZodError } from './format-zod-error.ts';
 // OWA query host; this command rejects them with a pointer to
 // `resolve-mail-link` (mirror of `resolve-mail-link`'s calendar rejection).
 const schema = z.object({
-  url: z.string().min(1).url(),
+  url: z.url(),
 });
 
 const OUTLOOK_HOSTS: ReadonlyArray<string> = ['outlook.office.com', 'outlook.office365.com', 'outlook.live.com'];

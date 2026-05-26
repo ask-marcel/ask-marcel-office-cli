@@ -14,7 +14,7 @@ import { formatZodError } from './format-zod-error.ts';
 // Pure transformation — no HTTP. Pair with `get-teams-chat-message` to
 // fetch the message body once the link is resolved.
 const schema = z.object({
-  url: z.string().min(1).url(),
+  url: z.url(),
 });
 
 const PREFIX = 'https://teams.microsoft.com/l/message/';

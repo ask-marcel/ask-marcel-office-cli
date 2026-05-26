@@ -22,7 +22,7 @@ import { buildShareToken } from './sharepoint-link-extractor.ts';
 // convert-mail-attachment-to-markdown, convert-mail-attachment-to-pdf) also
 // use it. Don't inline-duplicate it here.
 const schema = z.object({
-  url: z.string().min(1).url(),
+  url: z.url(),
 });
 
 const ACCEPTED_HOST_PATTERNS: ReadonlyArray<RegExp> = [

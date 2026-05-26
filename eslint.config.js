@@ -101,9 +101,24 @@ export default [
       // - `null-dereference`: TypeScript itself enforces strict null checks;
       //   SonarJS duplicates and routinely misfires (e.g., on `Object.keys()`
       //   loop variables, `String.prototype.split` results, regex matches).
+      // - `different-types-comparison`: misfires whenever runtime-defensive
+      //   `=== undefined` / `!== undefined` checks guard array index
+      //   accesses or `Record<K, V>` lookups. tsconfig deliberately leaves
+      //   `noUncheckedIndexedAccess: false` (the project predates that flag
+      //   and turning it on would cascade dozens of new errors); the
+      //   defensive runtime checks are still load-bearing — `parts[0]` IS
+      //   undefined at runtime when the input doesn't split into 3 chunks,
+      //   even though TS types it as `number`. SonarJS uses TS's view and
+      //   thinks the check is dead.
+      // - `argument-type`: misfires on `Array.prototype.includes(s)` when
+      //   the array element type is narrower than `string` but
+      //   `Object.keys()`-style inference erases the narrowing back to
+      //   `string`. Same root cause — TS / SonarJS type-view mismatch.
       'sonarjs/no-useless-intersection': 'off',
       'sonarjs/function-return-type': 'off',
       'sonarjs/null-dereference': 'off',
+      'sonarjs/different-types-comparison': 'off',
+      'sonarjs/argument-type': 'off',
     },
   },
   {
