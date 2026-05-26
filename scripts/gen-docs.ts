@@ -3,8 +3,12 @@
  * Documentation generator.
  *
  * Walks the `commands` registry, builds the JSON manifest at
- * `docs/commands.json`, and rewrites the per-category tables inside the
- * README between the AUTO-GENERATED-COMMANDS:BEGIN/END markers.
+ * `docs/commands.json`, and rewrites the per-category tables inside
+ * `docs/COMMANDS.md` between the AUTO-GENERATED-COMMANDS:BEGIN/END markers.
+ *
+ * Pre-1.4.0 the auto-generated block lived inside README.md; the marketing
+ * pass split docs out (README is the landing page, the deep tables moved
+ * to docs/COMMANDS.md) so the README would stop ballooning past 500 lines.
  *
  * Run via `bun run docs:gen`. The build pipeline runs this BEFORE
  * `bun build` so `dist/commands.json` is always up-to-date.
@@ -15,10 +19,10 @@ import { commands } from '../src/use-cases/commands/index.ts';
 import type { CommandManifest, CommandManifestEntry } from '../src/use-cases/commands/docs-render.ts';
 import { renderReadmeTables } from '../src/use-cases/commands/docs-render.ts';
 
-const README_PATH = 'README.md';
+const COMMANDS_DOC_PATH = 'docs/COMMANDS.md';
 const MANIFEST_PATH = 'docs/commands.json';
-const README_BEGIN = '<!-- AUTO-GENERATED-COMMANDS:BEGIN -->';
-const README_END = '<!-- AUTO-GENERATED-COMMANDS:END -->';
+const COMMANDS_DOC_BEGIN = '<!-- AUTO-GENERATED-COMMANDS:BEGIN -->';
+const COMMANDS_DOC_END = '<!-- AUTO-GENERATED-COMMANDS:END -->';
 
 const buildManifest = (): CommandManifest => {
   const entries: CommandManifestEntry[] = [];
@@ -53,31 +57,31 @@ const writeManifest = async (manifest: CommandManifest): Promise<void> => {
   process.stderr.write(`gen-docs: wrote ${MANIFEST_PATH} (${manifest.commands.length} commands)\n`);
 };
 
-const rewriteReadme = async (manifest: CommandManifest): Promise<void> => {
-  const file = Bun.file(README_PATH);
+const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
+  const file = Bun.file(COMMANDS_DOC_PATH);
   if (!(await file.exists())) {
-    process.stderr.write(`gen-docs: ${README_PATH} not found — skipping README rewrite\n`);
+    process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} not found — skipping rewrite\n`);
     return;
   }
   const text = await file.text();
-  const begin = text.indexOf(README_BEGIN);
-  const end = text.indexOf(README_END);
+  const begin = text.indexOf(COMMANDS_DOC_BEGIN);
+  const end = text.indexOf(COMMANDS_DOC_END);
   if (begin === -1 || end === -1 || end < begin) {
-    process.stderr.write(`gen-docs: README markers not found (${README_BEGIN} / ${README_END}) — skipping README rewrite\n`);
+    process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} markers not found (${COMMANDS_DOC_BEGIN} / ${COMMANDS_DOC_END}) — skipping rewrite\n`);
     return;
   }
-  const before = text.slice(0, begin + README_BEGIN.length);
+  const before = text.slice(0, begin + COMMANDS_DOC_BEGIN.length);
   const after = text.slice(end);
   const generated = `\n\n${renderReadmeTables(manifest)}\n\n`;
   const next = `${before}${generated}${after}`;
   if (next === text) {
-    process.stderr.write(`gen-docs: README already up-to-date\n`);
+    process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} already up-to-date\n`);
     return;
   }
-  await Bun.write(README_PATH, next);
-  process.stderr.write(`gen-docs: rewrote ${README_PATH} command tables\n`);
+  await Bun.write(COMMANDS_DOC_PATH, next);
+  process.stderr.write(`gen-docs: rewrote ${COMMANDS_DOC_PATH} command tables\n`);
 };
 
 const manifest = buildManifest();
 await writeManifest(manifest);
-await rewriteReadme(manifest);
+await rewriteCommandsDoc(manifest);
