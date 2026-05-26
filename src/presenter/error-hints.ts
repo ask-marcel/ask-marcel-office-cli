@@ -126,8 +126,20 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   },
   {
     source: 'graph',
-    matchCode: (c) => c === 'ErrorItemNotFound' || c === 'itemNotFound' || c === 'ResourceNotFound',
+    // Capital `ItemNotFound` (no Error prefix) is the shape /teams/, /groups/,
+    // and /users/ emit; the other variants come from /mailFolders/, /events/,
+    // and the SharePoint family. All share the same remedy.
+    matchCode: (c) => c === 'ErrorItemNotFound' || c === 'itemNotFound' || c === 'ItemNotFound' || c === 'ResourceNotFound',
     hint: 'The ID is well-formed but the resource is missing — it may have been deleted, moved, or never existed in this tenant. Re-fetch via the relevant `list-*` command before retrying.',
+  },
+  // v1.4.0 audit #8: Graph emits `BadRequest: <fooId> needs to be a valid
+  // GUID.` for every /teams/, /groups/, /users/ malformed-ID case. Pattern-
+  // match on the "needs to be a valid GUID" substring so a single rule
+  // covers the whole family.
+  {
+    source: 'graph',
+    matchMessage: (m) => /needs to be a valid GUID/i.test(m),
+    hint: 'The ID needs to be a 36-character GUID (e.g. `19a8c4f0-1234-5678-90ab-cdef01234567`), not a short alias or display name. Source it from a sibling `list-*` command: `list-joined-teams` for team IDs, `list-groups` for group IDs, `list-relevant-people` / `get-current-user` for user IDs. Pass the `id` field verbatim, never the `displayName`.',
   },
   // ─── Graph: scope missing (matched first so it wins over the generic ────
   // Forbidden / accessDenied rule below — Graph emits MissingScope as a

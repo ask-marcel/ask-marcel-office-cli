@@ -2174,6 +2174,60 @@ describe('commands', () => {
     expect(decoded).not.toMatch(/[,=]contentId([,&]|$)/);
   });
 
+  // Regression: the previous `attachmentMetaSchema.contentId` was
+  // `z.string().optional()` — accepts `string | undefined` but REJECTS
+  // `null`. Graph's polymorphic-cast response (microsoft.graph.fileAttachment/contentId)
+  // returns `contentId: null` on every non-fileAttachment entry, which
+  // failed the Zod schema and triggered the `malformed shape` note on every
+  // real call. Fixed by relaxing every optional field to `.nullish()`
+  // (= `.optional().nullable()`). The downstream `nonEmpty` predicate
+  // already handles `null` correctly — narrowed type accepts the slightly
+  // wider input.
+  it('convert-mail-to-markdown accepts the canonical Graph polymorphic-attachment shape where fileAttachment entries DO carry contentId and other subtypes return contentId: null (regression for the v1.2.0 cast-fix that introduced a Zod-shape false positive)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.includes('/attachments?')) {
+        return Response.json({
+          value: [
+            // fileAttachment — Graph populates contentId.
+            {
+              '@odata.type': '#microsoft.graph.fileAttachment',
+              id: 'a1',
+              name: 'report.pdf',
+              contentType: 'application/pdf',
+              size: 1024,
+              isInline: false,
+              contentId: null,
+            },
+            // itemAttachment — Graph returns null on the cast field.
+            {
+              '@odata.type': '#microsoft.graph.itemAttachment',
+              id: 'a2',
+              name: 'forwarded.msg',
+              contentType: 'application/octet-stream',
+              size: 4096,
+              isInline: false,
+              contentId: null,
+            },
+          ],
+        });
+      }
+      return Response.json({ subject: 's', body: { contentType: 'text', content: 'b' }, hasAttachments: true });
+    };
+    const cmd = cmdMap['convert-mail-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'mPolymorphic' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { text?: string; note?: string };
+    // The markdown body MUST NOT carry the 'malformed shape' note — null
+    // contentId is the canonical Graph shape, not a malformed response.
+    expect(v.note).toBeUndefined();
+    // The Attachments: section should list both files with their ids.
+    expect(v.text ?? '').toContain('report.pdf');
+    expect(v.text ?? '').toContain('forwarded.msg');
+  });
+
   it('convert-mail-to-markdown skips the **Subject:** line when the message has no subject field — kills the `if (m.subject !== undefined)` → `if (true)` mutant which would otherwise push `**Subject:** undefined`', async () => {
     const fetchFn = stagedFetch([
       {

@@ -18,6 +18,13 @@ type SuccessEnvelope = {
    * Audit Alex-session §3 fix.
    */
   readonly sizeHint?: string;
+  /**
+   * Surfaced when `data.value[]` carries N entries but each entry is empty
+   * after stripping `@odata.etag` — the telltale shape of a `--select` with
+   * unknown field names (Graph silently drops bogus fields). Distinct from
+   * `sizeHint` (which fires on byte count). Audit v1.4.0 #4 fix.
+   */
+  readonly selectHint?: string;
 };
 
 // 50 KB — roughly 12 500 tokens at the typical 4-chars/token ratio. The hint
@@ -28,7 +35,25 @@ const SIZE_HINT_THRESHOLD_BYTES = 50_000;
 const buildSizeHint = (bytes: number): string =>
   `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold). Trim with \`--select id,...\` if the command supports OData projection, lower \`--top\`, or use the global \`--output-path <file>\` flag to write bytes to disk instead of inlining them.`;
 
+const SELECT_HINT =
+  "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel docs <command>`.";
+
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// "Telltale bogus-select" detector: a `value[]` with N>0 entries where every
+// entry is a plain object whose only key (if any) is `@odata.etag`. A
+// legitimately-empty collection has `value: []` (N=0) and does NOT trigger.
+// A response with no `value[]` at all (single-resource GET) does NOT trigger.
+const looksLikeBogusSelectResponse = (data: unknown): boolean => {
+  if (!isPlainRecord(data)) return false;
+  const value = data['value'];
+  if (!Array.isArray(value) || value.length === 0) return false;
+  return value.every((entry) => {
+    if (!isPlainRecord(entry)) return false;
+    const meaningfulKeys = Object.keys(entry).filter((k) => k !== '@odata.etag');
+    return meaningfulKeys.length === 0;
+  });
+};
 
 // Pagination / cursor tokens that the presenter lifts to the top of the
 // envelope so an LLM consumer can write `if (resp.nextLink) ...` instead of
@@ -59,27 +84,32 @@ const wrap = (data: unknown): SuccessEnvelope => {
 
 const renderJson = (data: unknown): void => {
   const envelope = wrap(data);
-  const initial = JSON.stringify(envelope);
-  // Adding the hint AFTER the size check means a payload that's borderline
-  // doesn't get flagged just because the hint itself pushes it over 50 KB.
+  const selectHintField = looksLikeBogusSelectResponse(data) ? { selectHint: SELECT_HINT } : {};
+  const initial = JSON.stringify({ ...envelope, ...selectHintField });
+  // Adding the sizeHint AFTER the size check means a payload that's
+  // borderline doesn't get flagged just because the hint itself pushes it
+  // over 50 KB. (The selectHint is small enough not to need the same
+  // guard.)
   if (initial.length <= SIZE_HINT_THRESHOLD_BYTES) {
     process.stdout.write(`${initial}\n`);
     return;
   }
-  const withHint = JSON.stringify({ ...envelope, sizeHint: buildSizeHint(initial.length) });
-  process.stdout.write(`${withHint}\n`);
+  const withSizeHint = JSON.stringify({ ...envelope, ...selectHintField, sizeHint: buildSizeHint(initial.length) });
+  process.stdout.write(`${withSizeHint}\n`);
 };
 
 const renderText = (data: unknown): void => {
   const body = renderTextOutput(data);
+  const selectHintLine = looksLikeBogusSelectResponse(data) ? `selectHint: ${SELECT_HINT}\n` : '';
   if (body.length <= SIZE_HINT_THRESHOLD_BYTES) {
-    process.stdout.write(body);
+    process.stdout.write(`${selectHintLine}${body}`);
     return;
   }
   // Prepend (not append) so the LLM sees the hint before scrolling through
   // a 50 KB body — matches the `error:` / `hint:` / `source:` placement
-  // convention for the error path.
-  process.stdout.write(`sizeHint: ${buildSizeHint(body.length)}\n${body}`);
+  // convention for the error path. selectHint comes BEFORE sizeHint so the
+  // more-actionable signal (you have a typo) is at the very top.
+  process.stdout.write(`${selectHintLine}sizeHint: ${buildSizeHint(body.length)}\n${body}`);
 };
 
 const render = (data: unknown, logger: Logger, format: OutputFormat): void => {

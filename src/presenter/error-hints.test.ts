@@ -15,6 +15,28 @@ describe('findErrorHint — Graph error translation (Audit Alex-session §2)', (
     expect(result?.hint).toContain('well-formed but the resource is missing');
   });
 
+  // Regression for the v1.4.0 audit #8: `get-team --team-id <bad-guid>` and
+  // sibling /teams /groups /users endpoints emit `ItemNotFound` with a
+  // capital `I` (no `Error` prefix). The earlier rule only matched
+  // `ErrorItemNotFound | itemNotFound | ResourceNotFound`, so the capital-I
+  // variant slipped through with no hint.
+  it('also matches `ItemNotFound` (capital I, no `Error` prefix) — the shape /teams/, /groups/, /users/ endpoints actually emit', () => {
+    const result = findErrorHint("ItemNotFound: The requested resource doesn't exist.", 'ItemNotFound');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('well-formed but the resource is missing');
+  });
+
+  // Same audit: `BadRequest: teamId needs to be a valid GUID.` (and the
+  // sibling groupId / userId variants) had no hint. Pattern-match on the
+  // canonical "needs to be a valid GUID" substring — covers every /teams/,
+  // /groups/, /users/ malformed-ID case in one rule.
+  it('detects the "needs to be a valid GUID" message family (teamId / groupId / userId) and points at the right discovery commands', () => {
+    const result = findErrorHint('BadRequest: teamId needs to be a valid GUID.', 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('GUID');
+    expect(result?.hint).toContain('list-joined-teams');
+  });
+
   it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — Audit Alex-session §8 follow-up', () => {
     const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
     expect(result?.source).toBe('graph');

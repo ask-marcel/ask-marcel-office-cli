@@ -150,6 +150,59 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(out).toContain('> 50 KB threshold');
   });
 
+  // v1.4.0 audit #4: when `--select` is given all unknown field names,
+  // Graph silently drops every field and returns `value: [{@odata.etag},
+  // {@odata.etag}, ...]` — N entries that look "empty" once the etag is
+  // stripped. The presenter surfaces a `selectHint` to flag the likely
+  // typo. Distinct from `sizeHint` (which fires on byte count).
+  it('adds a `selectHint` to the JSON envelope when `value[]` has entries but each entry is empty after stripping @odata.etag (likely bogus `--select`)', async () => {
+    const logger = createLoggerFake();
+    const bogusSelect = {
+      value: [{ '@odata.etag': 'W/"abc1"' }, { '@odata.etag': 'W/"abc2"' }, { '@odata.etag': 'W/"abc3"' }],
+    };
+    const out = await captureStream('stdout', () => render(bogusSelect, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeDefined();
+    expect(parsed.selectHint).toContain('--select');
+    expect(parsed.selectHint).toContain('responseShape');
+  });
+
+  it('omits `selectHint` when `value[]` is legitimately empty (zero matches — distinguishable from bogus-select because there are no entries to be empty)', async () => {
+    const logger = createLoggerFake();
+    const out = await captureStream('stdout', () => render({ value: [] }, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeUndefined();
+  });
+
+  it('omits `selectHint` when entries carry any non-etag field (real data)', async () => {
+    const logger = createLoggerFake();
+    const realData = {
+      value: [
+        { id: '1', subject: 'a' },
+        { id: '2', subject: 'b' },
+      ],
+    };
+    const out = await captureStream('stdout', () => render(realData, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeUndefined();
+  });
+
+  it('omits `selectHint` when the response has no `value[]` at all (single-resource GET responses, where the bogus-select trap does not apply in the same shape)', async () => {
+    const logger = createLoggerFake();
+    const single = { id: 'u1', displayName: 'Alice' };
+    const out = await captureStream('stdout', () => render(single, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { ok: true; selectHint?: string };
+    expect(parsed.selectHint).toBeUndefined();
+  });
+
+  it('text-mode also surfaces the bogus-select warning as a `selectHint:` prelude line', async () => {
+    const logger = createLoggerFake();
+    const bogusSelect = { value: [{ '@odata.etag': 'W/"x"' }, { '@odata.etag': 'W/"y"' }] };
+    const out = await captureStream('stdout', () => render(bogusSelect, logger, 'text'));
+    expect(out.startsWith('selectHint: ')).toBe(true);
+    expect(out).toContain('--select');
+  });
+
   it('writes nothing to stderr when an error is rendered', async () => {
     const out = await captureStream('stderr', () => renderError('Boom', 'json'));
     expect(out).toBe('');

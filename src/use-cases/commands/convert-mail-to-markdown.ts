@@ -81,13 +81,22 @@ const renderHeaders = (m: {
 // tenant glitch) launders through the `as` cast and throws TypeError
 // downstream on `.filter()`. The schema-failure path surfaces a precise
 // note in the markdown envelope instead of an unhandled exception.
+//
+// Regression note (v1.4.0 follow-up): every field uses `.nullish()`
+// (= `.optional().nullable()`) rather than `.optional()`. Graph's
+// polymorphic-cast response (`microsoft.graph.fileAttachment/contentId`)
+// returns `contentId: null` on every non-fileAttachment entry — `.optional()`
+// rejects `null`, which made the schema fail and the "malformed shape" note
+// fire on every real call. The downstream `nonEmpty` predicate already
+// treats `null` as "empty" (it requires `typeof v === 'string'`), so
+// loosening the input type is safe and matches the wire reality.
 const attachmentMetaSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  contentType: z.string().optional(),
-  size: z.number().optional(),
-  isInline: z.boolean().optional(),
-  contentId: z.string().optional(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  contentType: z.string().nullish(),
+  size: z.number().nullish(),
+  isInline: z.boolean().nullish(),
+  contentId: z.string().nullish(),
 });
 
 const attachmentsListSchema = z.object({

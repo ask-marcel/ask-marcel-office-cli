@@ -4,6 +4,10 @@ import type { CommandOptionMeta } from './command-types.ts';
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 const NON_NEGATIVE_INTEGER = /^\d+$/;
 const SIGNED_INTEGER = /^-?\d+$/;
+// Audit v1.4.0 #7: `--top 1.5` used to fall through to "not a number" —
+// but 1.5 IS a number, just not an integer. Match the decimal shape
+// explicitly so the rejection message names the actual problem.
+const SIGNED_DECIMAL = /^-?\d+\.\d+$/;
 
 // Graph silently caps `$top` at 1000 across nearly every collection endpoint —
 // a request like `?$top=999999` returns the first 1000 items with NO warning,
@@ -13,13 +17,20 @@ const SIGNED_INTEGER = /^-?\d+$/;
 // validation message.
 const TOP_HARD_CAP = 1000;
 
+const explainNonPositiveInteger = (label: string, value: string): string => {
+  if (SIGNED_DECIMAL.test(value)) {
+    return `must be a positive integer (got "${value}", which is a decimal — pagination expects whole-number counts)`;
+  }
+  if (SIGNED_INTEGER.test(value)) {
+    return `must be a positive integer (Graph rejects ${label}=0 and negatives)`;
+  }
+  return `must be a positive integer (got "${value}", which is not a number)`;
+};
+
 const boundedPositiveIntegerSchema = (label: string, max: number): z.ZodString =>
   z.string().superRefine((value, ctx) => {
     if (!POSITIVE_INTEGER.test(value)) {
-      const reason = SIGNED_INTEGER.test(value)
-        ? `must be a positive integer (Graph rejects ${label}=0 and negatives)`
-        : `must be a positive integer (got "${value}", which is not a number)`;
-      ctx.addIssue({ code: 'custom', message: reason });
+      ctx.addIssue({ code: 'custom', message: explainNonPositiveInteger(label, value) });
       return;
     }
     if (Number.parseInt(value, 10) > max) {

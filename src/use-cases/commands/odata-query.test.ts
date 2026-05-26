@@ -69,6 +69,25 @@ describe('odataQuerySchema', () => {
     if (!parsed.success) expect(parsed.error.issues[0]?.message).toContain('0 and negatives');
   });
 
+  // v1.4.0 audit #7: `--top 1.5` used to say "not a number" — but 1.5 IS
+  // a number, just not an integer. Detect the decimal shape distinctly so
+  // the error is accurate.
+  it("rejects a decimal $top (e.g. `1.5`) with a 'decimal — pagination expects whole-number counts' message, distinct from the 'not a number' path", () => {
+    const parsed = odataQuerySchema.safeParse({ top: '1.5' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? '';
+      expect(msg).toContain('whole-number');
+      expect(msg).not.toContain('not a number');
+    }
+  });
+
+  it("rejects a negative decimal $top (e.g. `-2.5`) with the same 'whole-number' message — the decimal detector wins over the signed-integer path", () => {
+    const parsed = odataQuerySchema.safeParse({ top: '-2.5' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]?.message ?? '').toContain('whole-number');
+  });
+
   it('accepts $top=1000 (the documented Graph cap — pinning the boundary so off-by-one mutations are caught)', () => {
     expect(odataQuerySchema.safeParse({ top: '1000' }).success).toBe(true);
   });
