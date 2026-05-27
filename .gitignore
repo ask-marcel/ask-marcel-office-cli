@@ -111,3 +111,7 @@ Thumbs.db
 
 # Firebase Admin service accounts (if used)
 *-service-account*.json
+.agents
+skills-lock.json
+.claude/skills/atelier
+.vscode/settings.json
