@@ -72,7 +72,9 @@ const extensionOf = (filename: string): string => {
   return filename.slice(dot + 1).toLowerCase();
 };
 
-const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: FetchOptions = {}): Promise<Result<unknown, GraphError>> => {
+type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean };
+
+const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   if (isPlainTextFilename(filename)) {
     // Plain-text passthrough: follow the CDN redirect (just like csv/docx/xlsx
     // do) and return the bytes inline as `{ contentType: "text/plain", size,
@@ -100,7 +102,7 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   if (ext === 'docx') {
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
-    return docxToMarkdown(bytes.value);
+    return docxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
   if (ext === 'xlsx') {
@@ -121,4 +123,4 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
 };
 
 export { officeToMarkdown };
-export type { FetchOptions };
+export type { FetchOptions, OfficeToMarkdownOptions };

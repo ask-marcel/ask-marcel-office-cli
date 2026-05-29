@@ -18,6 +18,7 @@ const schema = z.object({
   itemId: z.string().min(1),
   versionId: z.string().min(1),
   format: z.enum(['original', 'pdf', 'markdown']).optional(),
+  includeMetadata: z.enum(['true', 'false']).optional(),
 });
 
 const fetchOriginal = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> =>
@@ -49,11 +50,11 @@ const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, ver
   );
 };
 
-const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> => {
+const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, versionId: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true, includeMetadata });
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -62,10 +63,11 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const { driveId, itemId } = parsed.data;
   const versionId = normalizeVersionId(parsed.data.versionId);
   const format = parsed.data.format ?? 'original';
+  const includeMetadata = parsed.data.includeMetadata === 'true';
 
   if (format === 'original') return fetchOriginal(graph, driveId, itemId, versionId);
   if (format === 'pdf') return fetchPdf(graph, driveId, itemId, versionId);
-  return fetchMarkdown(graph, driveId, itemId, versionId);
+  return fetchMarkdown(graph, driveId, itemId, versionId, includeMetadata);
 };
 
 const meta: CommandMeta = {
@@ -100,6 +102,14 @@ const meta: CommandMeta = {
       description:
         'Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/plain-text). All formats inline the bytes; pair with the global `--output-path` to land them on disk.',
       argumentHint: { kind: 'magicValue', values: ['original', 'pdf', 'markdown'] },
+    },
+    {
+      name: 'include-metadata',
+      key: 'includeMetadata',
+      required: false,
+      description:
+        'Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (only meaningful with `--format markdown` AND a docx source — silently ignored otherwise) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks.',
+      argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
   example: "ask-marcel download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",

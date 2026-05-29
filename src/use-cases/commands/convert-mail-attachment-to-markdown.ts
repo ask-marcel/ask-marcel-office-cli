@@ -21,6 +21,7 @@ import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
 const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
+  includeMetadata: z.enum(['true', 'false']).optional(),
 });
 
 const decodeBase64 = (b64: string): Uint8Array => {
@@ -55,7 +56,7 @@ const extensionOf = (filename: string): string => {
   return filename.slice(dot + 1).toLowerCase();
 };
 
-const convertFileAttachment = async (attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
+const convertFileAttachment = async (attachment: { name?: string; contentBytes?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const name = attachment.name ?? 'unnamed';
   const contentBytes = attachment.contentBytes ?? '';
   const bytes = decodeBase64(contentBytes);
@@ -70,7 +71,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   }
 
   const ext = extensionOf(name);
-  if (ext === 'docx') return docxToMarkdown(bytes);
+  if (ext === 'docx') return docxToMarkdown(bytes, { includeMetadata });
   if (ext === 'xlsx') return xlsxToMarkdown(bytes);
   if (ext === 'pptx') return err({ type: 'api_error', status: 415, message: PPTX_HINT });
   if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
@@ -78,7 +79,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
 };
 
-const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
+const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
     return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl' });
@@ -92,7 +93,7 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   if (typeof driveId !== 'string' || typeof itemId !== 'string') {
     return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
   }
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name);
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata });
 };
 
 const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): Result<unknown, GraphError> => {
@@ -128,6 +129,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
+  const includeMetadata = parsed.data.includeMetadata === 'true';
 
   const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
   if (!fetched.ok) return fetched;
@@ -140,9 +142,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(a);
+      return convertFileAttachment(a, includeMetadata);
     case '#microsoft.graph.referenceAttachment':
-      return convertReferenceAttachment(graph, a);
+      return convertReferenceAttachment(graph, a, includeMetadata);
     case '#microsoft.graph.itemAttachment':
       return convertItemAttachment(a);
     default:
@@ -160,6 +162,14 @@ const meta: CommandMeta = {
   options: [
     { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' },
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that message. Returned by `list-mail-attachments`.' },
+    {
+      name: 'include-metadata',
+      key: 'includeMetadata',
+      required: false,
+      description:
+        'Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (file + reference docx attachments only) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks. No-op on non-docx attachments and on itemAttachment renderers.',
+      argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+    },
   ],
   example: "ask-marcel convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

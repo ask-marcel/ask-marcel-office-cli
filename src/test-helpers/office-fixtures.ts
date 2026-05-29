@@ -1,4 +1,19 @@
-import { Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun } from 'docx';
+import {
+  Bookmark,
+  DeletedTextRun,
+  Document,
+  ExternalHyperlink,
+  HeadingLevel,
+  ImageRun,
+  InsertedTextRun,
+  Packer,
+  Paragraph,
+  SimpleMailMergeField,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+} from 'docx';
 import * as XLSX from 'xlsx';
 
 const TINY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
@@ -74,4 +89,60 @@ const buildMalformedDocx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0
 
 const buildMalformedXlsx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xff, 0xff, 0xff]);
 
-export { buildMalformedDocx, buildMalformedXlsx, buildSampleDocx, buildSampleXlsx };
+/**
+ * A docx fixture that embeds every "side-channel" surface the
+ * --include-metadata flag is supposed to surface: core/app/custom doc
+ * properties, a comment, a tracked insertion and deletion, a hidden-
+ * formatted run (vanish), an external hyperlink (which serialises as a
+ * HYPERLINK field), a MERGEFIELD via SimpleMailMergeField, and a bookmark.
+ */
+const buildRichDocx = async (): Promise<Uint8Array> => {
+  const doc = new Document({
+    creator: 'Vincent Delacourt',
+    lastModifiedBy: 'Vincent Delacourt',
+    title: 'Q4 Report',
+    subject: 'Quarterly Numbers',
+    description: 'Internal review draft',
+    keywords: 'q4,finance,review',
+    customProperties: [
+      { name: 'ClientID', value: 'ACME-42' },
+      { name: 'ReviewStatus', value: 'pending' },
+    ],
+    comments: {
+      children: [
+        {
+          id: 1,
+          author: 'Vincent Delacourt',
+          initials: 'VD',
+          date: new Date('2026-05-12T10:00:00Z'),
+          children: [new Paragraph({ children: [new TextRun('Please double-check this figure.')] })],
+        },
+      ],
+    },
+    sections: [
+      {
+        children: [
+          new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('Sample Heading')] }),
+          new Paragraph({
+            children: [new TextRun('Visible body. '), new TextRun({ text: 'This is hidden.', vanish: true }), new TextRun(' Resumed.')],
+          }),
+          new Paragraph({
+            children: [
+              new InsertedTextRun({ id: 100, author: 'Vincent Delacourt', date: '2026-05-12T10:05:00Z', children: [new TextRun({ text: 'inserted-phrase' })] }),
+              new DeletedTextRun({ id: 101, author: 'Vincent Delacourt', date: '2026-05-12T10:06:00Z', text: 'deleted-phrase' }),
+            ],
+          }),
+          new Paragraph({
+            children: [new ExternalHyperlink({ link: 'https://example.com/secret-portal', children: [new TextRun({ text: 'portal link' })] })],
+          }),
+          new Paragraph({ children: [new SimpleMailMergeField('CustomerName')] }),
+          new Paragraph({ children: [new Bookmark({ id: 'BM_intro', children: [new TextRun('introduction')] })] }),
+        ],
+      },
+    ],
+  });
+  const buffer = await Packer.toBuffer(doc);
+  return new Uint8Array(buffer);
+};
+
+export { buildMalformedDocx, buildMalformedXlsx, buildRichDocx, buildSampleDocx, buildSampleXlsx };

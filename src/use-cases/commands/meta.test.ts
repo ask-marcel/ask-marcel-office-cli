@@ -96,6 +96,10 @@ describe('command meta — invariants on every registered command', () => {
           // path placeholder. The graphPathTemplate points at the chat-list
           // endpoint that gets scanned, not at a per-name route.
           'name',
+          // `--include-metadata` on the three docx → markdown commands is a
+          // post-fetch processing toggle (run the metadata extractor on the
+          // already-downloaded docx bytes); not a URL placeholder.
+          'include-metadata',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

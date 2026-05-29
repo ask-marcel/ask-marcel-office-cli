@@ -3,8 +3,11 @@ import { ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { mammothToHtml } from '../../infra/mammoth-adapter.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import { extractDocxMetadata } from './docx-metadata.ts';
+import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 
 type MarkdownEnvelope = { readonly contentType: 'text/markdown'; readonly size: number; readonly text: string };
+type DocxToMarkdownOptions = { readonly includeMetadata?: boolean };
 
 /**
  * Mammoth emits docx tables as `<table><tr>...</tr>...</table>` with no
@@ -55,14 +58,20 @@ const promoteFirstRowToThead = (html: string): string => {
   return out;
 };
 
-const docxToMarkdown = async (bytes: Uint8Array): Promise<Result<MarkdownEnvelope, GraphError>> => {
+const docxToMarkdown = async (bytes: Uint8Array, opts: DocxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const html = await mammothToHtml(bytes);
   if (!html.ok) return html;
   const md = htmlToMarkdown(promoteFirstRowToThead(html.value));
   if (!md.ok) return md;
+  let text = md.value;
+  if (opts.includeMetadata === true) {
+    const meta = await extractDocxMetadata(bytes);
+    if (!meta.ok) return meta;
+    text = `${text}\n\n${formatDocxMetadata(meta.value)}`;
+  }
   // size = UTF-8 byte count (audit §2.1); `.length` is UTF-16 code units.
-  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md.value).byteLength, text: md.value });
+  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 
 export { docxToMarkdown, promoteFirstRowToThead };
-export type { MarkdownEnvelope };
+export type { DocxToMarkdownOptions, MarkdownEnvelope };

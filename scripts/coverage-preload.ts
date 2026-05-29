@@ -84,6 +84,7 @@ import '../src/use-cases/commands/download-drive-item-as-markdown.ts';
 import '../src/use-cases/commands/download-drive-item-as-pdf.ts';
 import '../src/use-cases/commands/download-drive-item-version.ts';
 import '../src/infra/turndown-adapter.ts';
+import '../src/infra/ooxml-zip-adapter.ts';
 import '../src/use-cases/commands/inline-image-embedder.ts';
 import '../src/use-cases/commands/markdown-pipeline.ts';
 import '../src/use-cases/commands/text-passthrough.ts';
