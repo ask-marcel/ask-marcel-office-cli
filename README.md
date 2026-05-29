@@ -46,7 +46,7 @@ Feed any Office-shaped file (docx, xlsx, pptx, csv, rtf, odt, …) into the loca
 - `download-drive-item-as-pdf` — Graph PDF conversion for anything it supports (preserves slide layout, images, charts — the right call for pptx and image-heavy docs)
 - `convert-mail-attachment-to-markdown` / `convert-mail-attachment-to-pdf` — same pipelines but starting from an email attachment
 
-Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachment-to-markdown`) command to append a `## DOCX metadata` section to the markdown output — core/app/custom doc properties, people registry, external hyperlinks, comments, tracked changes, hidden text (`w:vanish`), MERGEFIELD / HYPERLINK / DOCVARIABLE instructions, and bookmarks. Useful when an LLM needs the side-channel content mammoth drops on the floor. No-op on non-docx sources.
+Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachment-to-markdown`) command to append a metadata section surfacing the side-channel content the rendered body hides. For **docx** (`## DOCX metadata`): core/app/custom doc properties, people registry, external hyperlinks, comments, tracked changes, hidden text (`w:vanish`), MERGEFIELD / HYPERLINK / DOCVARIABLE instructions, bookmarks. For **xlsx** (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, and the persons registry. No-op on other sources.
 
 The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-29T00:31:45.503Z",
+  "generatedAt": "2026-05-29T01:06:04.532Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -27,7 +27,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (file + reference docx attachments only) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks. No-op on non-docx attachments and on itemAttachment renderers.",
+          "description": "Pass `--include-metadata true` to append a metadata section to the markdown output for docx and xlsx attachments (file + reference). For docx (`## DOCX metadata`): core/app/custom properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, bookmarks. For xlsx (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons. No-op on other attachment types and on itemAttachment renderers.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -112,7 +112,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), and bookmarks. Useful for an LLM that needs the side-channel content mammoth drops on the floor. No-op on non-docx sources.",
+          "description": "Pass `--include-metadata true` to append a metadata section to the markdown output surfacing the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, and the persons registry. No-op on other sources.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -193,7 +193,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (only meaningful with `--format markdown` AND a docx source — silently ignored otherwise) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks.",
+          "description": "Pass `--include-metadata true` to append a metadata section to the markdown output (only meaningful with `--format markdown` AND a docx or xlsx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons).",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
