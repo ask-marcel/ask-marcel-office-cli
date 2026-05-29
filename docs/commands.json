@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-26T09:04:52.130Z",
+  "generatedAt": "2026-05-29T00:31:45.503Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -22,6 +22,19 @@
           "key": "attachmentId",
           "required": true,
           "description": "Attachment ID inside that message. Returned by `list-mail-attachments`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (file + reference docx attachments only) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks. No-op on non-docx attachments and on itemAttachment renderers.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
@@ -94,6 +107,19 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), and bookmarks. Useful for an LLM that needs the side-channel content mammoth drops on the floor. No-op on non-docx sources.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
@@ -160,6 +186,19 @@
               "original",
               "pdf",
               "markdown"
+            ]
+          }
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (only meaningful with `--format markdown` AND a docx source — silently ignored otherwise) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
             ]
           }
         }
