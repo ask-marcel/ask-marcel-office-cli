@@ -50,7 +50,7 @@ Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachme
 
 ### Extract embedded images from Office docs
 
-`extract-drive-item-images` pulls the raster images (png/jpg/gif/bmp/tiff/webp) out of a docx, xlsx, or pptx — including original full-resolution / un-cropped originals and images on hidden slides that the rendered view or a PDF export never shows. Pair with the global `--output-dir <dir>` to write every image to a folder (the directory is auto-created and each `base64` becomes a `savedTo` path); without it the bytes ride back base64-encoded so a vision model can read them directly.
+`extract-drive-item-images` (OneDrive / SharePoint) and `extract-mail-attachment-images` (Outlook attachments) pull the raster images (png/jpg/gif/bmp/tiff/webp) out of a docx, xlsx, or pptx — including original full-resolution / un-cropped originals and images on hidden slides that the rendered view or a PDF export never shows. Pair with the global `--output-dir <dir>` to write every image to a folder (the directory is auto-created and each `base64` becomes a `savedTo` path); without it the bytes ride back base64-encoded so a vision model can read them directly.
 
 The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 

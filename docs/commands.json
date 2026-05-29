@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-29T02:50:25.598Z",
+  "generatedAt": "2026-05-29T03:57:26.434Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -253,6 +253,30 @@
       ],
       "example": "ask-marcel extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>`. `count: 0` with an empty `media` array means the document embeds no raster images."
+    },
+    {
+      "name": "extract-mail-attachment-images",
+      "summary": "Extract the embedded raster images (png/jpg/gif/bmp/tiff/webp) from an Outlook mail attachment that is a docx, xlsx, or pptx (and their macro-enabled / template variants) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Vector media (emf/wmf/svg) and audio/video are skipped. itemAttachment and non-OOXML attachments return a 415.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/attachment-get",
+      "options": [
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`."
+        },
+        {
+          "name": "attachment-id",
+          "key": "attachmentId",
+          "required": true,
+          "description": "Attachment ID inside that message. Returned by `list-mail-attachments`."
+        }
+      ],
+      "example": "ask-marcel extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo`. `count: 0` means the attachment embeds no raster images."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
