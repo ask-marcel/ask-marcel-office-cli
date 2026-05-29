@@ -48,6 +48,10 @@ Feed any Office-shaped file (docx, xlsx, pptx, csv, rtf, odt, …) into the loca
 
 Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachment-to-markdown`) command to surface the side-channel content the rendered body hides. For **docx** (`## DOCX metadata`): core/app/custom doc properties, people registry, external hyperlinks, comments, tracked changes, hidden text (`w:vanish`), MERGEFIELD / HYPERLINK / DOCVARIABLE instructions, bookmarks. For **xlsx** (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, the persons registry. For **pptx** (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern), and per-slide title / speaker notes / hidden flag — returned as a standalone document since pptx has no convertible body (use `*-as-pdf` for slide visuals). Each family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, and surfaces a `### Macros (VBA)` section flagging an embedded `vbaProject.bin` (the file can execute code on open). No-op on other sources.
 
+### Extract embedded images from Office docs
+
+`extract-drive-item-images` pulls the raster images (png/jpg/gif/bmp/tiff/webp) out of a docx, xlsx, or pptx — including original full-resolution / un-cropped originals and images on hidden slides that the rendered view or a PDF export never shows. Pair with the global `--output-dir <dir>` to write every image to a folder (the directory is auto-created and each `base64` becomes a `savedTo` path); without it the bytes ride back base64-encoded so a vision model can read them directly.
+
 The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 
 ### Browser-OAuth at first launch

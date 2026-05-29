@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-29T02:06:32.141Z",
+  "generatedAt": "2026-05-29T02:50:25.598Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -229,6 +229,30 @@
       ],
       "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"text/plain\", size, text }` for plain-text source extensions; `{ contentType, size, base64 }` for everything else. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files."
+    },
+    {
+      "name": "extract-drive-item-images",
+      "summary": "Extract the embedded raster images (png/jpg/gif/bmp/tiff/webp) from a OneDrive / SharePoint docx, xlsx, or pptx (and their macro-enabled / template variants) — including original full-resolution / un-cropped originals and images on hidden slides that the rendered view or a PDF export never shows. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded in the response. Vector media (emf/wmf/svg) and audio/video are skipped. For a non-OOXML source the command returns a 415 pointing at `download-onedrive-file-content`.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the docx / xlsx / pptx file. Returned by `list-folder-files` or `search-onedrive-files`."
+        }
+      ],
+      "example": "ask-marcel extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>`. `count: 0` with an empty `media` array means the document embeds no raster images."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
