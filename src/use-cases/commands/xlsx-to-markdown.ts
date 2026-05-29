@@ -3,6 +3,10 @@ import { ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { readSheetsAsCsv } from '../../infra/sheetjs-adapter.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
+import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
+import { extractXlsxMetadata } from './xlsx-metadata.ts';
+
+type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean };
 
 const splitCsvLine = (line: string): ReadonlyArray<string> => {
   const cells: string[] = [];
@@ -43,16 +47,22 @@ const csvToMarkdownTable = (csv: string): string => {
   return [header, separator, ...body].join('\n');
 };
 
-const xlsxToMarkdown = (bytes: Uint8Array): Result<MarkdownEnvelope, GraphError> => {
+const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const sheets = readSheetsAsCsv(bytes);
   if (!sheets.ok) return sheets;
   const sections = sheets.value.map(({ name, csv }) => {
     const table = csvToMarkdownTable(csv);
     return table.length === 0 ? `## ${name}` : `## ${name}\n\n${table}`;
   });
-  const md = sections.join('\n\n');
+  let md = sections.join('\n\n');
+  if (opts.includeMetadata === true) {
+    const meta = await extractXlsxMetadata(bytes);
+    if (!meta.ok) return meta;
+    md = `${md}\n\n${formatXlsxMetadata(meta.value)}`;
+  }
   // size = UTF-8 byte count (audit §2.1); `md.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 
 export { csvToMarkdownTable, xlsxToMarkdown };
+export type { XlsxToMarkdownOptions };

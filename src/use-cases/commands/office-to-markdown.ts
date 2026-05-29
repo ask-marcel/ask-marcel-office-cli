@@ -108,7 +108,7 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   if (ext === 'xlsx') {
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
-    return xlsxToMarkdown(bytes.value);
+    return xlsxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
   if (HTML_FORMAT_INPUTS.has(ext)) {

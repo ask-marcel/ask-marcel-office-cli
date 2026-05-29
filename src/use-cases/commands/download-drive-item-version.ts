@@ -108,7 +108,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (only meaningful with `--format markdown` AND a docx source — silently ignored otherwise) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks.',
+        'Pass `--include-metadata true` to append a metadata section to the markdown output (only meaningful with `--format markdown` AND a docx or xlsx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons).',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

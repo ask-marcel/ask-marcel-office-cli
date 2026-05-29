@@ -72,7 +72,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
 
   const ext = extensionOf(name);
   if (ext === 'docx') return docxToMarkdown(bytes, { includeMetadata });
-  if (ext === 'xlsx') return xlsxToMarkdown(bytes);
+  if (ext === 'xlsx') return xlsxToMarkdown(bytes, { includeMetadata });
   if (ext === 'pptx') return err({ type: 'api_error', status: 415, message: PPTX_HINT });
   if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
@@ -167,7 +167,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output (file + reference docx attachments only) with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, and bookmarks. No-op on non-docx attachments and on itemAttachment renderers.',
+        'Pass `--include-metadata true` to append a metadata section to the markdown output for docx and xlsx attachments (file + reference). For docx (`## DOCX metadata`): core/app/custom properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, bookmarks. For xlsx (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons. No-op on other attachment types and on itemAttachment renderers.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

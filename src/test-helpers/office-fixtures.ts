@@ -14,6 +14,7 @@ import {
   TableRow,
   TextRun,
 } from 'docx';
+import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
 const TINY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
@@ -90,6 +91,83 @@ const buildMalformedDocx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0
 const buildMalformedXlsx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xff, 0xff, 0xff]);
 
 /**
+ * A workbook fixture that embeds the side-channel surfaces sheetjs cannot
+ * write (defined names, custom doc properties, legacy + threaded comments)
+ * — hand-rolled as raw OOXML in a JSZip, the same pattern the docx
+ * people.xml case needed. Carries: custom properties, defined names (one
+ * visible, one hidden), a visible + hidden + veryHidden sheet, a legacy cell
+ * comment with an author, a threaded comment whose personId resolves through
+ * xl/persons/person.xml, and an external workbook link.
+ */
+const buildRichXlsx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'docProps/core.xml',
+    `<?xml version="1.0"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <dc:creator>Vincent Delacourt</dc:creator>
+  <dc:title>Budget Model</dc:title>
+</cp:coreProperties>`
+  );
+  zip.file(
+    'docProps/custom.xml',
+    `<?xml version="1.0"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="ClientID"><vt:lpwstr>ACME-42</vt:lpwstr></property>
+</Properties>`
+  );
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Summary" sheetId="1" r:id="rId1"/>
+    <sheet name="Hidden Data" sheetId="2" state="hidden" r:id="rId2"/>
+    <sheet name="Very Secret" sheetId="3" state="veryHidden" r:id="rId3"/>
+  </sheets>
+  <definedNames>
+    <definedName name="TaxRate">Summary!$A$1</definedName>
+    <definedName name="SecretFormula" hidden="1">'Hidden Data'!$B$2*1.5</definedName>
+  </definedNames>
+</workbook>`
+  );
+  zip.file(
+    'xl/comments1.xml',
+    `<?xml version="1.0"?>
+<comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <authors><author>Alice Smith</author></authors>
+  <commentList>
+    <comment ref="B2" authorId="0"><text><r><t>Double-check this total</t></r></text></comment>
+  </commentList>
+</comments>`
+  );
+  zip.file(
+    'xl/threadedComments/threadedComment1.xml',
+    `<?xml version="1.0"?>
+<ThreadedComments xmlns="http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments">
+  <threadedComment ref="C3" dT="2026-05-20T10:00:00Z" personId="{P1}" id="{T1}"><text>Needs review before sign-off</text></threadedComment>
+</ThreadedComments>`
+  );
+  zip.file(
+    'xl/persons/person.xml',
+    `<?xml version="1.0"?>
+<personList xmlns="http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments">
+  <person displayName="Bob Jones" id="{P1}" userId="bob@contoso.com" providerId="AD"/>
+</personList>`
+  );
+  zip.file('xl/externalLinks/externalLink1.xml', '<?xml version="1.0"?><externalLink xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>');
+  zip.file(
+    'xl/externalLinks/_rels/externalLink1.xml.rels',
+    `<?xml version="1.0"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath" Target="file:///\\\\server\\share\\other-model.xlsx" TargetMode="External"/>
+</Relationships>`
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/**
  * A docx fixture that embeds every "side-channel" surface the
  * --include-metadata flag is supposed to surface: core/app/custom doc
  * properties, a comment, a tracked insertion and deletion, a hidden-
@@ -145,4 +223,4 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
   return new Uint8Array(buffer);
 };
 
-export { buildMalformedDocx, buildMalformedXlsx, buildRichDocx, buildSampleDocx, buildSampleXlsx };
+export { buildMalformedDocx, buildMalformedXlsx, buildRichDocx, buildRichXlsx, buildSampleDocx, buildSampleXlsx };

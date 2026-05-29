@@ -43,7 +43,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append a `## DOCX metadata` section to the markdown output with core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), and bookmarks. Useful for an LLM that needs the side-channel content mammoth drops on the floor. No-op on non-docx sources.',
+        'Pass `--include-metadata true` to append a metadata section to the markdown output surfacing the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, and the persons registry. No-op on other sources.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

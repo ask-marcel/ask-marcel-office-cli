@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { buildMalformedXlsx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildMalformedXlsx, buildRichXlsx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 describe('xlsxToMarkdown', () => {
-  it('converts an xlsx into one `## SheetName` section per sheet, each with a markdown table', () => {
-    const result = xlsxToMarkdown(buildSampleXlsx());
+  it('converts an xlsx into one `## SheetName` section per sheet, each with a markdown table', async () => {
+    const result = await xlsxToMarkdown(buildSampleXlsx());
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.contentType).toBe('text/markdown');
@@ -17,8 +17,8 @@ describe('xlsxToMarkdown', () => {
     }
   });
 
-  it('separates the per-sheet sections with blank lines', () => {
-    const result = xlsxToMarkdown(buildSampleXlsx());
+  it('separates the per-sheet sections with blank lines', async () => {
+    const result = await xlsxToMarkdown(buildSampleXlsx());
     if (result.ok) {
       const sheet1Index = result.value.text.indexOf('## Sheet1');
       const sheet2Index = result.value.text.indexOf('## Sheet2');
@@ -27,12 +27,29 @@ describe('xlsxToMarkdown', () => {
     }
   });
 
-  it('propagates the api_error from the sheetjs adapter when the input is not a valid xlsx', () => {
-    const result = xlsxToMarkdown(buildMalformedXlsx());
+  it('propagates the api_error from the sheetjs adapter when the input is not a valid xlsx', async () => {
+    const result = await xlsxToMarkdown(buildMalformedXlsx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain('xlsx parse failed');
     }
+  });
+
+  it('appends a `## Workbook metadata` section when --include-metadata is set, surfacing authored content the value-rendered tables hide', async () => {
+    const result = await xlsxToMarkdown(await buildRichXlsx(), { includeMetadata: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.text).toContain('## Workbook metadata');
+    expect(result.value.text).toContain('### Defined names');
+    expect(result.value.text).toContain('SecretFormula');
+    expect(result.value.text).toContain('### Hidden / very-hidden sheets');
+    expect(result.value.text).toContain('Very Secret');
+  });
+
+  it('does NOT append the metadata block by default (backward-compat — existing callers see the same envelope)', async () => {
+    const result = await xlsxToMarkdown(buildSampleXlsx());
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.text).not.toContain('## Workbook metadata');
   });
 });
 
