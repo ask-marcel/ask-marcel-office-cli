@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
@@ -97,7 +97,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     expect(calledPath).toBe('/drives/d1/items/i1/content?format=html');
   });
 
-  it('errs with a clear pptx-specific hint pointing at the *-as-pdf sibling for pptx', async () => {
+  it('errs with a clear pptx-specific hint pointing at the *-as-pdf sibling for pptx when --include-metadata is not set', async () => {
     const graph = noopGraph({});
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.pptx');
     expect(result.ok).toBe(false);
@@ -106,6 +106,22 @@ describe('officeToMarkdown — extension dispatch', () => {
       expect(result.error.message).toContain('pptx not supported');
       expect(result.error.message).toContain('*-as-pdf');
       expect(result.error.message).toContain('vision-capable LLM');
+    }
+  });
+
+  it('routes pptx through the metadata extractor when --include-metadata true is set (pptx has no markdown body, so the metadata IS the output)', async () => {
+    const pptxBytes = await buildRichPptx();
+    const graph = noopGraph({
+      getBinary: async () => ok({ contentType: 'application/octet-stream', size: pptxBytes.byteLength, base64: toBase64(pptxBytes) }),
+    });
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.pptx', { includeMetadata: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const env = result.value as { contentType: string; text: string };
+      expect(env.contentType).toBe('text/markdown');
+      expect(env.text).toContain('## PPTX metadata');
+      expect(env.text).toContain('*-as-pdf');
+      expect(env.text).toContain('Quarterly Review');
     }
   });
 

@@ -108,7 +108,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append a metadata section to the markdown output (only meaningful with `--format markdown` AND a docx or xlsx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons).',
+        'Pass `--include-metadata true` to surface side-channel content (only meaningful with `--format markdown` AND a docx / xlsx / pptx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag).',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

@@ -223,4 +223,82 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
   return new Uint8Array(buffer);
 };
 
-export { buildMalformedDocx, buildMalformedXlsx, buildRichDocx, buildRichXlsx, buildSampleDocx, buildSampleXlsx };
+const buildMalformedPptx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x01]);
+
+const PPTX_SLIDE_NS =
+  'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+
+/**
+ * A deck fixture carrying the authored-but-invisible content a slide PDF
+ * never shows: custom properties, a slide tag, legacy + modern comment
+ * authors and comments, an external hyperlink, a visible slide (title +
+ * speaker notes) and a hidden slide (`show="0"`). Hand-rolled OOXML in a
+ * JSZip — there is no pptx builder in the dependency tree.
+ */
+const buildRichPptx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'docProps/core.xml',
+    '<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Vincent Delacourt</dc:creator><dc:title>Board Deck</dc:title></cp:coreProperties>'
+  );
+  zip.file(
+    'docProps/custom.xml',
+    '<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="ClientID"><vt:lpwstr>ACME-42</vt:lpwstr></property></Properties>'
+  );
+  zip.file('ppt/tags/tag1.xml', `<?xml version="1.0"?><p:tagLst ${PPTX_SLIDE_NS}><p:tag name="REVIEW_STATE" val="confidential-draft"/></p:tagLst>`);
+  zip.file(
+    'ppt/commentAuthors.xml',
+    `<?xml version="1.0"?><p:cmAuthorLst ${PPTX_SLIDE_NS}><p:cmAuthor id="0" name="Alice Smith" initials="AS" userId="alice@contoso.com" providerId="AD"/></p:cmAuthorLst>`
+  );
+  zip.file(
+    'ppt/comments/comment1.xml',
+    `<?xml version="1.0"?><p:cmLst ${PPTX_SLIDE_NS}><p:cm authorId="0" dt="2026-05-15T09:00:00Z" idx="1"><p:pos x="0" y="0"/><p:text>Fix the revenue figure on this slide.</p:text></p:cm></p:cmLst>`
+  );
+  zip.file(
+    'ppt/authors.xml',
+    '<?xml version="1.0"?><p188:authorLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main"><p188:author id="{B1}" name="Bob Jones" initials="BJ" userId="bob@contoso.com" providerId="AD"/></p188:authorLst>'
+  );
+  zip.file(
+    'ppt/comments/modernComment1.xml',
+    '<?xml version="1.0"?><p188:cmLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p188:cm authorId="{B1}" created="2026-05-16T11:00:00Z"><p188:txBody><a:bodyPr/><a:p><a:r><a:t>Can we add a source for this number?</a:t></a:r></a:p></p188:txBody></p188:cm></p188:cmLst>'
+  );
+  zip.file(
+    'ppt/slides/slide1.xml',
+    `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS}><p:cSld><p:spTree>` +
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>Quarterly Review</a:t></a:r></a:p></p:txBody></p:sp>' +
+      '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Body 1"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr><a:hlinkClick r:id="rId2"/></a:rPr><a:t>see the portal</a:t></a:r></a:p></p:txBody></p:sp>' +
+      '</p:spTree></p:cSld></p:sld>'
+  );
+  zip.file(
+    'ppt/slides/_rels/slide1.xml.rels',
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/board-portal" TargetMode="External"/>' +
+      '</Relationships>'
+  );
+  zip.file(
+    'ppt/notesSlides/notesSlide1.xml',
+    `<?xml version="1.0"?><p:notes ${PPTX_SLIDE_NS}><p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/><a:p><a:r><a:t>Remember to mention the Q3 shortfall and the ACME contract renewal.</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>`
+  );
+  zip.file(
+    'ppt/slides/slide2.xml',
+    `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS} show="0"><p:cSld><p:spTree>` +
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr/><p:nvPr><p:ph type="ctrTitle"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>Internal Only — Do Not Present</a:t></a:r></a:p></p:txBody></p:sp>' +
+      '</p:spTree></p:cSld></p:sld>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/** A barebones deck: one visible, untitled slide with no tags, comments, notes, or custom props. */
+const buildMinimalPptx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'ppt/slides/slide1.xml',
+    `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS}><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Body"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>plain content</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+export { buildMalformedDocx, buildMalformedPptx, buildMalformedXlsx, buildMinimalPptx, buildRichDocx, buildRichPptx, buildRichXlsx, buildSampleDocx, buildSampleXlsx };

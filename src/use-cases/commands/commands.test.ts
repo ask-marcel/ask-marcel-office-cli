@@ -5,7 +5,7 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -3025,6 +3025,29 @@ describe('commands', () => {
       expect(result.error.status).toBe(415);
       expect(result.error.message).toContain('pptx attachment');
       expect(result.error.message).toContain('convert-mail-attachment-to-pdf');
+    }
+  });
+
+  it('convert-mail-attachment-to-markdown extracts a `## PPTX metadata` document for a pptx fileAttachment when --include-metadata true is set', async () => {
+    const pptxBytes = await buildRichPptx();
+    let binary = '';
+    for (const byte of pptxBytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aPptxMeta')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentBytes: btoa(binary) });
+      }
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPptxMeta', includeMetadata: 'true' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/markdown');
+      expect(v.text).toContain('## PPTX metadata');
+      expect(v.text).toContain('Quarterly Review');
     }
   });
 

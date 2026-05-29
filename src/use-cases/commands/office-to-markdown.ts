@@ -4,6 +4,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
+import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { isPlainTextFilename } from './text-passthrough.ts';
 import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
@@ -27,7 +28,7 @@ import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx', 'whiteboard']);
 
 const PPTX_HINT =
-  'pptx not supported by `*-as-markdown`. Use the corresponding `*-as-pdf` command — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets.';
+  'pptx not supported by `*-as-markdown`. Use the corresponding `*-as-pdf` command — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
 
 // Extensions Graph's `?format=pdf` does NOT accept — pointing the user at
 // `*-as-pdf` for these would trade one InputFormatNotSupported error for
@@ -116,7 +117,10 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   }
 
   if (ext === 'pptx') {
-    return err({ type: 'api_error', status: 415, message: PPTX_HINT });
+    if (opts.includeMetadata !== true) return err({ type: 'api_error', status: 415, message: PPTX_HINT });
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    return pptxToMarkdown(bytes.value);
   }
 
   return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext === '' ? '<no-extension>' : ext) });

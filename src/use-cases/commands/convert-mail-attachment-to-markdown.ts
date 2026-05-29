@@ -14,6 +14,7 @@ import {
 } from './embedded-item-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
+import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 import { isPlainTextFilename } from './text-passthrough.ts';
 import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
@@ -32,7 +33,7 @@ const decodeBase64 = (b64: string): Uint8Array => {
 };
 
 const PPTX_HINT =
-  'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets.';
+  'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
 
 // Audit v1.0.0 §bug-6: there is no PDF→markdown path in this CLI (no bundled
 // PDF parser). The previous fallback pointed users at convert-…-to-pdf which
@@ -73,7 +74,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   const ext = extensionOf(name);
   if (ext === 'docx') return docxToMarkdown(bytes, { includeMetadata });
   if (ext === 'xlsx') return xlsxToMarkdown(bytes, { includeMetadata });
-  if (ext === 'pptx') return err({ type: 'api_error', status: 415, message: PPTX_HINT });
+  if (ext === 'pptx') return includeMetadata ? pptxToMarkdown(bytes) : err({ type: 'api_error', status: 415, message: PPTX_HINT });
   if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
   return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
@@ -167,7 +168,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append a metadata section to the markdown output for docx and xlsx attachments (file + reference). For docx (`## DOCX metadata`): core/app/custom properties, people registry, external hyperlinks, comments, tracked changes, hidden-formatted text (w:vanish), field instructions, bookmarks. For xlsx (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons. No-op on other attachment types and on itemAttachment renderers.',
+        'Pass `--include-metadata true` to surface side-channel content for docx, xlsx, and pptx attachments (file + reference). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag) as a standalone document, since pptx has no convertible body. No-op on other attachment types and on itemAttachment renderers.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
