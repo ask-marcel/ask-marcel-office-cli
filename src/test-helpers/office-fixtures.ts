@@ -225,6 +225,43 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
 
 const buildMalformedPptx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x01]);
 
+const ODF_META_NS =
+  'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"';
+
+/**
+ * An OpenDocument text fixture carrying the metadata `extractOdfMetadata`
+ * surfaces: Dublin Core + ODF meta properties, a multi-keyword list, and two
+ * user-defined custom fields. ODF is a ZIP, so the shared zip adapter reads it;
+ * only `meta.xml` matters for metadata.
+ */
+const buildRichOdt = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
+  zip.file(
+    'meta.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${ODF_META_NS}><office:meta>` +
+      '<meta:generator>LibreOffice/7.4.2</meta:generator>' +
+      '<dc:title>Q4 Plan</dc:title>' +
+      '<dc:creator>Vincent</dc:creator>' +
+      '<dc:description>Internal draft</dc:description>' +
+      '<meta:initial-creator>Alice</meta:initial-creator>' +
+      '<meta:creation-date>2026-05-01T10:00:00</meta:creation-date>' +
+      '<meta:editing-cycles>7</meta:editing-cycles>' +
+      '<meta:keyword>budget</meta:keyword><meta:keyword>confidential</meta:keyword>' +
+      '<meta:user-defined meta:name="ClientID">ACME-42</meta:user-defined>' +
+      '<meta:user-defined meta:name="Reviewer">Bob</meta:user-defined>' +
+      '</office:meta></office:document-meta>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/** A barebones ODF package: mimetype only, no meta.xml. */
+const buildMinimalOdt = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 /**
  * A macro-enabled document (`.docm`) carrying a `word/vbaProject.bin` so the
  * macro-presence flag can be exercised. The bin content is the OLE/CFB magic
@@ -341,8 +378,10 @@ export {
   buildMalformedPptx,
   buildMalformedXlsx,
   buildMediaSamples,
+  buildMinimalOdt,
   buildMinimalPptx,
   buildRichDocx,
+  buildRichOdt,
   buildRichPptx,
   buildRichXlsx,
   buildSampleDocx,

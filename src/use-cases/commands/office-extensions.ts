@@ -11,4 +11,8 @@ const DOCX_FAMILY: ReadonlySet<string> = new Set(['docx', 'docm', 'dotx', 'dotm'
 const XLSX_FAMILY: ReadonlySet<string> = new Set(['xlsx', 'xlsm', 'xltx', 'xltm']);
 const PPTX_FAMILY: ReadonlySet<string> = new Set(['pptx', 'pptm', 'potx', 'potm']);
 
-export { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY };
+// OpenDocument (text / spreadsheet / presentation) + their template variants.
+// Not OOXML, but also ZIP packages — they share the metadata machinery.
+const ODF_FAMILY: ReadonlySet<string> = new Set(['odt', 'ods', 'odp', 'ott', 'ots', 'otp']);
+
+export { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY };

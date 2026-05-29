@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
@@ -145,7 +145,34 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
-  it('errs with the generic 38-input-set hint for every other extension (pdf, rtf, odt, etc.)', async () => {
+  it('routes odt through the OpenDocument metadata extractor when --include-metadata true is set (no markdown body — metadata IS the output)', async () => {
+    const odtBytes = await buildRichOdt();
+    const graph = noopGraph({
+      getBinary: async () => ok({ contentType: 'application/octet-stream', size: odtBytes.byteLength, base64: toBase64(odtBytes) }),
+    });
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'plan.odt', { includeMetadata: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const env = result.value as { contentType: string; text: string };
+      expect(env.contentType).toBe('text/markdown');
+      expect(env.text).toContain('## OpenDocument metadata');
+      expect(env.text).toContain('*-as-pdf');
+      expect(env.text).toContain('Q4 Plan');
+    }
+  });
+
+  it('errs with the generic *-as-pdf hint for odt when --include-metadata is not set', async () => {
+    const graph = noopGraph({});
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'plan.odt');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('odt not supported');
+      expect(result.error.message).toContain('38 input extensions');
+    }
+  });
+
+  it('errs with the generic 38-input-set hint for every other extension (pdf, rtf, etc.)', async () => {
     const graph = noopGraph({});
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
     expect(result.ok).toBe(false);

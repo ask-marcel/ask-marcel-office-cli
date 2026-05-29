@@ -4,7 +4,8 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
-import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { odfToMarkdown } from './odf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { isPlainTextFilename } from './text-passthrough.ts';
@@ -122,6 +123,13 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
     return pptxToMarkdown(bytes.value);
+  }
+
+  if (ODF_FAMILY.has(ext)) {
+    if (opts.includeMetadata !== true) return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext) });
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    return odfToMarkdown(bytes.value);
   }
 
   return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext === '' ? '<no-extension>' : ext) });

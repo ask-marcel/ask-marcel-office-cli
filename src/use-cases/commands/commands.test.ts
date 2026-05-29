@@ -5,7 +5,7 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildMalformedDocx, buildMediaSamples, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildMalformedDocx, buildMediaSamples, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -3077,6 +3077,34 @@ describe('commands', () => {
       expect(result.error.message).toContain('image');
       expect(result.error.message).toContain('get-mail-attachment');
     }
+  });
+
+  it('convert-mail-attachment-to-markdown extracts `## OpenDocument metadata` for an odt fileAttachment when --include-metadata true is set', async () => {
+    const odtBytes = await buildRichOdt();
+    let binary = '';
+    for (const byte of odtBytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.odt', contentBytes: btoa(binary) });
+    const cmd = cmdMap['convert-mail-attachment-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aOdt', includeMetadata: 'true' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/markdown');
+      expect(v.text).toContain('## OpenDocument metadata');
+      expect(v.text).toContain('Q4 Plan');
+    }
+  });
+
+  it('convert-mail-attachment-to-markdown errs on an odt fileAttachment without --include-metadata (points at the PDF sibling)', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.odt', contentBytes: btoa('zzz') });
+    const cmd = cmdMap['convert-mail-attachment-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aOdtNoMeta' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('38 input extensions');
   });
 
   it('convert-mail-attachment-to-pdf rejects a referenceAttachment with no sourceUrl', async () => {
