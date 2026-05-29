@@ -63,12 +63,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
 
-  // Parallel manifest-driven list for the --output-dir flag. Not sorted —
-  // there is a single media-producing command today; re-add `.toSorted(...)`
-  // (and its coverage) when a second one lands.
+  // Parallel manifest-driven list for the --output-dir flag.
   const mediaProducingCommands = Object.entries(cmdRegistry)
     .filter(([, c]) => c.meta.producesMedia === true)
-    .map(([n]) => n);
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
 
   const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
     if (error.type === 'no_inlined_bytes')

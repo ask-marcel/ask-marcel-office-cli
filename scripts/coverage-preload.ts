@@ -82,6 +82,7 @@ import '../src/use-cases/commands/get-onenote-page-as-markdown.ts';
 import '../src/use-cases/commands/get-onenote-page-content.ts';
 import '../src/use-cases/commands/download-drive-item-as-markdown.ts';
 import '../src/use-cases/commands/extract-drive-item-images.ts';
+import '../src/use-cases/commands/extract-mail-attachment-images.ts';
 import '../src/use-cases/commands/media-files.ts';
 import '../src/use-cases/commands/download-drive-item-as-pdf.ts';
 import '../src/use-cases/commands/download-drive-item-version.ts';

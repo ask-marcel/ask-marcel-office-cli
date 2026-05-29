@@ -13,7 +13,8 @@ const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) 
 
 const extensionOf = (filename: string): string => {
   const dot = filename.lastIndexOf('.');
-  return dot === -1 || dot === filename.length - 1 ? '' : filename.slice(dot + 1).toLowerCase();
+  // A trailing dot needs no special case: slice(dot + 1) is already '' for it.
+  return dot === -1 ? '' : filename.slice(dot + 1).toLowerCase();
 };
 
 const isOoxml = (ext: string): boolean => DOCX_FAMILY.has(ext) || XLSX_FAMILY.has(ext) || PPTX_FAMILY.has(ext);

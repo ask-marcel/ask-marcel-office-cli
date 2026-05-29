@@ -77,6 +77,7 @@ import * as searchOnedriveFiles from './search-onedrive-files.ts';
 import * as searchOnenotePages from './search-onenote-pages.ts';
 import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
+import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
@@ -219,6 +220,7 @@ const commands: Record<string, Command> = {
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
+  'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,
   'list-all-onenote-sections': listAllOnenoteSections,

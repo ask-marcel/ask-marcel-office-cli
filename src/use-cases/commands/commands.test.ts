@@ -87,6 +87,7 @@ import * as searchOnenotePages from './search-onenote-pages.ts';
 import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
+import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as listChats from './list-chats.ts';
@@ -226,6 +227,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
+  'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,
   'list-all-onenote-sections': listAllOnenoteSections,
@@ -3085,6 +3087,208 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefBad' });
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('missing sourceUrl');
+  });
+
+  it('extract-mail-attachment-images returns a media envelope for a pptx fileAttachment', async () => {
+    const bytes = await buildMediaSamples();
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aDeck')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentBytes: btoa(binary) });
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aDeck' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { count: number; media: ReadonlyArray<{ path: string }> };
+      expect(v.count).toBe(3);
+      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/image1.png', 'xl/media/photo.jpeg']);
+    }
+  });
+
+  it('extract-mail-attachment-images resolves a referenceAttachment via /shares and extracts the linked docx images', async () => {
+    const bytes = await buildMediaSamples();
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRef'))
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/x/q3.docx' });
+      if (url.includes('/shares/u!')) return Response.json({ id: 'i9', name: 'q3.docx', parentReference: { driveId: 'd9' } });
+      if (url.includes('/drives/d9/items/i9/content')) return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } });
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRef' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { count: number; media: ReadonlyArray<{ path: string }> };
+      expect(v.count).toBe(3);
+      expect(v.media.map((m) => m.path)).toContain('word/media/image1.png');
+    }
+  });
+
+  it('extract-mail-attachment-images returns a media envelope for an xlsx fileAttachment (xlsx family)', async () => {
+    const bytes = await buildMediaSamples();
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'sheet.xlsx', contentBytes: btoa(binary) });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aXlsx' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { count: number }).count).toBe(3);
+  });
+
+  it('extract-mail-attachment-images rejects a non-OOXML fileAttachment with a 415 api_error naming the extension', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'scan.pdf', contentBytes: btoa('zzz') });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aPdf' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('pdf is not an OOXML document — image extraction supports docx / xlsx / pptx');
+    }
+  });
+
+  it('extract-mail-attachment-images treats a trailing-dot attachment name as non-OOXML', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'weird.', contentBytes: btoa('zzz') });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aDot' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+  });
+
+  it('extract-mail-attachment-images surfaces a media-extraction failure for an OOXML-named attachment that is not a valid zip', async () => {
+    let binary = '';
+    for (const byte of buildMalformedDocx()) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'corrupt.docx', contentBytes: btoa(binary) });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aBad' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('ooxml media extraction failed');
+  });
+
+  it('extract-mail-attachment-images propagates the attachment-GET error (404) before inspecting @odata.type', async () => {
+    const fetchFn: FetchFn = async () => new Response('gone', { status: 404 });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aGone' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(404);
+  });
+
+  it('extract-mail-attachment-images returns a 415 api_error for an itemAttachment (no embedded OOXML doc)', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.itemAttachment', item: { '@odata.type': '#microsoft.graph.contact' } });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aItem' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('itemAttachment');
+    }
+  });
+
+  it('extract-mail-attachment-images returns api_error for an unknown attachment @odata.type', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.weirdNewType' });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aWeird' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('unsupported attachment type');
+  });
+
+  it('extract-mail-attachment-images returns api_error when the outer attachment is missing @odata.type', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ name: 'x.docx' });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aNoType' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('missing @odata.type discriminator');
+  });
+
+  it('extract-mail-attachment-images rejects a referenceAttachment with no sourceUrl', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment' });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRefBad' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') {
+      expect(result.error.status).toBe(400);
+      expect(result.error.message).toContain('missing sourceUrl');
+    }
+  });
+
+  it('extract-mail-attachment-images rejects a referenceAttachment with an empty-string sourceUrl', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: '' });
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aEmptyUrl' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('missing sourceUrl');
+  });
+
+  it('extract-mail-attachment-images propagates a failed /shares resolution', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefErr'))
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/x/q3.docx' });
+      if (url.includes('/shares/u!')) return new Response('forbidden', { status: 403 });
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRefErr' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(403);
+  });
+
+  it('extract-mail-attachment-images errs when a resolved referenceAttachment lacks driveId/id', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRef2'))
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/x/q3.docx' });
+      if (url.includes('/shares/u!')) return Response.json({ id: 'i9' });
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRef2' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('missing id or driveId');
+  });
+
+  it('extract-mail-attachment-images returns a validation_error when messageId is missing', async () => {
+    const cmd = cmdMap['extract-mail-attachment-images'];
+    if (!cmd) throw new Error('extract-mail-attachment-images not registered');
+    const result = await cmd.execute(
+      createGraphClient(fakeAuth(), async () => Response.json({})),
+      { attachmentId: 'a1' }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
 
   it('convert-mail-attachment-to-pdf rejects a referenceAttachment whose resolved driveItem lacks ids', async () => {

@@ -1037,6 +1037,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-current-user', '--output-dir', '/work/imgs']));
     expect(out).toContain('did not return a media array');
     expect(out).toContain('extract-drive-item-images');
+    expect(out).toContain('extract-mail-attachment-images');
   });
 
   it('rejects an empty --output-dir explicitly', async () => {

@@ -6,6 +6,31 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-05-29 | OOXML side-channel extraction composes on a shared `ooxml-*` core
+
+docx/xlsx/pptx are all ZIP packages with byte-identical `docProps/{core,app,custom}.xml` and the same `*.rels` relationship graph. The metadata + image features share four format-agnostic modules: `src/infra/ooxml-zip-adapter.ts` (`openOoxmlZip`), `src/use-cases/commands/ooxml-xml-walker.ts` (fast-xml-parser traversal), `ooxml-metadata.ts` (core/app/custom props + all-`*.rels` external-link scan + VBA-macro flag), and `ooxml-metadata-to-markdown.ts` (render primitives). Per-format modules (`docx-metadata`, `xlsx-metadata`, `pptx-metadata`, …) own only body-specific extractors and compose the shared core. New OOXML work (ODF is the next zip-based candidate) must reuse these, not re-parse the zip.
+Applies to: any future Office-document content/metadata feature.
+
+## [decision] 2026-05-29 | `--include-metadata` appends for docx/xlsx, stands alone for pptx
+
+The flag surfaces side-channel content (authored-but-not-rendered: properties, comments, tracked changes, speaker notes, hidden slides, defined names, VBA-macro presence). For formats with a convertible markdown body (docx via mammoth, xlsx via sheetjs) the metadata is appended as a `## … metadata` section. pptx has no markdown body in this CLI (it 415s toward `*-as-pdf`), so with the flag it returns the metadata as a *standalone* document and without it keeps the 415. Macro-enabled (`.docm`/`.xlsm`/`.pptm`) and template (`.dotx`/…) variants alias onto their base format via `office-extensions.ts`. New format metadata follows the same rule: append if there is a body, standalone if not.
+Applies to: `office-to-markdown.ts`, `convert-mail-attachment-to-markdown.ts`, the `extract-*-images` family.
+
+## [gotcha] 2026-05-29 | binary parts need a separate adapter from the metadata zip adapter
+
+`ooxml-zip-adapter` pre-decodes every entry as a UTF-8 string (correct for XML, corrupting for binary images). Image extraction therefore uses a *separate* `src/infra/ooxml-media-extractor.ts` that returns raw `Uint8Array` per `*/media/*` part. Do not reuse the metadata adapter for binary content. The `--output-dir` flag mirrors `--output-path` (`persistMediaIfRequested` in `output-path.ts`) — single-file `--output-path` cannot split a `media` array across files.
+Affects: any feature that pulls binary parts out of an OOXML package.
+
+## [gotcha] 2026-05-29 | mutation: assert `error.type`, never guard on it
+
+`if (!result.ok && result.error.type === 'api_error') expect(...)` lets a mutant that changes the error `type` skip the inner assertions — the test still passes, the mutant survives. This was the dominant cause of surviving mutants across the image feature. Assert the discriminant directly: `expect(result.ok).toBe(false); if (result.ok) return; expect(result.error.type).toBe('api_error');`. Also add a non-`io_failed` write-error case to kill the `type === 'io_failed' ? message : type` ternary survivors in `output-path.ts`.
+Applies to: every `Result`-returning use-case test.
+
+## [gotcha] 2026-05-29 | Stryker incremental cache lies after test-only changes; 1-element `.toSorted` is an uncovered fn
+
+Two traps hit while mutation-testing: (1) `incremental: true` in `stryker.conf.json` serves *stale cached verdicts* when only test files change (finishes in seconds, scores don't move) and the report also lists cached unrelated files — `rm -f reports/stryker-incremental.json` (or scope `--mutate` to specific files) for an honest re-measure. (2) A `.toSorted((a,b) => …)` over a *single-element* array never invokes the comparator, so the comparator shows as an uncovered function even at 100% line coverage — drop the sort until there are ≥2 elements.
+Affects: `bun run mutate:changed`, any manifest-derived list (`mediaProducingCommands` in `cli.ts`).
+
 ## [gotcha] 2026-05-06 | elevated capture deadline must accommodate federated-IdP interactive auth
 
 The first elevated-token capture in `src/infra/browser-auth.ts` capped the poll deadline at 60 s, assuming silent SSO would always succeed via persistent profile cookies. On IdP-fronted tenants (e.g. ExampleCorp) the ThirdPartyIdP passive WS-Fed session expires every few hours, after which `m365.cloud.microsoft/*` redirects through `okta.<tenant>.com/.../sso/wsfed/passive` and stays there pending interactive sign-in. 60 s is not enough — bump the deadline to the full `pollDeadlineMs` (5 min default) so the user has time to finish the ThirdPartyIdP dance inside the visible Edge popup.
