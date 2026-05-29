@@ -79,5 +79,12 @@ const extractExternalRels = (zip: OoxmlZip): ReadonlyArray<ExternalRel> => {
   return out;
 };
 
-export { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels };
+// VBA macro projects live at `word/`, `xl/`, or `ppt/vbaProject.bin` in
+// macro-enabled packages (.docm / .xlsm / .pptm / the *m template variants).
+// We surface their presence — a macro-enabled file can execute code on open,
+// the classic malware / credential-stuffing vector — not the decompiled VBA
+// (that needs an OLE/CFB parser, out of scope).
+const extractMacros = (zip: OoxmlZip): ReadonlyArray<string> => zip.list().filter((path) => path.endsWith('vbaProject.bin'));
+
+export { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros };
 export type { CustomProp, ExternalRel };

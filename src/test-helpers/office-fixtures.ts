@@ -225,6 +225,23 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
 
 const buildMalformedPptx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x01]);
 
+/**
+ * A macro-enabled document (`.docm`) carrying a `word/vbaProject.bin` so the
+ * macro-presence flag can be exercised. The bin content is the OLE/CFB magic
+ * header — enough to be a realistic stand-in; we only detect presence, never
+ * decompile. Hand-rolled because the `docx` package can't inject a VBA part.
+ */
+const buildMacroDocm = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'word/document.xml',
+    '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>macro-enabled body</w:t></w:r></w:p></w:body></w:document>'
+  );
+  zip.file('word/vbaProject.bin', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 const PPTX_SLIDE_NS =
   'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
@@ -301,4 +318,15 @@ const buildMinimalPptx = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
-export { buildMalformedDocx, buildMalformedPptx, buildMalformedXlsx, buildMinimalPptx, buildRichDocx, buildRichPptx, buildRichXlsx, buildSampleDocx, buildSampleXlsx };
+export {
+  buildMacroDocm,
+  buildMalformedDocx,
+  buildMalformedPptx,
+  buildMalformedXlsx,
+  buildMinimalPptx,
+  buildRichDocx,
+  buildRichPptx,
+  buildRichXlsx,
+  buildSampleDocx,
+  buildSampleXlsx,
+};

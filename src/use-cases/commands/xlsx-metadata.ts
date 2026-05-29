@@ -2,7 +2,7 @@ import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels } from './ooxml-metadata.ts';
+import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { attrOf, findAll, parseXml, textOf } from './ooxml-xml-walker.ts';
 import { extractLegacyComments, extractPeople, extractThreadedComments } from './xlsx-comments.ts';
@@ -33,6 +33,7 @@ type XlsxMetadata = {
   readonly comments: ReadonlyArray<CellComment>;
   readonly threadedComments: ReadonlyArray<ThreadedComment>;
   readonly people: ReadonlyArray<Person>;
+  readonly macros: ReadonlyArray<string>;
 };
 
 const HIDDEN_STATES: ReadonlySet<string> = new Set(['hidden', 'veryHidden']);
@@ -65,6 +66,7 @@ const extractXlsxMetadata = async (bytes: Uint8Array): Promise<Result<XlsxMetada
     comments: extractLegacyComments(zip),
     threadedComments: extractThreadedComments(zip, people),
     people,
+    macros: extractMacros(zip),
   });
 };
 

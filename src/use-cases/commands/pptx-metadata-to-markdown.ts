@@ -1,5 +1,5 @@
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
-import { renderKv, renderTable } from './ooxml-metadata-to-markdown.ts';
+import { renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 import type { CommentAuthor, PptxComment, PptxMetadata, Slide, SlideTag } from './pptx-metadata.ts';
 
 /**
@@ -54,6 +54,7 @@ const formatPptxMetadata = (meta: PptxMetadata): string => {
     ['Comment authors', renderAuthors(meta.commentAuthors)],
     ['Comments', renderComments(meta.comments)],
     ['Slides', renderSlides(meta.slides)],
+    ['Macros (VBA)', renderMacros(meta.macros)],
   ];
   const body = sections.map(([title, content]) => `### ${title}\n\n${content}`).join('\n\n');
   return `## PPTX metadata\n\n${body}\n`;

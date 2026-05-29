@@ -3028,6 +3028,28 @@ describe('commands', () => {
     }
   });
 
+  it('convert-mail-attachment-to-markdown aliases a macro-enabled .docm fileAttachment onto the docx path', async () => {
+    const docxBytes = await buildSampleDocx();
+    let binary = '';
+    for (const byte of docxBytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aDocm')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'macro.docm', contentBytes: btoa(binary) });
+      }
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-markdown'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aDocm' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/markdown');
+      expect(v.text).toContain('# Sample Heading');
+    }
+  });
+
   it('convert-mail-attachment-to-markdown extracts a `## PPTX metadata` document for a pptx fileAttachment when --include-metadata true is set', async () => {
     const pptxBytes = await buildRichPptx();
     let binary = '';

@@ -31,4 +31,9 @@ const renderBullets = (items: ReadonlyArray<string>): string => {
   return items.map((i) => `- ${escapeCell(i)}`).join('\n');
 };
 
-export { escapeCell, NONE, renderBullets, renderKv, renderTable };
+// Shared across the docx / xlsx / pptx renderers (Rule of Three): the macro
+// section flags each vbaProject.bin part with a plain-language warning.
+const renderMacros = (macros: ReadonlyArray<string>): string =>
+  macros.length === 0 ? NONE : renderBullets(macros.map((path) => `\`${path}\` — embedded VBA macro project; this file can execute code when opened, treat as untrusted`));
+
+export { escapeCell, NONE, renderBullets, renderKv, renderMacros, renderTable };

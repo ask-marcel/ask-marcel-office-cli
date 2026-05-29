@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildMalformedDocx, buildRichDocx, buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
+import { buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 
@@ -127,5 +127,26 @@ describe('extractDocxMetadata', () => {
     expect(rendered).toContain('### People registry');
     expect(rendered).toContain('Alice Smith');
     expect(rendered).toContain('alice@contoso.com');
+  });
+});
+
+describe('VBA macro detection (shared across docx / xlsx / pptx)', () => {
+  it('flags the vbaProject.bin part of a macro-enabled document and renders a `### Macros (VBA)` warning', async () => {
+    const result = await extractDocxMetadata(await buildMacroDocm());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.macros).toEqual(['word/vbaProject.bin']);
+    const rendered = formatDocxMetadata(result.value);
+    expect(rendered).toContain('### Macros (VBA)');
+    expect(rendered).toContain('word/vbaProject.bin');
+    expect(rendered).toContain('can execute code when opened');
+  });
+
+  it('reports no macros (and renders `_(none)_`) for a document with no vbaProject.bin', async () => {
+    const result = await extractDocxMetadata(await buildSampleDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.macros).toEqual([]);
+    expect(formatDocxMetadata(result.value)).toContain('### Macros (VBA)\n\n_(none)_');
   });
 });

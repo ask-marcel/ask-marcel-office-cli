@@ -3,7 +3,7 @@ import { ok } from '../../domain/result.ts';
 import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels } from './ooxml-metadata.ts';
+import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { attrOf, findAll, parseXml } from './ooxml-xml-walker.ts';
 import { extractCommentAuthors, extractComments } from './pptx-comments.ts';
@@ -32,6 +32,7 @@ type PptxMetadata = {
   readonly commentAuthors: ReadonlyArray<CommentAuthor>;
   readonly comments: ReadonlyArray<PptxComment>;
   readonly slides: ReadonlyArray<Slide>;
+  readonly macros: ReadonlyArray<string>;
 };
 
 const tagsInPart = (root: unknown, source: string): ReadonlyArray<SlideTag> =>
@@ -57,6 +58,7 @@ const extractPptxMetadata = async (bytes: Uint8Array): Promise<Result<PptxMetada
     commentAuthors,
     comments: extractComments(zip, commentAuthors),
     slides: extractSlides(zip),
+    macros: extractMacros(zip),
   });
 };
 

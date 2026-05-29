@@ -4,6 +4,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
+import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { isPlainTextFilename } from './text-passthrough.ts';
@@ -100,13 +101,13 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
   }
 
-  if (ext === 'docx') {
+  if (DOCX_FAMILY.has(ext)) {
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
     return docxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
-  if (ext === 'xlsx') {
+  if (XLSX_FAMILY.has(ext)) {
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
     return xlsxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
@@ -116,7 +117,7 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     return convertToMarkdown(graph, `${contentPath}?format=html`);
   }
 
-  if (ext === 'pptx') {
+  if (PPTX_FAMILY.has(ext)) {
     if (opts.includeMetadata !== true) return err({ type: 'api_error', status: 415, message: PPTX_HINT });
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;

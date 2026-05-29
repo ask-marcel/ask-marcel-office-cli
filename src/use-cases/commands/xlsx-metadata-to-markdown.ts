@@ -1,5 +1,5 @@
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
-import { renderKv, renderTable } from './ooxml-metadata-to-markdown.ts';
+import { renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 import type { CellComment, DefinedName, Person, Sheet, ThreadedComment, XlsxMetadata } from './xlsx-metadata.ts';
 
 /**
@@ -61,6 +61,7 @@ const formatXlsxMetadata = (meta: XlsxMetadata): string => {
     ['Cell comments', renderComments(meta.comments)],
     ['Threaded comments', renderThreaded(meta.threadedComments)],
     ['People', renderPeople(meta.people)],
+    ['Macros (VBA)', renderMacros(meta.macros)],
   ];
   const body = sections.map(([title, content]) => `### ${title}\n\n${content}`).join('\n\n');
   return `---\n\n## Workbook metadata\n\n${body}\n`;

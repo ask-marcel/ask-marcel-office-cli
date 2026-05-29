@@ -109,6 +109,26 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
+  it('aliases the macro-enabled / template families onto their base parser (.docm → docx, .xlsm → xlsx, .pptm → pptx metadata)', async () => {
+    const docxBytes = await buildSampleDocx();
+    const docmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) }) });
+    const docm = await officeToMarkdown(docmGraph, '/drives/d1/items/i1/content', 'report.docm');
+    expect(docm.ok).toBe(true);
+    if (docm.ok) expect((docm.value as { text: string }).text).toContain('# Sample Heading');
+
+    const xlsxBytes = buildSampleXlsx();
+    const xlsmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }) });
+    const xlsm = await officeToMarkdown(xlsmGraph, '/drives/d1/items/i1/content', 'data.xlsm');
+    expect(xlsm.ok).toBe(true);
+    if (xlsm.ok) expect((xlsm.value as { text: string }).text).toContain('## Sheet1');
+
+    const pptxBytes = await buildRichPptx();
+    const pptmGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: pptxBytes.byteLength, base64: toBase64(pptxBytes) }) });
+    const pptm = await officeToMarkdown(pptmGraph, '/drives/d1/items/i1/content', 'deck.pptm', { includeMetadata: true });
+    expect(pptm.ok).toBe(true);
+    if (pptm.ok) expect((pptm.value as { text: string }).text).toContain('## PPTX metadata');
+  });
+
   it('routes pptx through the metadata extractor when --include-metadata true is set (pptx has no markdown body, so the metadata IS the output)', async () => {
     const pptxBytes = await buildRichPptx();
     const graph = noopGraph({

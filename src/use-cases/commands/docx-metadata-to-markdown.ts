@@ -1,5 +1,5 @@
 import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, Person, TrackedChange } from './docx-metadata.ts';
-import { escapeCell, NONE, renderBullets, renderKv, renderTable } from './ooxml-metadata-to-markdown.ts';
+import { escapeCell, NONE, renderBullets, renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 
 /**
  * Pure renderer: DocxMetadata → markdown block to append after the
@@ -62,6 +62,7 @@ const formatDocxMetadata = (meta: DocxMetadata): string => {
     ['Hidden-formatted text (w:vanish)', renderBullets(meta.hiddenText)],
     ['Fields (MERGEFIELD / HYPERLINK / DOCVARIABLE)', renderFields(meta.fields)],
     ['Bookmarks', renderBookmarks(meta.bookmarks)],
+    ['Macros (VBA)', renderMacros(meta.macros)],
   ];
   const body = sections.map(([title, content]) => `### ${title}\n\n${content}`).join('\n\n');
   return `---\n\n## DOCX metadata\n\n${body}\n`;

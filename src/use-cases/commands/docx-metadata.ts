@@ -3,7 +3,7 @@ import { ok } from '../../domain/result.ts';
 import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels } from './ooxml-metadata.ts';
+import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { attrOf, collectText, findAll, findAllTexts, parseXml } from './ooxml-xml-walker.ts';
 import type { XmlObject } from './ooxml-xml-walker.ts';
@@ -43,6 +43,7 @@ type DocxMetadata = {
   readonly hiddenText: ReadonlyArray<string>;
   readonly fields: ReadonlyArray<Field>;
   readonly bookmarks: ReadonlyArray<Bookmark>;
+  readonly macros: ReadonlyArray<string>;
 };
 
 const extractPeople = (root: unknown): ReadonlyArray<Person> => {
@@ -135,6 +136,7 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
     hiddenText: extractHidden(document),
     fields: collectFields(zip),
     bookmarks: extractBookmarks(document),
+    macros: extractMacros(zip),
   });
 };
 
