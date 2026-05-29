@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-29T01:23:25.919Z",
+  "generatedAt": "2026-05-29T02:06:32.141Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -27,7 +27,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to surface side-channel content for docx, xlsx, and pptx attachments (file + reference). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag) as a standalone document, since pptx has no convertible body. No-op on other attachment types and on itemAttachment renderers.",
+          "description": "Pass `--include-metadata true` to surface side-channel content for docx, xlsx, and pptx attachments (file + reference). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag) as a standalone document, since pptx has no convertible body. Each family also covers its macro-enabled and template variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other attachment types and on itemAttachment renderers.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -112,7 +112,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to surface the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, persons. For pptx (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern), and per-slide title / speaker notes / hidden flag — returned as a standalone document since pptx has no convertible body (use `download-drive-item-as-pdf` for slide visuals). No-op on other sources.",
+          "description": "Pass `--include-metadata true` to surface the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, persons. For pptx (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern), and per-slide title / speaker notes / hidden flag — returned as a standalone document since pptx has no convertible body (use `download-drive-item-as-pdf` for slide visuals). Each family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other sources.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -193,7 +193,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to surface side-channel content (only meaningful with `--format markdown` AND a docx / xlsx / pptx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag).",
+          "description": "Pass `--include-metadata true` to surface side-channel content (only meaningful with `--format markdown` AND a docx / xlsx / pptx source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag). Each family covers its macro-enabled and template variants too, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
