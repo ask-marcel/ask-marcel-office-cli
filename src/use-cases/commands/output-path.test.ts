@@ -75,7 +75,7 @@ describe('persistIfRequested', () => {
     if (!result.ok) expect(result.error.type).toBe('no_inlined_bytes');
   });
 
-  it('maps writeBytes io_failed to write_failed with the underlying message', async () => {
+  it('maps writeBytes io_failed to write_failed, carrying the underlying message', async () => {
     const failingFs: FileSystem = {
       readJson: async () => err({ type: 'not_found' }),
       writeText: async () => ok(undefined),
@@ -86,12 +86,26 @@ describe('persistIfRequested', () => {
     const data = { contentType: 'application/pdf', base64: 'JVBERi0=' };
     const result = await persistIfRequested(failingFs, '/root/forbidden.pdf', data);
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'write_failed') {
-      expect(result.error.message).toContain('EACCES');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('write_failed');
+    if (result.error.type === 'write_failed') expect(result.error.message).toBe('EACCES: permission denied');
   });
 
-  it('maps writeText io_failed to write_failed with the underlying message', async () => {
+  it('falls back to the error type as the write-failed message when a non-io_failed writeBytes error has no message', async () => {
+    const failingFs: FileSystem = {
+      readJson: async () => err({ type: 'not_found' }),
+      writeText: async () => ok(undefined),
+      writeBytes: async () => err({ type: 'not_found' }),
+      deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
+    };
+    const data = { contentType: 'application/pdf', base64: 'JVBERi0=' };
+    const result = await persistIfRequested(failingFs, '/root/forbidden.pdf', data);
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toBe('not_found');
+  });
+
+  it('maps writeText io_failed to write_failed, carrying the underlying message', async () => {
     const failingFs: FileSystem = {
       readJson: async () => err({ type: 'not_found' }),
       writeText: async () => err({ type: 'io_failed', message: 'ENOSPC: no space left on device' }),
@@ -102,9 +116,23 @@ describe('persistIfRequested', () => {
     const data = { contentType: 'text/plain', text: 'hello' };
     const result = await persistIfRequested(failingFs, '/full/disk.txt', data);
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'write_failed') {
-      expect(result.error.message).toContain('ENOSPC');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('write_failed');
+    if (result.error.type === 'write_failed') expect(result.error.message).toBe('ENOSPC: no space left on device');
+  });
+
+  it('falls back to the error type as the write-failed message when a non-io_failed writeText error has no message', async () => {
+    const failingFs: FileSystem = {
+      readJson: async () => err({ type: 'not_found' }),
+      writeText: async () => err({ type: 'not_found' }),
+      writeBytes: async () => ok(undefined),
+      deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
+    };
+    const data = { contentType: 'text/plain', text: 'hello' };
+    const result = await persistIfRequested(failingFs, '/full/disk.txt', data);
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toBe('not_found');
   });
 
   // Audit v1.0.0 §B4: when a *-as-pdf command silently falls back to raw
@@ -124,7 +152,13 @@ describe('persistIfRequested', () => {
     };
     const result = await persistIfRequested(fs, '/work/test-output/rimowa-v1.pdf', data);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('passthrough_extension_mismatch');
+    if (!result.ok) {
+      expect(result.error.type).toBe('passthrough_extension_mismatch');
+      if (result.error.type === 'passthrough_extension_mismatch') {
+        expect(result.error.requestedExtension).toBe('.pdf');
+        expect(result.error.contentType).toBe('application/octet-stream');
+      }
+    }
     expect(fs.has('/work/test-output/rimowa-v1.pdf')).toBe(false);
   });
 
@@ -218,7 +252,37 @@ describe('persistMediaIfRequested', () => {
     if (!result.ok) expect(result.error.type).toBe('no_media');
   });
 
-  it('maps a writeBytes io_failure to write_failed with the underlying message', async () => {
+  it('returns no_media when a media item is missing its path', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', { media: [{ base64: PNG_B64 }] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('returns no_media (without dereferencing) when a media item is null — the isPlainRecord guard short-circuits', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', { media: [null] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('returns no_media without dereferencing a null body (the isPlainRecord guard runs before reading .media)', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', null);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('rejects the whole batch (every, not some) when even one item is malformed — a valid sibling does not get written', async () => {
+    const fs = createFileSystemFake();
+    const mixed = { media: [{ path: 'ppt/media/ok.png', base64: PNG_B64 }, { path: 'ppt/media/bad.png' }] };
+    const result = await persistMediaIfRequested(fs, '/work/imgs', mixed);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+    expect(fs.has('/work/imgs/ok.png')).toBe(false);
+  });
+
+  it('maps a writeBytes io_failure to write_failed, carrying the underlying message', async () => {
     const failingFs: FileSystem = {
       readJson: async () => err({ type: 'not_found' }),
       writeText: async () => ok(undefined),
@@ -228,6 +292,22 @@ describe('persistMediaIfRequested', () => {
     };
     const result = await persistMediaIfRequested(failingFs, '/root/imgs', mediaEnvelope);
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toContain('EACCES');
+    if (!result.ok) {
+      expect(result.error.type).toBe('write_failed');
+      if (result.error.type === 'write_failed') expect(result.error.message).toBe('EACCES: permission denied');
+    }
+  });
+
+  it('falls back to the error type as the message when a non-io_failed write error has no message field', async () => {
+    const failingFs: FileSystem = {
+      readJson: async () => err({ type: 'not_found' }),
+      writeText: async () => ok(undefined),
+      writeBytes: async () => err({ type: 'not_found' }),
+      deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
+    };
+    const result = await persistMediaIfRequested(failingFs, '/root/imgs', mediaEnvelope);
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toBe('not_found');
   });
 });

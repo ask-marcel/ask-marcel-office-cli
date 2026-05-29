@@ -5,7 +5,7 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildMediaSamples, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildMalformedDocx, buildMediaSamples, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -1143,18 +1143,136 @@ describe('commands', () => {
     }
   });
 
-  it('extract-drive-item-images rejects a non-OOXML source with a 415 pointing at download-onedrive-file-content', async () => {
+  it('extract-drive-item-images rejects a non-OOXML source with a 415 that names the offending extension and points at download-onedrive-file-content', async () => {
     const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'report.pdf' }) }]);
     const cmd = cmdMap['extract-drive-item-images'];
     if (!cmd) throw new Error('extract-drive-item-images not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf' });
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('not an OOXML document');
-      expect(result.error.message).toContain('download-onedrive-file-content');
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.status).toBe(415);
+    expect(result.error.message).toContain('pdf is not an OOXML document — image extraction supports docx / xlsx / pptx');
+    expect(result.error.message).toContain('download-onedrive-file-content');
+  });
+
+  it('extract-drive-item-images returns a validation_error when itemId is missing', async () => {
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), stagedFetch([])), { driveId: 'd1' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('validation_error');
+  });
+
+  it('extract-drive-item-images surfaces a media-extraction failure when an OOXML-named file is not a valid zip', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iBad', method: 'GET', response: Response.json({ name: 'corrupt.docx' }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iBad/content',
+        method: 'GET',
+        response: () => new Response(buildMalformedDocx() as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iBad' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('ooxml media extraction failed');
+  });
+
+  it('extract-drive-item-images treats a trailing-dot name (no real extension) as non-OOXML', async () => {
+    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iDot', method: 'GET', response: Response.json({ name: 'weird.' }) }]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iDot' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+  });
+
+  it('extract-drive-item-images aliases the docx and xlsx macro-enabled families onto the same extractor', async () => {
+    const bytes = await buildMediaSamples();
+    for (const [name, itemId] of [
+      ['macro.docm', 'iDocm'],
+      ['model.xlsm', 'iXlsm'],
+    ] as const) {
+      const fetchFn = stagedFetch([
+        { urlPrefix: `https://graph.microsoft.com/v1.0/drives/d1/items/${itemId}`, method: 'GET', response: Response.json({ name }) },
+        {
+          urlPrefix: `https://graph.microsoft.com/v1.0/drives/d1/items/${itemId}/content`,
+          method: 'GET',
+          response: () => new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+        },
+      ]);
+      const cmd = cmdMap['extract-drive-item-images'];
+      if (!cmd) throw new Error('extract-drive-item-images not registered');
+      const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect((result.value as { count: number }).count).toBe(3);
     }
+  });
+
+  it('extract-drive-item-images returns a 415 api_error with the <no-extension> placeholder when the driveItem name has no extension', async () => {
+    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iNoExt', method: 'GET', response: Response.json({ name: 'README' }) }]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iNoExt' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.status).toBe(415);
+    expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+  });
+
+  it('extract-drive-item-images returns count 0 with an empty media array for an OOXML doc with no embedded images', async () => {
+    const xlsxBytes = buildSampleXlsx();
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iEmpty', method: 'GET', response: Response.json({ name: 'plain.xlsx' }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iEmpty/content',
+        method: 'GET',
+        response: () => new Response(xlsxBytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iEmpty' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { count: number; media: ReadonlyArray<unknown> };
+      expect(v.count).toBe(0);
+      expect(v.media).toEqual([]);
+    }
+  });
+
+  it('extract-drive-item-images propagates the driveItem metadata GET error (404) verbatim, before any extension check', async () => {
+    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iGone', method: 'GET', response: new Response('nope', { status: 404 }) }]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iGone' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(404);
+  });
+
+  it('extract-drive-item-images propagates a content-fetch failure verbatim (503), not the extraction error path', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFail', method: 'GET', response: Response.json({ name: 'deck.pptx' }) },
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFail/content', method: 'GET', response: new Response('boom', { status: 503 }) },
+    ]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iFail' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(503);
   });
 
   it('download-drive-item-as-markdown short-circuits to raw download for plain-text source extensions', async () => {

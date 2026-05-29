@@ -116,5 +116,8 @@ export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string 
   if (failed !== undefined && !failed.ok) return err({ type: 'write_failed', message: failed.error.type === 'io_failed' ? failed.error.message : failed.error.type });
 
   const saved = media.map((item) => ({ ...withoutKey(item, 'base64'), savedTo: destOf(item) }));
-  return ok({ ...withoutKey(data, 'media'), count: saved.length, media: saved });
+  // The media envelope is exactly `{ count, media }` — rebuild it directly
+  // rather than spreading `data` (which would only re-introduce the unsaved
+  // `media`, immediately overridden — an equivalent-mutant trap).
+  return ok({ count: saved.length, media: saved });
 };
