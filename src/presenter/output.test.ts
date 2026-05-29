@@ -397,6 +397,27 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     expect(out).toBe('contentType: application/pdf\nsize: 12345\nsavedTo: /work/test/may-deck.pdf\n');
   });
 
+  it('replaces an unsaved media array with a one-line "use --output-dir" hint in text output (base64 stays out of stdout)', async () => {
+    const logger = createLoggerFake();
+    const data = {
+      count: 2,
+      media: [
+        { path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2048, base64: 'iVBOR…' },
+        { path: 'word/media/photo.jpeg', contentType: 'image/jpeg', sizeBytes: 4096, base64: '/9j/4…' },
+      ],
+    };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toBe('2 image(s), 6 KB total — use --output-dir <dir> to extract them to disk (base64 omitted from text output; add --output json to inline it)\n');
+  });
+
+  it('renders a saved media array (savedTo, no base64) as ordinary key:value lines', async () => {
+    const logger = createLoggerFake();
+    const data = { count: 1, media: [{ path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2048, savedTo: '/work/imgs/image1.png' }] };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toContain('savedTo: /work/imgs/image1.png');
+    expect(out).not.toContain('use --output-dir');
+  });
+
   it('inlines a flat array of primitive scope strings on the same line so a 30-item array stays one line tall', async () => {
     const logger = createLoggerFake();
     const data = { audience: 'graph', scopes: ['Mail.Read', 'Calendars.Read', 'Files.Read'] };

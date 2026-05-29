@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
@@ -29,6 +30,10 @@ export type OutputPathError =
   | { readonly type: 'empty_path' }
   | { readonly type: 'is_directory' }
   | { readonly type: 'passthrough_extension_mismatch'; readonly contentType: string; readonly requestedExtension: string };
+
+export type OutputDirError = { readonly type: 'no_media' } | { readonly type: 'empty_path' } | { readonly type: 'write_failed'; readonly message: string };
+
+type MediaItem = { readonly path: string; readonly base64: string };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -86,4 +91,30 @@ const withoutKey = (data: Record<string, unknown>, key: string): Record<string, 
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) if (k !== key) out[k] = v;
   return out;
+};
+
+const isMediaItem = (value: unknown): value is MediaItem => isPlainRecord(value) && typeof value['path'] === 'string' && typeof value['base64'] === 'string';
+
+/**
+ * Sibling of `persistIfRequested` for the global `--output-dir` flag. When a
+ * command returns a `media` array (`{ count, media: [{ path, base64, ... }] }`,
+ * from the image-extraction commands) and `--output-dir` is set, write each
+ * image to `<dir>/<basename>` and replace its `base64` with `savedTo`. The
+ * filesystem port auto-creates the directory. Anything without a media array
+ * returns `no_media` so the CLI can surface a clear error.
+ */
+export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string | undefined, data: unknown): Promise<Result<unknown, OutputDirError>> => {
+  if (outputDir === undefined) return ok(data);
+  if (outputDir === '') return err({ type: 'empty_path' });
+  if (!isPlainRecord(data)) return err({ type: 'no_media' });
+  const media = data['media'];
+  if (!Array.isArray(media) || !media.every(isMediaItem)) return err({ type: 'no_media' });
+
+  const destOf = (item: MediaItem): string => posix.join(outputDir, posix.basename(item.path));
+  const writes = await Promise.all(media.map((item) => fs.writeBytes(destOf(item), decodeBase64(item.base64))));
+  const failed = writes.find((w) => !w.ok);
+  if (failed !== undefined && !failed.ok) return err({ type: 'write_failed', message: failed.error.type === 'io_failed' ? failed.error.message : failed.error.type });
+
+  const saved = media.map((item) => ({ ...withoutKey(item, 'base64'), savedTo: destOf(item) }));
+  return ok({ ...withoutKey(data, 'media'), count: saved.length, media: saved });
 };

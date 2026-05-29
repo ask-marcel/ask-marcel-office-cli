@@ -14,6 +14,17 @@ const isTextPayload = (record: Record<string, unknown>): boolean =>
 const isBinaryPayload = (record: Record<string, unknown>): boolean =>
   typeof record.contentType === 'string' && typeof record.size === 'number' && typeof record.base64 === 'string';
 
+// A media envelope whose images still carry base64 (not yet written by
+// --output-dir). Text output replaces the base64 blobs with a one-line hint
+// so stdout stays small; JSON output keeps them.
+const isUnsavedMediaPayload = (record: Record<string, unknown>): boolean =>
+  Array.isArray(record.media) && record.media.length > 0 && record.media.every((m) => isRecord(m) && typeof m.base64 === 'string');
+
+const mediaHintLine = (media: ReadonlyArray<unknown>): string => {
+  const totalBytes = media.reduce((sum: number, m) => sum + (isRecord(m) && typeof m.sizeBytes === 'number' ? m.sizeBytes : 0), 0);
+  return `${media.length} image(s), ${Math.round(totalBytes / 1024)} KB total — use --output-dir <dir> to extract them to disk (base64 omitted from text output; add --output json to inline it)\n`;
+};
+
 const encodeScalar = (value: unknown): string => {
   if (value === null) return 'null';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -85,6 +96,7 @@ const renderCollection = (items: ReadonlyArray<unknown>, footer: string): string
 const renderEnveloped = (data: Record<string, unknown>): string => {
   if (isTextPayload(data)) return `${data.text as string}\n`;
   if (isBinaryPayload(data)) return `binary: ${data.contentType as string}, ${data.size as number} bytes — use --output-path to save\n`;
+  if (isUnsavedMediaPayload(data)) return mediaHintLine(data.media as ReadonlyArray<unknown>);
   const { stripped, cursors } = extractCursors(data);
   const footer = renderFooter(cursors);
   if (Array.isArray(stripped.value) && Object.keys(stripped).length === 1) return renderCollection(stripped.value, footer);

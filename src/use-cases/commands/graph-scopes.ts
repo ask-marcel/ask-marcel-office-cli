@@ -49,6 +49,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-drive-item-list-item': ['Files.Read', 'Sites.Read.All'],
   'download-drive-item-as-pdf': ['Files.Read'],
   'download-drive-item-as-markdown': ['Files.Read'],
+  'extract-drive-item-images': ['Files.Read'],
   'download-drive-item-version': ['Files.Read'],
   'list-trending-insights': ['Sites.Read.All'],
   'list-recently-used-insights': ['Sites.Read.All'],

@@ -5,10 +5,11 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildMediaSamples, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
+import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
 import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
@@ -179,6 +180,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'download-drive-item-version': downloadDriveItemVersion,
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
+  'extract-drive-item-images': extractDriveItemImages,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
   'get-excel-range': getExcelRange,
@@ -1112,6 +1114,46 @@ describe('commands', () => {
       const v = result.value as { contentType: string; text: string };
       expect(v.contentType).toBe('text/markdown');
       expect(v.text).toContain('# Sample Heading');
+    }
+  });
+
+  it('extract-drive-item-images returns a base64 media envelope of the raster images embedded in a pptx', async () => {
+    const pptxBytes = await buildMediaSamples();
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iDeck', method: 'GET', response: Response.json({ name: 'deck.pptx' }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iDeck/content',
+        method: 'GET',
+        response: () => new Response(pptxBytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iDeck' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { count: number; media: ReadonlyArray<{ path: string; contentType: string; sizeBytes: number; base64: string }> };
+      expect(v.count).toBe(3);
+      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/image1.png', 'xl/media/photo.jpeg']);
+      const png = v.media.find((m) => m.path === 'word/media/image1.png');
+      expect(png?.contentType).toBe('image/png');
+      expect(png?.sizeBytes).toBe(4);
+      expect(typeof png?.base64).toBe('string');
+    }
+  });
+
+  it('extract-drive-item-images rejects a non-OOXML source with a 415 pointing at download-onedrive-file-content', async () => {
+    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'report.pdf' }) }]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('not an OOXML document');
+      expect(result.error.message).toContain('download-onedrive-file-content');
     }
   });
 

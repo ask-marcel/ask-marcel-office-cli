@@ -1,5 +1,6 @@
 import type { Command } from './command-types.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
+import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
 import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
@@ -172,6 +173,7 @@ const commands: Record<string, Command> = {
   'download-drive-item-version': downloadDriveItemVersion,
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
+  'extract-drive-item-images': extractDriveItemImages,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
   'get-excel-range': getExcelRange,

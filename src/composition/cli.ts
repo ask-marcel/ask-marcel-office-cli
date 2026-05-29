@@ -9,8 +9,8 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
-import type { OutputPathError } from '../use-cases/commands/output-path.ts';
-import { persistIfRequested } from '../use-cases/commands/output-path.ts';
+import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
+import { persistIfRequested, persistMediaIfRequested } from '../use-cases/commands/output-path.ts';
 import * as update from '../use-cases/commands/update.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
@@ -63,6 +63,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
 
+  // Parallel manifest-driven list for the --output-dir flag. Not sorted —
+  // there is a single media-producing command today; re-add `.toSorted(...)`
+  // (and its coverage) when a second one lands.
+  const mediaProducingCommands = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.producesMedia === true)
+    .map(([n]) => n);
+
   const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
     if (error.type === 'no_inlined_bytes')
       return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel ${commandName} ... > out.json\`.`;
@@ -76,6 +83,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
     const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
     if (enoent !== null) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
     return `--output-path: write failed: ${error.message}`;
+  };
+
+  const formatOutputDirError = (error: OutputDirError, commandName: string): string => {
+    if (error.type === 'no_media')
+      return `--output-dir: ${commandName} did not return a media array — this flag works only with the image-extraction commands. Supported: ${mediaProducingCommands.join(', ')}.`;
+    if (error.type === 'empty_path') return '--output-dir: directory argument is empty (likely a shell-quoting mistake — pass a real directory path)';
+    return `--output-dir: write failed: ${error.message}`;
   };
 
   // Audit v1.0.0 §B5: route help-json / docs through persistIfRequested so --output-path is honoured (was silently ignored).
@@ -164,6 +178,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .option(
       '--output-path <path>',
       'Globally available. When the command returns inlined bytes (`{contentType, size, base64}` for binary or `{..., text}` for text), decode and write them to <path>, replacing the inline field with `savedTo: <path>` in the JSON envelope. Use this for multi-MB PDFs / images so the LLM never has to round-trip a base64 string through stdout. Parent directories are auto-created. When applied to a command whose response has neither `base64` nor `text` (e.g. plain JSON gets like `get-current-user`) the CLI emits a clear `{"ok":false,"error":"--output-path: <cmd> did not return inlined bytes …"}` envelope rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake.'
+    )
+    .option(
+      '--output-dir <dir>',
+      'Globally available. For commands that return a `media` array (the `extract-*-images` family), decode and write every image to <dir>/<filename>, replacing each `base64` with `savedTo` in the JSON envelope. The directory is auto-created. Use this for image-heavy decks so the LLM never round-trips a base64 blob through stdout. Applied to a command that returns no media array, the CLI emits a clear error rather than writing nothing.'
     )
     .addOption(
       ((): Option => {
@@ -476,6 +494,16 @@ const buildCli = (deps: BuildCliDeps): Command => {
             message = message.replaceAll(`--${canonical}`, `--${alias}`);
           }
           fail(message, result.error.code, sourceFromGraphError(result.error));
+          return;
+        }
+        const outputDir = program.opts<{ outputDir?: string }>().outputDir;
+        if (outputDir !== undefined) {
+          const persistedMedia = await persistMediaIfRequested(fs, outputDir, result.value);
+          if (persistedMedia.ok) {
+            renderOut(persistedMedia.value);
+            return;
+          }
+          fail(formatOutputDirError(persistedMedia.error, name));
           return;
         }
         const outputPath = program.opts<{ outputPath?: string }>().outputPath;

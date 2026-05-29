@@ -2,7 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import { createFileSystemFake } from '../../test-helpers/filesystem-fake.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
-import { persistIfRequested } from './output-path.ts';
+import { persistIfRequested, persistMediaIfRequested } from './output-path.ts';
+
+// base64 of the bytes [0x89,0x50] and [0xff,0xd8]
+const PNG_B64 = btoa(String.fromCharCode(0x89, 0x50));
+const JPG_B64 = btoa(String.fromCharCode(0xff, 0xd8));
 
 describe('persistIfRequested', () => {
   it('returns the data unchanged when --output-path was not supplied', async () => {
@@ -150,5 +154,80 @@ describe('persistIfRequested', () => {
     const windows = await persistIfRequested(fs, 'C:\\Users\\me\\', data);
     expect(windows.ok).toBe(false);
     if (!windows.ok) expect(windows.error.type).toBe('is_directory');
+  });
+});
+
+describe('persistMediaIfRequested', () => {
+  const mediaEnvelope = {
+    count: 2,
+    media: [
+      { path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2, base64: PNG_B64 },
+      { path: 'word/media/photo.jpeg', contentType: 'image/jpeg', sizeBytes: 2, base64: JPG_B64 },
+    ],
+  };
+
+  it('returns the data unchanged when --output-dir was not supplied', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, undefined, mediaEnvelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual(mediaEnvelope);
+  });
+
+  it('rejects an empty --output-dir explicitly', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '', mediaEnvelope);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('empty_path');
+  });
+
+  it('writes every image to <dir>/<basename> and replaces each base64 with savedTo (trailing slash trimmed)', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs/', mediaEnvelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({
+        count: 2,
+        media: [
+          { path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2, savedTo: '/work/imgs/image1.png' },
+          { path: 'word/media/photo.jpeg', contentType: 'image/jpeg', sizeBytes: 2, savedTo: '/work/imgs/photo.jpeg' },
+        ],
+      });
+    }
+    expect(Array.from(fs.snapshotBytes('/work/imgs/image1.png') ?? [])).toEqual([0x89, 0x50]);
+    expect(Array.from(fs.snapshotBytes('/work/imgs/photo.jpeg') ?? [])).toEqual([0xff, 0xd8]);
+  });
+
+  it('returns no_media when --output-dir is set but the response has no media array', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', { contentType: 'application/pdf', base64: 'JVBERi0=' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('returns no_media when the data is not a plain object', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', [1, 2, 3]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('returns no_media when a media item is missing its base64 (malformed envelope)', async () => {
+    const fs = createFileSystemFake();
+    const result = await persistMediaIfRequested(fs, '/work/imgs', { media: [{ path: 'ppt/media/x.png' }] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('no_media');
+  });
+
+  it('maps a writeBytes io_failure to write_failed with the underlying message', async () => {
+    const failingFs: FileSystem = {
+      readJson: async () => err({ type: 'not_found' }),
+      writeText: async () => ok(undefined),
+      writeBytes: async () => err({ type: 'io_failed', message: 'EACCES: permission denied' }),
+      deleteIfExists: async () => ok(undefined),
+      deleteDirIfExists: async () => ok(undefined),
+    };
+    const result = await persistMediaIfRequested(failingFs, '/root/imgs', mediaEnvelope);
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toContain('EACCES');
   });
 });

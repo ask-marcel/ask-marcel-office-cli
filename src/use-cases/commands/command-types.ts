@@ -133,6 +133,13 @@ type CommandMeta = {
    */
   readonly producesBytes?: true;
   /**
+   * `true` if the command returns a `media` array (`{ count, media: [{ path,
+   * contentType, sizeBytes, base64 }] }`) and is therefore a valid target for
+   * the global `--output-dir` flag, which writes each image to a directory.
+   * Parallel to `producesBytes` (single-file `--output-path`).
+   */
+  readonly producesMedia?: true;
+  /**
    * Stability tier of the command. Omitted from manifest entries when the
    * command is `'stable'` (the implicit default), surfaced only on
    * `'experimental'` commands so an LLM can prefer stable siblings when they

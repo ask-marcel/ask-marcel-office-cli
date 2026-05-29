@@ -4,6 +4,7 @@ import type { AuthError, AuthManager } from '../infra/auth.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { buildCli } from './cli.ts';
@@ -1004,5 +1005,63 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1']));
     expect(out).toBe('binary: application/pdf, 12345 bytes — use --output-path to save\n');
+  });
+
+  const mediaGraph = async (): Promise<GraphClient> => {
+    const bytes = await buildMediaSamples();
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return {
+      ...okGraph({}),
+      get: async () => ({ ok: true, value: { name: 'deck.pptx' } }),
+      getBinary: async () => ({ ok: true, value: { contentType: 'application/octet-stream', size: bytes.byteLength, base64: btoa(binary) } }),
+    };
+  };
+
+  it('extract-drive-item-images --output-dir writes every image to the directory and replaces base64 with savedTo', async () => {
+    const logger = createLoggerFake();
+    const fs = createFileSystemFake();
+    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
+    );
+    expect(out).toContain('savedTo');
+    expect(out).toContain('/work/imgs/image1.png');
+    expect(out).not.toContain('base64');
+    expect(Array.from(fs.snapshotBytes('/work/imgs/image1.png') ?? [])).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  });
+
+  it('--output-dir on a command that returns no media array emits a clear error pointing at the image-extraction commands', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Vincent' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-current-user', '--output-dir', '/work/imgs']));
+    expect(out).toContain('did not return a media array');
+    expect(out).toContain('extract-drive-item-images');
+  });
+
+  it('rejects an empty --output-dir explicitly', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', ''])
+    );
+    expect(out).toContain('directory argument is empty');
+  });
+
+  it('surfaces a filesystem write failure from --output-dir', async () => {
+    const logger = createLoggerFake();
+    const failingFs: FileSystem = {
+      readJson: async () => ({ ok: false, error: { type: 'not_found' } }),
+      writeText: async () => ({ ok: true, value: undefined }),
+      writeBytes: async () => ({ ok: false, error: { type: 'io_failed', message: 'ENOSPC: no space left on device' } }),
+      deleteIfExists: async () => ({ ok: true, value: undefined }),
+      deleteDirIfExists: async () => ({ ok: true, value: undefined }),
+    };
+    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs: failingFs });
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
+    );
+    expect(out).toContain('write failed');
+    expect(out).toContain('ENOSPC');
   });
 });

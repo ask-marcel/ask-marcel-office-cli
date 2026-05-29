@@ -307,6 +307,23 @@ const buildRichPptx = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+/**
+ * A package carrying raster media across all three format prefixes
+ * (word/xl/ppt/media) plus a vector part (.emf) and a non-media binary
+ * (embeddings) — exercises the raster-only filter of the media extractor.
+ * Hand-rolled so the byte contents are deterministic.
+ */
+const buildMediaSamples = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file('word/media/image1.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+  zip.file('xl/media/photo.jpeg', new Uint8Array([0xff, 0xd8, 0xff, 0xe0]));
+  zip.file('ppt/media/diagram.gif', new Uint8Array([0x47, 0x49, 0x46, 0x38]));
+  zip.file('ppt/media/logo.emf', new Uint8Array([0x01, 0x00, 0x00, 0x00]));
+  zip.file('word/embeddings/oleObject1.bin', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0]));
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 /** A barebones deck: one visible, untitled slide with no tags, comments, notes, or custom props. */
 const buildMinimalPptx = async (): Promise<Uint8Array> => {
   const zip = new JSZip();
@@ -323,6 +340,7 @@ export {
   buildMalformedDocx,
   buildMalformedPptx,
   buildMalformedXlsx,
+  buildMediaSamples,
   buildMinimalPptx,
   buildRichDocx,
   buildRichPptx,
