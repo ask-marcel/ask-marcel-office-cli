@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-30T06:35:26.944Z",
+  "generatedAt": "2026-05-30T12:49:28.074Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1848,7 +1848,7 @@
         }
       ],
       "example": "ask-marcel list-accessible-drives --output json",
-      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, channel, or site whose sub-call failed."
+      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, channel, or site whose sub-call failed."
     },
     {
       "name": "list-all-onenote-sections",
@@ -6371,7 +6371,7 @@
         }
       ],
       "example": "ask-marcel search-all-accessible-sites --output json",
-      "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count (compare with `count` to see if the ceiling truncated the sweep); `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
+      "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, fileTotal?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count for sites (compare with `count` to see if the ceiling truncated the sweep); `fileTotal` (best-effort, omitted if the extra query fails) is the index's security-trimmed `driveItem` count — i.e. roughly how many files+folders the user can access across all of SharePoint/OneDrive; `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
       "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
     },
     {

@@ -4,6 +4,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { searchIndexTotal } from './search-index-total.ts';
 
 /**
  * Enumerate every SharePoint / Teams / OneDrive document library the signed-in
@@ -325,7 +326,16 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   if (value.length === 0 && partialErrors.length > 0) return err(partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all drive-discovery sub-requests failed' });
 
-  return ok({ value, count: value.length, ...(truncated ? { truncated: true } : {}), ...(partialErrors.length > 0 ? { partialErrors } : {}) });
+  // Best-effort index-wide file count (driveItems) for context — NOT scoped to the drives above.
+  const fileEstimate = await searchIndexTotal(graph, 'driveItem');
+
+  return ok({
+    value,
+    count: value.length,
+    ...(fileEstimate !== undefined ? { fileEstimate } : {}),
+    ...(truncated ? { truncated: true } : {}),
+    ...(partialErrors.length > 0 ? { partialErrors } : {}),
+  });
 };
 
 const meta: CommandMeta = {
@@ -348,7 +358,7 @@ const meta: CommandMeta = {
   ],
   example: 'ask-marcel list-accessible-drives --output json',
   responseShape:
-    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"|"siteLibrary"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, channel, or site whose sub-call failed.',
+    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"|"siteLibrary"], groupId? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index\'s security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, channel, or site whose sub-call failed.',
 };
 
 export { execute, meta, schema };

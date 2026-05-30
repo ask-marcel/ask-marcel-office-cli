@@ -6,9 +6,14 @@ import { execute, meta } from './search-all-accessible-sites.ts';
 
 // A graph fake whose POST handler is driven by the `from` offset of the search body,
 // so tests can stage one response per page.
-const graphWith = (onPost: (from: number) => Result<unknown, GraphError>): GraphClient => ({
+const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveItemTotal?: number): GraphClient => ({
   get: async () => ok({}),
-  post: async (_path, body) => onPost((body as { requests: ReadonlyArray<{ from?: number }> }).requests[0]?.from ?? 0),
+  post: async (_path, body) => {
+    const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
+    // The command issues one extra driveItem-count query for `fileTotal`; route it separately so site-paging tests stay isolated.
+    if (req?.entityTypes?.[0] === 'driveItem') return driveItemTotal === undefined ? ok({ value: [] }) : page([], false, driveItemTotal);
+    return onPost(req?.from ?? 0);
+  },
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
   teamsChat: async () => ok({}),
@@ -120,13 +125,35 @@ describe('search-all-accessible-sites', () => {
     const graph: GraphClient = {
       ...graphWith(() => page([], false, 0)),
       post: async (_path, body) => {
-        queries.push(queryStringOf(body));
+        const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; query: { queryString: string } }> }).requests[0];
+        if (req?.entityTypes?.[0] === 'site') queries.push(queryStringOf(body)); // ignore the driveItem fileTotal query
         return page([], false, 0);
       },
     };
     await execute(graph, {});
     await execute(graph, { query: 'budget' });
     expect(queries).toEqual(['*', 'budget']);
+  });
+
+  it('includes fileTotal — the index driveItem (file) count — alongside the site total', async () => {
+    const graph = graphWith((from) => (from === 0 ? page([{ id: 's1' }], false, 1) : page([], false, 1)), 139461);
+    const result = await execute(graph, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { count: number; total: number; fileTotal?: number };
+    expect(v.count).toBe(1);
+    expect(v.fileTotal).toBe(139461);
+  });
+
+  it('omits fileTotal when the driveItem count query yields no numeric total', async () => {
+    // default graphWith (no driveItemTotal) → the driveItem query returns an empty body
+    const result = await execute(
+      graphWith(() => page([{ id: 's1' }], false, 1)),
+      {}
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.value as { fileTotal?: number }).fileTotal).toBeUndefined();
   });
 
   it('searches sites via POST /search/query per its meta', () => {

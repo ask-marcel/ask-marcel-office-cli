@@ -626,4 +626,12 @@ describe('list-accessible-drives', () => {
     expect(v.truncated).toBe(true); // 3 distinct sites > cap of 2
     expect(v.value.map((d) => d.id).sort()).toEqual(['a', 'b', 'cc']);
   });
+
+  it('attaches a best-effort index-wide fileEstimate (driveItem count) from /search/query', async () => {
+    const graph: GraphClient = { ...routeGraph(fullRoutes), post: async () => ok({ value: [{ hitsContainers: [{ total: 139461 }] }] }) };
+    const result = await execute(graph, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.value as { fileEstimate?: number }).fileEstimate).toBe(139461);
+  });
 });

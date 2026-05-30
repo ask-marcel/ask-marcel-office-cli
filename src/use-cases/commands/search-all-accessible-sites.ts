@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { searchIndexTotal } from './search-index-total.ts';
 
 /**
  * Enumerate every SharePoint site the signed-in user can access via the Microsoft
@@ -60,7 +61,10 @@ const execute: Command['execute'] = async (graph, params) => {
     if (page === MAX_PAGES - 1) truncated = true;
   }
 
-  return ok({ value, count: value.length, total, ...(truncated ? { truncated: true } : {}) });
+  // Best-effort: the index's accessible-file (driveItem) count, alongside the site total.
+  const fileTotal = await searchIndexTotal(graph, 'driveItem');
+
+  return ok({ value, count: value.length, total, ...(fileTotal !== undefined ? { fileTotal } : {}), ...(truncated ? { truncated: true } : {}) });
 };
 
 const meta: CommandMeta = {
@@ -83,7 +87,7 @@ const meta: CommandMeta = {
   bodyTemplate:
     "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
   responseShape:
-    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count (compare with `count` to see if the ceiling truncated the sweep); `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
+    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, fileTotal?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count for sites (compare with `count` to see if the ceiling truncated the sweep); `fileTotal` (best-effort, omitted if the extra query fails) is the index's security-trimmed `driveItem` count — i.e. roughly how many files+folders the user can access across all of SharePoint/OneDrive; `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
 };
 
 export { execute, meta, schema };
