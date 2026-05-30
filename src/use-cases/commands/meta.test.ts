@@ -100,6 +100,9 @@ describe('command meta — invariants on every registered command', () => {
           // post-fetch processing toggle (run the metadata extractor on the
           // already-downloaded docx bytes); not a URL placeholder.
           'include-metadata',
+          // `list-accessible-drives --max-groups` caps the per-group drive
+          // fan-out; runtime-additive, not a URL placeholder.
+          'max-groups',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

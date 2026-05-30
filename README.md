@@ -54,6 +54,10 @@ Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachme
 
 The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 
+### Find every drive you can reach
+
+`list-drives` only returns your personal OneDrive(s). `list-accessible-drives` unions the discovery vectors the delegated token can hit — `/me/drives` (personal), `/me/joinedTeams` (Teams libraries), `/me/memberOf` Unified groups → each group's drive (SharePoint M365-group sites), and `/me/drive/sharedWithMe` (the drives behind files shared with you) — deduped by drive id and tagged with the `sources[]` that surfaced each one. The `sharedWithMe` vector catches direct-link-only sites that the tenant search index (`search-sharepoint-sites-by-name`) misses. Per-vector failures land in `partialErrors[]` rather than failing the call; `--max-groups` caps the per-group fan-out.
+
 ### Browser-OAuth at first launch
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.

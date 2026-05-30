@@ -10,6 +10,7 @@ import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
+import * as listAccessibleDrives from './list-accessible-drives.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
 import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
@@ -182,6 +183,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
   'extract-drive-item-images': extractDriveItemImages,
+  'list-accessible-drives': listAccessibleDrives,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
   'get-excel-range': getExcelRange,

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-29T04:48:57.951Z",
+  "generatedAt": "2026-05-30T05:04:59.254Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1825,6 +1825,30 @@
       ],
       "example": "ask-marcel get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
       "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`)."
+    },
+    {
+      "name": "list-accessible-drives",
+      "summary": "Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, and the drives behind files shared with the user — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups, each resolved to `/groups/{id}/drive`), and `/me/drive/sharedWithMe`. Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites), the sharedWithMe vector surfaces drives reached via a shared link. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-vector and per-group failures do not fail the command — they appear in `partialErrors[]`; a group with no provisioned drive is dropped silently. Fans out one `/groups/{id}/drive` call per joined team + member group (capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-list",
+      "options": [
+        {
+          "name": "max-groups",
+          "key": "maxGroups",
+          "required": false,
+          "description": "Safety cap on the per-group `/groups/{id}/drive` fan-out (positive integer; default 100). Each joined team + member M365 group costs one Graph call, so a user in hundreds of groups would otherwise issue hundreds of parallel requests (429 risk). When the cap is hit the response carries `truncated: true`. Same cap bounds the `/drives/{id}` lookups for shared-only drives.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "100"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel list-accessible-drives --output json",
+      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive; `groupId` is present only for Teams/group drives. `truncated: true` means the `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector or group whose sub-call failed."
     },
     {
       "name": "list-all-onenote-sections",
