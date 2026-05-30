@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-30T05:04:59.254Z",
+  "generatedAt": "2026-05-30T05:32:28.807Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -1828,17 +1828,17 @@
     },
     {
       "name": "list-accessible-drives",
-      "summary": "Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, and the drives behind files shared with the user — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups, each resolved to `/groups/{id}/drive`), and `/me/drive/sharedWithMe`. Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites), the sharedWithMe vector surfaces drives reached via a shared link. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-vector and per-group failures do not fail the command — they appear in `partialErrors[]`; a group with no provisioned drive is dropped silently. Fans out one `/groups/{id}/drive` call per joined team + member group (capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.",
+      "summary": "Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, the drives behind files shared with the user, AND private/shared Teams channel sites — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups, each resolved to `/groups/{id}/drive`), `/me/drive/sharedWithMe`, and per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (only private/shared channels, whose files live in their own site rather than the team default drive). Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites), the sharedWithMe + channel vectors surface drives the search index never returns. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-vector and per-group failures do not fail the command — they appear in `partialErrors[]`; a group/channel with no provisioned drive is dropped silently. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, plus a `filesFolder` call per private/shared channel (all capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.",
       "category": "drive",
       "graphMethod": "GET",
-      "graphPathTemplate": "/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive",
+      "graphPathTemplate": "/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive + per-team /teams/<id>/channels/<ch>/filesFolder",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-list",
       "options": [
         {
           "name": "max-groups",
           "key": "maxGroups",
           "required": false,
-          "description": "Safety cap on the per-group `/groups/{id}/drive` fan-out (positive integer; default 100). Each joined team + member M365 group costs one Graph call, so a user in hundreds of groups would otherwise issue hundreds of parallel requests (429 risk). When the cap is hit the response carries `truncated: true`. Same cap bounds the `/drives/{id}` lookups for shared-only drives.",
+          "description": "Safety cap on each fan-out (positive integer; default 100): the per-group `/groups/{id}/drive` calls, the per-team `/teams/{id}/channels` enumeration, the per-private/shared-channel `filesFolder` lookups, and the `/drives/{id}` enrichment for shared- and channel-only drives. A user in hundreds of teams/groups would otherwise issue hundreds of parallel requests (429 risk). When any cap is hit the response carries `truncated: true`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -1848,7 +1848,7 @@
         }
       ],
       "example": "ask-marcel list-accessible-drives --output json",
-      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive; `groupId` is present only for Teams/group drives. `truncated: true` means the `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector or group whose sub-call failed."
+      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder); `groupId` is present only for Teams/group drives. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, or channel whose sub-call failed."
     },
     {
       "name": "list-all-onenote-sections",

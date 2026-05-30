@@ -56,7 +56,7 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 
 ### Find every drive you can reach
 
-`list-drives` only returns your personal OneDrive(s). `list-accessible-drives` unions the discovery vectors the delegated token can hit — `/me/drives` (personal), `/me/joinedTeams` (Teams libraries), `/me/memberOf` Unified groups → each group's drive (SharePoint M365-group sites), and `/me/drive/sharedWithMe` (the drives behind files shared with you) — deduped by drive id and tagged with the `sources[]` that surfaced each one. The `sharedWithMe` vector catches direct-link-only sites that the tenant search index (`search-sharepoint-sites-by-name`) misses. Per-vector failures land in `partialErrors[]` rather than failing the call; `--max-groups` caps the per-group fan-out.
+`list-drives` only returns your personal OneDrive(s). `list-accessible-drives` unions the discovery vectors the delegated token can hit — `/me/drives` (personal), `/me/joinedTeams` (Teams libraries), `/me/memberOf` Unified groups → each group's drive (SharePoint M365-group sites), `/me/drive/sharedWithMe` (the drives behind files shared with you), and per-team `/teams/{id}/channels` → `filesFolder` for **private/shared channels** (which live in their own sites, not the team default drive) — deduped by drive id and tagged with the `sources[]` that surfaced each one (`channel` marks a private/shared channel drive). The `sharedWithMe` and `channel` vectors catch sites the tenant search index (`search-sharepoint-sites-by-name`) misses. Per-vector failures land in `partialErrors[]` rather than failing the call; `--max-groups` caps every fan-out.
 
 ### Browser-OAuth at first launch
 
