@@ -6,6 +6,14 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-05-30 | "maximum SharePoint a delegated user can see" = union of search-index + membership/activity vectors
+
+There is no single delegated Graph API for "every site I can access" (Microsoft confirms it; `/sites/getAllSites` is application-only and not access-trimmed; `/me/followedSites` 403s on this token). The practical maximum is the UNION of two complementary commands, each catching what the other can't:
+- `search-all-accessible-sites` — deep-pages `POST /search/query` `entityTypes:['site']` via `from`/`size` until `moreResultsAvailable` is false. This returns the FULL security-trimmed site index (incl. sites you can open but aren't a member of). Critically, `GET /sites?search=*` (behind `search-sharepoint-sites-by-name`) returns a single capped page with NO `@odata.nextLink` — measured 80 sites — whereas the Search API reported `total:142` and paged out 141. Always prefer `/search/query` paging over `/sites?search=` for completeness.
+- `list-accessible-drives` — 7 vectors: `/me/drives`, joinedTeams→`/groups/{id}/drive`, memberOf(Unified)→drive, `/me/drive/sharedWithMe`, private/shared channels (`/teams/{id}/channels`→`filesFolder`), activity (`/me/drive/recent`+`/following`+`/me/insights/{trending,used,shared}`), and ALL libraries per site (path-addressed `/sites/{host}:/sites/{name}:/drives` — sites routinely have a non-default "Teams Wiki Data"/custom library the default-drive vectors miss).
+Measured union on one tenant: 190 distinct site-roots vs 80 from `search *` alone (2.4×). Drive-level granularity matters — a site-root can host several driveIds; measure new coverage by driveId, not webUrl host/path (site-root dedup undercounts secondary libraries).
+Applies to: any "show me everything I can reach in SharePoint/OneDrive" request on the Teams web-client delegated token.
+
 ## [gotcha] 2026-05-30 | Stryker `incremental` reports optimistically — `rm`-ing the file is not enough; set `incremental: false`
 
 The 2026-05-29 note said `rm -f reports/stryker-incremental.json` fixes stale verdicts. It does not fully: with `testRunner: command` + `incremental: true`, a scoped `--mutate` run still over-credits kills (measured 85.4% where a truly-clean run was 84.0%) even after deleting the file. The CLI flags do not help — `--incremental false` is parsed as a config-file path ("Invalid config file 'false'") and `--no-incremental` is rejected as an unknown option. The only reliable accurate gate is editing `stryker.conf.json` to `"incremental": false` (optionally `"cleanTempDir": false` to keep the sandbox for inspection), running, then restoring. Restore both before committing — they are dev-speed defaults, not part of a feature change.
