@@ -28,7 +28,7 @@ const GRAPH_PREFIX = 'https://graph.microsoft.com/v1.0';
 const DEFAULT_MAX_GROUPS = 100;
 const MAX_PAGES = 25;
 
-type Source = 'activity' | 'channel' | 'joinedTeam' | 'memberOfGroup' | 'personal' | 'sharedWithMe';
+type Source = 'activity' | 'channel' | 'joinedTeam' | 'memberOfGroup' | 'personal' | 'sharedWithMe' | 'siteLibrary';
 type DriveResource = { readonly id?: string; readonly name?: string; readonly driveType?: string; readonly webUrl?: string };
 type Accumulator = { name: string; driveType: string; webUrl: string; groupId: string | null; readonly sources: Set<Source> };
 
@@ -212,6 +212,41 @@ const collectActivityDriveIds = async (graph: GraphClient, partialErrors: Partia
   return [...ids];
 };
 
+// The group/site vectors only surface a site's DEFAULT library. Path-address each known
+// SharePoint site (from a drive's webUrl) and enumerate ALL its document libraries.
+const siteAddress = (webUrl: string): string | undefined => {
+  const match = webUrl.match(/^https:\/\/([^/]+)\/sites\/([^/]+)/);
+  return match === null ? undefined : `${match[1]}:/sites/${match[2]}:`;
+};
+
+const driveValues = (body: unknown): ReadonlyArray<unknown> => {
+  const value = (body as { value?: ReadonlyArray<unknown> } | null)?.value;
+  return Array.isArray(value) ? value : [];
+};
+
+const addSiteLibraries = async (graph: GraphClient, drives: Map<string, Accumulator>, maxGroups: number, partialErrors: PartialErrors): Promise<boolean> => {
+  const sites = new Set<string>();
+  for (const acc of drives.values()) {
+    const addr = siteAddress(acc.webUrl);
+    if (addr !== undefined) sites.add(addr);
+  }
+  const capped = [...sites].slice(0, maxGroups);
+  const results = await Promise.all(capped.map((addr) => graph.get(`/sites/${addr}/drives`)));
+  capped.forEach((addr, i) => {
+    const r = results[i];
+    if (r === undefined) return;
+    if (!r.ok) {
+      if (!isNoDrive(r.error)) partialErrors.push({ source: `/sites/${addr}/drives`, error: r.error });
+      return;
+    }
+    for (const lib of driveValues(r.value)) {
+      const libId = idOf(lib);
+      if (libId !== undefined && !drives.has(libId)) upsert(drives, lib as DriveResource, 'siteLibrary', null);
+    }
+  });
+  return sites.size > maxGroups;
+};
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -281,6 +316,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   tagKnown(drives, activityIds, 'activity');
   if (await enrichUnknownDrives(graph, activityIds, 'activity', drives, maxGroups, partialErrors)) truncated = true;
 
+  // Seventh vector: every OTHER document library of each known SharePoint site (not just the default).
+  if (await addSiteLibraries(graph, drives, maxGroups, partialErrors)) truncated = true;
+
   const value = [...drives.entries()]
     .map(([id, d]) => ({ id, name: d.name, driveType: d.driveType, webUrl: d.webUrl, sources: [...d.sources].sort(), ...(d.groupId !== null ? { groupId: d.groupId } : {}) }))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -292,11 +330,11 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, drives behind files shared with the user, private/shared Teams channel sites, AND drives behind recently-used / followed / trending items (activity signals) — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups, each resolved to `/groups/{id}/drive`), `/me/drive/sharedWithMe`, per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (private/shared channels only — their files live in their own site, not the team default drive), and `/me/drive/recent` + `/me/drive/following` + `/me/insights/{trending,used,shared}`. Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites + OneDrives), the sharedWithMe / channel / activity vectors surface drives the search index never returns; the index in turn returns sites you can open but are not a member of, so the *union of both commands* is the practical maximum on a delegated token. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-vector / per-group failures do not fail the command — they appear in `partialErrors[]`; a group/channel with no provisioned drive is dropped silently. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, plus a `filesFolder` call per private/shared channel and five fixed activity calls (all `/drives/{id}` enrichment capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.',
+    'Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, drives behind files shared with the user, private/shared Teams channel sites, drives behind recently-used / followed / trending items (activity signals), AND every NON-default document library of each discovered SharePoint site — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups → `/groups/{id}/drive`), `/me/drive/sharedWithMe`, per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (private/shared channels only — their files live in their own site, not the team default drive), `/me/drive/recent` + `/me/drive/following` + `/me/insights/{trending,used,shared}`, and a path-addressed `/sites/{host}:/sites/{name}:/drives` per discovered site (catches secondary libraries like "Teams Wiki Data" the default-drive vectors miss). Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites + OneDrives), these vectors surface drives the search index never returns; the index in turn returns sites you can open but are not a member of, so the *union of both commands* is the practical maximum on a delegated token. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-vector / per-group failures do not fail the command — they appear in `partialErrors[]`; a group/channel/site with no provisioned drive is dropped silently. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, a `filesFolder` call per private/shared channel, five fixed activity calls, and one `/sites/{id}/drives` call per discovered site (all capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate:
-    '/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive + per-team /teams/<id>/channels/<ch>/filesFolder + /me/drive/recent + /me/drive/following + /me/insights/<trending|used|shared>',
+    '/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive + per-team /teams/<id>/channels/<ch>/filesFolder + /me/drive/recent + /me/drive/following + /me/insights/<trending|used|shared> + per-site /sites/<host>:/sites/<name>:/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
   options: [
     {
@@ -304,13 +342,13 @@ const meta: CommandMeta = {
       key: 'maxGroups',
       required: false,
       description:
-        'Safety cap on each fan-out (positive integer; default 100): the per-group `/groups/{id}/drive` calls, the per-team `/teams/{id}/channels` enumeration, the per-private/shared-channel `filesFolder` lookups, and the `/drives/{id}` enrichment for shared-, channel-, and activity-only drives. A user in hundreds of teams/groups would otherwise issue hundreds of parallel requests (429 risk). When any cap is hit the response carries `truncated: true`.',
+        'Safety cap on each fan-out (positive integer; default 100): the per-group `/groups/{id}/drive` calls, the per-team `/teams/{id}/channels` enumeration, the per-private/shared-channel `filesFolder` lookups, the per-site `/sites/{id}/drives` enumeration, and the `/drives/{id}` enrichment for shared-, channel-, and activity-only drives. A user in hundreds of teams/groups/sites would otherwise issue hundreds of parallel requests (429 risk). When any cap is hit the response carries `truncated: true`.',
       argumentHint: { kind: 'magicValue', values: ['100'] },
     },
   ],
   example: 'ask-marcel list-accessible-drives --output json',
   responseShape:
-    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive); `groupId` is present only for Teams/group drives. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, or channel whose sub-call failed.',
+    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"|"siteLibrary"], groupId? }], count, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (when present) names each vector, group, channel, or site whose sub-call failed.',
 };
 
 export { execute, meta, schema };

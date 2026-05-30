@@ -544,4 +544,86 @@ describe('list-accessible-drives', () => {
     expect(v.value[0]?.sources).toEqual(['activity', 'personal']);
     expect(v.partialErrors?.map((p) => p.source)).toEqual(['/me/insights/used']);
   });
+
+  it('adds non-default site libraries via /sites/{id}/drives tagged "siteLibrary", without re-tagging the known default', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives') return ok({ value: [] });
+      if (path === '/me/joinedTeams') return ok({ value: [{ id: 'g1' }] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/groups/g1/drive')
+        return ok({ id: 'd-default', name: 'Documents', driveType: 'documentLibrary', webUrl: 'https://contoso.sharepoint.com/sites/TeamA/Shared%20Documents' });
+      if (path === '/sites/contoso.sharepoint.com:/sites/TeamA:/drives')
+        return ok({
+          value: [
+            { id: 'd-default', name: 'Documents', driveType: 'documentLibrary', webUrl: 'https://contoso.sharepoint.com/sites/TeamA/Shared%20Documents' },
+            { id: 'd-wiki', name: 'Teams Wiki Data', driveType: 'documentLibrary', webUrl: 'https://contoso.sharepoint.com/sites/TeamA/Teams%20Wiki%20Data' },
+          ],
+        });
+      if (path.startsWith('/teams/')) return ok({ value: [] }); // g1 has no channels in this scenario
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
+    expect(v.value.map((d) => d.id).sort()).toEqual(['d-default', 'd-wiki']);
+    expect(v.value.find((d) => d.id === 'd-default')?.sources).toEqual(['joinedTeam']); // known default NOT re-tagged
+    expect(v.value.find((d) => d.id === 'd-wiki')?.sources).toEqual(['siteLibrary']); // secondary library, newly found
+  });
+
+  it('skips OneDrive sites, ignores malformed libs / no-value bodies, drops 404 sites, records non-404 site failures', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives')
+        return ok({
+          value: [
+            { id: 'od', name: 'OneDrive', driveType: 'business', webUrl: 'https://c-my.sharepoint.com/personal/me/Documents' },
+            { id: 's1', name: 'S1', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteOK/Shared%20Documents' },
+            { id: 's2', name: 'S2', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteEmpty/Shared%20Documents' },
+            { id: 's3', name: 'S3', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/Site404/Shared%20Documents' },
+            { id: 's4', name: 'S4', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/Site500/Shared%20Documents' },
+          ],
+        });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteOK:/drives')
+        return ok({ value: [null, { name: 'no id' }, { id: 'lib1', name: 'Lib', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteOK/Lib' }] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteEmpty:/drives') return ok({ notValue: true });
+      if (path === '/sites/c.sharepoint.com:/sites/Site404:/drives') return err({ type: 'api_error', status: 404, message: 'gone' });
+      if (path === '/sites/c.sharepoint.com:/sites/Site500:/drives') return err({ type: 'api_error', status: 500, message: 'boom' });
+      return emptyActivity(path); // a /personal/ site-drives call would throw here — proves OneDrive is skipped
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string }>; partialErrors?: ReadonlyArray<{ source: string }> };
+    expect(v.value.map((d) => d.id).sort()).toEqual(['lib1', 'od', 's1', 's2', 's3', 's4']);
+    expect(v.partialErrors?.map((p) => p.source)).toEqual(['/sites/c.sharepoint.com:/sites/Site500:/drives']);
+  });
+
+  it('caps the site-library fan-out at --max-groups and flags truncated', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives')
+        return ok({
+          value: [
+            { id: 'a', name: 'A', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteA/Shared%20Documents' },
+            { id: 'b', name: 'B', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteB/Shared%20Documents' },
+            { id: 'cc', name: 'C', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteC/Shared%20Documents' },
+          ],
+        });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteA:/drives') return ok({ value: [] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteB:/drives') return ok({ value: [] });
+      return emptyActivity(path); // SiteC must NOT be enumerated under the cap of 2
+    };
+    const result = await execute(routeGraph(routes), { maxGroups: '2' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { truncated?: boolean; value: ReadonlyArray<{ id: string }> };
+    expect(v.truncated).toBe(true); // 3 distinct sites > cap of 2
+    expect(v.value.map((d) => d.id).sort()).toEqual(['a', 'b', 'cc']);
+  });
 });
