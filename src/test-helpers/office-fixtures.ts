@@ -14,6 +14,7 @@ import {
   TableRow,
   TextRun,
 } from 'docx';
+import { deflateSync } from 'node:zlib';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
@@ -372,6 +373,46 @@ const buildMinimalPptx = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+// Minimal valid PDF (correct xref offsets); `withImage` paints one 2x2 RGB image (FlateDecode).
+const buildPdf = (withImage: boolean): Uint8Array => {
+  const enc = (s: string): Buffer => Buffer.from(s, 'latin1');
+  const content = withImage ? enc('q 50 0 0 50 25 25 cm /Im0 Do Q') : enc('BT ET');
+  const page = withImage
+    ? '<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents 4 0 R/Resources<</XObject<</Im0 5 0 R>>>>>>'
+    : '<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents 4 0 R/Resources<<>>>>';
+  const objs: Record<number, Buffer> = {
+    1: enc('<</Type/Catalog/Pages 2 0 R>>'),
+    2: enc('<</Type/Pages/Kids[3 0 R]/Count 1>>'),
+    3: enc(page),
+    4: Buffer.concat([enc(`<</Length ${content.length}>>\nstream\n`), content, enc('\nendstream')]),
+  };
+  if (withImage) {
+    const img = deflateSync(Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]));
+    objs[5] = Buffer.concat([
+      enc(`<</Type/XObject/Subtype/Image/Width 2/Height 2/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode/Length ${img.length}>>\nstream\n`),
+      img,
+      enc('\nendstream'),
+    ]);
+  }
+  const ids = Object.keys(objs)
+    .map(Number)
+    .sort((a, b) => a - b);
+  let pdf = enc('%PDF-1.7\n');
+  const off: Record<number, number> = {};
+  for (const id of ids) {
+    off[id] = pdf.length;
+    pdf = Buffer.concat([pdf, enc(`${id} 0 obj\n`), objs[id]!, enc('\nendobj\n')]);
+  }
+  const xrefAt = pdf.length;
+  const size = ids.length + 1;
+  let xref = enc(`xref\n0 ${size}\n0000000000 65535 f \n`);
+  for (const id of ids) xref = Buffer.concat([xref, enc(`${String(off[id]).padStart(10, '0')} 00000 n \n`)]);
+  return new Uint8Array(Buffer.concat([pdf, xref, enc(`trailer\n<</Size ${size}/Root 1 0 R>>\nstartxref\n${xrefAt}\n%%EOF`)]));
+};
+
+const buildPdfWithImage = (): Uint8Array => buildPdf(true);
+const buildPdfNoImages = (): Uint8Array => buildPdf(false);
+
 export {
   buildMacroDocm,
   buildMalformedDocx,
@@ -380,6 +421,8 @@ export {
   buildMediaSamples,
   buildMinimalOdt,
   buildMinimalPptx,
+  buildPdfNoImages,
+  buildPdfWithImage,
   buildRichDocx,
   buildRichOdt,
   buildRichPptx,

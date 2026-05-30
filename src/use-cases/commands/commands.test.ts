@@ -5,7 +5,7 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildMalformedDocx, buildMediaSamples, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildMalformedDocx, buildMediaSamples, buildPdfWithImage, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -1149,18 +1149,40 @@ describe('commands', () => {
     }
   });
 
-  it('extract-drive-item-images rejects a non-OOXML source with a 415 that names the offending extension and points at download-onedrive-file-content', async () => {
-    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'report.pdf' }) }]);
+  it('extract-drive-item-images extracts PNG-encoded page images from a PDF source', async () => {
+    const pdfBytes = buildPdfWithImage();
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf', method: 'GET', response: Response.json({ name: 'report.pdf' }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iPdf/content',
+        method: 'GET',
+        response: () => new Response(pdfBytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } }),
+      },
+    ]);
     const cmd = cmdMap['extract-drive-item-images'];
     if (!cmd) throw new Error('extract-drive-item-images not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iPdf' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { count: number; media: ReadonlyArray<{ path: string; contentType: string }> };
+    expect(v.count).toBe(1);
+    expect(v.media[0]?.path).toMatch(/^pdf\/page1\/.+\.png$/);
+    expect(v.media[0]?.contentType).toBe('image/png');
+  });
+
+  it('extract-drive-item-images rejects an unsupported source with a 415 that names the extension and points at download-onedrive-file-content', async () => {
+    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt', method: 'GET', response: Response.json({ name: 'notes.txt' }) }]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iTxt' });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
     if (result.error.type !== 'api_error') return;
     expect(result.error.status).toBe(415);
-    expect(result.error.message).toContain('pdf is not an OOXML document — image extraction supports docx / xlsx / pptx');
+    expect(result.error.message).toContain('txt is not a supported document — image extraction supports pdf and docx / xlsx / pptx');
     expect(result.error.message).toContain('download-onedrive-file-content');
   });
 
@@ -1197,7 +1219,7 @@ describe('commands', () => {
     if (!cmd) throw new Error('extract-drive-item-images not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iDot' });
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not a supported document');
   });
 
   it('extract-drive-item-images aliases the docx and xlsx macro-enabled families onto the same extractor', async () => {
@@ -1232,7 +1254,7 @@ describe('commands', () => {
     expect(result.error.type).toBe('api_error');
     if (result.error.type !== 'api_error') return;
     expect(result.error.status).toBe(415);
-    expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+    expect(result.error.message).toContain('<no-extension> is not a supported document');
   });
 
   it('extract-drive-item-images returns count 0 with an empty media array for an OOXML doc with no embedded images', async () => {
@@ -3172,18 +3194,17 @@ describe('commands', () => {
     if (result.ok) expect((result.value as { count: number }).count).toBe(3);
   });
 
-  it('extract-mail-attachment-images rejects a non-OOXML fileAttachment with a 415 api_error naming the extension', async () => {
-    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'scan.pdf', contentBytes: btoa('zzz') });
+  it('extract-mail-attachment-images extracts PNG page images from a PDF fileAttachment', async () => {
+    const contentBytes = Buffer.from(buildPdfWithImage()).toString('base64');
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'scan.pdf', contentBytes });
     const cmd = cmdMap['extract-mail-attachment-images'];
     if (!cmd) throw new Error('extract-mail-attachment-images not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aPdf' });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.type).toBe('api_error');
-    if (result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('pdf is not an OOXML document — image extraction supports docx / xlsx / pptx');
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { count: number; media: ReadonlyArray<{ path: string }> };
+    expect(v.count).toBe(1);
+    expect(v.media[0]?.path).toMatch(/^pdf\/page1\/.+\.png$/);
   });
 
   it('extract-mail-attachment-images treats a trailing-dot attachment name as non-OOXML', async () => {
@@ -3192,7 +3213,7 @@ describe('commands', () => {
     if (!cmd) throw new Error('extract-mail-attachment-images not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aDot' });
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not an OOXML document');
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('<no-extension> is not a supported document');
   });
 
   it('extract-mail-attachment-images surfaces a media-extraction failure for an OOXML-named attachment that is not a valid zip', async () => {

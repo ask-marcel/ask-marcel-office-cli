@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
+import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
 import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -27,19 +28,27 @@ const extensionOf = (filename: string): string => {
 
 const isOoxml = (ext: string): boolean => DOCX_FAMILY.has(ext) || XLSX_FAMILY.has(ext) || PPTX_FAMILY.has(ext);
 
-const notOoxml = (ext: string): Result<unknown, GraphError> => ({
+// Pick the media extractor by extension: PDF via unpdf, OOXML via the zip media parts, else unsupported.
+const extractorFor = (ext: string): typeof extractPdfImages | undefined => {
+  if (ext === 'pdf') return extractPdfImages;
+  if (isOoxml(ext)) return extractOoxmlMedia;
+  return undefined;
+};
+
+const unsupportedFormat = (ext: string): Result<unknown, GraphError> => ({
   ok: false,
   error: {
     type: 'api_error',
     status: 415,
-    message: `${ext === '' ? '<no-extension>' : ext} is not an OOXML document — image extraction supports docx / xlsx / pptx and their macro-enabled / template variants. For other attachments, fetch the bytes via \`get-mail-attachment\` and process locally.`,
+    message: `${ext === '' ? '<no-extension>' : ext} is not a supported document — image extraction supports pdf and docx / xlsx / pptx (and their macro-enabled / template variants). For other attachments, fetch the bytes via \`get-mail-attachment\` and process locally.`,
   },
 });
 
 const extractFromBytes = async (bytes: Uint8Array, name: string): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(name);
-  if (!isOoxml(ext)) return notOoxml(ext);
-  const media = await extractOoxmlMedia(bytes);
+  const extractor = extractorFor(ext);
+  if (extractor === undefined) return unsupportedFormat(ext);
+  const media = await extractor(bytes);
   if (!media.ok) return media;
   return ok(buildMediaResponse(media.value));
 };
@@ -78,7 +87,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     case '#microsoft.graph.referenceAttachment':
       return fromReferenceAttachment(graph, a);
     case '#microsoft.graph.itemAttachment':
-      return err({ type: 'api_error', status: 415, message: 'itemAttachment (embedded mail / event / contact) has no OOXML document to extract images from.' });
+      return err({ type: 'api_error', status: 415, message: 'itemAttachment (embedded mail / event / contact) has no document to extract images from.' });
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
@@ -86,7 +95,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Extract the embedded raster images (png/jpg/gif/bmp/tiff/webp) from an Outlook mail attachment that is a docx, xlsx, or pptx (and their macro-enabled / template variants) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Vector media (emf/wmf/svg) and audio/video are skipped. itemAttachment and non-OOXML attachments return a 415.',
+    'Extract the embedded raster images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Vector media (emf/wmf/svg) and audio/video are skipped. itemAttachment and unsupported formats return a 415.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
