@@ -40,7 +40,7 @@ const fullRoutes: Route = (path) => {
   if (path === '/groups/g2/drive') return ok({ id: 'dg2', name: 'Group Two', driveType: 'documentLibrary', webUrl: 'u2' });
   if (path === '/drives/d-shared') return ok({ id: 'd-shared', name: 'Shared Lib', driveType: 'documentLibrary', webUrl: 'us' });
   if (path.startsWith('/teams/')) return ok({ value: [] }); // no channels in the base scenario
-  throw new Error(`unexpected path: ${path}`);
+  return emptyActivity(path);
 };
 
 // Two drives (sA, sB) reachable ONLY via sharedWithMe — no personal/team/member vectors.
@@ -51,7 +51,15 @@ const twoSharedOnlyRoutes: Route = (path) => {
   if (path === '/me/drive/sharedWithMe') return ok({ value: [{ remoteItem: { parentReference: { driveId: 'sA' } } }, { remoteItem: { parentReference: { driveId: 'sB' } } }] });
   if (path === '/drives/sA') return ok({ id: 'sA', name: 'A', driveType: 'documentLibrary', webUrl: 'wa' });
   if (path === '/drives/sB') return ok({ id: 'sB', name: 'B', driveType: 'documentLibrary', webUrl: 'wb' });
-  throw new Error(`unexpected path: ${path}`);
+  return emptyActivity(path);
+};
+
+// The activity vector (recent/following/insights) hits five fixed endpoints. Scenarios that
+// predate it return empty for those so their assertions stay unchanged; activity tests below
+// override these explicitly. A distinct throw message keeps it out of the replace below.
+const emptyActivity: Route = (path) => {
+  if (path === '/me/drive/recent' || path === '/me/drive/following' || path.startsWith('/me/insights/')) return ok({ value: [] });
+  throw new Error(`unhandled path: ${path}`);
 };
 
 describe('list-accessible-drives', () => {
@@ -158,7 +166,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
       if (path === '/groups/g1/drive') return ok({ id: 'dg1', name: 'One', driveType: 'documentLibrary', webUrl: 'u1' });
       if (path === '/groups/g2/drive') return ok({ id: 'dg2', name: 'Two', driveType: 'documentLibrary', webUrl: 'u2' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -176,7 +184,7 @@ describe('list-accessible-drives', () => {
       if (path === '/groups/g1/drive') return ok({ id: 'dg1', name: 'T', driveType: 'documentLibrary', webUrl: 'w' });
       if (path === '/groups/g3/drive') return ok({ id: 'dg3', name: 'G', driveType: 'documentLibrary', webUrl: 'w' });
       if (path.startsWith('/teams/')) return ok({ value: [] });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -206,7 +214,7 @@ describe('list-accessible-drives', () => {
           ],
         });
       if (path === '/drives/d1') return ok({ id: 'd1', name: 'D1', driveType: 'documentLibrary', webUrl: 'w1' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -240,7 +248,7 @@ describe('list-accessible-drives', () => {
       if (path.startsWith('/me/memberOf')) return ok({ value: [{ id: 'gX', groupTypes: ['Unified'] }] });
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
       if (path === '/groups/gX/drive') return ok({ id: 'dX', name: 'Filled', driveType: 'documentLibrary', webUrl: 'wf' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -260,7 +268,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
       if (path === '/groups/g1/drive') return ok({ id: 'dg1', name: 'One', driveType: 'documentLibrary', webUrl: 'u1' });
       if (path === '/groups/g2/drive') return ok({ id: 'dg2', name: 'Two', driveType: 'documentLibrary', webUrl: 'u2' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -276,7 +284,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/drive/sharedWithMe') return err({ type: 'api_error', status: 403, message: 'c' });
       if (path === '/groups/g1/drive') return ok({ id: 'dg1', name: 'One', driveType: 'documentLibrary', webUrl: 'u1' });
       if (path.startsWith('/teams/')) return ok({ value: [] });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -292,7 +300,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/joinedTeams') return ok({ value: [] });
       if (path.startsWith('/me/memberOf')) return ok({ value: [] });
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -334,7 +342,7 @@ describe('list-accessible-drives', () => {
       if (path === '/drives/gone') return err({ type: 'api_error', status: 404, message: 'x' });
       if (path === '/drives/boom') return err({ type: 'api_error', status: 500, message: 'y' });
       if (path === '/drives/okd') return ok({ id: 'okd', name: 'OK', driveType: 'documentLibrary', webUrl: 'wo' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -352,7 +360,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/joinedTeams') return ok({ value: [] });
       if (path.startsWith('/me/memberOf')) return ok({ value: [] });
       if (path === '/me/drive/sharedWithMe') return ok({ notValue: 1 });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -379,7 +387,7 @@ describe('list-accessible-drives', () => {
       if (path.startsWith('/me/memberOf')) return ok({ value: [{ id: 'gDup', groupTypes: ['Unified'] }] });
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
       if (path === '/groups/gDup/drive') return ok({ id: 'dup', name: 'GName', driveType: 'documentLibrary', webUrl: 'gURL' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -411,7 +419,7 @@ describe('list-accessible-drives', () => {
       if (path === '/teams/t1/channels/shar/filesFolder') return ok({ parentReference: { driveId: 'shar-drive' } });
       if (path === '/drives/priv-drive') return ok({ id: 'priv-drive', name: 'Priv', driveType: 'documentLibrary', webUrl: 'up' });
       if (path === '/drives/shar-drive') return ok({ id: 'shar-drive', name: 'Shar', driveType: 'documentLibrary', webUrl: 'ush' });
-      throw new Error(`unexpected path: ${path}`); // /teams/m1/* and /teams/t1/channels/std/filesFolder must never be hit
+      return emptyActivity(path); // /teams/m1/* and /teams/t1/channels/std/filesFolder must never be hit
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -431,7 +439,7 @@ describe('list-accessible-drives', () => {
       if (path === '/groups/t1/drive') return ok({ id: 'd1', name: 'Team', driveType: 'documentLibrary', webUrl: 'ut' });
       if (path.startsWith('/teams/t1/channels?')) return ok({ value: [{ id: 'priv', membershipType: 'private' }] });
       if (path === '/teams/t1/channels/priv/filesFolder') return ok({ parentReference: { driveId: 'd1' } });
-      throw new Error(`unexpected path: ${path}`); // no /drives/d1 enrichment — d1 is already known
+      return emptyActivity(path); // no /drives/d1 enrichment — d1 is already known
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -453,7 +461,7 @@ describe('list-accessible-drives', () => {
       if (path.startsWith('/teams/t3/channels?')) return ok({ value: [{ id: 'c3', membershipType: 'private' }] });
       if (path === '/teams/t2/channels/c2/filesFolder') return err({ type: 'api_error', status: 404, message: 'gone' });
       if (path === '/teams/t3/channels/c3/filesFolder') return err({ type: 'api_error', status: 500, message: 'boom' });
-      throw new Error(`unexpected path: ${path}`);
+      return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
@@ -479,7 +487,7 @@ describe('list-accessible-drives', () => {
         });
       if (path === '/teams/t1/channels/ca/filesFolder') return ok({ parentReference: { driveId: 'da' } });
       if (path === '/drives/da') return ok({ id: 'da', name: 'A', driveType: 'documentLibrary', webUrl: 'ua' });
-      throw new Error(`unexpected path: ${path}`); // 'cb' must not be resolved under the cap of 1
+      return emptyActivity(path); // 'cb' must not be resolved under the cap of 1
     };
     const result = await execute(routeGraph(routes), { maxGroups: '1' });
     expect(result.ok).toBe(true);
@@ -487,5 +495,53 @@ describe('list-accessible-drives', () => {
     const v = result.value as { truncated?: boolean; value: ReadonlyArray<{ id: string }> };
     expect(v.truncated).toBe(true);
     expect(v.value.map((d) => d.id)).toEqual(['da']);
+  });
+
+  it('surfaces drives behind recent / followed / trending items tagged "activity", ignoring malformed items', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives') return ok({ value: [] });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      // recent: driveItems via parentReference.driveId, mixed with malformed entries
+      if (path === '/me/drive/recent') return ok({ value: [null, 'x', { parentReference: {} }, { parentReference: { driveId: 5 } }, { parentReference: { driveId: 'rec1' } }] });
+      if (path === '/me/drive/following') return ok({ value: [{ parentReference: { driveId: 'fol1' } }] });
+      // insights: driveId encoded in resourceReference.id = "drives/<id>/items/…"; a non-drive ref is ignored
+      if (path === '/me/insights/trending') return ok({ value: [{ resourceReference: { id: 'sites/foo' } }, { resourceReference: { id: 'drives/b!tre1/items/x' } }] });
+      if (path === '/me/insights/used') return ok({ value: [] });
+      if (path === '/me/insights/shared') return ok({ value: [] });
+      if (path === '/drives/rec1') return ok({ id: 'rec1', name: 'Recent', driveType: 'documentLibrary', webUrl: 'ur' });
+      if (path === '/drives/fol1') return ok({ id: 'fol1', name: 'Followed', driveType: 'documentLibrary', webUrl: 'uf' });
+      if (path === '/drives/b!tre1') return ok({ id: 'b!tre1', name: 'Trending', driveType: 'documentLibrary', webUrl: 'ut' });
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
+    expect(v.value.map((d) => d.id).sort()).toEqual(['b!tre1', 'fol1', 'rec1']);
+    for (const id of ['rec1', 'fol1', 'b!tre1']) expect(v.value.find((d) => d.id === id)?.sources).toEqual(['activity']);
+  });
+
+  it('records an activity-endpoint failure and tags an already-known drive with "activity"', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/me/drive/recent') return ok({ value: [{ parentReference: { driveId: 'p1' } }] }); // p1 already known via personal
+      if (path === '/me/drive/following') return ok({ value: [] });
+      if (path === '/me/insights/trending') return ok({ value: [] });
+      if (path === '/me/insights/used') return err({ type: 'api_error', status: 403, message: 'no insights' });
+      if (path === '/me/insights/shared') return ok({ value: [] });
+      return emptyActivity(path); // no /drives/p1 enrichment — p1 is already known
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }>; partialErrors?: ReadonlyArray<{ source: string }> };
+    expect(v.value).toHaveLength(1);
+    expect(v.value[0]?.sources).toEqual(['activity', 'personal']);
+    expect(v.partialErrors?.map((p) => p.source)).toEqual(['/me/insights/used']);
   });
 });
