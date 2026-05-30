@@ -449,18 +449,18 @@ describe('list-accessible-drives', () => {
     expect(v.value[0]?.sources).toEqual(['channel', 'joinedTeam']);
   });
 
-  it('records a channel-list failure and a non-404 files-folder failure, dropping 404 channel folders', async () => {
+  it('drops benign channel failures (403 access-denied list, 404 folder) and surfaces only the actionable (5xx) files-folder failure', async () => {
     const routes: Route = (path) => {
       if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] });
       if (path === '/me/joinedTeams') return ok({ value: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] });
       if (path.startsWith('/me/memberOf')) return ok({ value: [] });
       if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
       if (path === '/groups/t1/drive' || path === '/groups/t2/drive' || path === '/groups/t3/drive') return err({ type: 'api_error', status: 404, message: 'no team drive' });
-      if (path.startsWith('/teams/t1/channels?')) return err({ type: 'api_error', status: 403, message: 'no chan' });
+      if (path.startsWith('/teams/t1/channels?')) return err({ type: 'api_error', status: 403, message: 'AccessDenied' }); // benign → dropped
       if (path.startsWith('/teams/t2/channels?')) return ok({ value: [{ id: 'c2', membershipType: 'private' }] });
       if (path.startsWith('/teams/t3/channels?')) return ok({ value: [{ id: 'c3', membershipType: 'private' }] });
-      if (path === '/teams/t2/channels/c2/filesFolder') return err({ type: 'api_error', status: 404, message: 'gone' });
-      if (path === '/teams/t3/channels/c3/filesFolder') return err({ type: 'api_error', status: 500, message: 'boom' });
+      if (path === '/teams/t2/channels/c2/filesFolder') return err({ type: 'api_error', status: 403, message: 'not a channel member' }); // benign → dropped
+      if (path === '/teams/t3/channels/c3/filesFolder') return err({ type: 'api_error', status: 500, message: 'boom' }); // actionable → surfaced
       return emptyActivity(path);
     };
     const result = await execute(routeGraph(routes), {});
@@ -468,7 +468,7 @@ describe('list-accessible-drives', () => {
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string }>; partialErrors?: ReadonlyArray<{ source: string }> };
     expect(v.value.map((d) => d.id)).toEqual(['p1']);
-    expect(v.partialErrors?.map((p) => p.source).sort()).toEqual(['/teams/t1/channels', '/teams/t3/channels/c3/filesFolder']);
+    expect(v.partialErrors?.map((p) => p.source)).toEqual(['/teams/t3/channels/c3/filesFolder']); // 403s dropped; only the 500 remains
   });
 
   it('caps the channel files-folder fan-out at --max-groups and flags truncated', async () => {
@@ -523,7 +523,7 @@ describe('list-accessible-drives', () => {
     for (const id of ['rec1', 'fol1', 'b!tre1']) expect(v.value.find((d) => d.id === id)?.sources).toEqual(['activity']);
   });
 
-  it('records an activity-endpoint failure and tags an already-known drive with "activity"', async () => {
+  it('records an ACTIONABLE (5xx) activity-endpoint failure and tags an already-known drive with "activity"', async () => {
     const routes: Route = (path) => {
       if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] });
       if (path === '/me/joinedTeams') return ok({ value: [] });
@@ -532,7 +532,7 @@ describe('list-accessible-drives', () => {
       if (path === '/me/drive/recent') return ok({ value: [{ parentReference: { driveId: 'p1' } }] }); // p1 already known via personal
       if (path === '/me/drive/following') return ok({ value: [] });
       if (path === '/me/insights/trending') return ok({ value: [] });
-      if (path === '/me/insights/used') return err({ type: 'api_error', status: 403, message: 'no insights' });
+      if (path === '/me/insights/used') return err({ type: 'api_error', status: 500, message: 'server error' }); // actionable → surfaced
       if (path === '/me/insights/shared') return ok({ value: [] });
       return emptyActivity(path); // no /drives/p1 enrichment — p1 is already known
     };
@@ -543,6 +543,34 @@ describe('list-accessible-drives', () => {
     expect(v.value).toHaveLength(1);
     expect(v.value[0]?.sources).toEqual(['activity', 'personal']);
     expect(v.partialErrors?.map((p) => p.source)).toEqual(['/me/insights/used']);
+  });
+
+  it('drops benign per-resource failures (403 access-denied, 423 locked, 400 stale id) and surfaces only actionable ones (5xx)', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe')
+        return ok({
+          value: [
+            { remoteItem: { parentReference: { driveId: 'd403' } } },
+            { remoteItem: { parentReference: { driveId: 'd423' } } },
+            { remoteItem: { parentReference: { driveId: 'd400' } } },
+            { remoteItem: { parentReference: { driveId: 'd500' } } },
+          ],
+        });
+      if (path === '/drives/d403') return err({ type: 'api_error', status: 403, message: 'AccessDenied' });
+      if (path === '/drives/d423') return err({ type: 'api_error', status: 423, message: 'resourceLocked' });
+      if (path === '/drives/d400') return err({ type: 'api_error', status: 400, message: 'invalidRequest' });
+      if (path === '/drives/d500') return err({ type: 'api_error', status: 500, message: 'boom' });
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string }>; partialErrors?: ReadonlyArray<{ source: string }> };
+    expect(v.value.map((d) => d.id)).toEqual(['p1']); // none of the failed drives enriched in
+    expect(v.partialErrors?.map((p) => p.source)).toEqual(['/drives/d500']); // 403/423/400 dropped; only 500 surfaces
   });
 
   it('adds non-default site libraries via /sites/{id}/drives tagged "siteLibrary", without re-tagging the known default', async () => {

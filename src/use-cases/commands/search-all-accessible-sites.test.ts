@@ -10,7 +10,7 @@ const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveI
   get: async () => ok({}),
   post: async (_path, body) => {
     const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
-    // The command issues one extra driveItem-count query for `fileTotal`; route it separately so site-paging tests stay isolated.
+    // The command issues one extra driveItem-count query for `fileEstimate`; route it separately so site-paging tests stay isolated.
     if (req?.entityTypes?.[0] === 'driveItem') return driveItemTotal === undefined ? ok({ value: [] }) : page([], false, driveItemTotal);
     return onPost(req?.from ?? 0);
   },
@@ -36,10 +36,9 @@ describe('search-all-accessible-sites', () => {
     const result = await execute(graph, {});
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const v = result.value as { value: ReadonlyArray<{ id: string }>; count: number; total: number; truncated?: boolean };
+    const v = result.value as { value: ReadonlyArray<{ id: string }>; count: number; truncated?: boolean };
     expect(v.value.map((s) => s.id)).toEqual(['s1', 's2', 's3', 's4']);
     expect(v.count).toBe(4);
-    expect(v.total).toBe(4);
     expect(v.truncated).toBeUndefined();
   });
 
@@ -78,7 +77,7 @@ describe('search-all-accessible-sites', () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value).toEqual({ value: [], count: 0, total: 0 });
+    expect(result.value).toEqual({ value: [], count: 0 });
   });
 
   it('returns the error verbatim when the first page fails', async () => {
@@ -126,7 +125,7 @@ describe('search-all-accessible-sites', () => {
       ...graphWith(() => page([], false, 0)),
       post: async (_path, body) => {
         const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; query: { queryString: string } }> }).requests[0];
-        if (req?.entityTypes?.[0] === 'site') queries.push(queryStringOf(body)); // ignore the driveItem fileTotal query
+        if (req?.entityTypes?.[0] === 'site') queries.push(queryStringOf(body)); // ignore the driveItem fileEstimate query
         return page([], false, 0);
       },
     };
@@ -135,17 +134,17 @@ describe('search-all-accessible-sites', () => {
     expect(queries).toEqual(['*', 'budget']);
   });
 
-  it('includes fileTotal — the index driveItem (file) count — alongside the site total', async () => {
+  it('includes fileEstimate — the index driveItem (file) count', async () => {
     const graph = graphWith((from) => (from === 0 ? page([{ id: 's1' }], false, 1) : page([], false, 1)), 139461);
     const result = await execute(graph, {});
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const v = result.value as { count: number; total: number; fileTotal?: number };
+    const v = result.value as { count: number; fileEstimate?: number };
     expect(v.count).toBe(1);
-    expect(v.fileTotal).toBe(139461);
+    expect(v.fileEstimate).toBe(139461);
   });
 
-  it('omits fileTotal when the driveItem count query yields no numeric total', async () => {
+  it('omits fileEstimate when the driveItem count query yields no numeric total', async () => {
     // default graphWith (no driveItemTotal) → the driveItem query returns an empty body
     const result = await execute(
       graphWith(() => page([{ id: 's1' }], false, 1)),
@@ -153,7 +152,7 @@ describe('search-all-accessible-sites', () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect((result.value as { fileTotal?: number }).fileTotal).toBeUndefined();
+    expect((result.value as { fileEstimate?: number }).fileEstimate).toBeUndefined();
   });
 
   it('searches sites via POST /search/query per its meta', () => {

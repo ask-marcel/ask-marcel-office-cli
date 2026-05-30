@@ -39,7 +39,6 @@ const execute: Command['execute'] = async (graph, params) => {
 
   const seen = new Set<string>();
   const value: Array<unknown> = [];
-  let total = 0;
   let truncated = false;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const r = await graph.post('/search/query', { requests: [{ entityTypes: ['site'], query: { queryString }, from: page * PAGE_SIZE, size: PAGE_SIZE }] });
@@ -49,7 +48,6 @@ const execute: Command['execute'] = async (graph, params) => {
       break;
     }
     const container = firstContainer(r.value);
-    if (typeof container?.total === 'number') total = container.total;
     for (const hit of container?.hits ?? []) {
       const id = siteId(hit.resource);
       if (id !== undefined && !seen.has(id)) {
@@ -61,10 +59,10 @@ const execute: Command['execute'] = async (graph, params) => {
     if (page === MAX_PAGES - 1) truncated = true;
   }
 
-  // Best-effort: the index's accessible-file (driveItem) count, alongside the site total.
-  const fileTotal = await searchIndexTotal(graph, 'driveItem');
+  // Best-effort: the index's accessible-file (driveItem) count.
+  const fileEstimate = await searchIndexTotal(graph, 'driveItem');
 
-  return ok({ value, count: value.length, total, ...(fileTotal !== undefined ? { fileTotal } : {}), ...(truncated ? { truncated: true } : {}) });
+  return ok({ value, count: value.length, ...(fileEstimate !== undefined ? { fileEstimate } : {}), ...(truncated ? { truncated: true } : {}) });
 };
 
 const meta: CommandMeta = {
@@ -87,7 +85,7 @@ const meta: CommandMeta = {
   bodyTemplate:
     "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
   responseShape:
-    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, fileTotal?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count for sites (compare with `count` to see if the ceiling truncated the sweep); `fileTotal` (best-effort, omitted if the extra query fails) is the index's security-trimmed `driveItem` count — i.e. roughly how many files+folders the user can access across all of SharePoint/OneDrive; `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
+    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
 };
 
 export { execute, meta, schema };
