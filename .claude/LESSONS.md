@@ -6,6 +6,16 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [gotcha] 2026-05-30 | Stryker `incremental` reports optimistically — `rm`-ing the file is not enough; set `incremental: false`
+
+The 2026-05-29 note said `rm -f reports/stryker-incremental.json` fixes stale verdicts. It does not fully: with `testRunner: command` + `incremental: true`, a scoped `--mutate` run still over-credits kills (measured 85.4% where a truly-clean run was 84.0%) even after deleting the file. The CLI flags do not help — `--incremental false` is parsed as a config-file path ("Invalid config file 'false'") and `--no-incremental` is rejected as an unknown option. The only reliable accurate gate is editing `stryker.conf.json` to `"incremental": false` (optionally `"cleanTempDir": false` to keep the sandbox for inspection), running, then restoring. Restore both before committing — they are dev-speed defaults, not part of a feature change.
+Affects: any scoped `bunx stryker run --mutate <file>` where you need a trustworthy pass/fail against the 90% break threshold.
+
+## [gotcha] 2026-05-30 | a "survived" mutant you can't explain is usually an operand-level equivalent — pull the exact id
+
+When a mutant survives that you're *certain* your tests kill, do not assume it's the whole-expression mutant. Stryker emits a separate mutant per operand of a compound condition. Example: `e.type === 'api_error' && e.status === 404` produces, among others, id=83 (whole→`true`, killed) AND id=86 (left operand `e.type === 'api_error'`→`true`, survived). id=86 makes the predicate `e.status === 404` — behaviorally identical because only the `api_error` member of the `GraphError` union carries a `status` field, so no representable input distinguishes it: a genuine equivalent mutant, correctly left alive. To diagnose: parse `reports/mutation/mutation.json` (`Bun.file().json()` — the HTML report embeds multi-file code-frames that break naive brace-slicing) for `{id, location.start.line, mutatorName, replacement, status}`, then activate the precise id in the sandbox via `__STRYKER_ACTIVE_MUTANT__=<id> bun test` and read the exit code. Don't write a test for an operand mutant the type system makes unreachable.
+Affects: closing the last few points to a 90% mutation gate on files with compound boolean guards.
+
 ## [decision] 2026-05-29 | OOXML side-channel extraction composes on a shared `ooxml-*` core
 
 docx/xlsx/pptx are all ZIP packages with byte-identical `docProps/{core,app,custom}.xml` and the same `*.rels` relationship graph. The metadata + image features share four format-agnostic modules: `src/infra/ooxml-zip-adapter.ts` (`openOoxmlZip`), `src/use-cases/commands/ooxml-xml-walker.ts` (fast-xml-parser traversal), `ooxml-metadata.ts` (core/app/custom props + all-`*.rels` external-link scan + VBA-macro flag), and `ooxml-metadata-to-markdown.ts` (render primitives). Per-format modules (`docx-metadata`, `xlsx-metadata`, `pptx-metadata`, …) own only body-specific extractors and compose the shared core. New OOXML work (ODF is the next zip-based candidate) must reuse these, not re-parse the zip.
