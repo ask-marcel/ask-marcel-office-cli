@@ -84,6 +84,7 @@ import '../src/use-cases/commands/download-drive-item-as-markdown.ts';
 import '../src/use-cases/commands/extract-drive-item-images.ts';
 import '../src/use-cases/commands/extract-mail-attachment-images.ts';
 import '../src/use-cases/commands/list-accessible-drives.ts';
+import '../src/use-cases/commands/search-all-accessible-sites.ts';
 import '../src/use-cases/commands/media-files.ts';
 import '../src/use-cases/commands/odf-metadata.ts';
 import '../src/use-cases/commands/odf-metadata-to-markdown.ts';

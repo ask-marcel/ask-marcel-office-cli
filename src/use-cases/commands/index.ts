@@ -76,6 +76,7 @@ import * as searchMailMessages from './search-mail-messages.ts';
 import * as searchMyDocuments from './search-my-documents.ts';
 import * as searchOnedriveFiles from './search-onedrive-files.ts';
 import * as searchOnenotePages from './search-onenote-pages.ts';
+import * as searchAllAccessibleSites from './search-all-accessible-sites.ts';
 import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
@@ -186,6 +187,7 @@ const commands: Record<string, Command> = {
   'list-excel-table-rows': listExcelTableRows,
   'get-drive-delta': getDriveDelta,
   'search-sharepoint-sites-by-name': searchSharepointSitesByName,
+  'search-all-accessible-sites': searchAllAccessibleSites,
   'get-sharepoint-site': getSharepointSite,
   'list-sharepoint-site-drives': listSharepointSiteDrives,
   'get-sharepoint-site-drive-by-id': getSharepointSiteDriveById,

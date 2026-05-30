@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-30T06:21:06.469Z",
+  "generatedAt": "2026-05-30T06:35:26.944Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -6354,6 +6354,25 @@
       "options": [],
       "example": "ask-marcel scopes-check",
       "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`)."
+    },
+    {
+      "name": "search-all-accessible-sites",
+      "summary": "Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: [\"site\"]`) using `from`/`size`, following the index's own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Optional `--query` narrows the index (default `*` = all accessible sites).",
+      "category": "sharepoint",
+      "graphMethod": "POST",
+      "graphPathTemplate": "/search/query",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/search-query",
+      "options": [
+        {
+          "name": "query",
+          "key": "query",
+          "required": false,
+          "description": "Optional KQL filter applied to the site index (default `*` = every site you can access). Examples: a name fragment like `budget`, or `contentclass:STS_Site` to restrict to site collections. Free text is matched against site title/url."
+        }
+      ],
+      "example": "ask-marcel search-all-accessible-sites --output json",
+      "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, total, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is how many distinct sites were returned; `total` is the index's own reported match count (compare with `count` to see if the ceiling truncated the sweep); `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest.",
+      "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
     },
     {
       "name": "search-mail-messages",

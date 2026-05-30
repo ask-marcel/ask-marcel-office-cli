@@ -70,6 +70,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
 
   // — SharePoint —
   'search-sharepoint-sites-by-name': ['Sites.Read.All'],
+  'search-all-accessible-sites': ['Sites.Read.All'],
   'get-sharepoint-site': ['Sites.Read.All'],
   'get-sharepoint-site-by-path': ['Sites.Read.All'],
   'get-sharepoint-site-drive-by-id': ['Sites.Read.All', 'Files.Read'],
