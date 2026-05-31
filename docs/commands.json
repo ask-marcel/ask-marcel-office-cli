@@ -1,11 +1,11 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-31T09:49:28.714Z",
+  "generatedAt": "2026-05-31T10:39:08.007Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
-      "summary": "Convert an attachment on an Outlook calendar event to markdown. Polymorphic on the attachment’s `@odata.type` (shares the mail-attachment pipeline): fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally. A pptx deck attached to a meeting yields its speaker notes / slide titles / comments via `## PPTX metadata` (pass `--include-metadata true`). For raw bytes of a pdf/image attachment, save it via `get-mail-attachment` on the equivalent message, or fetch the linked file directly.",
+      "summary": "Convert an attachment on an Outlook calendar event to markdown. Polymorphic on the attachment’s `@odata.type` (shares the mail-attachment pipeline): fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally. For pptx decks attached to a meeting, `convert-calendar-event-attachment-to-pdf` preserves slide layout (a pptx here yields only its speaker notes / titles / comments via `## PPTX metadata` with `--include-metadata true`). For pdf/rtf/etc. also use the PDF sibling.",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/{event-id}/attachments/{attachment-id}",
@@ -39,6 +39,30 @@
       ],
       "example": "ask-marcel convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400."
+    },
+    {
+      "name": "convert-calendar-event-attachment-to-pdf",
+      "summary": "Convert an attachment on an Outlook calendar event to PDF on the fly (shares the mail-attachment pipeline). fileAttachment uploads the bytes to a temp folder under /me/drive, runs Graph `?format=pdf`, then deletes the temp item; referenceAttachment resolves via /shares/{token}/driveItem and converts in place; plain-text and `pdf` sources short-circuit to a raw-bytes envelope (Graph’s `?format=pdf` does not accept `pdf` as an input). image attachments are rejected (Graph rejects image inputs); itemAttachment (embedded mail/event/contact) is unsupported — use convert-calendar-event-attachment-to-markdown. Best for the deck attached to a meeting, where PDF preserves slide layout for a vision-capable LLM.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/events/{event-id}/attachments/{attachment-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/attachment-get",
+      "options": [
+        {
+          "name": "event-id",
+          "key": "eventId",
+          "required": true,
+          "description": "Outlook calendar event ID. Returned by `list-calendar-events` or `get-calendar-event`."
+        },
+        {
+          "name": "attachment-id",
+          "key": "attachmentId",
+          "required": true,
+          "description": "Attachment ID inside that event. Returned by `list-calendar-event-attachments`."
+        }
+      ],
+      "example": "ask-marcel convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`."
     },
     {
       "name": "convert-drive-item-zip",
@@ -2017,7 +2041,7 @@
     },
     {
       "name": "list-calendar-event-attachments",
-      "summary": "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown`.",
+      "summary": "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown` (or `convert-calendar-event-attachment-to-pdf` for slide / layout fidelity).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/events/{event-id}/attachments",

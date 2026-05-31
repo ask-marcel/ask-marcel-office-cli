@@ -120,12 +120,12 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-
-  const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
+// Fetch an attachment by its full Graph path and convert it to PDF, branching
+// on the polymorphic `@odata.type`. Path-agnostic so both the mail
+// (`/me/messages/{id}/attachments/{id}`) and calendar-event
+// (`/me/events/{id}/attachments/{id}`) commands share one implementation.
+const convertAttachmentToPdf = async (graph: GraphClient, attachmentPath: string): Promise<Result<unknown, GraphError>> => {
+  const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
 
@@ -151,6 +151,13 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   }
 };
 
+const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const { messageId, attachmentId } = parsed.data;
+  return convertAttachmentToPdf(graph, `/me/messages/${messageId}/attachments/${attachmentId}`);
+};
+
 const meta: CommandMeta = {
   summary:
     'Convert an Outlook mail attachment to PDF on the fly. Polymorphic on the attachment’s `@odata.type`: fileAttachment uploads the bytes to a temp folder under /me/drive (large files use Graph’s chunked upload session — no 4 MB ceiling), runs ?format=pdf, then deletes the temp item; referenceAttachment resolves via /shares/{token}/driveItem and runs ?format=pdf in place; plain-text source extensions and `pdf` sources short-circuit to a raw-bytes envelope on either path (Graph’s `?format=pdf` does not accept `pdf` as an input format — pdf attachments are returned as-is). itemAttachment (embedded mail/event/contact) is unsupported here — Graph rejects those source types — use convert-mail-attachment-to-markdown instead. Worst-case wall-clock for huge attachments is ~22 minutes (1 metadata GET + up-to-20 chunk PUTs + 1 convert GET + 1 cleanup DELETE, each capped at 60s).',
@@ -168,4 +175,4 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { execute, meta, schema };
+export { convertAttachmentToPdf, execute, meta, schema };

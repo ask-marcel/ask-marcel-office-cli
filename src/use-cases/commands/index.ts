@@ -84,6 +84,7 @@ import * as extractMailAttachmentImages from './extract-mail-attachment-images.t
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
+import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
@@ -232,6 +233,7 @@ const commands: Record<string, Command> = {
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,
   'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
+  'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,
   'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,

@@ -21,7 +21,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown`.",
+    "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown` (or `convert-calendar-event-attachment-to-pdf` for slide / layout fidelity).",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/events/{event-id}/attachments',
