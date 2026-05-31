@@ -6,6 +6,7 @@ import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
 import {
+  buildDocxWithSharepointLinks,
   buildMalformedDocx,
   buildMediaSamples,
   buildOversizedZipArchive,
@@ -107,6 +108,8 @@ import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-ev
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
+import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
+import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
@@ -246,6 +249,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-drive-item-zip': convertDriveItemZip,
+  'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,
@@ -4018,6 +4022,155 @@ describe('convert-drive-item-zip', () => {
   });
 });
 
+describe('extract-sharepoint-links-in-documents', () => {
+  // Serve the document bytes for the `/content` fetch and a resolved driveItem
+  // (or a caller-supplied response) for each `/shares/{token}/driveItem` resolve.
+  const docResponse =
+    (bytes: Uint8Array, shareResolver?: () => Response): FetchFn =>
+    async (url) => {
+      if (url.includes('/items/i1/content'))
+        return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } });
+      if (url.includes('/shares/'))
+        return shareResolver
+          ? shareResolver()
+          : Response.json({ id: 'item-1', name: 'spec.docx', webUrl: 'https://contoso.sharepoint.com/sites/Marketing/spec', parentReference: { driveId: 'drive-X' } });
+      throw new Error(`unexpected ${url}`);
+    };
+
+  it('extracts and resolves SharePoint links from a docx, dedupes, and filters non-SharePoint externals', async () => {
+    const bytes = await buildDocxWithSharepointLinks();
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as {
+      driveId: string;
+      itemId: string;
+      links: ReadonlyArray<{ url: string; driveId?: string; itemId?: string; name?: string; webUrl?: string; error?: string }>;
+      truncated: boolean;
+      skippedCount: number;
+    };
+    expect(v.driveId).toBe('d1');
+    expect(v.itemId).toBe('i1');
+    // two identical SharePoint rels deduped to one; the example.com external is filtered out; the internal styles rel never surfaces
+    expect(v.links).toHaveLength(1);
+    expect(v.links[0]?.url).toBe('https://contoso.sharepoint.com/sites/Marketing/Shared%20Documents/spec.docx');
+    expect(v.links[0]?.driveId).toBe('drive-X');
+    expect(v.links[0]?.itemId).toBe('item-1');
+    expect(v.links[0]?.name).toBe('spec.docx');
+    expect(v.links.some((l) => l.url.includes('example.com'))).toBe(false);
+    expect(v.truncated).toBe(false);
+    expect(v.skippedCount).toBe(0);
+  });
+
+  it('returns an empty links array for a valid Office doc with no external SharePoint links', async () => {
+    const bytes = await buildSampleDocx();
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(true);
+    if (result?.ok) expect((result.value as { links: ReadonlyArray<unknown> }).links).toHaveLength(0);
+  });
+
+  it('returns an api_error 400 when the item is not an OOXML package', async () => {
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(new Uint8Array([0x25, 0x50, 0x44, 0x46]))), {
+      driveId: 'd1',
+      itemId: 'i1',
+    });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) {
+      expect(result.error.type).toBe('api_error');
+      expect(result.error.message).toContain('not an Office Open XML document');
+      if (result.error.type === 'api_error') expect(result.error.status).toBe(400);
+    }
+  });
+
+  it('captures a per-link resolve failure inside the entry instead of failing the whole call', async () => {
+    const bytes = await buildDocxWithSharepointLinks();
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(
+      createGraphClient(
+        fakeAuth(),
+        docResponse(
+          bytes,
+          () => new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } })
+        )
+      ),
+      { driveId: 'd1', itemId: 'i1' }
+    );
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { links: ReadonlyArray<{ url: string; error?: string }> };
+    expect(v.links).toHaveLength(1);
+    expect(v.links[0]?.error).toBeDefined();
+  });
+
+  it('propagates the content-fetch error rather than mislabelling it as a non-OOXML document', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } });
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) {
+      expect(result.error.type).toBe('api_error');
+      // the original fetch error is returned as-is — NOT swallowed and re-surfaced as the non-OOXML 400
+      expect(result.error.message).not.toContain('not an Office Open XML document');
+    }
+  });
+
+  it('returns a validation_error when itemId is missing', async () => {
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { driveId: 'd1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('validation_error');
+  });
+});
+
+describe('sharepoint-link-extractor helpers', () => {
+  it('buildShareToken encodes a url as u! + unpadded base64url (+ → -, / → _, = stripped)', () => {
+    // url chosen so its raw base64 contains +, /, AND = padding — exercises every replaceAll
+    expect(buildShareToken('https://contoso.sharepoint.com/x?q=~//?>')).toBe('u!aHR0cHM6Ly9jb250b3NvLnNoYXJlcG9pbnQuY29tL3g_cT1-Ly8_Pg');
+  });
+
+  const okShares: FetchFn = async (url) => {
+    if (url.includes('/shares/')) return Response.json({ id: 'i', name: 'n', parentReference: { driveId: 'd' } });
+    throw new Error(`unexpected ${url}`);
+  };
+  const urls = (n: number): string[] => Array.from({ length: n }, (_, i) => `https://contoso.sharepoint.com/doc${i}`);
+
+  it('resolveSharepointUrls keeps exactly MAX_LINKS (25) without truncating, and truncates at 26', async () => {
+    const graph = createGraphClient(fakeAuth(), okShares);
+    const at25 = await resolveSharepointUrls(graph, urls(25));
+    expect(at25.links).toHaveLength(25);
+    expect(at25.truncated).toBe(false); // boundary: 25 > 25 is false
+    expect(at25.skippedCount).toBe(0);
+
+    const at26 = await resolveSharepointUrls(graph, urls(26));
+    expect(at26.links).toHaveLength(25);
+    expect(at26.truncated).toBe(true);
+    expect(at26.skippedCount).toBe(1);
+  });
+
+  it('resolveSharepointUrls returns the bare message for an api_error and a type-labelled message for a non-api_error', async () => {
+    const apiFail = createGraphClient(
+      fakeAuth(),
+      async () => new Response(JSON.stringify({ error: { code: 'accessDenied', message: 'no access here' } }), { status: 403, headers: { 'content-type': 'application/json' } })
+    );
+    const apiRes = await resolveSharepointUrls(apiFail, ['https://contoso.sharepoint.com/x']);
+    expect(apiRes.links[0]?.error).toBeDefined();
+    expect(apiRes.links[0]?.error?.startsWith('api_error:')).toBe(false); // api_error → bare message, no type prefix
+
+    const netFail = createGraphClient(fakeAuth(), async () => {
+      throw new Error('socket hang up');
+    });
+    const netRes = await resolveSharepointUrls(netFail, ['https://contoso.sharepoint.com/y']);
+    expect(netRes.links[0]?.error).toContain('network_error:'); // non-api_error → labelled `${type}: ${message}`
+  });
+
+  it('resolveSharepointUrls tolerates a resolved driveItem with no parentReference (driveId undefined, no throw)', async () => {
+    const noParent = createGraphClient(fakeAuth(), async (url) => (url.includes('/shares/') ? Response.json({ id: 'i1', name: 'n1' }) : new Response('x', { status: 500 })));
+    const res = await resolveSharepointUrls(noParent, ['https://contoso.sharepoint.com/z']);
+    expect(res.links).toHaveLength(1);
+    expect(res.links[0]?.itemId).toBe('i1');
+    expect(res.links[0]?.driveId).toBeUndefined();
+    expect(res.links[0]?.error).toBeUndefined();
+  });
+});
+
 type CommandFixture = { readonly name: string; readonly params: Record<string, string>; readonly responseBody?: unknown };
 
 const allCommandFixtures: CommandFixture[] = [
@@ -4223,6 +4376,7 @@ describe('command schema rejection', () => {
     { name: 'get-onenote-page-as-markdown', params: {} },
     { name: 'search-mail-messages', params: {} },
     { name: 'extract-sharepoint-links-in-mail', params: {} },
+    { name: 'extract-sharepoint-links-in-documents', params: { driveId: 'd1' } },
     { name: 'convert-mail-to-markdown', params: {} },
     { name: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1' } },
     { name: 'convert-mail-attachment-to-markdown', params: { messageId: 'm1' } },
@@ -4525,6 +4679,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'convert-calendar-event-attachment-to-markdown', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
   { name: 'convert-calendar-event-attachment-to-pdf', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
   { name: 'convert-drive-item-zip', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
+  { name: 'extract-sharepoint-links-in-documents', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
   { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },
   { name: 'list-followed-drive-items', params: {}, expectedPath: '/me/drive/following' },

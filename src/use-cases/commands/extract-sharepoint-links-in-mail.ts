@@ -3,19 +3,9 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { buildShareToken, extractSharepointUrls } from './sharepoint-link-extractor.ts';
+import { extractSharepointUrls, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
+import type { ResolvedLink } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
-
-const MAX_LINKS = 25; // Hardening #4: cap fan-out
-
-type ResolvedLink = {
-  readonly url: string;
-  readonly driveId?: string;
-  readonly itemId?: string;
-  readonly name?: string;
-  readonly webUrl?: string;
-  readonly error?: string;
-};
 
 type LinkExtractionSummary = {
   readonly messageId: string;
@@ -26,20 +16,6 @@ type LinkExtractionSummary = {
 };
 
 const schema = z.object({ messageId: z.string().min(1) });
-
-const resolveOne = async (graph: GraphClient, url: string): Promise<ResolvedLink> => {
-  const token = buildShareToken(url);
-  const result = await graph.get(`/shares/${token}/driveItem`);
-  if (!result.ok) return { url, error: result.error.type === 'api_error' ? result.error.message : `${result.error.type}: ${result.error.message}` };
-  const item = result.value as { id?: string; name?: string; webUrl?: string; parentReference?: { driveId?: string } };
-  return {
-    url,
-    driveId: item.parentReference?.driveId,
-    itemId: item.id,
-    name: item.name,
-    webUrl: item.webUrl,
-  };
-};
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<LinkExtractionSummary, GraphError>> => {
   const parsed = schema.safeParse(params);
@@ -52,14 +28,8 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const m = message.value as { subject?: string; body?: { content?: string } };
   const body = m.body?.content ?? '';
 
-  // 2. Find every *.sharepoint.com URL.
-  const allUrls = extractSharepointUrls(body);
-  const truncated = allUrls.length > MAX_LINKS;
-  const skippedCount = truncated ? allUrls.length - MAX_LINKS : 0;
-  const kept = truncated ? allUrls.slice(0, MAX_LINKS) : allUrls;
-
-  // 3. Resolve each via /shares/{token}/driveItem.
-  const links = await Promise.all(kept.map((u) => resolveOne(graph, u)));
+  // 2. Find every *.sharepoint.com URL, then resolve each via /shares/{token}/driveItem.
+  const { links, truncated, skippedCount } = await resolveSharepointUrls(graph, extractSharepointUrls(body));
 
   return ok({
     messageId,
