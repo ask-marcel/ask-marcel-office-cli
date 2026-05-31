@@ -94,6 +94,7 @@ import '../src/use-cases/commands/download-drive-item-version.ts';
 import '../src/infra/turndown-adapter.ts';
 import '../src/infra/ooxml-zip-adapter.ts';
 import '../src/infra/ooxml-media-extractor.ts';
+import '../src/infra/zip-reader.ts';
 import '../src/use-cases/commands/inline-image-embedder.ts';
 import '../src/use-cases/commands/markdown-pipeline.ts';
 import '../src/use-cases/commands/text-passthrough.ts';

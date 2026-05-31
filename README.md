@@ -172,7 +172,6 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 Read-only stays the default forever. The list below is additive coverage and convenience — concrete next steps, ordered by how often they come up in real LLM workflows. Each line carries a rough implementation-effort tag: **[S]** small (reuses existing machinery), **[M]** medium (new orchestration, no new infra), **[L]** large (new infra/deps or a scope investigation).
 
-- **[S] Zip archive support** — extract a `.zip` from an email attachment or OneDrive item and run every contained file through the right conversion pipeline (markdown or PDF), so an agent reading "the project handover archive" doesn't have to shell out to `unzip`.
 - **[M] SharePoint links inside documents** — today `extract-sharepoint-links-in-mail` finds and resolves every `sharepoint.com` URL in an email body; the same pass for inline links in docx/xlsx/pptx would close the loop on "follow every reference in this document".
 - **[M] Bulk folder conversion** — `convert-folder --drive-id … --item-id <folder> --format markdown` walks a folder and converts every Office file in one call, returning the combined markdown (or writing per-file outputs to a directory via `--output-path`).
 - **[M] OneNote end-to-end markdown** — OneNote page reads currently return raw HTML; chaining the turndown pipeline (same one `convert-mail-to-markdown` uses) would give parity with the docx route.

@@ -5,7 +5,17 @@ import { ok } from '../../domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
-import { buildMalformedDocx, buildMediaSamples, buildPdfWithImage, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import {
+  buildMalformedDocx,
+  buildMediaSamples,
+  buildOversizedZipArchive,
+  buildPdfWithImage,
+  buildRichOdt,
+  buildRichPptx,
+  buildSampleDocx,
+  buildSampleXlsx,
+  buildSampleZipArchive,
+} from '../../test-helpers/office-fixtures.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -95,6 +105,7 @@ import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
+import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
@@ -233,6 +244,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'search-mail-messages': searchMailMessages,
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'convert-mail-to-markdown': convertMailToMarkdown,
+  'convert-drive-item-zip': convertDriveItemZip,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,
@@ -3661,6 +3673,95 @@ describe('calendar event attachments', () => {
   });
 });
 
+describe('convert-drive-item-zip', () => {
+  const zipResponse =
+    (bytes: Uint8Array): FetchFn =>
+    async () =>
+      new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/zip' } });
+
+  it('converts every Office/text entry, notes a malformed entry, and skips non-convertible ones', async () => {
+    const archive = await buildSampleZipArchive();
+    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
+    const at = (p: string): { contentType?: string; text?: string; note?: string } => v.files.find((f) => f.path === p) ?? {};
+    expect(v.count).toBe(9);
+    expect(v.truncated).toBeUndefined(); // under the cap → no truncation flag
+    expect(at('report.docx').text).toContain('# Sample Heading');
+    expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
+    expect(at('data.xlsx').text).toContain('## Sheet1');
+    expect(at('deck.pptx').text).toContain('## PPTX metadata');
+    expect(at('plan.odt').text).toContain('# Heading One');
+    expect(at('notes.txt').text).toBe('hello from the archive');
+    expect(at('notes.txt').contentType).toBe('text/plain');
+    expect(at('broken.docx').note).toContain('conversion failed');
+    expect(at('scan.pdf').note).toContain('pdf is not a convertible'); // the false branch names the extension
+    expect(at('data.bin').note).toContain('bin is not a convertible');
+    expect(at('LICENSE').note).toContain('no extension'); // dotless entry → the ext === '' branch
+  });
+
+  it('appends each Office file’s metadata block when --include-metadata true (and accepts an explicit false)', async () => {
+    const archive = await buildSampleZipArchive();
+    const withMeta = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1', includeMetadata: 'true' });
+    expect(withMeta?.ok).toBe(true);
+    if (!withMeta?.ok) return;
+    const files = (withMeta.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files;
+    expect(files.find((f) => f.path === 'report.docx')?.text).toContain('## DOCX metadata');
+    expect(files.find((f) => f.path === 'data.xlsx')?.text).toContain('## Workbook metadata');
+    expect(files.find((f) => f.path === 'plan.odt')?.text).toContain('## OpenDocument metadata');
+    // `false` is an accepted enum value and must omit the metadata blocks
+    const explicitFalse = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(await buildSampleZipArchive())), {
+      driveId: 'd1',
+      itemId: 'i1',
+      includeMetadata: 'false',
+    });
+    expect(explicitFalse?.ok).toBe(true);
+    if (explicitFalse?.ok)
+      expect((explicitFalse.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files.find((f) => f.path === 'report.docx')?.text).not.toContain(
+        '## DOCX metadata'
+      );
+  });
+
+  it('caps at 100 entries and flags truncation', async () => {
+    const archive = await buildOversizedZipArchive();
+    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { count: number; truncated?: boolean; totalEntries?: number };
+    expect(v.count).toBe(100);
+    expect(v.truncated).toBe(true);
+    expect(v.totalEntries).toBe(101);
+  });
+
+  it('propagates a zip-parse error for non-zip bytes', async () => {
+    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(new Uint8Array([1, 2, 3]))), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) {
+      expect(result.error.type).toBe('api_error');
+      expect(result.error.message).toContain('zip parse failed');
+    }
+  });
+
+  it('propagates the content-fetch error', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } });
+    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) {
+      expect(result.error.type).toBe('api_error');
+      // the fetch error is returned as-is — NOT swallowed and re-surfaced as a zip-parse failure
+      expect(result.error.message).not.toContain('zip parse failed');
+    }
+  });
+
+  it('returns a validation_error when itemId is missing', async () => {
+    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { driveId: 'd1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('validation_error');
+  });
+});
+
 type CommandFixture = { readonly name: string; readonly params: Record<string, string>; readonly responseBody?: unknown };
 
 const allCommandFixtures: CommandFixture[] = [
@@ -4161,6 +4262,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     expectedPath: "/drives/d1/items/i1/workbook/worksheets/Sheet1/charts/c1/Image(width=0,height=0,fittingMode='Fit')",
   },
   { name: 'convert-calendar-event-attachment-to-markdown', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
+  { name: 'convert-drive-item-zip', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
   { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },
   { name: 'list-followed-drive-items', params: {}, expectedPath: '/me/drive/following' },

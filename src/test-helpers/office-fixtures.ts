@@ -526,8 +526,36 @@ const buildSideChannelDocx = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+// A .zip carrying one of every entry kind the zip-conversion command branches on:
+// each Office family (docx/xlsx/pptx/odt → markdown), a plain-text file (decoded
+// inline), a malformed docx (conversion-failed note), and two non-convertible
+// entries (a pdf + a raw binary → skip-note). Hand-rolled so the entry set is
+// deterministic and exercises every dispatch branch.
+const buildSampleZipArchive = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('report.docx', await buildSampleDocx());
+  zip.file('data.xlsx', buildSampleXlsx());
+  zip.file('deck.pptx', await buildRichPptx());
+  zip.file('plan.odt', await buildRichOdt());
+  zip.file('notes.txt', new TextEncoder().encode('hello from the archive'));
+  zip.file('broken.docx', buildMalformedDocx());
+  zip.file('scan.pdf', new Uint8Array([0x25, 0x50, 0x44, 0x46]));
+  zip.file('data.bin', new Uint8Array([0x00, 0x01, 0x02, 0x03]));
+  zip.file('LICENSE', new TextEncoder().encode('a dotless, no-extension entry'));
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+// A .zip with more than the per-call entry cap (100), to exercise the truncation path.
+const buildOversizedZipArchive = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  for (let i = 0; i < 101; i += 1) zip.file(`note${String(i).padStart(3, '0')}.txt`, new TextEncoder().encode(`entry ${i}`));
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 export {
   buildDocxWithHeaderFooterTextbox,
+  buildSampleZipArchive,
+  buildOversizedZipArchive,
   buildSideChannelDocx,
   buildMacroDocm,
   buildMalformedDocx,

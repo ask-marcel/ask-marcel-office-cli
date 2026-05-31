@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-31T09:17:15.639Z",
+  "generatedAt": "2026-05-31T09:49:28.714Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -39,6 +39,43 @@
       ],
       "example": "ask-marcel convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400."
+    },
+    {
+      "name": "convert-drive-item-zip",
+      "summary": "Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so \"read the handover archive\" doesn't need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; pdf, images, binaries, and nested archives are listed with a skip note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .zip file. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## OpenDocument metadata`, etc.) after its body.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel convert-drive-item-zip --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
     },
     {
       "name": "convert-mail-attachment-to-markdown",
