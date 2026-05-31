@@ -145,7 +145,7 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
-  it('routes odt through the OpenDocument metadata extractor when --include-metadata true is set (no markdown body — metadata IS the output)', async () => {
+  it('routes odt through the OpenDocument body converter and appends the metadata block when --include-metadata true is set', async () => {
     const odtBytes = await buildRichOdt();
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'application/octet-stream', size: odtBytes.byteLength, base64: toBase64(odtBytes) }),
@@ -155,20 +155,24 @@ describe('officeToMarkdown — extension dispatch', () => {
     if (result.ok) {
       const env = result.value as { contentType: string; text: string };
       expect(env.contentType).toBe('text/markdown');
+      expect(env.text).toContain('# Heading One');
       expect(env.text).toContain('## OpenDocument metadata');
-      expect(env.text).toContain('*-as-pdf');
       expect(env.text).toContain('Q4 Plan');
     }
   });
 
-  it('errs with the generic *-as-pdf hint for odt when --include-metadata is not set', async () => {
-    const graph = noopGraph({});
+  it('converts the odt body to markdown (no metadata block) even when --include-metadata is not set', async () => {
+    const odtBytes = await buildRichOdt();
+    const graph = noopGraph({
+      getBinary: async () => ok({ contentType: 'application/octet-stream', size: odtBytes.byteLength, base64: toBase64(odtBytes) }),
+    });
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'plan.odt');
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('odt not supported');
-      expect(result.error.message).toContain('38 input extensions');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const env = result.value as { contentType: string; text: string };
+      expect(env.contentType).toBe('text/markdown');
+      expect(env.text).toContain('# Heading One');
+      expect(env.text).not.toContain('## OpenDocument metadata');
     }
   });
 
@@ -193,6 +197,33 @@ describe('officeToMarkdown — extension dispatch', () => {
       expect(result.error.message).toContain('get-mail-attachment');
       expect(result.error.message).toContain('download-onedrive-file-content');
     }
+  });
+
+  it('routes every PDF_UNSUPPORTED extension to the "cannot be converted to markdown OR pdf" hint', async () => {
+    const graph = noopGraph({});
+    const unsupported = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'mp3', 'mp4', 'mov', 'wav', 'avi', 'mkv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'exe', 'dmg', 'iso'];
+    for (const ext of unsupported) {
+      const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', `file.${ext}`);
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.error.type).toBe('api_error');
+      expect(result.error.message).toContain(`${ext} cannot be converted to markdown OR pdf`);
+      expect(result.error.message).toContain('get-mail-attachment');
+    }
+  });
+
+  it('threads includeMetadata into the docx and xlsx converters (appends the metadata block when true)', async () => {
+    const docxBytes = await buildSampleDocx();
+    const docxGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: docxBytes.byteLength, base64: toBase64(docxBytes) }) });
+    const docx = await officeToMarkdown(docxGraph, '/drives/d1/items/i1/content', 'report.docx', { includeMetadata: true });
+    expect(docx.ok).toBe(true);
+    if (docx.ok) expect((docx.value as { text: string }).text).toContain('## DOCX metadata');
+
+    const xlsxBytes = buildSampleXlsx();
+    const xlsxGraph = noopGraph({ getBinary: async () => ok({ contentType: 'application/octet-stream', size: xlsxBytes.byteLength, base64: toBase64(xlsxBytes) }) });
+    const xlsx = await officeToMarkdown(xlsxGraph, '/drives/d1/items/i1/content', 'data.xlsx', { includeMetadata: true });
+    expect(xlsx.ok).toBe(true);
+    if (xlsx.ok) expect((xlsx.value as { text: string }).text).toContain('## Workbook metadata');
   });
 
   it('errs with `<no-extension>` placeholder when the filename has no dot', async () => {

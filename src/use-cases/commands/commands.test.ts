@@ -3123,15 +3123,19 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-markdown errs on an odt fileAttachment without --include-metadata (points at the PDF sibling)', async () => {
-    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.odt', contentBytes: btoa('zzz') });
+  it('convert-mail-attachment-to-markdown converts an odt fileAttachment body without --include-metadata (no metadata block)', async () => {
+    const odtBytes = await buildRichOdt();
+    let binary = '';
+    for (const byte of odtBytes) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.odt', contentBytes: btoa(binary) });
     const cmd = cmdMap['convert-mail-attachment-to-markdown'];
     if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aOdtNoMeta' });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.type).toBe('api_error');
-    if (result.error.type === 'api_error') expect(result.error.message).toContain('38 input extensions');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { contentType: string; text: string };
+    expect(v.text).toContain('# Heading One');
+    expect(v.text).not.toContain('## OpenDocument metadata');
   });
 
   it('convert-mail-attachment-to-pdf rejects a referenceAttachment with no sourceUrl', async () => {

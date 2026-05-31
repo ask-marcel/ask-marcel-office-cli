@@ -19,10 +19,12 @@ import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
  * - csv                                 → csvToMarkdownTable (markdown table)
  * - docx                                → mammoth → turndown
  * - xlsx                                → sheetjs → markdown table per sheet
+ * - odt / ods / odp                     → walk content.xml (headings/lists/
+ *                                         tables/sheets/slides); +metadata block
  * - loop / fluid / wbtx / whiteboard    → existing Graph ?format=html
  *                                         pipeline (the only inputs Graph
  *                                         HTML conversion actually accepts)
- * - everything else (pptx, pdf, rtf, odt, …) → err pointing at the
+ * - everything else (pptx, pdf, rtf, …) → err pointing at the
  *                                              corresponding *-as-pdf
  *                                              command (38 input extensions)
  */
@@ -126,10 +128,9 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   }
 
   if (ODF_FAMILY.has(ext)) {
-    if (opts.includeMetadata !== true) return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext) });
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
-    return odfToMarkdown(bytes.value);
+    return odfToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
   return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext === '' ? '<no-extension>' : ext) });

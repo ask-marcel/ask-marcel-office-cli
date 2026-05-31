@@ -229,6 +229,9 @@ const buildMalformedPptx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0
 const ODF_META_NS =
   'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"';
 
+const ODF_CONTENT_NS =
+  'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"';
+
 /**
  * An OpenDocument text fixture carrying the metadata `extractOdfMetadata`
  * surfaces: Dublin Core + ODF meta properties, a multi-keyword list, and two
@@ -252,6 +255,54 @@ const buildRichOdt = async (): Promise<Uint8Array> => {
       '<meta:user-defined meta:name="ClientID">ACME-42</meta:user-defined>' +
       '<meta:user-defined meta:name="Reviewer">Bob</meta:user-defined>' +
       '</office:meta></office:document-meta>'
+  );
+  zip.file(
+    'content.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_CONTENT_NS}><office:body><office:text>` +
+      '<text:h text:outline-level="1">Heading One</text:h>' +
+      '<text:p>First <text:span>paragraph</text:span> body.</text:p>' +
+      '<text:h text:outline-level="2">Sub heading</text:h>' +
+      '<text:p>Spaced<text:s text:c="2"/>out<text:tab/>cell.</text:p>' +
+      '<text:list><text:list-item><text:p>Item one</text:p></text:list-item>' +
+      '<text:list-item><text:p>Item two</text:p><text:list><text:list-item><text:p>Nested item</text:p></text:list-item></text:list></text:list-item></text:list>' +
+      '<table:table table:name="Table1">' +
+      '<table:table-row><table:table-cell><text:p>A1</text:p></table:table-cell><table:table-cell><text:p>B1</text:p></table:table-cell></table:table-row>' +
+      '<table:table-row><table:table-cell><text:p>A2</text:p></table:table-cell><table:table-cell><text:p>B2</text:p></table:table-cell></table:table-row>' +
+      '</table:table>' +
+      '<text:section text:display="none" text:name="Secret"><text:p>Hidden body text</text:p></text:section>' +
+      '<text:p>Final paragraph.</text:p>' +
+      '</office:text></office:body></office:document-content>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/** An OpenDocument spreadsheet: two named sheets; the data sheet ends in a 16384-wide empty-cell tail to exercise the repeat cap + trailing trim. */
+const buildRichOds = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.spreadsheet');
+  zip.file(
+    'content.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_CONTENT_NS}><office:body><office:spreadsheet>` +
+      '<table:table table:name="Budget">' +
+      '<table:table-row><table:table-cell><text:p>Item</text:p></table:table-cell><table:table-cell><text:p>Cost</text:p></table:table-cell></table:table-row>' +
+      '<table:table-row><table:table-cell><text:p>Rent</text:p></table:table-cell><table:table-cell><text:p>1000</text:p></table:table-cell><table:table-cell table:number-columns-repeated="16384"/></table:table-row>' +
+      '</table:table>' +
+      '<table:table table:name="Notes"><table:table-row><table:table-cell><text:p>Hello</text:p></table:table-cell></table:table-row></table:table>' +
+      '</office:spreadsheet></office:body></office:document-content>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/** An OpenDocument presentation: two named slides, each carrying a text box with paragraph text. */
+const buildRichOdp = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.presentation');
+  zip.file(
+    'content.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_CONTENT_NS}><office:body><office:presentation>` +
+      '<draw:page draw:name="Intro"><draw:frame><draw:text-box><text:p>Welcome slide</text:p><text:p>Subtitle here</text:p></draw:text-box></draw:frame></draw:page>' +
+      '<draw:page draw:name="Details"><draw:frame><draw:text-box><text:p>Detail bullet</text:p></draw:text-box></draw:frame></draw:page>' +
+      '</office:presentation></office:body></office:document-content>'
   );
   return zip.generateAsync({ type: 'uint8array' });
 };
@@ -486,6 +537,8 @@ export {
   buildPdfNoImages,
   buildPdfWithImage,
   buildRichDocx,
+  buildRichOdp,
+  buildRichOds,
   buildRichOdt,
   buildRichPptx,
   buildRichXlsx,

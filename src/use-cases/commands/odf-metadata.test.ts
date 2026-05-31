@@ -93,15 +93,33 @@ describe('formatOdfMetadata', () => {
 });
 
 describe('odfToMarkdown', () => {
-  it('wraps the metadata in a text/markdown envelope led by a use-the-PDF note', async () => {
+  it('converts the body to a text/markdown envelope and omits the metadata block by default', async () => {
     const result = await odfToMarkdown(await buildRichOdt());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/markdown');
-    expect(result.value.size).toBeGreaterThan(0);
-    expect(result.value.text).toContain('*-as-pdf');
+    expect(result.value.size).toBe(new TextEncoder().encode(result.value.text).byteLength);
+    expect(result.value.text).toContain('# Heading One');
+    expect(result.value.text).toContain('Final paragraph.');
+    expect(result.value.text).not.toContain('## OpenDocument metadata');
+  });
+
+  it('appends the `## OpenDocument metadata` block after the body when includeMetadata is true', async () => {
+    const result = await odfToMarkdown(await buildRichOdt(), { includeMetadata: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.text).toContain('# Heading One');
     expect(result.value.text).toContain('## OpenDocument metadata');
     expect(result.value.text).toContain('Q4 Plan');
+    // body precedes the metadata block
+    expect(result.value.text.indexOf('# Heading One')).toBeLessThan(result.value.text.indexOf('## OpenDocument metadata'));
+  });
+
+  it('returns the metadata block alone when the body is empty (no content.xml) and includeMetadata is true', async () => {
+    const result = await odfToMarkdown(await buildMinimalOdt(), { includeMetadata: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.text.startsWith('## OpenDocument metadata')).toBe(true);
   });
 
   it('propagates the zip-parse error for a malformed package', async () => {
