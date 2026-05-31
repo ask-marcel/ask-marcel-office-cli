@@ -92,6 +92,8 @@ import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mai
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
+import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
+import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
@@ -233,6 +235,8 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
+  'list-calendar-event-attachments': listCalendarEventAttachments,
+  'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
   'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,
@@ -3599,6 +3603,64 @@ describe('commands', () => {
   });
 });
 
+describe('calendar event attachments', () => {
+  it('list-calendar-event-attachments hits /me/events/{id}/attachments with a slim default --select, and honors an explicit --select', async () => {
+    let defaultUrl = '';
+    await cmdMap['list-calendar-event-attachments']?.execute(
+      createGraphClient(fakeAuth(), async (url) => {
+        defaultUrl = url;
+        return Response.json({ value: [] });
+      }),
+      { eventId: 'e1' }
+    );
+    expect(defaultUrl).toContain('/me/events/e1/attachments');
+    expect(defaultUrl).toContain('isInline');
+    let overrideUrl = '';
+    await cmdMap['list-calendar-event-attachments']?.execute(
+      createGraphClient(fakeAuth(), async (url) => {
+        overrideUrl = url;
+        return Response.json({ value: [] });
+      }),
+      { eventId: 'e1', select: 'id' }
+    );
+    expect(overrideUrl).not.toContain('isInline');
+  });
+
+  it('list-calendar-event-attachments returns a validation_error when eventId is missing', async () => {
+    const result = await cmdMap['list-calendar-event-attachments']?.execute(createGraphClient(fakeAuth(), fakeFetch({ value: [] })), {});
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  it('convert-calendar-event-attachment-to-markdown converts a docx event attachment and threads includeMetadata (true appends the metadata block; false/absent omits it)', async () => {
+    const docx = await buildSampleDocx();
+    let binary = '';
+    for (const byte of docx) binary += String.fromCharCode(byte);
+    const fetchFn: FetchFn = async (url) => {
+      if (url.includes('/me/events/e1/attachments/a1')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'r.docx', contentBytes: btoa(binary) });
+      throw new Error(`unexpected ${url}`);
+    };
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const text = async (params: Record<string, string>): Promise<string> => {
+      const r = await cmdMap['convert-calendar-event-attachment-to-markdown']?.execute(graph, params);
+      return r?.ok ? (r.value as { text: string }).text : '';
+    };
+    expect(await text({ eventId: 'e1', attachmentId: 'a1' })).toContain('# Sample Heading');
+    expect(await text({ eventId: 'e1', attachmentId: 'a1' })).not.toContain('## DOCX metadata');
+    expect(await text({ eventId: 'e1', attachmentId: 'a1', includeMetadata: 'true' })).toContain('## DOCX metadata');
+    // `false` must be an accepted enum value (kills the enum-literal mutant) and must omit metadata
+    const explicitFalse = await cmdMap['convert-calendar-event-attachment-to-markdown']?.execute(graph, { eventId: 'e1', attachmentId: 'a1', includeMetadata: 'false' });
+    expect(explicitFalse?.ok).toBe(true);
+    if (explicitFalse?.ok) expect((explicitFalse.value as { text: string }).text).not.toContain('## DOCX metadata');
+  });
+
+  it('convert-calendar-event-attachment-to-markdown returns a validation_error when attachmentId is missing', async () => {
+    const result = await cmdMap['convert-calendar-event-attachment-to-markdown']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { eventId: 'e1' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('validation_error');
+  });
+});
+
 type CommandFixture = { readonly name: string; readonly params: Record<string, string>; readonly responseBody?: unknown };
 
 const allCommandFixtures: CommandFixture[] = [
@@ -3745,6 +3807,12 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
   { name: 'get-excel-chart-image', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' }, responseBody: { value: 'aW1n' } },
+  { name: 'list-calendar-event-attachments', params: { eventId: 'e1' } },
+  {
+    name: 'convert-calendar-event-attachment-to-markdown',
+    params: { eventId: 'e1', attachmentId: 'a1' },
+    responseBody: { '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt', contentBytes: 'aGk=' },
+  },
   { name: 'microsoft-search-query', params: { query: 'q3 budget' } },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' } },
   { name: 'get-drive-root-delta', params: {} },
@@ -4092,6 +4160,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' },
     expectedPath: "/drives/d1/items/i1/workbook/worksheets/Sheet1/charts/c1/Image(width=0,height=0,fittingMode='Fit')",
   },
+  { name: 'convert-calendar-event-attachment-to-markdown', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
   { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },
   { name: 'list-followed-drive-items', params: {}, expectedPath: '/me/drive/following' },

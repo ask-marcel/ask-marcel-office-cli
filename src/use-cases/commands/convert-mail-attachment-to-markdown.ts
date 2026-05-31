@@ -129,13 +129,12 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
   }
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
-
-  const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
+// Fetch an attachment by its full Graph path and convert it to markdown,
+// branching on the polymorphic `@odata.type`. Path-agnostic so both the mail
+// (`/me/messages/{id}/attachments/{id}`) and calendar-event
+// (`/me/events/{id}/attachments/{id}`) commands share one implementation.
+const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
+  const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
 
@@ -154,6 +153,13 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
+};
+
+const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const { messageId, attachmentId } = parsed.data;
+  return convertAttachmentToMarkdown(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, parsed.data.includeMetadata === 'true');
 };
 
 const meta: CommandMeta = {
@@ -181,4 +187,4 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { execute, meta, schema };
+export { convertAttachmentToMarkdown, execute, meta, schema };

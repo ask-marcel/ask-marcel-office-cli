@@ -82,6 +82,8 @@ import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
+import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
+import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as listChats from './list-chats.ts';
@@ -226,6 +228,8 @@ const commands: Record<string, Command> = {
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
+  'list-calendar-event-attachments': listCalendarEventAttachments,
+  'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
   'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,

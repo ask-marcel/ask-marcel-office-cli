@@ -1,8 +1,45 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-31T08:15:45.730Z",
+  "generatedAt": "2026-05-31T09:17:15.639Z",
   "commands": [
+    {
+      "name": "convert-calendar-event-attachment-to-markdown",
+      "summary": "Convert an attachment on an Outlook calendar event to markdown. Polymorphic on the attachment’s `@odata.type` (shares the mail-attachment pipeline): fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally. A pptx deck attached to a meeting yields its speaker notes / slide titles / comments via `## PPTX metadata` (pass `--include-metadata true`). For raw bytes of a pdf/image attachment, save it via `get-mail-attachment` on the equivalent message, or fetch the linked file directly.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/events/{event-id}/attachments/{attachment-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/attachment-get",
+      "options": [
+        {
+          "name": "event-id",
+          "key": "eventId",
+          "required": true,
+          "description": "Outlook calendar event ID. Returned by `list-calendar-events` or `get-calendar-event`."
+        },
+        {
+          "name": "attachment-id",
+          "key": "attachmentId",
+          "required": true,
+          "description": "Attachment ID inside that event. Returned by `list-calendar-event-attachments`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to surface side-channel content for docx, xlsx, pptx, and OpenDocument attachments. docx → `## DOCX metadata`; xlsx → `## Workbook metadata`; pptx → `## PPTX metadata` (standalone, since pptx has no convertible body); odt/ods/odp → `## OpenDocument metadata`, appended after the converted body. No-op on other attachment types and on itemAttachment renderers.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400."
+    },
     {
       "name": "convert-mail-attachment-to-markdown",
       "summary": "Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx attachments, `convert-mail-attachment-to-pdf` is recommended (Graph PDF preserves slide layout). For pdf/rtf/etc. also use the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).",
@@ -1939,6 +1976,61 @@
       ],
       "example": "ask-marcel list-all-onenote-sections",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-calendar-event-attachments",
+      "summary": "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown`.",
+      "category": "calendar",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/events/{event-id}/attachments",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/event-list-attachments",
+      "options": [
+        {
+          "name": "event-id",
+          "key": "eventId",
+          "required": true,
+          "description": "Outlook calendar event ID. Returned by `ask-marcel list-calendar-events` or `get-calendar-event`."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel list-calendar-event-attachments --event-id 'AAMkAGI2...'",
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — that discriminator is what the attachment-converting commands branch on.",
       "pagination": true
     },
     {
