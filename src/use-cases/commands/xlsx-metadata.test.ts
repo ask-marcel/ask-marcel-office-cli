@@ -17,6 +17,8 @@ describe('extractXlsxMetadata', () => {
     // Defined names — both the plain named range and the hidden one, with their formulas
     expect(m.definedNames).toContainEqual({ name: 'TaxRate', refersTo: 'Summary!$A$1', hidden: false });
     expect(m.definedNames.some((d) => d.name === 'SecretFormula' && d.hidden && d.refersTo.includes('1.5'))).toBe(true);
+    // hidden="1" AND hidden="true" both mark a defined name hidden (the two truthy spellings Excel emits)
+    expect(m.definedNames).toContainEqual({ name: 'TrueHidden', refersTo: "'Very Secret'!$Z$9", hidden: true });
 
     // Hidden + veryHidden sheets are flagged (the visible "Summary" sheet is NOT listed here)
     expect(m.hiddenSheets).toContainEqual({ name: 'Hidden Data', state: 'hidden' });

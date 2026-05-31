@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'bun:test';
+import JSZip from 'jszip';
 import { buildMalformedPptx, buildMinimalPptx, buildRichPptx } from '../../test-helpers/office-fixtures.ts';
 import { formatPptxMetadata } from './pptx-metadata-to-markdown.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 
 describe('extractPptxMetadata', () => {
+  it('collects p:tag entries ONLY from ppt/tags/tag{N}.xml parts — the ^/$ anchored path filter excludes look-alike paths and p:tags elsewhere in the package', async () => {
+    const P = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+    const tagPart = (name: string, val: string): string => `<?xml version="1.0"?><p:tags xmlns:p="${P}"><p:tag name="${name}" val="${val}"/></p:tags>`;
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+    zip.file('ppt/tags/tag1.xml', tagPart('KEEP', 'kept')); // a real single-digit tag part
+    zip.file('ppt/tags/tag10.xml', tagPart('KEEP10', 'kept10')); // a real two-digit tag part (the \d+ quantifier must match it)
+    zip.file('notppt/tags/tag1.xml', tagPart('NOCARET', 'x')); // matches only if the leading ^ is dropped
+    zip.file('ppt/tags/tag1.xmlbak', tagPart('NODOLLAR', 'x')); // matches only if the trailing $ is dropped
+    zip.file('ppt/foo/decoy.xml', tagPart('FILTERED', 'x')); // a p:tag outside the tags folder — only the no-filter mutant reads it
+    const result = await extractPptxMetadata(await zip.generateAsync({ type: 'uint8array' }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.slideTags).toEqual([
+      { source: 'ppt/tags/tag1.xml', name: 'KEEP', value: 'kept' },
+      { source: 'ppt/tags/tag10.xml', name: 'KEEP10', value: 'kept10' },
+    ]);
+  });
+
   it('surfaces the authored-but-invisible content a slide PDF never shows — custom props, slide tag, legacy + modern comments, hidden slide, speaker notes, external hyperlink', async () => {
     const result = await extractPptxMetadata(await buildRichPptx());
     expect(result.ok).toBe(true);

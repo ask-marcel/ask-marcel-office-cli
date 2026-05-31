@@ -20,7 +20,31 @@ const buildEdgeCaseOdt = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+// A meta.xml that pins the remaining filter branches: an empty-text property
+// (`dc:subject`) that must NOT enter the flat record, a single `meta:user-defined`
+// whose `meta:name` is empty (an object the walker keeps, so the name-filter must
+// drop it) — which also proves user-defined tags never leak into the property map.
+const buildEmptyFieldsOdt = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file(
+    'meta.xml',
+    '<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">' +
+      '<office:meta><dc:title>T</dc:title><dc:subject></dc:subject><meta:keyword>kw</meta:keyword><meta:user-defined meta:name="">noname</meta:user-defined></office:meta>' +
+      '</office:document-meta>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 describe('extractOdfMetadata', () => {
+  it('excludes empty-text properties from the flat record, never folds user-defined into it, and drops an empty-name user-defined field', async () => {
+    const result = await extractOdfMetadata(await buildEmptyFieldsOdt());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.properties).toEqual({ title: 'T' });
+    expect(result.value.keywords).toEqual(['kw']);
+    expect(result.value.userDefined).toEqual([]);
+  });
+
   it('extracts Dublin Core + ODF meta properties, the keyword list, and user-defined custom fields', async () => {
     const result = await extractOdfMetadata(await buildRichOdt());
     expect(result.ok).toBe(true);

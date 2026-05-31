@@ -130,6 +130,7 @@ const buildRichXlsx = async (): Promise<Uint8Array> => {
   <definedNames>
     <definedName name="TaxRate">Summary!$A$1</definedName>
     <definedName name="SecretFormula" hidden="1">'Hidden Data'!$B$2*1.5</definedName>
+    <definedName name="TrueHidden" hidden="true">'Very Secret'!$Z$9</definedName>
   </definedNames>
 </workbook>`
   );
