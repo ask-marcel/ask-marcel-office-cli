@@ -397,10 +397,11 @@ const buildRichPptx = async (): Promise<Uint8Array> => {
 };
 
 /**
- * A package carrying raster media across all three format prefixes
- * (word/xl/ppt/media) plus a vector part (.emf) and a non-media binary
- * (embeddings) — exercises the raster-only filter of the media extractor.
- * Hand-rolled so the byte contents are deterministic.
+ * A package carrying image media across all three format prefixes
+ * (word/xl/ppt/media) — raster (png/jpeg/gif) plus an svg — alongside a legacy
+ * vector part (.emf) and a non-media binary (embeddings) that the extractor
+ * must skip. Exercises the image filter of the media extractor (svg included,
+ * emf excluded). Hand-rolled so the byte contents are deterministic.
  */
 const buildMediaSamples = async (): Promise<Uint8Array> => {
   const zip = new JSZip();
