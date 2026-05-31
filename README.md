@@ -34,6 +34,7 @@ A typical "read this email" loop in raw Graph: GET the message → GET the attac
 `convert-mail-to-markdown` collapses that into one call:
 
 - Body rendered as markdown (turndown pipeline)
+- Quoted reply chains / forwarded-message blocks stripped by default so a long thread doesn't duplicate earlier messages into the model's context (the cut is replaced with a visible marker; opt out with `--keep-quoted true` to keep the full body)
 - Inline images embedded as base64 `data:` URIs (size-capped per image — opt out with `--inline-images false` to keep raw `cid:` refs)
 - File attachments listed below the body with id + name + size, ready for follow-up calls
 - Pair with `extract-sharepoint-links-in-mail` to resolve every SharePoint URL in the body to its driveItem in parallel (capped at 25 unique URLs per call)
@@ -176,7 +177,6 @@ Read-only stays the default forever. The list below is additive coverage and con
 - **[M] OneNote end-to-end markdown** — OneNote page reads currently return raw HTML; chaining the turndown pipeline (same one `convert-mail-to-markdown` uses) would give parity with the docx route.
 - **[L] Multi-tenant auth profiles** — `ask-marcel login --profile work` / `--profile personal` with separate token caches at `~/.ask-marcel/<profile>/`, for consultants and contractors who routinely switch tenants.
 - **[L] Streaming pagination output** — write each page to stdout as it arrives instead of accumulating, so long delta walks don't hold gigabytes in memory and an agent can start processing page 1 while page 2 is in flight.
-- **[M] Quoted-text stripping in `convert-mail-to-markdown`** — collapse "On Tuesday Alice wrote..." reply chains so long threads stop blowing the context budget on duplicated quoted content.
 - **[L] Full-fidelity document context** — extract every piece of written information in a document: reviewer comments, threaded comments, slide notes, revision marks, descriptions, custom metadata, and sensitivity labels — folded into the markdown output so an LLM reads the whole story of a document, not just its body text.
 
 Suggestions, requests, and pull requests welcome — see the [issues page](https://github.com/vdelacou/ask-marcel-office-cli/issues).

@@ -103,6 +103,10 @@ describe('command meta — invariants on every registered command', () => {
           // `list-accessible-drives --max-groups` caps the per-group drive
           // fan-out; runtime-additive, not a URL placeholder.
           'max-groups',
+          // `convert-mail-to-markdown --keep-quoted true` is a post-fetch
+          // processing toggle (skip the quoted-reply-chain strip on the HTML
+          // body before turndown); not a URL placeholder.
+          'keep-quoted',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

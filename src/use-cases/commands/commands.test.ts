@@ -110,6 +110,7 @@ import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
+import { stripQuotedReplies } from './mail-quote-stripper.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
@@ -4168,6 +4169,120 @@ describe('sharepoint-link-extractor helpers', () => {
     expect(res.links[0]?.itemId).toBe('i1');
     expect(res.links[0]?.driveId).toBeUndefined();
     expect(res.links[0]?.error).toBeUndefined();
+  });
+});
+
+describe('mail-quote-stripper', () => {
+  // Each fixture puts a multi-char attribute (`data-x="y"`) before the id/class
+  // so the `<tag[^>]*` quantifier must match more than one char (kills the
+  // `[^>]*` → `[^>]` regex mutants), and the Gmail ones prefix the class value
+  // with `im ` so `class="[^"]*gmail_quote` must match a non-empty prefix
+  // (kills the `[^"]*` → `["]*` mutants).
+  const boundaryFixtures = [
+    { label: 'Outlook divRplyFwdMsg', html: '<p>reply body</p><div data-x="y" id="divRplyFwdMsg"><b>From:</b> Alice</div><p>old quoted</p>' },
+    { label: 'Outlook appendonsend', html: '<p>reply body</p><div data-x="y" id="appendonsend"></div><blockquote>old quoted</blockquote>' },
+    { label: 'Outlook mobile container', html: '<p>reply body</p><div data-x="y" id="mail-editor-reference-message-container"><p>old quoted</p></div>' },
+    { label: 'Outlook stopSpelling hr', html: '<p>reply body</p><hr data-x="y" id="stopSpelling"><p>old quoted</p>' },
+    { label: 'Gmail div quote', html: '<p>reply body</p><div data-x="y" class="im gmail_quote">old quoted</div>' },
+    { label: 'Gmail blockquote quote', html: '<p>reply body</p><blockquote data-x="y" class="im gmail_quote">old quoted</blockquote>' },
+  ];
+  it.each(boundaryFixtures)('stripQuotedReplies cuts the body at the $label boundary (with attributes before the marker)', ({ html }) => {
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(true);
+    expect(r.html).toBe(`<p>reply body</p>${'<p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>'}`);
+    expect(r.html).not.toContain('old quoted');
+  });
+
+  it('stripQuotedReplies leaves a body with no quote markers untouched (a bare blockquote is NOT a marker)', () => {
+    const html = '<p>Just a normal email with a <blockquote>short inline citation</blockquote>.</p>';
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(false);
+    expect(r.html).toBe(html);
+  });
+
+  it('stripQuotedReplies cuts at the EARLIEST marker — later-in-body marker (gmail) does not win over an earlier one (divRplyFwdMsg)', () => {
+    // divRplyFwdMsg (1st in the boundary list) appears EARLIER in the body than
+    // gmail_quote (5th). A broken `cut === -1 → true` guard would unconditionally
+    // overwrite cut to the LAST matching boundary (gmail, later) — caught here.
+    const html = '<p>keep</p><div id="divRplyFwdMsg">A</div><p>mid</p><div class="gmail_quote">B</div>';
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(true);
+    expect(r.html).toBe('<p>keep</p><p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>');
+  });
+
+  it('stripQuotedReplies cuts at the EARLIEST marker — later-in-list boundary (gmail) appearing earlier in the body still wins', () => {
+    // gmail_quote (5th in the boundary list) appears BEFORE divRplyFwdMsg (1st) in the body
+    const html = '<p>keep</p><div class="gmail_quote">A</div><div id="divRplyFwdMsg">B</div>';
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(true);
+    expect(r.html).toBe('<p>keep</p><p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>');
+  });
+});
+
+describe('convert-mail-to-markdown — quoted-text stripping', () => {
+  const htmlMsg = (content: string, hasAttachments = false): FetchFn => {
+    const body = { subject: 'Re: Q3', body: { contentType: 'html', content }, hasAttachments };
+    return async (url) => {
+      if (url.includes('/attachments')) return Response.json({ value: [{ id: 'att-broken-shape' }], extra: 'forces a list when hasAttachments' });
+      return Response.json(body);
+    };
+  };
+
+  it('strips the quoted reply chain by default and flags it in the note', async () => {
+    const content = '<p>My reply.</p><div id="divRplyFwdMsg"><b>From:</b> Alice<br><b>Sent:</b> Friday</div><p>Original message text that should be dropped.</p>';
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg(content)), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string; note?: string };
+    expect(v.text).toContain('My reply.');
+    expect(v.text).not.toContain('Original message text');
+    expect(v.text).toContain('Quoted reply chain removed');
+    expect(v.note).toContain('quoted reply chain stripped');
+  });
+
+  it('preserves the quoted reply chain with --keep-quoted true and sets no note', async () => {
+    const content = '<p>My reply.</p><div id="divRplyFwdMsg"><b>From:</b> Alice</div><p>Original message text.</p>';
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg(content)), { messageId: 'm1', keepQuoted: 'true' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string; note?: string };
+    expect(v.text).toContain('Original message text');
+    expect(v.text).not.toContain('Quoted reply chain removed');
+    expect(v.note).toBeUndefined();
+  });
+
+  it('does not strip quoted markers from a plain-text body', async () => {
+    const content = 'My reply.\n\n<div id="divRplyFwdMsg">not real html</div>';
+    const fetchFn: FetchFn = async () => Response.json({ subject: 'Re', body: { contentType: 'text', content }, hasAttachments: false });
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string; note?: string };
+    expect(v.text).toContain('divRplyFwdMsg'); // plain-text passthrough — untouched
+    expect(v.note).toBeUndefined();
+  });
+
+  it('sets no quoted note when an html body has no quote markers', async () => {
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg('<p>standalone reply</p>')), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (result?.ok) expect((result.value as { note?: string }).note).toBeUndefined();
+  });
+
+  it('joins the attachments-list note and the quoted-strip note with "; "', async () => {
+    // hasAttachments:true → the attachments list is fetched; the malformed shape
+    // sets attachmentsListNote, and the quoted block sets the strip note → both joined.
+    const content = '<p>reply</p><div id="divRplyFwdMsg">x</div><p>old</p>';
+    const fetchFn: FetchFn = async (url) => {
+      if (url.includes('/attachments')) return Response.json({ value: 'not-an-array' });
+      return Response.json({ subject: 'Re', body: { contentType: 'html', content }, hasAttachments: true });
+    };
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { note?: string };
+    expect(v.note).toContain('quoted reply chain stripped');
+    expect(v.note).toContain('malformed shape');
+    expect(v.note).toContain('; ');
   });
 });
 

@@ -6,6 +6,7 @@ import type { CommandMeta } from './command-types.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { stripQuotedReplies } from './mail-quote-stripper.ts';
 
 // Audit v1.4.0 fresh-pass #6: `--inline-images false` opts out of the
 // per-image bytes-fetch + base64 embedding. An LLM that just wants the text
@@ -17,6 +18,7 @@ import { formatZodError } from './format-zod-error.ts';
 const schema = z.object({
   messageId: z.string().min(1),
   inlineImages: z.enum(['true', 'false']).optional(),
+  keepQuoted: z.enum(['true', 'false']).optional(),
 });
 
 // Audit v1.0.0 — multi-MB attachments timeout fix. `?$expand=attachments`
@@ -183,6 +185,10 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // base64-embedded output. Pass `--inline-images false` to skip the per-
   // image bytes fetch + embedding (cheaper for an LLM that just wants text).
   const embedInlineImagesEnabled = parsed.data.inlineImages !== 'false';
+  // Quoted reply chains / forwarded-message blocks are stripped by default
+  // (they duplicate content already in earlier messages and blow the context
+  // budget). Pass `--keep-quoted true` to preserve the full body.
+  const keepQuoted = parsed.data.keepQuoted === 'true';
 
   const fetched = await graph.get(`/me/messages/${messageId}`);
   if (!fetched.ok) return fetched;
@@ -227,8 +233,14 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const withPlaceholders = renderOversizePlaceholders(rawHtml, embedResults);
   const inlined = inlineImages.length > 0 ? embedInlineImages(withPlaceholders, inlineImages) : withPlaceholders;
   let bodyMd: string;
+  let quotedStripped = false;
   if (m.body?.contentType === 'html') {
-    const converted = htmlToMarkdown(inlined);
+    // Strip quoted reply chains before turndown (the Outlook / Gmail markers
+    // are still HTML at this point). v1 covers HTML bodies only — plain-text
+    // reply detection is a separate heuristic.
+    const stripped = keepQuoted ? { html: inlined, stripped: false } : stripQuotedReplies(inlined);
+    quotedStripped = stripped.stripped;
+    const converted = htmlToMarkdown(stripped.html);
     if (!converted.ok) return converted;
     bodyMd = converted.value;
   } else {
@@ -243,7 +255,10 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     size: new TextEncoder().encode(text).byteLength,
     text,
   };
-  if (attachmentsListNote !== undefined) envelope.note = attachmentsListNote;
+  const notes: string[] = [];
+  if (attachmentsListNote !== undefined) notes.push(attachmentsListNote);
+  if (quotedStripped) notes.push('quoted reply chain stripped — pass --keep-quoted true to include it');
+  if (notes.length > 0) envelope.note = notes.join('; ');
   return ok(envelope);
 };
 
@@ -263,10 +278,18 @@ const meta: CommandMeta = {
       description:
         'Pass `--inline-images false` to skip the per-image bytes fetch + base64 embedding. Default is `true` (embed). Disabling cuts the response size dramatically on emails with several inline images (a 6 KB body with 6 inline images shipped at ~36 KB by default; with `--inline-images false` it stays close to 6 KB). The body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list instead, so the LLM caller can still see what is there and fetch any specific image via `get-mail-attachment` on demand.',
     },
+    {
+      name: 'keep-quoted',
+      key: 'keepQuoted',
+      required: false,
+      description:
+        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut (Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`); HTML bodies only.',
+      argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+    },
   ],
   example: "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
   responseShape:
-    '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded.',
+    '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).',
   producesBytes: true,
 };
 
