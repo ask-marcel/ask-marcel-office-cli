@@ -56,16 +56,23 @@ const extractHtml = async (graph: GraphClient, binaryResult: Record<string, unkn
   return err({ type: 'api_error', status: 500, message: 'unexpected response shape from getBinary: no text or downloadUrl' });
 };
 
-const convertToMarkdown = async (
-  graph: GraphClient,
-  contentPath: string,
-  inlineAttachments: ReadonlyArray<InlineAttachment> = []
-): Promise<Result<MarkdownEnvelope, GraphError>> => {
+// `htmlTransform` runs on the extracted HTML *before* turndown — used by the
+// OneNote route to fetch + embed Graph `resources/{id}/$value` images as data
+// URIs (mail uses the `cid:`-based `inlineAttachments` path instead). Both are
+// optional and compose: transform first, then cid embedding, then turndown.
+type ConvertOptions = {
+  readonly inlineAttachments?: ReadonlyArray<InlineAttachment>;
+  readonly htmlTransform?: (html: string) => Promise<string>;
+};
+
+const convertToMarkdown = async (graph: GraphClient, contentPath: string, options: ConvertOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const binary = await graph.getBinary(contentPath);
   if (!binary.ok) return err(augmentSandboxError(binary.error));
   const html = await extractHtml(graph, binary.value as Record<string, unknown>);
   if (!html.ok) return err(augmentSandboxError(html.error));
-  const inlined = inlineAttachments.length > 0 ? embedInlineImages(html.value, inlineAttachments) : html.value;
+  const transformed = options.htmlTransform ? await options.htmlTransform(html.value) : html.value;
+  const inlineAttachments = options.inlineAttachments ?? [];
+  const inlined = inlineAttachments.length > 0 ? embedInlineImages(transformed, inlineAttachments) : transformed;
   const md = htmlToMarkdown(inlined);
   if (!md.ok) return md;
   // size = UTF-8 byte count (audit §2.1); `.length` is UTF-16 code units.
@@ -73,4 +80,4 @@ const convertToMarkdown = async (
 };
 
 export { convertToMarkdown };
-export type { MarkdownEnvelope };
+export type { ConvertOptions, MarkdownEnvelope };

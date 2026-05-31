@@ -111,6 +111,8 @@ import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import { stripQuotedReplies } from './mail-quote-stripper.ts';
+import { embedOnenoteResources } from './onenote-resource-embedder.ts';
+import { formatOnenoteMetadata } from './onenote-metadata.ts';
 import * as listChats from './list-chats.ts';
 import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
@@ -4283,6 +4285,238 @@ describe('convert-mail-to-markdown — quoted-text stripping', () => {
     expect(v.note).toContain('quoted reply chain stripped');
     expect(v.note).toContain('malformed shape');
     expect(v.note).toContain('; ');
+  });
+});
+
+describe('onenote-resource-embedder', () => {
+  const RES = 'https://graph.microsoft.com/v1.0/users/u1/onenote/resources/r1/$value';
+  // Strict on the exact resource URL so a broken base-strip (wrong getBinary path) → 404 → no embed.
+  const imageFetch =
+    (contentType: string, bytes: Uint8Array): FetchFn =>
+    async (url) =>
+      url === RES ? new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': contentType } }) : new Response('no', { status: 404 });
+
+  it('embeds a OneNote resource image as a base64 data URI (fetching the base-stripped resource path)', async () => {
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array([1, 2, 3]))), `<p>see <img src="${RES}" alt="x"></p>`);
+    expect(out).toContain('data:image/png;base64,AQID');
+    expect(out).not.toContain(RES);
+  });
+
+  it('matches the image content-type case-insensitively (IMAGE/PNG embeds)', async () => {
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('IMAGE/PNG', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
+    expect(out).toContain('data:IMAGE/PNG;base64,AQID');
+  });
+
+  it('leaves the URL in place when the resource is not an image', async () => {
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('application/pdf', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
+    expect(out).toContain(RES);
+    expect(out).not.toContain('data:');
+  });
+
+  it('embeds at exactly the size limit but leaves the URL one byte over (boundary)', async () => {
+    const atLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array(2_000_000))), `<img src="${RES}">`);
+    expect(atLimit).toContain('data:image/png;base64,'); // 2_000_000 is NOT over the limit → embedded
+    expect(atLimit).not.toContain(RES);
+
+    const overLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array(2_000_001))), `<img src="${RES}">`);
+    expect(overLimit).toContain(RES); // one byte over → left as URL
+    expect(overLimit).not.toContain('data:image');
+  });
+
+  it('leaves the URL in place when the resource fetch fails', async () => {
+    const out = await embedOnenoteResources(
+      createGraphClient(fakeAuth(), async () => new Response('nope', { status: 500 })),
+      `<img src="${RES}">`
+    );
+    expect(out).toContain(RES);
+  });
+
+  it('leaves the URL in place (no throw) when the resource has no inline bytes — a 302 redirect with no base64/contentType', async () => {
+    const redirect = createGraphClient(fakeAuth(), async () => new Response(null, { status: 302, headers: { location: 'https://francecentral1-mediap.svc.ms/x' } }));
+    const out = await embedOnenoteResources(redirect, `<img src="${RES}">`);
+    expect(out).toContain(RES);
+    expect(out).not.toContain('data:');
+  });
+
+  it('leaves the URL in place (no throw) when the resource response has base64 but no contentType (JSON envelope)', async () => {
+    const jsonNoType = createGraphClient(fakeAuth(), async () => Response.json({ base64: 'AQID' })); // no contentType field
+    const out = await embedOnenoteResources(jsonNoType, `<img src="${RES}">`);
+    expect(out).toContain(RES);
+    expect(out).not.toContain('data:');
+  });
+
+  it('fetches each distinct resource once (dedupe) and embeds every occurrence', async () => {
+    let calls = 0;
+    const graph = createGraphClient(fakeAuth(), async (url) => {
+      if (url !== RES) return new Response('no', { status: 404 });
+      calls += 1;
+      return new Response(new Uint8Array([1, 2, 3]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+    });
+    const out = await embedOnenoteResources(graph, `<img src="${RES}"> mid <img src="${RES}">`);
+    expect(calls).toBe(1);
+    expect(out.match(/data:image\/png;base64,AQID/g) ?? []).toHaveLength(2);
+    expect(out).not.toContain(RES);
+  });
+
+  it('returns the html unchanged AND fetches nothing when there are no OneNote resource URLs', async () => {
+    let calls = 0;
+    const graph = createGraphClient(fakeAuth(), async () => {
+      calls += 1;
+      return new Response('unexpected', { status: 500 });
+    });
+    const html = '<p>plain page with an <img src="https://example.com/x.png"> external image</p>';
+    expect(await embedOnenoteResources(graph, html)).toBe(html);
+    expect(calls).toBe(0); // no match → empty array default → no getBinary call (kills the `?? []` mutant)
+  });
+});
+
+describe('onenote-metadata', () => {
+  it('renders every field (newline-joined, in order) including the expanded parent section + notebook names', () => {
+    const md = formatOnenoteMetadata({
+      title: 'Q3 Plan',
+      createdDateTime: '2026-01-02T03:04:05Z',
+      lastModifiedDateTime: '2026-05-06T07:08:09Z',
+      parentSection: { displayName: 'Planning' },
+      parentNotebook: { displayName: 'Work' },
+    });
+    // exact output asserts the `\n` join + line ordering (kills the join-separator mutant)
+    expect(md).toBe(
+      [
+        '## OneNote metadata',
+        '- **Title:** Q3 Plan',
+        '- **Created:** 2026-01-02T03:04:05Z',
+        '- **Last modified:** 2026-05-06T07:08:09Z',
+        '- **Notebook:** Work',
+        '- **Section:** Planning',
+      ].join('\n')
+    );
+  });
+
+  it('omits absent fields and tolerates a missing parentSection / parentNotebook (no throw)', () => {
+    const md = formatOnenoteMetadata({ title: 'Only Title' });
+    expect(md).toContain('- **Title:** Only Title');
+    expect(md).not.toContain('Created');
+    expect(md).not.toContain('Notebook');
+    expect(md).not.toContain('Section');
+  });
+
+  it('treats an empty-string field as absent (no blank line emitted)', () => {
+    const md = formatOnenoteMetadata({ title: '', createdDateTime: '2026-01-01T00:00:00Z' });
+    expect(md).not.toContain('Title');
+    expect(md).toContain('- **Created:** 2026-01-01T00:00:00Z');
+  });
+
+  it('returns just the header when the page has no metadata fields', () => {
+    expect(formatOnenoteMetadata({})).toBe('## OneNote metadata');
+  });
+});
+
+describe('get-onenote-page-as-markdown — inline images + metadata', () => {
+  const RES = 'https://graph.microsoft.com/v1.0/me/onenote/resources/r1/$value';
+  const pageHtml = `<html><body><p>Notes.</p><img src="${RES}"></body></html>`;
+  const onenoteFetch = (): FetchFn => async (url) => {
+    if (url.endsWith('/onenote/pages/p1/content')) return new Response(pageHtml, { status: 200, headers: { 'content-type': 'text/html' } });
+    if (url === RES) return new Response(new Uint8Array([1, 2, 3]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+    if (url.includes('/onenote/pages/p1?')) {
+      return Response.json({
+        title: 'My Page',
+        createdDateTime: '2026-01-01T00:00:00Z',
+        lastModifiedDateTime: '2026-02-02T00:00:00Z',
+        parentSection: { displayName: 'Sec' },
+        parentNotebook: { displayName: 'NB' },
+      });
+    }
+    return new Response('no', { status: 404 });
+  };
+
+  it('embeds inline resource images by default', async () => {
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string };
+    expect(v.text).toContain('Notes.');
+    expect(v.text).toContain('data:image/png;base64,AQID');
+    expect(v.text).not.toContain('resources/r1/$value');
+  });
+
+  it('keeps the raw resource URL with --inline-images false', async () => {
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', inlineImages: 'false' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string };
+    expect(v.text).toContain('resources/r1/$value');
+    expect(v.text).not.toContain('data:image');
+  });
+
+  it('embeds inline resource images when --inline-images true is passed explicitly', async () => {
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', inlineImages: 'true' });
+    expect(result?.ok).toBe(true);
+    if (result?.ok) expect((result.value as { text: string }).text).toContain('data:image/png;base64,AQID');
+  });
+
+  it('appends the OneNote metadata block (after a blank line) with --include-metadata true, expanding section + notebook', async () => {
+    let metadataUrl = '';
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/onenote/pages/p1/content')) return new Response('<p>Body.</p>', { status: 200, headers: { 'content-type': 'text/html' } });
+      if (url.includes('/onenote/pages/p1?')) {
+        metadataUrl = url;
+        return Response.json({
+          title: 'My Page',
+          createdDateTime: '2026-01-01T00:00:00Z',
+          lastModifiedDateTime: '2026-02-02T00:00:00Z',
+          parentSection: { displayName: 'Sec' },
+          parentNotebook: { displayName: 'NB' },
+        });
+      }
+      return new Response('no', { status: 404 });
+    };
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { onenotePageId: 'p1', includeMetadata: 'true' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string };
+    // metadata GET expands the parent section + notebook display names (kills the query-string mutant)
+    expect(metadataUrl).toContain('$select=title');
+    expect(metadataUrl).toContain('$expand=parentSection');
+    expect(metadataUrl).toContain('parentNotebook');
+    // body, then a blank line, then the metadata block (kills the `\n\n` separator mutant)
+    expect(v.text).toContain('Body.\n\n## OneNote metadata');
+    expect(v.text).toContain('- **Title:** My Page');
+    expect(v.text).toContain('- **Notebook:** NB');
+    expect(v.text).toContain('- **Section:** Sec');
+  });
+
+  it('omits the metadata block by default and when --include-metadata false is passed explicitly', async () => {
+    const def = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1' });
+    expect(def?.ok).toBe(true);
+    if (def?.ok) expect((def.value as { text: string }).text).not.toContain('## OneNote metadata');
+
+    const explicitFalse = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', includeMetadata: 'false' });
+    expect(explicitFalse?.ok).toBe(true);
+    if (explicitFalse?.ok) expect((explicitFalse.value as { text: string }).text).not.toContain('## OneNote metadata');
+  });
+
+  it('propagates a content-fetch failure', async () => {
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(
+      createGraphClient(
+        fakeAuth(),
+        async () => new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } })
+      ),
+      { onenotePageId: 'p1' }
+    );
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('api_error');
+  });
+
+  it('propagates a metadata-fetch failure under --include-metadata true', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/onenote/pages/p1/content')) return new Response('<p>x</p>', { status: 200, headers: { 'content-type': 'text/html' } });
+      if (url.includes('/onenote/pages/p1?'))
+        return new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } });
+      return new Response('no', { status: 404 });
+    };
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { onenotePageId: 'p1', includeMetadata: 'true' });
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.error.type).toBe('api_error');
   });
 });
 

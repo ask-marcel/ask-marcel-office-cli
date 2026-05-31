@@ -52,12 +52,27 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     const graph = noopGraph({
       getBinary: async () => ok({ contentType: 'text/html', size: 60, text: '<p>Logo: <img src="cid:l1" alt="logo"></p>' }),
     });
-    const result = await convertToMarkdown(graph, '/me/messages/m1?$select=body', [{ contentId: 'l1', contentType: 'image/png', contentBytes: 'iVBORw0=' }]);
+    const result = await convertToMarkdown(graph, '/me/messages/m1?$select=body', { inlineAttachments: [{ contentId: 'l1', contentType: 'image/png', contentBytes: 'iVBORw0=' }] });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
       expect(v.text).toContain('data:image/png;base64,iVBORw0=');
       expect(v.text).not.toContain('cid:l1');
+    }
+  });
+
+  it('applies the htmlTransform hook to the extracted HTML before turndown', async () => {
+    const graph = noopGraph({
+      getBinary: async () => ok({ contentType: 'text/html', size: 20, text: '<p>RAW resource ref</p>' }),
+    });
+    const result = await convertToMarkdown(graph, '/me/onenote/pages/p1/content', {
+      htmlTransform: async (html) => html.replace('RAW resource ref', 'EMBEDDED'),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { text: string };
+      expect(v.text).toContain('EMBEDDED');
+      expect(v.text).not.toContain('RAW resource ref');
     }
   });
 
@@ -67,7 +82,13 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     });
     const result = await convertToMarkdown(graph, '/missing');
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('api_error');
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') {
+      expect(result.error.status).toBe(404);
+      // a non-Sandbox error is returned verbatim — augmentSandboxError does NOT rewrite it
+      expect(result.error.message).toBe('not found');
+    }
   });
 
   it('propagates an err from fetchUrl when following a 302 redirect fails', async () => {
@@ -88,9 +109,11 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     });
     const result = await convertToMarkdown(graph, '/some/path');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('unexpected response shape');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    // the specific "no text or downloadUrl" message (not the fetchUrl "missing text field" one)
+    // proves the downloadUrl branch was NOT entered for an envelope that has neither.
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('no text or downloadUrl');
   });
 
   it('also accepts the "redirect-followed-by-fetchUrl" path when fetchUrl returns the same envelope shape', async () => {
@@ -110,9 +133,9 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     });
     const result = await convertToMarkdown(graph, '/whatever');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('missing text field');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('missing text field');
   });
 
   it('rewrites the Sandbox_InputFormatNotSupported error into a clear hint citing the documented HTML input set + *-as-pdf workaround', async () => {
@@ -126,7 +149,9 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     });
     const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') {
       expect(result.error.message).toContain('loop, fluid, wbtx, whiteboard');
       expect(result.error.message).toContain('*-as-pdf');
     }
@@ -144,8 +169,8 @@ describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + im
     });
     const result = await convertToMarkdown(graph, '/drives/d1/items/i1/content?format=html');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('loop, fluid, wbtx, whiteboard');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.message).toContain('loop, fluid, wbtx, whiteboard');
   });
 });

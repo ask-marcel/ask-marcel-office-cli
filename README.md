@@ -1,6 +1,6 @@
 # ask-marcel-office-cli
 
-**A Microsoft Graph CLI built for LLMs.** 165 read-only commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+**A Microsoft Graph CLI built for LLMs.** 171 read-only commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
 
 ```bash
 npm i -g ask-marcel-office-cli
@@ -174,7 +174,6 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 Read-only stays the default forever. The list below is additive coverage and convenience — concrete next steps, ordered by how often they come up in real LLM workflows. Each line carries a rough implementation-effort tag: **[S]** small (reuses existing machinery), **[M]** medium (new orchestration, no new infra), **[L]** large (new infra/deps or a scope investigation).
 
-- **[M] OneNote end-to-end markdown** — OneNote page reads currently return raw HTML; chaining the turndown pipeline (same one `convert-mail-to-markdown` uses) would give parity with the docx route.
 - **[L] Multi-tenant auth profiles** — `ask-marcel login --profile work` / `--profile personal` with separate token caches at `~/.ask-marcel/<profile>/`, for consultants and contractors who routinely switch tenants.
 - **[L] Streaming pagination output** — write each page to stdout as it arrives instead of accumulating, so long delta walks don't hold gigabytes in memory and an agent can start processing page 1 while page 2 is in flight.
 - **[L] Full-fidelity document context** — extract every piece of written information in a document: reviewer comments, threaded comments, slide notes, revision marks, descriptions, custom metadata, and sensitivity labels — folded into the markdown output so an LLM reads the whole story of a document, not just its body text.
