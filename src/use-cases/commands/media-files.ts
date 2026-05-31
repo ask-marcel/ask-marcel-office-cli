@@ -22,6 +22,7 @@ const CONTENT_TYPES = new Map<string, string>([
   ['tif', 'image/tiff'],
   ['tiff', 'image/tiff'],
   ['webp', 'image/webp'],
+  ['svg', 'image/svg+xml'],
 ]);
 
 const extensionOf = (path: string): string => {

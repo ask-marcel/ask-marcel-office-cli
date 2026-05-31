@@ -357,6 +357,7 @@ const buildMediaSamples = async (): Promise<Uint8Array> => {
   zip.file('word/media/image1.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
   zip.file('xl/media/photo.jpeg', new Uint8Array([0xff, 0xd8, 0xff, 0xe0]));
   zip.file('ppt/media/diagram.gif', new Uint8Array([0x47, 0x49, 0x46, 0x38]));
+  zip.file('word/media/chart.svg', new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><text>Org chart label</text></svg>'));
   zip.file('ppt/media/logo.emf', new Uint8Array([0x01, 0x00, 0x00, 0x00]));
   zip.file('word/embeddings/oleObject1.bin', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0]));
   return zip.generateAsync({ type: 'uint8array' });

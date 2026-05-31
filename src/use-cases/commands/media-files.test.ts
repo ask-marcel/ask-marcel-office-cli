@@ -15,8 +15,19 @@ describe('buildMediaResponse', () => {
       part('word/media/f.tif', [1]),
       part('word/media/g.tiff', [1]),
       part('word/media/h.webp', [1]),
+      part('word/media/i.svg', [1]),
     ]);
-    expect(result.media.map((m) => m.contentType)).toEqual(['image/png', 'image/jpeg', 'image/jpeg', 'image/gif', 'image/bmp', 'image/tiff', 'image/tiff', 'image/webp']);
+    expect(result.media.map((m) => m.contentType)).toEqual([
+      'image/png',
+      'image/jpeg',
+      'image/jpeg',
+      'image/gif',
+      'image/bmp',
+      'image/tiff',
+      'image/tiff',
+      'image/webp',
+      'image/svg+xml',
+    ]);
   });
 
   it('is case-insensitive on the extension', () => {

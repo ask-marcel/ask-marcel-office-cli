@@ -1123,7 +1123,7 @@ describe('commands', () => {
     }
   });
 
-  it('extract-drive-item-images returns a base64 media envelope of the raster images embedded in a pptx', async () => {
+  it('extract-drive-item-images returns a base64 media envelope of the images (raster + svg) embedded in a pptx', async () => {
     const pptxBytes = await buildMediaSamples();
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iDeck', method: 'GET', response: Response.json({ name: 'deck.pptx' }) },
@@ -1140,12 +1140,13 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { count: number; media: ReadonlyArray<{ path: string; contentType: string; sizeBytes: number; base64: string }> };
-      expect(v.count).toBe(3);
-      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/image1.png', 'xl/media/photo.jpeg']);
+      expect(v.count).toBe(4);
+      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/chart.svg', 'word/media/image1.png', 'xl/media/photo.jpeg']);
       const png = v.media.find((m) => m.path === 'word/media/image1.png');
       expect(png?.contentType).toBe('image/png');
       expect(png?.sizeBytes).toBe(4);
       expect(typeof png?.base64).toBe('string');
+      expect(v.media.find((m) => m.path === 'word/media/chart.svg')?.contentType).toBe('image/svg+xml');
     }
   });
 
@@ -1240,7 +1241,7 @@ describe('commands', () => {
       if (!cmd) throw new Error('extract-drive-item-images not registered');
       const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId });
       expect(result.ok).toBe(true);
-      if (result.ok) expect((result.value as { count: number }).count).toBe(3);
+      if (result.ok) expect((result.value as { count: number }).count).toBe(4);
     }
   });
 
@@ -3157,8 +3158,8 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { count: number; media: ReadonlyArray<{ path: string }> };
-      expect(v.count).toBe(3);
-      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/image1.png', 'xl/media/photo.jpeg']);
+      expect(v.count).toBe(4);
+      expect(v.media.map((m) => m.path)).toEqual(['ppt/media/diagram.gif', 'word/media/chart.svg', 'word/media/image1.png', 'xl/media/photo.jpeg']);
     }
   });
 
@@ -3177,7 +3178,7 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { count: number; media: ReadonlyArray<{ path: string }> };
-      expect(v.count).toBe(3);
+      expect(v.count).toBe(4);
       expect(v.media.map((m) => m.path)).toContain('word/media/image1.png');
     }
   });
@@ -3191,7 +3192,7 @@ describe('commands', () => {
     if (!cmd) throw new Error('extract-mail-attachment-images not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aXlsx' });
     expect(result.ok).toBe(true);
-    if (result.ok) expect((result.value as { count: number }).count).toBe(3);
+    if (result.ok) expect((result.value as { count: number }).count).toBe(4);
   });
 
   it('extract-mail-attachment-images extracts PNG page images from a PDF fileAttachment', async () => {
