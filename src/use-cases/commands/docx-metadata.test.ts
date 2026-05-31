@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
+import { buildDocxWithHeaderFooterTextbox, buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx, buildSideChannelDocx } from '../../test-helpers/office-fixtures.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 
@@ -77,6 +77,57 @@ describe('extractDocxMetadata', () => {
     expect(m.externalRels.some((r) => r.target === 'https://example.com/secret-portal')).toBe(true);
     expect(m.fields.some((f) => f.instruction.includes('CustomerName'))).toBe(true);
     expect(m.bookmarks.some((b) => b.name === 'BM_intro')).toBe(true);
+  });
+
+  it('captures header/footer body prose and text-box (w:txbxContent) text that mammoth drops', async () => {
+    const result = await extractDocxMetadata(await buildDocxWithHeaderFooterTextbox());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const m = result.value;
+    expect(m.textBoxes).toEqual(['Callout box text']);
+    expect(m.headersFooters).toEqual([
+      { part: 'word/header1.xml', text: 'Confidential draft' },
+      { part: 'word/footer1.xml', text: 'Page footer note' },
+    ]);
+    // the regular body paragraph is mammoth's job — it must NOT leak into the text-box list
+    expect(m.textBoxes).not.toContain('Body paragraph.');
+  });
+
+  it('pins every side-channel field and its empty/whitespace filtering: comment attrs, tracked id/author/date, hidden-text, bookmark name filter, trimmed/empty fields, text boxes, two-digit + decoy header parts', async () => {
+    const result = await extractDocxMetadata(await buildSideChannelDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const m = result.value;
+
+    // Comments — id + initials are otherwise unasserted anywhere
+    expect(m.comments).toEqual([{ id: '5', author: 'Commenter', initials: 'CC', date: '2026-03-03T00:00:00Z', text: 'comment-body' }]);
+
+    // Tracked changes — id/author/date pinned; the empty-text insertion is filtered out
+    expect(m.insertions).toEqual([{ id: '20', author: 'InsAuthor', date: '2026-01-01T00:00:00Z', text: 'kept-ins' }]);
+    expect(m.deletions).toEqual([{ id: '30', author: 'DelAuthor', date: '2026-02-02T00:00:00Z', text: 'kept-del' }]);
+
+    // Hidden text — the empty-vanish run is filtered; the rPr-less run is never treated as hidden
+    expect(m.hiddenText).toEqual(['secret-hidden']);
+
+    // Bookmarks — the empty-name bookmark is filtered out
+    expect(m.bookmarks).toEqual([{ id: '10', name: 'BM_named' }]);
+
+    // Fields — instrText trimmed, whitespace-only instrText + empty w:fldSimple filtered, header field discovered
+    expect(m.fields.map((f) => f.instruction).toSorted()).toEqual(['DOCVARIABLE FS', 'MERGEFIELD Spaced', 'PAGE']);
+    expect(m.fields.every((f) => f.instruction !== '')).toBe(true);
+    expect(m.fields).toContainEqual({ source: 'word/document.xml', instruction: 'MERGEFIELD Spaced' });
+    expect(m.fields).toContainEqual({ source: 'word/header1.xml', instruction: 'PAGE' });
+
+    // Text boxes — trimmed; the whitespace-only box is filtered
+    expect(m.textBoxes).toEqual(['box-text']);
+
+    // Headers/footers — trimmed; whitespace-only header2 filtered; two-digit header10 found
+    // (the `\d+` quantifier); ^/$-anchored regex rejects notword/* and *.xmlbak decoys
+    expect(m.headersFooters).toHaveLength(3);
+    expect(m.headersFooters).toContainEqual({ part: 'word/header1.xml', text: 'HeaderOneProse' });
+    expect(m.headersFooters).toContainEqual({ part: 'word/header10.xml', text: 'HeaderTenProse' });
+    expect(m.headersFooters).toContainEqual({ part: 'word/footer1.xml', text: 'FooterOneProse' });
+    expect(m.headersFooters.some((h) => h.text.includes('DECOY'))).toBe(false);
   });
 
   it('returns empty arrays for every list section on a barebones docx with no side-channel content (no people, no comments, no tracked changes, no hidden text, no bookmarks)', async () => {

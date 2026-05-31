@@ -413,7 +413,68 @@ const buildPdf = (withImage: boolean): Uint8Array => {
 const buildPdfWithImage = (): Uint8Array => buildPdf(true);
 const buildPdfNoImages = (): Uint8Array => buildPdf(false);
 
+// A docx whose only text lives in surfaces mammoth drops: a header, a footer, and a
+// text box (w:txbxContent). Hand-rolled raw OOXML because the `docx` lib can't emit text boxes.
+const buildDocxWithHeaderFooterTextbox = async (): Promise<Uint8Array> => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'word/document.xml',
+    `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body><w:p><w:r><w:t>Body paragraph.</w:t></w:r></w:p><w:p><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>Callout box text</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p></w:body></w:document>`
+  );
+  zip.file('word/header1.xml', `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>Confidential draft</w:t></w:r></w:p></w:hdr>`);
+  zip.file('word/footer1.xml', `<?xml version="1.0"?><w:ftr xmlns:w="${W}"><w:p><w:r><w:t>Page footer note</w:t></w:r></w:p></w:ftr>`);
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+// A docx engineered to exercise every branch of the side-channel extractors with
+// KNOWN values: a fully-attributed comment, tracked ins/del (plus an empty-text
+// insertion that must be filtered), a hidden (w:vanish) run + an empty vanish run +
+// a plain run with no w:rPr, a named bookmark + an empty-name bookmark (filtered),
+// whitespace-padded + whitespace-only field codes and an empty w:fldSimple (filtered),
+// whitespace-padded + whitespace-only text boxes, a two-digit header (header10 — the
+// `\d+` quantifier), a whitespace-only header (filtered after trim), and two decoy
+// parts that only match a regex with its ^/$ anchors removed.
+const buildSideChannelDocx = async (): Promise<Uint8Array> => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  const body =
+    '<w:bookmarkStart w:id="10" w:name="BM_named"/>' +
+    '<w:bookmarkStart w:id="11" w:name=""/>' +
+    '<w:ins w:id="20" w:author="InsAuthor" w:date="2026-01-01T00:00:00Z"><w:r><w:t>kept-ins</w:t></w:r></w:ins>' +
+    '<w:ins w:id="21" w:author="EmptyIns" w:date="2026-01-02T00:00:00Z"><w:r></w:r></w:ins>' +
+    '<w:del w:id="30" w:author="DelAuthor" w:date="2026-02-02T00:00:00Z"><w:r><w:delText>kept-del</w:delText></w:r></w:del>' +
+    '<w:r><w:rPr><w:vanish/></w:rPr><w:t>secret-hidden</w:t></w:r>' +
+    '<w:r><w:rPr><w:vanish/></w:rPr><w:t></w:t></w:r>' +
+    '<w:r><w:t>visible</w:t></w:r>' +
+    '<w:r><w:instrText>  MERGEFIELD Spaced  </w:instrText></w:r>' +
+    '<w:r><w:instrText>   </w:instrText></w:r>' +
+    '<w:fldSimple w:instr="  DOCVARIABLE FS  "><w:r><w:t>x</w:t></w:r></w:fldSimple>' +
+    '<w:fldSimple w:instr=""><w:r><w:t>y</w:t></w:r></w:fldSimple>' +
+    '<w:p><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>  box-text  </w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>' +
+    '<w:p><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>   </w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p>';
+  zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`);
+  zip.file(
+    'word/comments.xml',
+    `<?xml version="1.0"?><w:comments xmlns:w="${W}"><w:comment w:id="5" w:author="Commenter" w:initials="CC" w:date="2026-03-03T00:00:00Z"><w:p><w:r><w:t>comment-body</w:t></w:r></w:p></w:comment></w:comments>`
+  );
+  zip.file(
+    'word/header1.xml',
+    `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>  HeaderOneProse  </w:t></w:r></w:p><w:p><w:r><w:instrText>PAGE</w:instrText></w:r></w:p></w:hdr>`
+  );
+  zip.file('word/header2.xml', `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>   </w:t></w:r></w:p></w:hdr>`);
+  zip.file('word/header10.xml', `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>HeaderTenProse</w:t></w:r></w:p></w:hdr>`);
+  zip.file('word/footer1.xml', `<?xml version="1.0"?><w:ftr xmlns:w="${W}"><w:p><w:r><w:t>FooterOneProse</w:t></w:r></w:p></w:ftr>`);
+  zip.file('notword/header1.xml', `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>DECOY_NO_CARET</w:t></w:r></w:p></w:hdr>`);
+  zip.file('word/header1.xmlbak', `<?xml version="1.0"?><w:hdr xmlns:w="${W}"><w:p><w:r><w:t>DECOY_NO_DOLLAR</w:t></w:r></w:p></w:hdr>`);
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 export {
+  buildDocxWithHeaderFooterTextbox,
+  buildSideChannelDocx,
   buildMacroDocm,
   buildMalformedDocx,
   buildMalformedPptx,

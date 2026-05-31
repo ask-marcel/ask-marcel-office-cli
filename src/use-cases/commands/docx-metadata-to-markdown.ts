@@ -1,4 +1,4 @@
-import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, Person, TrackedChange } from './docx-metadata.ts';
+import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, TrackedChange } from './docx-metadata.ts';
 import { escapeCell, NONE, renderBullets, renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 
 /**
@@ -49,6 +49,12 @@ const renderBookmarks = (bookmarks: ReadonlyArray<Bookmark>): string =>
     ['id', 'name']
   );
 
+const renderHeadersFooters = (parts: ReadonlyArray<HeaderFooter>): string =>
+  renderTable(
+    parts.map((p) => [p.part, p.text]),
+    ['part', 'text']
+  );
+
 const formatDocxMetadata = (meta: DocxMetadata): string => {
   const sections: ReadonlyArray<readonly [string, string]> = [
     ['Core properties', renderKv(meta.core)],
@@ -60,6 +66,8 @@ const formatDocxMetadata = (meta: DocxMetadata): string => {
     ['Tracked changes — insertions', renderTracked(meta.insertions)],
     ['Tracked changes — deletions', renderTracked(meta.deletions)],
     ['Hidden-formatted text (w:vanish)', renderBullets(meta.hiddenText)],
+    ['Text boxes / shapes', renderBullets(meta.textBoxes)],
+    ['Headers & footers', renderHeadersFooters(meta.headersFooters)],
     ['Fields (MERGEFIELD / HYPERLINK / DOCVARIABLE)', renderFields(meta.fields)],
     ['Bookmarks', renderBookmarks(meta.bookmarks)],
     ['Macros (VBA)', renderMacros(meta.macros)],

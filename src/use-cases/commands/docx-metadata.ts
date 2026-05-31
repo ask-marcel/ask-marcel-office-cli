@@ -10,10 +10,10 @@ import type { XmlObject } from './ooxml-xml-walker.ts';
 
 /**
  * Pulls the side-channel content out of a .docx zip — every text-bearing
- * surface mammoth drops on the floor. High-value subset (10 sections, see
- * plan): core / app / custom doc properties, people registry, external
- * hyperlinks, comments, tracked changes (ins + del), hidden text (w:vanish),
- * field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks.
+ * surface mammoth drops on the floor: core / app / custom doc properties,
+ * people registry, external hyperlinks, comments, tracked changes (ins + del),
+ * hidden text (w:vanish), text-box / shape text (w:txbxContent), header/footer
+ * body prose, field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks.
  *
  * The package-level parts (docProps/*, every *.rels) come from the shared
  * ooxml-metadata module; this file owns only the docx-body-specific parts.
@@ -30,6 +30,7 @@ type Comment = { readonly id: string; readonly author: string; readonly initials
 type TrackedChange = { readonly id: string; readonly author: string; readonly date: string; readonly text: string };
 type Field = { readonly source: string; readonly instruction: string };
 type Bookmark = { readonly id: string; readonly name: string };
+type HeaderFooter = { readonly part: string; readonly text: string };
 
 type DocxMetadata = {
   readonly core: CoreProps;
@@ -41,6 +42,8 @@ type DocxMetadata = {
   readonly insertions: ReadonlyArray<TrackedChange>;
   readonly deletions: ReadonlyArray<TrackedChange>;
   readonly hiddenText: ReadonlyArray<string>;
+  readonly textBoxes: ReadonlyArray<string>;
+  readonly headersFooters: ReadonlyArray<HeaderFooter>;
   readonly fields: ReadonlyArray<Field>;
   readonly bookmarks: ReadonlyArray<Bookmark>;
   readonly macros: ReadonlyArray<string>;
@@ -108,13 +111,43 @@ const extractBookmarks = (root: unknown): ReadonlyArray<Bookmark> => {
   return nodes.map((b) => ({ id: attrOf(b, 'w:id'), name: attrOf(b, 'w:name') })).filter((b) => b.name !== '');
 };
 
+const headerFooterPaths = (zip: OoxmlZip): ReadonlyArray<string> => zip.list().filter((p) => /^word\/(header|footer)\d+\.xml$/.test(p));
+
+// Field codes live in the body and in every header/footer part. Discover the
+// header/footer parts dynamically (not a fixed header1..3/footer1..3 list, which
+// silently misses header4+/footer4+ and is brittle to renumbering).
 const collectFields = (zip: OoxmlZip): ReadonlyArray<Field> => {
-  const candidates = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/header3.xml', 'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml'];
   const out: Array<Field> = [];
-  for (const path of candidates) {
+  for (const path of ['word/document.xml', ...headerFooterPaths(zip)]) {
     const parsed = parseXml(zip.read(path));
     if (parsed === undefined) continue;
     for (const f of extractFieldsFromOne(parsed, path)) out.push(f);
+  }
+  return out;
+};
+
+// Header/footer body prose — mammoth drops headers/footers entirely, and `collectFields`
+// only pulls their field codes, so the regular paragraph text is captured here.
+const extractHeadersFooters = (zip: OoxmlZip): ReadonlyArray<HeaderFooter> => {
+  const out: Array<HeaderFooter> = [];
+  for (const part of headerFooterPaths(zip)) {
+    const text = collectText(parseXml(zip.read(part)), 'w:t').trim();
+    if (text !== '') out.push({ part, text });
+  }
+  return out;
+};
+
+// Text-box / shape prose (`w:txbxContent`) anywhere in the body or headers/footers —
+// neither mammoth nor any other side-channel extractor surfaces it.
+const extractTextBoxes = (zip: OoxmlZip): ReadonlyArray<string> => {
+  const out: Array<string> = [];
+  for (const part of ['word/document.xml', ...headerFooterPaths(zip)]) {
+    const parsed = parseXml(zip.read(part));
+    if (parsed === undefined) continue;
+    for (const box of findAll(parsed, 'w:txbxContent')) {
+      const text = collectText(box, 'w:t').trim();
+      if (text !== '') out.push(text);
+    }
   }
   return out;
 };
@@ -134,6 +167,8 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
     insertions: extractTracked(document, 'w:ins'),
     deletions: extractTracked(document, 'w:del'),
     hiddenText: extractHidden(document),
+    textBoxes: extractTextBoxes(zip),
+    headersFooters: extractHeadersFooters(zip),
     fields: collectFields(zip),
     bookmarks: extractBookmarks(document),
     macros: extractMacros(zip),
@@ -141,4 +176,4 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
 };
 
 export { extractDocxMetadata };
-export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, Person, TrackedChange };
+export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, TrackedChange };
