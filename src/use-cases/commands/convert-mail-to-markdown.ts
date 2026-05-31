@@ -6,7 +6,7 @@ import type { CommandMeta } from './command-types.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { stripQuotedReplies } from './mail-quote-stripper.ts';
+import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 
 // Audit v1.4.0 fresh-pass #6: `--inline-images false` opts out of the
 // per-image bytes-fetch + base64 embedding. An LLM that just wants the text
@@ -244,7 +244,11 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     if (!converted.ok) return converted;
     bodyMd = converted.value;
   } else {
-    bodyMd = inlined;
+    // Plain-text body: strip the quoted reply chain with the line-anchored
+    // plain-text markers (Original Message / "On … wrote:" / leading `>`).
+    const stripped = keepQuoted ? { text: inlined, stripped: false } : stripQuotedPlainText(inlined);
+    quotedStripped = stripped.stripped;
+    bodyMd = stripped.text;
   }
   const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled);
   const text = [headers, bodyMd, fileList].filter((s) => s !== '').join('\n\n');
@@ -283,7 +287,7 @@ const meta: CommandMeta = {
       key: 'keepQuoted',
       required: false,
       description:
-        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut (Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`); HTML bodies only.',
+        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling` and Gmail `gmail_quote`; in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, and leading `>` quote lines.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

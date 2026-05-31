@@ -552,6 +552,27 @@ const buildOversizedZipArchive = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+// A minimal OpenDocument (.odt) carrying inline `xlink:href` hyperlinks in
+// content.xml: one SharePoint link (twice, for dedup) and one non-SharePoint
+// link (filtered out). The `mimetype` entry marks it as ODF so the command
+// reads content.xml instead of relationship parts.
+const buildOdtWithSharepointLinks = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
+  zip.file(
+    'content.xml',
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">' +
+      '<office:body><office:text>' +
+      '<text:p><text:a xlink:href="https://contoso.sharepoint.com/sites/Marketing/Shared%20Documents/odf-spec.odt">spec</text:a></text:p>' +
+      '<text:p><text:a xlink:href="https://example.com/not-sharepoint">other</text:a></text:p>' +
+      '<text:p><text:a xlink:href="https://contoso.sharepoint.com/sites/Marketing/Shared%20Documents/odf-spec.odt">spec again</text:a></text:p>' +
+      '</office:text></office:body></office:document-content>'
+  );
+  zip.file('styles.xml', '<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>');
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 // A minimal .docx whose relationship part carries external hyperlinks: one
 // SharePoint link (twice, to exercise dedup), one non-SharePoint external link
 // (must be filtered out), and one internal relationship (TargetMode is not
@@ -576,6 +597,7 @@ const buildDocxWithSharepointLinks = async (): Promise<Uint8Array> => {
 export {
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
+  buildOdtWithSharepointLinks,
   buildSampleZipArchive,
   buildOversizedZipArchive,
   buildSideChannelDocx,

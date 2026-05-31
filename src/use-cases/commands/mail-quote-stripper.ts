@@ -26,6 +26,14 @@ const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
 
 const STRIP_MARKER = '<p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>';
 
+// Plain-text reply boundaries, for `body.contentType === 'text'` messages where
+// the HTML markers above don't apply. Conservative, line-anchored: the Outlook
+// "Original Message" / underscore-rule banners, the Gmail/Apple "On <date> …
+// wrote:" attribution line, and the first `>`-quoted line.
+const PLAINTEXT_BOUNDARIES: ReadonlyArray<RegExp> = [/^-{2,}\s*Original Message\s*-{2,}\s*$/im, /^_{5,}\s*$/m, /^On\b.+\bwrote:\s*$/im, /^>.*$/m];
+
+const PLAINTEXT_MARKER = '[Quoted reply chain removed — pass --keep-quoted true to include it]';
+
 const stripQuotedReplies = (html: string): { readonly html: string; readonly stripped: boolean } => {
   let cut = -1;
   for (const boundary of QUOTE_BOUNDARIES) {
@@ -36,4 +44,14 @@ const stripQuotedReplies = (html: string): { readonly html: string; readonly str
   return { html: `${html.slice(0, cut)}${STRIP_MARKER}`, stripped: true };
 };
 
-export { stripQuotedReplies };
+const stripQuotedPlainText = (text: string): { readonly text: string; readonly stripped: boolean } => {
+  let cut = -1;
+  for (const boundary of PLAINTEXT_BOUNDARIES) {
+    const match = boundary.exec(text);
+    if (match !== null && (cut === -1 || match.index < cut)) cut = match.index;
+  }
+  if (cut === -1) return { text, stripped: false };
+  return { text: `${text.slice(0, cut)}${PLAINTEXT_MARKER}`, stripped: true };
+};
+
+export { stripQuotedPlainText, stripQuotedReplies };

@@ -9,6 +9,7 @@ import {
   buildDocxWithSharepointLinks,
   buildMalformedDocx,
   buildMediaSamples,
+  buildOdtWithSharepointLinks,
   buildOversizedZipArchive,
   buildPdfWithImage,
   buildRichOdt,
@@ -110,7 +111,7 @@ import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
-import { stripQuotedReplies } from './mail-quote-stripper.ts';
+import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 import { embedOnenoteResources } from './onenote-resource-embedder.ts';
 import { formatOnenoteMetadata } from './onenote-metadata.ts';
 import * as listChats from './list-chats.ts';
@@ -4065,6 +4066,18 @@ describe('extract-sharepoint-links-in-documents', () => {
     expect(v.skippedCount).toBe(0);
   });
 
+  it('extracts and resolves SharePoint links from an OpenDocument (.odt) via content.xml xlink:href, dedupes, and filters non-SharePoint', async () => {
+    const bytes = await buildOdtWithSharepointLinks();
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { links: ReadonlyArray<{ url: string; driveId?: string }> };
+    expect(v.links).toHaveLength(1); // the SharePoint href appears twice (deduped); example.com filtered out
+    expect(v.links[0]?.url).toBe('https://contoso.sharepoint.com/sites/Marketing/Shared%20Documents/odf-spec.odt');
+    expect(v.links[0]?.driveId).toBe('drive-X');
+    expect(v.links.some((l) => l.url.includes('example.com'))).toBe(false);
+  });
+
   it('returns an empty links array for a valid Office doc with no external SharePoint links', async () => {
     const bytes = await buildSampleDocx();
     const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
@@ -4072,7 +4085,7 @@ describe('extract-sharepoint-links-in-documents', () => {
     if (result?.ok) expect((result.value as { links: ReadonlyArray<unknown> }).links).toHaveLength(0);
   });
 
-  it('returns an api_error 400 when the item is not an OOXML package', async () => {
+  it('returns an api_error 400 when the item is not a zip-based Office document', async () => {
     const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(new Uint8Array([0x25, 0x50, 0x44, 0x46]))), {
       driveId: 'd1',
       itemId: 'i1',
@@ -4080,7 +4093,7 @@ describe('extract-sharepoint-links-in-documents', () => {
     expect(result?.ok).toBe(false);
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
-      expect(result.error.message).toContain('not an Office Open XML document');
+      expect(result.error.message).toContain('not a zip-based Office document');
       if (result.error.type === 'api_error') expect(result.error.status).toBe(400);
     }
   });
@@ -4111,8 +4124,8 @@ describe('extract-sharepoint-links-in-documents', () => {
     expect(result?.ok).toBe(false);
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
-      // the original fetch error is returned as-is — NOT swallowed and re-surfaced as the non-OOXML 400
-      expect(result.error.message).not.toContain('not an Office Open XML document');
+      // the original fetch error is returned as-is — NOT swallowed and re-surfaced as the non-zip 400
+      expect(result.error.message).not.toContain('not a zip-based Office document');
     }
   });
 
@@ -4219,6 +4232,37 @@ describe('mail-quote-stripper', () => {
     expect(r.stripped).toBe(true);
     expect(r.html).toBe('<p>keep</p><p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>');
   });
+
+  // Surrounding / trailing whitespace at every `\s*` position so the regexes'
+  // whitespace matchers are actually exercised (kills the `\s`→`\S` mutants).
+  const plainFixtures = [
+    { label: 'Outlook Original Message banner', text: 'My reply.\n\n----- Original Message -----  \nFrom: Alice\nold body' },
+    { label: 'Outlook underscore rule', text: 'My reply.\n\n________________________________  \nFrom: Alice\nold body' },
+    { label: 'Gmail On … wrote attribution', text: 'My reply.\n\nOn Mon, May 5, 2026 at 3:00 PM Alice <alice@x> wrote:  \nold body' },
+    { label: 'leading quote line', text: 'My reply.\n\n> old quoted line\n> more quoted' },
+  ];
+  it.each(plainFixtures)('stripQuotedPlainText cuts a plain-text body at the $label boundary', ({ text }) => {
+    const r = stripQuotedPlainText(text);
+    expect(r.stripped).toBe(true);
+    expect(r.text.startsWith('My reply.')).toBe(true);
+    expect(r.text).not.toContain('old');
+    expect(r.text).toContain('[Quoted reply chain removed');
+  });
+
+  it('stripQuotedPlainText leaves a plain-text body with no quote markers untouched', () => {
+    const text = 'Just a normal note.\nSecond line with a > arrow mid-sentence is fine when not line-leading.';
+    const r = stripQuotedPlainText(text);
+    expect(r.stripped).toBe(false);
+    expect(r.text).toBe(text);
+  });
+
+  it('stripQuotedPlainText cuts at the EARLIEST plain-text marker when several are present', () => {
+    // the leading-`>` line (4th in the list) appears before the "On … wrote:" line (3rd)
+    const text = 'keep\n> early quote\nOn Tue Bob wrote:\nlater';
+    const r = stripQuotedPlainText(text);
+    expect(r.stripped).toBe(true);
+    expect(r.text).toBe('keep\n[Quoted reply chain removed — pass --keep-quoted true to include it]');
+  });
 });
 
 describe('convert-mail-to-markdown — quoted-text stripping', () => {
@@ -4253,14 +4297,39 @@ describe('convert-mail-to-markdown — quoted-text stripping', () => {
     expect(v.note).toBeUndefined();
   });
 
-  it('does not strip quoted markers from a plain-text body', async () => {
+  it('does not treat an HTML marker as a plain-text quote boundary (HTML markers are not plain-text markers)', async () => {
     const content = 'My reply.\n\n<div id="divRplyFwdMsg">not real html</div>';
     const fetchFn: FetchFn = async () => Response.json({ subject: 'Re', body: { contentType: 'text', content }, hasAttachments: false });
     const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { text: string; note?: string };
-    expect(v.text).toContain('divRplyFwdMsg'); // plain-text passthrough — untouched
+    expect(v.text).toContain('divRplyFwdMsg'); // no plain-text marker present → body untouched
+    expect(v.note).toBeUndefined();
+  });
+
+  it('strips a quoted reply chain from a plain-text body via the plain-text markers', async () => {
+    const content = 'My reply here.\n\nOn Mon, May 5, 2026 at 3:00 PM Alice <alice@x> wrote:\nThe original message text to drop.';
+    const fetchFn: FetchFn = async () => Response.json({ subject: 'Re: Q3', body: { contentType: 'text', content }, hasAttachments: false });
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string; note?: string };
+    expect(v.text).toContain('My reply here.');
+    expect(v.text).not.toContain('original message text to drop');
+    expect(v.text).toContain('[Quoted reply chain removed');
+    expect(v.note).toContain('quoted reply chain stripped');
+  });
+
+  it('preserves a plain-text quoted chain with --keep-quoted true', async () => {
+    const content = 'My reply.\n\nOn Mon Alice wrote:\nThe original message.';
+    const fetchFn: FetchFn = async () => Response.json({ subject: 'Re', body: { contentType: 'text', content }, hasAttachments: false });
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', keepQuoted: 'true' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const v = result.value as { text: string; note?: string };
+    expect(v.text).toContain('The original message.');
+    expect(v.text).not.toContain('[Quoted reply chain removed');
     expect(v.note).toBeUndefined();
   });
 
@@ -4367,6 +4436,32 @@ describe('onenote-resource-embedder', () => {
     const html = '<p>plain page with an <img src="https://example.com/x.png"> external image</p>';
     expect(await embedOnenoteResources(graph, html)).toBe(html);
     expect(calls).toBe(0); // no match → empty array default → no getBinary call (kills the `?? []` mutant)
+  });
+
+  // <object> file attachments are annotated (not fetched) — the fetch must NOT fire.
+  const noFetch: FetchFn = async () => {
+    throw new Error('object attachments must not trigger a fetch');
+  };
+
+  it('annotates an <object> file attachment with its name + type and drops the raw element', async () => {
+    const html = `<p>doc</p><object data="${RES}" data-attachment="report.pdf" type="application/pdf"></object>`;
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), noFetch), html);
+    expect(out).toContain('[OneNote attachment: report.pdf (application/pdf)]');
+    expect(out).not.toContain('<object');
+    expect(out).not.toContain(RES);
+  });
+
+  it('annotates an <object> attachment without a type (no parenthetical)', async () => {
+    const html = `<object data="${RES}" data-attachment="notes.docx"></object>`;
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), noFetch), html);
+    expect(out).toContain('[OneNote attachment: notes.docx]');
+    expect(out).not.toContain('(');
+  });
+
+  it('falls back to a generic name for an <object> attachment with no data-attachment', async () => {
+    const html = `<object data="${RES}" type="application/pdf"></object>`;
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), noFetch), html);
+    expect(out).toContain('[OneNote attachment: file (application/pdf)]');
   });
 });
 
