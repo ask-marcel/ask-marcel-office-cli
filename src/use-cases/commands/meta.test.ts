@@ -141,6 +141,18 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
+      it('declares non-empty magicValue argumentHint values and only-`true` capability flags (kills inert argumentHint / boolean-flag mutants)', () => {
+        for (const opt of cmd.meta.options) {
+          if (opt.argumentHint?.kind === 'magicValue') {
+            expect(opt.argumentHint.values.length).toBeGreaterThan(0);
+            for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);
+          }
+        }
+        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
+          if (flag !== undefined) expect(flag).toBe(true);
+        }
+      });
+
       it('summary references only flags that are actually registered as options or aliases on this command', () => {
         const flagsInSummary = Array.from(cmd.meta.summary.matchAll(/--([a-z][a-z0-9-]*)/g), (m) => m[1] ?? '');
         if (flagsInSummary.length === 0) return;
