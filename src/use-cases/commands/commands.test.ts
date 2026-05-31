@@ -20,6 +20,7 @@ import * as getCurrentUser from './get-current-user.ts';
 import * as getDriveDelta from './get-drive-delta.ts';
 import * as getDriveItem from './get-drive-item.ts';
 import * as getDriveRootItem from './get-drive-root-item.ts';
+import * as getExcelChartImage from './get-excel-chart-image.ts';
 import * as getExcelRange from './get-excel-range.ts';
 import * as getExcelTable from './get-excel-table.ts';
 import * as getMailAttachment from './get-mail-attachment.ts';
@@ -187,6 +188,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-accessible-drives': listAccessibleDrives,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
+  'get-excel-chart-image': getExcelChartImage,
   'get-excel-range': getExcelRange,
   'list-excel-worksheets': listExcelWorksheets,
   'list-excel-tables': listExcelTables,
@@ -554,6 +556,51 @@ describe('commands', () => {
       expect(result.error.message).not.toMatch(/--address --address/);
       expect(result.error.message).toMatch(/^--address spans/);
     }
+  });
+
+  it('get-excel-chart-image returns the chart PNG as { image/png, size, base64 } from Graph chart Image()', async () => {
+    const result = await callCommand('get-excel-chart-image', { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'Chart 1' }, { value: 'aW1n' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { contentType: string; size: number; base64: string };
+    expect(v.contentType).toBe('image/png');
+    expect(v.base64).toBe('aW1n');
+    expect(v.size).toBe(3);
+  });
+
+  it('get-excel-chart-image errs when Graph returns no base64 string (wrong type OR empty string) in the value field', async () => {
+    for (const value of [42, '']) {
+      const result = await callCommand('get-excel-chart-image', { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' }, { value });
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.error.type).toBe('api_error');
+      expect(result.error.message).toContain('no base64 PNG');
+    }
+  });
+
+  it('get-excel-chart-image returns a validation_error when chartId is missing', async () => {
+    const result = await callCommand('get-excel-chart-image', { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' }, { value: 'x' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('validation_error');
+  });
+
+  it('get-excel-chart-image maps the non-workbook Graph error through the excel-error wrapper', async () => {
+    const graph = createGraphClient(
+      fakeAuth(),
+      async () =>
+        new Response(JSON.stringify({ error: { code: 'AccessDenied', message: 'Could not obtain a WAC access token' } }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const cmd = cmdMap['get-excel-chart-image'];
+    if (!cmd) throw new Error('get-excel-chart-image not registered');
+    const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect((result.error as { message: string }).message).toContain('not an accessible Excel workbook');
   });
 
   it('get-excel-range accepts a single-cell --address without parsing', async () => {
@@ -3697,6 +3744,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-sharepoint-site-pages', params: { siteId: 's1' } },
   { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' } },
+  { name: 'get-excel-chart-image', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' }, responseBody: { value: 'aW1n' } },
   { name: 'microsoft-search-query', params: { query: 'q3 budget' } },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' } },
   { name: 'get-drive-root-delta', params: {} },
@@ -4039,6 +4087,11 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-sharepoint-site-pages', params: { siteId: 's1' }, expectedPath: '/sites/s1/pages' },
   { name: 'list-excel-defined-names', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/workbook/names' },
   { name: 'list-excel-worksheet-charts', params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1' }, expectedPath: '/drives/d1/items/i1/workbook/worksheets/Sheet1/charts' },
+  {
+    name: 'get-excel-chart-image',
+    params: { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'c1' },
+    expectedPath: "/drives/d1/items/i1/workbook/worksheets/Sheet1/charts/c1/Image(width=0,height=0,fittingMode='Fit')",
+  },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
   { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },
   { name: 'list-followed-drive-items', params: {}, expectedPath: '/me/drive/following' },

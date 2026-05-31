@@ -11,6 +11,7 @@ import * as getCurrentUser from './get-current-user.ts';
 import * as getDriveDelta from './get-drive-delta.ts';
 import * as getDriveItem from './get-drive-item.ts';
 import * as getDriveRootItem from './get-drive-root-item.ts';
+import * as getExcelChartImage from './get-excel-chart-image.ts';
 import * as getExcelRange from './get-excel-range.ts';
 import * as getExcelTable from './get-excel-table.ts';
 import * as getMailAttachment from './get-mail-attachment.ts';
@@ -180,6 +181,7 @@ const commands: Record<string, Command> = {
   'list-accessible-drives': listAccessibleDrives,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,
+  'get-excel-chart-image': getExcelChartImage,
   'get-excel-range': getExcelRange,
   'list-excel-worksheets': listExcelWorksheets,
   'list-excel-tables': listExcelTables,

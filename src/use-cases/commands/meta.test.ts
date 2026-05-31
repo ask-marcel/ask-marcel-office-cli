@@ -143,6 +143,7 @@ describe('command meta — invariants on every registered command', () => {
 
       it('declares non-empty magicValue argumentHint values and only-`true` capability flags (kills inert argumentHint / boolean-flag mutants)', () => {
         for (const opt of cmd.meta.options) {
+          if (opt.argumentHint !== undefined) expect(opt.argumentHint.kind.trim().length).toBeGreaterThan(0);
           if (opt.argumentHint?.kind === 'magicValue') {
             expect(opt.argumentHint.values.length).toBeGreaterThan(0);
             for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);

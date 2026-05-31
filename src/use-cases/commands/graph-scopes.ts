@@ -61,6 +61,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-excel-tables': ['Files.Read'],
   'list-excel-table-rows': ['Files.Read'],
   'get-excel-table': ['Files.Read'],
+  'get-excel-chart-image': ['Files.Read'],
   'get-excel-range': ['Files.Read'],
   'get-excel-used-range': ['Files.Read'],
   'list-excel-defined-names': ['Files.Read'],

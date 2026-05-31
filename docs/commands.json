@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-31T05:20:12.392Z",
+  "generatedAt": "2026-05-31T08:15:45.730Z",
   "commands": [
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -778,6 +778,48 @@
       ],
       "example": "ask-marcel get-drive-special-folder --folder-name 'documents'",
       "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
+    },
+    {
+      "name": "get-excel-chart-image",
+      "summary": "Render a chart on an Excel worksheet as a PNG (base64). Calls Graph's chart `Image()` function (natural size, aspect-preserving) so a vision-capable LLM can read the plotted data itself — not just the chart's title / position metadata that `list-excel-worksheet-charts` returns. The chart id or name comes from `list-excel-worksheet-charts`.",
+      "category": "excel",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/charts/{chart-id}/Image(width=0,height=0,fittingMode='Fit')",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chart-image",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "OneDrive / SharePoint drive ID."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .xlsx file."
+        },
+        {
+          "name": "worksheet-id",
+          "key": "worksheetId",
+          "required": true,
+          "description": "Worksheet display name (e.g. `Sheet1`) or the worksheet `id` GUID returned by `list-excel-worksheets`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        },
+        {
+          "name": "chart-id",
+          "key": "chartId",
+          "required": true,
+          "description": "Chart name (e.g. `Chart 1`) or `id`, as returned by `list-excel-worksheet-charts`.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        }
+      ],
+      "example": "ask-marcel get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
+      "responseShape": "`{ contentType: \"image/png\", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`)."
     },
     {
       "name": "get-excel-range",
