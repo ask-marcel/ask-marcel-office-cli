@@ -28,12 +28,17 @@ const OBJECT_EL = /<object\b([^>]*\bdata="https:\/\/graph\.microsoft\.com\/v1\.0
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const IMAGE_SIZE_LIMIT_BYTES = 2_000_000;
 
-const attrValue = (attrs: string, name: string): string | undefined => new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
+// Literal patterns (not `new RegExp(name)`) so the attribute name is never an
+// injection vector — only these two attributes are ever read off an `<object>`.
+// Non-global, so `.exec` is stateless and the shared instances are reuse-safe.
+const DATA_ATTACHMENT_ATTR = /\bdata-attachment="([^"]*)"/;
+const TYPE_ATTR = /\btype="([^"]*)"/;
+const attrValue = (attrs: string, pattern: RegExp): string | undefined => pattern.exec(attrs)?.[1];
 
 const annotateOnenoteObjects = (html: string): string =>
   html.replace(OBJECT_EL, (_match, attrs: string) => {
-    const name = attrValue(attrs, 'data-attachment') ?? 'file';
-    const type = attrValue(attrs, 'type');
+    const name = attrValue(attrs, DATA_ATTACHMENT_ATTR) ?? 'file';
+    const type = attrValue(attrs, TYPE_ATTR);
     const suffix = type === undefined ? '' : ` (${type})`;
     return `<p>[OneNote attachment: ${name}${suffix}]</p>`;
   });
