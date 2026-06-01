@@ -71,6 +71,8 @@ describe('extractDocxMetadata', () => {
     expect(m.comments).toHaveLength(1);
     expect(m.comments[0]?.author).toBe('Vincent Delacourt');
     expect(m.comments[0]?.text).toContain('Please double-check');
+    // the comment is anchored to its commentRange span in document.xml
+    expect(m.comments[0]?.anchor).toBe('the Q4 revenue figure');
     expect(m.insertions.some((i) => i.text.includes('inserted-phrase'))).toBe(true);
     expect(m.deletions.some((d) => d.text.includes('deleted-phrase'))).toBe(true);
     expect(m.hiddenText.some((h) => h.includes('This is hidden.'))).toBe(true);

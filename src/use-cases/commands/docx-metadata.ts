@@ -5,6 +5,7 @@ import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
+import { extractCommentAnchors } from './docx-comment-anchors.ts';
 import { attrOf, collectText, findAll, findAllTexts, parseXml } from './ooxml-xml-walker.ts';
 import type { XmlObject } from './ooxml-xml-walker.ts';
 
@@ -26,7 +27,7 @@ import type { XmlObject } from './ooxml-xml-walker.ts';
 type CoreProps = Readonly<Record<string, string>>;
 type AppProps = Readonly<Record<string, string>>;
 type Person = { readonly author: string; readonly providerId: string; readonly userId: string };
-type Comment = { readonly id: string; readonly author: string; readonly initials: string; readonly date: string; readonly text: string };
+type Comment = { readonly id: string; readonly author: string; readonly initials: string; readonly date: string; readonly text: string; readonly anchor?: string };
 type TrackedChange = { readonly id: string; readonly author: string; readonly date: string; readonly text: string };
 type Field = { readonly source: string; readonly instruction: string };
 type Bookmark = { readonly id: string; readonly name: string };
@@ -61,15 +62,14 @@ const extractPeople = (root: unknown): ReadonlyArray<Person> => {
   });
 };
 
-const extractComments = (root: unknown): ReadonlyArray<Comment> => {
+const extractComments = (root: unknown, anchors: ReadonlyMap<string, string>): ReadonlyArray<Comment> => {
   const comments = findAll(root, 'w:comment');
-  return comments.map((c) => ({
-    id: attrOf(c, 'w:id'),
-    author: attrOf(c, 'w:author'),
-    initials: attrOf(c, 'w:initials'),
-    date: attrOf(c, 'w:date'),
-    text: collectText(c, 'w:t'),
-  }));
+  return comments.map((c) => {
+    const id = attrOf(c, 'w:id');
+    const base: Comment = { id, author: attrOf(c, 'w:author'), initials: attrOf(c, 'w:initials'), date: attrOf(c, 'w:date'), text: collectText(c, 'w:t') };
+    const anchor = anchors.get(id);
+    return anchor === undefined ? base : { ...base, anchor };
+  });
 };
 
 const extractTracked = (root: unknown, kind: 'w:ins' | 'w:del'): ReadonlyArray<TrackedChange> => {
@@ -156,14 +156,16 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
   const zipR = await openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
   const zip = zipR.value;
-  const document = parseXml(zip.read('word/document.xml'));
+  const documentXml = zip.read('word/document.xml');
+  const document = parseXml(documentXml);
+  const anchors = extractCommentAnchors(documentXml);
   return ok({
     core: extractCoreProps(zip),
     app: extractAppProps(zip),
     custom: extractCustomProps(zip),
     people: extractPeople(parseXml(zip.read('word/people.xml'))),
     externalRels: extractExternalRels(zip),
-    comments: extractComments(parseXml(zip.read('word/comments.xml'))),
+    comments: extractComments(parseXml(zip.read('word/comments.xml')), anchors),
     insertions: extractTracked(document, 'w:ins'),
     deletions: extractTracked(document, 'w:del'),
     hiddenText: extractHidden(document),

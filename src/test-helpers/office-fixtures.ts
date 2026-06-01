@@ -1,5 +1,8 @@
 import {
   Bookmark,
+  CommentRangeEnd,
+  CommentRangeStart,
+  CommentReference,
   DeletedTextRun,
   Document,
   ExternalHyperlink,
@@ -205,6 +208,17 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
           new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('Sample Heading')] }),
           new Paragraph({
             children: [new TextRun('Visible body. '), new TextRun({ text: 'This is hidden.', vanish: true }), new TextRun(' Resumed.')],
+          }),
+          // Comment id 1 anchored to a known body span (commentRangeStart/End in document.xml).
+          new Paragraph({
+            children: [
+              new TextRun('Revenue was '),
+              new CommentRangeStart(1),
+              new TextRun('the Q4 revenue figure'),
+              new CommentRangeEnd(1),
+              new TextRun({ children: [new CommentReference(1)] }),
+              new TextRun(' overall.'),
+            ],
           }),
           new Paragraph({
             children: [

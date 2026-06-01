@@ -28,7 +28,13 @@ const renderRels = (rels: ReadonlyArray<ExternalRel>): string =>
 
 const renderComments = (comments: ReadonlyArray<Comment>): string => {
   if (comments.length === 0) return NONE;
-  return comments.map((c) => `- **id ${escapeCell(c.id)}** — ${escapeCell(c.author)} (${escapeCell(c.initials)}) @ ${escapeCell(c.date)}\n  > ${escapeCell(c.text)}`).join('\n');
+  return comments
+    .map((c) => {
+      const head = `- **id ${escapeCell(c.id)}** — ${escapeCell(c.author)} (${escapeCell(c.initials)}) @ ${escapeCell(c.date)}`;
+      const on = c.anchor === undefined ? '' : ` on “${escapeCell(c.anchor)}”`;
+      return `${head}${on}\n  > ${escapeCell(c.text)}`;
+    })
+    .join('\n');
 };
 
 const renderTracked = (changes: ReadonlyArray<TrackedChange>): string =>
