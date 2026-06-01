@@ -155,6 +155,68 @@ describe('search-all-accessible-sites', () => {
     expect((result.value as { fileEstimate?: number }).fileEstimate).toBeUndefined();
   });
 
+  it('excludes a site whose archive probe reports it locked, keeping the active sites', async () => {
+    const graph: GraphClient = {
+      ...graphWith((from) => (from === 0 ? page([{ id: 's1' }, { id: 'archived' }], false, 2) : page([], false, 2))),
+      get: async (path) => (path.includes('/sites/archived') ? err({ type: 'api_error', status: 423, message: 'resourceLocked', code: 'resourceLocked' }) : ok({})),
+    };
+    const result = await execute(graph, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string }>; count: number; archivedExcluded?: number };
+    expect(v.value.map((s) => s.id)).toEqual(['s1']);
+    expect(v.count).toBe(1);
+    expect(v.archivedExcluded).toBe(1);
+  });
+
+  it('omits archivedExcluded and archiveProbeErrors when every site is active', async () => {
+    const result = await execute(
+      graphWith(() => page([{ id: 's1' }], false, 1)),
+      {}
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { archivedExcluded?: number; archiveProbeErrors?: number };
+    expect(v.archivedExcluded).toBeUndefined();
+    expect(v.archiveProbeErrors).toBeUndefined();
+  });
+
+  it('surfaces archiveProbeErrors (and keeps the site) when a probe fails for an unrelated reason', async () => {
+    const graph: GraphClient = {
+      ...graphWith((from) => (from === 0 ? page([{ id: 's1' }, { id: 'flaky' }], false, 2) : page([], false, 2))),
+      get: async (path) => (path.includes('/sites/flaky') ? err({ type: 'api_error', status: 500, message: 'boom' }) : ok({})),
+    };
+    const result = await execute(graph, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<{ id: string }>; archiveProbeErrors?: number; archivedExcluded?: number };
+    expect(v.value.map((s) => s.id)).toEqual(['s1', 'flaky']);
+    expect(v.archiveProbeErrors).toBe(1);
+    expect(v.archivedExcluded).toBeUndefined();
+  });
+
+  it('caps the archive probe and flags archiveProbeTruncated when more than 250 sites are returned', async () => {
+    const TOTAL = 275;
+    const graph: GraphClient = {
+      ...graphWith(() => page([], false, 0)),
+      post: async (_p, body) => {
+        const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
+        if (req?.entityTypes?.[0] === 'driveItem') return ok({ value: [] });
+        const from = req?.from ?? 0;
+        const sites = Array.from({ length: 25 }, (_v, k) => ({ id: `s${from + k}` }));
+        return page(sites, from + 25 < TOTAL, TOTAL);
+      },
+      get: async () => ok({}), // every probe reports an active site
+    };
+    const result = await execute(graph, {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { count: number; archiveProbeTruncated?: boolean; archivedExcluded?: number };
+    expect(v.count).toBe(TOTAL); // all kept (all active), but only the first 250 were probed
+    expect(v.archiveProbeTruncated).toBe(true);
+    expect(v.archivedExcluded).toBeUndefined();
+  });
+
   it('searches sites via POST /search/query per its meta', () => {
     expect(meta.graphMethod).toBe('POST');
     expect(meta.graphPathTemplate).toBe('/search/query');

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { filterOutArchivedSites } from './filter-archived-sites.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { searchIndexTotal } from './search-index-total.ts';
 
@@ -59,15 +60,26 @@ const execute: Command['execute'] = async (graph, params) => {
     if (page === MAX_PAGES - 1) truncated = true;
   }
 
+  // Drop archived sites (auto-archived OneDrives surface as `423 resourceLocked`).
+  const filtered = await filterOutArchivedSites(graph, value);
+
   // Best-effort: the index's accessible-file (driveItem) count.
   const fileEstimate = await searchIndexTotal(graph, 'driveItem');
 
-  return ok({ value, count: value.length, ...(fileEstimate !== undefined ? { fileEstimate } : {}), ...(truncated ? { truncated: true } : {}) });
+  return ok({
+    value: filtered.value,
+    count: filtered.value.length,
+    ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
+    ...(filtered.probeErrors > 0 ? { archiveProbeErrors: filtered.probeErrors } : {}),
+    ...(filtered.probeTruncated ? { archiveProbeTruncated: true } : {}),
+    ...(fileEstimate !== undefined ? { fileEstimate } : {}),
+    ...(truncated ? { truncated: true } : {}),
+  });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: ["site"]`) using `from`/`size`, following the index\'s own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Optional `--query` narrows the index (default `*` = all accessible sites).',
+    'Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: ["site"]`) using `from`/`size`, following the index\'s own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Archived sites are EXCLUDED: each returned site is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` (the signal an auto-archived OneDrive of a departed/unlicensed user returns) — see `archivedExcluded`. Optional `--query` narrows the index (default `*` = all accessible sites) and keeps the per-site probe cheap.',
   category: 'sharepoint',
   graphMethod: 'POST',
   graphPathTemplate: '/search/query',
@@ -85,7 +97,7 @@ const meta: CommandMeta = {
   bodyTemplate:
     "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
   responseShape:
-    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
+    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
 };
 
 export { execute, meta, schema };

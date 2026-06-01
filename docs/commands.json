@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-05-31T10:39:08.007Z",
+  "generatedAt": "2026-06-01T06:59:09.367Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -181,10 +181,23 @@
           "key": "inlineImages",
           "required": false,
           "description": "Pass `--inline-images false` to skip the per-image bytes fetch + base64 embedding. Default is `true` (embed). Disabling cuts the response size dramatically on emails with several inline images (a 6 KB body with 6 inline images shipped at ~36 KB by default; with `--inline-images false` it stays close to 6 KB). The body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list instead, so the LLM caller can still see what is there and fetch any specific image via `get-mail-attachment` on demand."
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling` and Gmail `gmail_quote`; in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, and leading `>` quote lines.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it)."
     },
     {
       "name": "download-drive-item-as-markdown",
@@ -375,6 +388,30 @@
       ],
       "example": "ask-marcel extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo`. `count: 0` means the attachment embeds no extractable images."
+    },
+    {
+      "name": "extract-sharepoint-links-in-documents",
+      "summary": "Find every `*.sharepoint.com` URL embedded in a Word / Excel / PowerPoint or OpenDocument file on OneDrive or SharePoint and resolve each one to its driveItem (driveId, itemId, name, webUrl) so the agent can feed those into `download-drive-item-as-pdf` / `-as-markdown` etc. The document sibling of `extract-sharepoint-links-in-mail`. For OOXML (.docx/.xlsx/.pptx) it reads external hyperlinks from the package’s relationship parts (`_rels/*.rels`, `TargetMode=\"External\"`); for OpenDocument (.odt/.ods/.odp) it reads the inline `xlink:href` links in content.xml / styles.xml — either way it catches links wherever they live (body text, headers/footers, cell formulas, slide shapes). Read-only — no conversion happens here. Capped at 25 unique URLs per call (returns `truncated: true` and `skippedCount` when there are more); duplicates are deduplicated; per-link errors are captured inside each entry instead of failing the whole call. Non-zip inputs (pdf/images) return an api_error.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the .docx/.xlsx/.pptx or .odt/.ods/.odp file. Returned by `list-folder-files` or `search-onedrive-files`."
+        }
+      ],
+      "example": "ask-marcel extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -1252,7 +1289,7 @@
     },
     {
       "name": "get-onenote-page-as-markdown",
-      "summary": "Get the body of a single OneNote page as markdown. Graph already returns OneNote pages as HTML, so this command runs that HTML through turndown locally. Inline image references in the page survive as Graph resource URLs (they are NOT base64-embedded — that is future work). For the raw HTML use `get-onenote-page-content`.",
+      "summary": "Get the body of a single OneNote page as markdown. Graph returns OneNote pages as HTML, which this command runs through turndown locally. By default the page’s inline images (its `…/onenote/resources/{id}/$value` references) are fetched and embedded as base64 `data:` URIs so the markdown is self-contained — pass `--inline-images false` to keep the raw Graph resource URLs instead. Image embedding is per-image isolated: any resource that fails to fetch, is oversize (> 2 MB), or is not an image is left as a URL rather than failing the page. Pass `--include-metadata true` to append a `## OneNote metadata` block (title, created / last-modified timestamps, parent section + notebook). For the raw HTML use `get-onenote-page-content`.",
       "category": "notes",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/onenote/pages/{onenote-page-id}/content",
@@ -1269,10 +1306,36 @@
               "key": "pageId"
             }
           ]
+        },
+        {
+          "name": "inline-images",
+          "key": "inlineImages",
+          "required": false,
+          "description": "Pass `--inline-images false` to skip fetching + embedding the page’s `onenote/resources/{id}/$value` images and keep the raw Graph resource URLs in the markdown. Default is `true` (embed as base64 `data:` URIs so the output is self-contained). Embedding is per-image isolated — a failed / oversize / non-image resource is left as a URL either way.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append a `## OneNote metadata` block after the body: page title, created / last-modified timestamps, and the parent section + notebook display names (one extra GET, expanded). Default omits it.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` — turndown-rendered markdown of the OneNote page body."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body."
     },
     {
       "name": "get-onenote-page-content",
@@ -6552,7 +6615,7 @@
     },
     {
       "name": "search-all-accessible-sites",
-      "summary": "Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: [\"site\"]`) using `from`/`size`, following the index's own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Optional `--query` narrows the index (default `*` = all accessible sites).",
+      "summary": "Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: [\"site\"]`) using `from`/`size`, following the index's own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Archived sites are EXCLUDED: each returned site is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` (the signal an auto-archived OneDrive of a departed/unlicensed user returns) — see `archivedExcluded`. Optional `--query` narrows the index (default `*` = all accessible sites) and keeps the per-site probe cheap.",
       "category": "sharepoint",
       "graphMethod": "POST",
       "graphPathTemplate": "/search/query",
@@ -6566,7 +6629,7 @@
         }
       ],
       "example": "ask-marcel search-all-accessible-sites --output json",
-      "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
+      "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
       "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
     },
     {
@@ -6835,7 +6898,7 @@
         }
       ],
       "example": "ask-marcel search-sharepoint-sites-by-name --query 'marketing'",
-      "responseShape": "collection of Microsoft Graph `site` resources under `value[]` (up to 25)",
+      "responseShape": "collection of Microsoft Graph `site` resources under `value[]` (up to 25). Archived sites are excluded: each match is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` (an auto-archived OneDrive). `archivedExcluded` (omitted when 0) counts the drops; `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason.",
       "pagination": true
     }
   ]
