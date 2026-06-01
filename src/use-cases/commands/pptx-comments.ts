@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import { attrOf, collectText, findAll, parseXml } from './ooxml-xml-walker.ts';
 import type { XmlObject } from './ooxml-xml-walker.ts';
@@ -12,7 +13,26 @@ import type { XmlObject } from './ooxml-xml-walker.ts';
  */
 
 type CommentAuthor = { readonly id: string; readonly name: string; readonly initials: string };
-type PptxComment = { readonly author: string; readonly date: string; readonly text: string };
+type PptxComment = { readonly author: string; readonly date: string; readonly text: string; readonly slide?: string };
+
+const SLIDE_RE = /^ppt\/slides\/slide\d+\.xml$/;
+
+// Map each comment part (ppt/comments/*.xml) to the slide that references it.
+// A slide's `_rels` carries a `…/comments` relationship to its comment part —
+// the same rels mechanism pptx-slides uses for speaker notes. Comments whose
+// part isn't referenced by any slide stay unanchored.
+const commentPartToSlide = (zip: OoxmlZip): ReadonlyMap<string, string> => {
+  const map = new Map<string, string>();
+  for (const slidePath of zip.list().filter((p) => SLIDE_RE.test(p))) {
+    const relsPath = `${posix.dirname(slidePath)}/_rels/${posix.basename(slidePath)}.rels`;
+    for (const rel of findAll(parseXml(zip.read(relsPath)), 'Relationship')) {
+      if (!attrOf(rel, 'Type').endsWith('comments')) continue;
+      const target = posix.normalize(posix.join(posix.dirname(slidePath), attrOf(rel, 'Target')));
+      map.set(target, posix.basename(slidePath));
+    }
+  }
+  return map;
+};
 
 const toAuthor = (node: XmlObject): CommentAuthor => ({ id: attrOf(node, 'id'), name: attrOf(node, 'name'), initials: attrOf(node, 'initials') });
 
@@ -31,8 +51,12 @@ const commentsInPart = (root: unknown, nameById: Map<string, string>): ReadonlyA
 
 const extractComments = (zip: OoxmlZip, authors: ReadonlyArray<CommentAuthor>): ReadonlyArray<PptxComment> => {
   const nameById = new Map(authors.map((a) => [a.id, a.name]));
+  const partToSlide = commentPartToSlide(zip);
   const out: Array<PptxComment> = [];
-  for (const path of zip.list().filter((p) => /^ppt\/comments\/.*\.xml$/.test(p))) out.push(...commentsInPart(parseXml(zip.read(path)), nameById));
+  for (const path of zip.list().filter((p) => /^ppt\/comments\/.*\.xml$/.test(p))) {
+    const slide = partToSlide.get(path);
+    for (const comment of commentsInPart(parseXml(zip.read(path)), nameById)) out.push(slide === undefined ? comment : { ...comment, slide });
+  }
   return out;
 };
 

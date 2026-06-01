@@ -37,13 +37,15 @@ describe('extractPptxMetadata', () => {
     // Slide tag — the pptx equivalent of a docVar
     expect(m.slideTags.some((t) => t.name === 'REVIEW_STATE' && t.value === 'confidential-draft')).toBe(true);
 
-    // Comment authors — legacy (commentAuthors.xml) + modern (authors.xml)
-    expect(m.commentAuthors.some((a) => a.name === 'Alice Smith')).toBe(true);
+    // Comment authors — legacy (commentAuthors.xml) + modern (authors.xml); initials pinned too
+    expect(m.commentAuthors.find((a) => a.name === 'Alice Smith')?.initials).toBe('AS');
     expect(m.commentAuthors.some((a) => a.name === 'Bob Jones')).toBe(true);
 
-    // Comments — legacy p:cm (author resolved by index) + modern p188:cm (author resolved by GUID)
-    expect(m.comments.some((c) => c.author === 'Alice Smith' && c.text.includes('revenue figure'))).toBe(true);
-    expect(m.comments.some((c) => c.author === 'Bob Jones' && c.text.includes('add a source'))).toBe(true);
+    // Comments — legacy p:cm (author resolved by index, date from `dt`) + modern p188:cm
+    // (author resolved by GUID, date from `created`). The legacy comment's part is referenced
+    // from slide1's rels → anchored to that slide; the modern comment's part isn't → unanchored.
+    expect(m.comments.some((c) => c.author === 'Alice Smith' && c.text.includes('revenue figure') && c.date === '2026-05-15T09:00:00Z' && c.slide === 'slide1.xml')).toBe(true);
+    expect(m.comments.some((c) => c.author === 'Bob Jones' && c.text.includes('add a source') && c.date === '2026-05-16T11:00:00Z' && c.slide === undefined)).toBe(true);
 
     // Slides — visible slide with title + resolved speaker notes; hidden slide flagged
     const visible = m.slides.find((s) => s.name === 'slide1.xml');

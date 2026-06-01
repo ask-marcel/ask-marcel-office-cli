@@ -34,8 +34,8 @@ const renderAuthors = (authors: ReadonlyArray<CommentAuthor>): string =>
 
 const renderComments = (comments: ReadonlyArray<PptxComment>): string =>
   renderTable(
-    comments.map((c) => [c.author, c.date, c.text]),
-    ['author', 'date', 'text']
+    comments.map((c) => [c.slide ?? '—', c.author, c.date, c.text]),
+    ['slide', 'author', 'date', 'text']
   );
 
 const renderSlides = (slides: ReadonlyArray<Slide>): string =>
