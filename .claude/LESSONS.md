@@ -6,6 +6,11 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-06-01 | per-document sensitivity labels are unreachable on the Teams token (content scope absent)
+
+Per-document MIP sensitivity labels read via the POST action `/drives/{d}/items/{i}/extractSensitivityLabels` (the `driveItem` resource exposes no GET label field in Graph v1.0). That action requires the delegated scope `InformationProtectionContent.Read.All`, which is NOT in the Teams web-client token's fixed grant — the token only carries `InformationProtectionPolicy.Read` (the *catalog* scope behind `list-sensitivity-labels`). So a per-item label read 403s like the other token-ceiling blocks (`Chat.Read`, `ChannelMessage.Read.All`, …). Spiked during the "full-fidelity document context" feature and DROPPED: the catalog command stays, but `download-drive-item-as-markdown --include-metadata` cannot surface a per-file `**Sensitivity:**` line on this token. The only fix is a custom Azure AD app (separate CLIENT_ID) granting the content scope — out of scope for the inherited Teams token.
+Applies to: any future attempt to read/extract a driveItem's assigned sensitivity label; do not add such a command against the Teams token.
+
 ## [decision] 2026-05-30 | "maximum SharePoint a delegated user can see" = union of search-index + membership/activity vectors
 
 There is no single delegated Graph API for "every site I can access" (Microsoft confirms it; `/sites/getAllSites` is application-only and not access-trimmed; `/me/followedSites` 403s on this token). The practical maximum is the UNION of two complementary commands, each catching what the other can't:
