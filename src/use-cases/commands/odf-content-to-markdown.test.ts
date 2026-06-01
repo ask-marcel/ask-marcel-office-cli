@@ -25,8 +25,57 @@ describe('odfContentToMarkdown — text document (.odt)', () => {
         '> _(hidden section — not shown in the rendered document)_',
         'Hidden body text',
         'Final paragraph.',
+        '> 💬 **Reviewer, 2026-06-01T09:00:00**: Check this number.',
       ].join('\n\n')
     );
+  });
+});
+
+describe('odfContentToMarkdown — office:annotation comments rendered inline', () => {
+  it('renders an annotation as a blockquote line right after its paragraph, and does NOT leak the comment into the body text', () => {
+    const md = renderOdfContent(
+      text('<text:p>The body text<office:annotation><dc:creator>Alice</dc:creator><dc:date>2026-06-01T09:00:00</dc:date><text:p>my comment</text:p></office:annotation></text:p>')
+    );
+    expect(md).toBe('The body text\n\n> 💬 **Alice, 2026-06-01T09:00:00**: my comment');
+  });
+
+  it('falls back to just the comment when the annotation has no creator/date', () => {
+    const md = renderOdfContent(text('<text:p>Body<office:annotation><text:p>orphan note</text:p></office:annotation></text:p>'));
+    expect(md).toBe('Body\n\n> 💬 orphan note');
+  });
+
+  it('uses just the creator when there is no date', () => {
+    const md = renderOdfContent(text('<text:p>Body<office:annotation><dc:creator>Bob</dc:creator><text:p>note</text:p></office:annotation></text:p>'));
+    expect(md).toBe('Body\n\n> 💬 **Bob**: note');
+  });
+
+  it('finds an annotation nested inside an inline span', () => {
+    const md = renderOdfContent(
+      text('<text:p>Body <text:span>span<office:annotation><dc:creator>Carol</dc:creator><text:p>deep note</text:p></office:annotation></text:span></text:p>')
+    );
+    expect(md).toContain('> 💬 **Carol**: deep note');
+    expect(md).toContain('Body span');
+    expect(md).not.toContain('Body spandeep note'); // comment is not merged into the run text
+  });
+
+  it('emits only the annotation line for a paragraph that is just a comment', () => {
+    const md = renderOdfContent(text('<text:p><office:annotation><dc:creator>Dan</dc:creator><text:p>standalone</text:p></office:annotation></text:p>'));
+    expect(md).toBe('> 💬 **Dan**: standalone');
+  });
+
+  it('trims creator/date, drops empty body paragraphs, and joins multi-paragraph comment bodies with a single space', () => {
+    const md = renderOdfContent(
+      text(
+        '<text:p>Body<office:annotation><dc:creator> Alice </dc:creator><dc:date> 2026 </dc:date><text:p> line one </text:p><text:p></text:p><text:p>line two</text:p></office:annotation></text:p>'
+      )
+    );
+    // creator/date trimmed; the empty <text:p> filtered out; the two real lines joined by one space
+    expect(md).toBe('Body\n\n> 💬 **Alice, 2026**: line one line two');
+  });
+
+  it('does not treat office:annotation-end as body content', () => {
+    const md = renderOdfContent(text('<text:p>Body<office:annotation-end office:name="x"/> tail</text:p>'));
+    expect(md).toBe('Body tail');
   });
 });
 

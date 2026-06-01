@@ -245,7 +245,7 @@ const ODF_META_NS =
   'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"';
 
 const ODF_CONTENT_NS =
-  'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"';
+  'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"';
 
 /**
  * An OpenDocument text fixture carrying the metadata `extractOdfMetadata`
@@ -285,7 +285,7 @@ const buildRichOdt = async (): Promise<Uint8Array> => {
       '<table:table-row><table:table-cell><text:p>A2</text:p></table:table-cell><table:table-cell><text:p>B2</text:p></table:table-cell></table:table-row>' +
       '</table:table>' +
       '<text:section text:display="none" text:name="Secret"><text:p>Hidden body text</text:p></text:section>' +
-      '<text:p>Final paragraph.</text:p>' +
+      '<text:p>Final paragraph.<office:annotation><dc:creator>Reviewer</dc:creator><dc:date>2026-06-01T09:00:00</dc:date><text:p>Check this number.</text:p></office:annotation></text:p>' +
       '</office:text></office:body></office:document-content>'
   );
   return zip.generateAsync({ type: 'uint8array' });

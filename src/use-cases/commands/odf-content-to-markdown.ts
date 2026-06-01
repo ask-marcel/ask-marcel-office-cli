@@ -64,9 +64,48 @@ const inlineText = (children: ReadonlyArray<Node>): string => {
     }
     const tag = tagOf(node);
     if (tag === undefined) continue;
+    // Comments (office:annotation) are surfaced as their own line by
+    // renderBlock, not merged into the body text they're anchored beside.
+    if (tag === 'office:annotation' || tag === 'office:annotation-end') continue;
     if (tag === 'text:s') out += ' '.repeat(intAttr(node, 'text:c'));
     else if (tag === 'text:tab' || tag === 'text:line-break') out += ' ';
     else out += inlineText(kidsOf(node, tag));
+  }
+  return out;
+};
+
+// ODF comments sit inline in content.xml as `<office:annotation>` with
+// `<dc:creator>`, `<dc:date>` and `<text:p>` children, anchored at their
+// position. Render each as a blockquote line right after the paragraph it sits
+// in — true inline, no id correlation needed (the walker is already ordered).
+const annotationChildText = (kids: ReadonlyArray<Node>, tag: string): string => {
+  for (const child of kids) if (tagOf(child) === tag) return inlineText(kidsOf(child, tag)).trim();
+  return '';
+};
+
+const renderAnnotation = (node: Node): string => {
+  const kids = kidsOf(node, 'office:annotation');
+  const creator = annotationChildText(kids, 'dc:creator');
+  const date = annotationChildText(kids, 'dc:date');
+  const body = kids
+    .filter((child) => tagOf(child) === 'text:p')
+    .map((para) => inlineText(kidsOf(para, 'text:p')).trim())
+    .filter((text) => text !== '')
+    .join(' ');
+  const who = [creator, date].filter((part) => part !== '').join(', ');
+  return who === '' ? `> 💬 ${body}` : `> 💬 **${who}**: ${body}`;
+};
+
+const collectAnnotations = (children: ReadonlyArray<Node>): ReadonlyArray<Node> => {
+  const out: Array<Node> = [];
+  for (const node of children) {
+    const tag = tagOf(node);
+    if (tag === undefined) continue;
+    if (tag === 'office:annotation') {
+      out.push(node);
+      continue;
+    }
+    out.push(...collectAnnotations(kidsOf(node, tag)));
   }
   return out;
 };
@@ -148,7 +187,9 @@ const renderBlock = (node: Node, tag: string): ReadonlyArray<string> => {
   if (tag === 'text:h') return [renderHeading(node, kids)];
   if (tag === 'text:p') {
     const text = inlineText(kids).trim();
-    return text === '' ? [] : [text];
+    const notes = collectAnnotations(kids).map(renderAnnotation);
+    // text === '' && notes empty → returns notes (= []), so no separate guard needed.
+    return text === '' ? notes : [text, ...notes];
   }
   if (tag === 'text:list') {
     const lines = renderListLines(kids, 0);
