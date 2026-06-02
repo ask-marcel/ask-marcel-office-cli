@@ -7,6 +7,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
+import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<unknown>): Promise<string> => {
@@ -93,6 +94,16 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
     expect(out).toContain('"status":"authenticated"');
+  });
+
+  it('top-level description advertises endpoint counts derived from the command registry, never a hardcoded literal', () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET').length;
+    const postCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'POST').length;
+    const description = cli.description();
+    expect(description).toContain(`${getCount} GET endpoints`);
+    expect(description).toContain(`${postCount} POST`);
   });
 
   it('renders an authenticated status as plain "status: authenticated" by default (text format)', async () => {

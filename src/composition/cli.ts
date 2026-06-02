@@ -160,11 +160,20 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return full.charAt(cut) === '.' ? full.slice(0, cut + 1) : full.slice(0, cut);
   };
 
+  // QA fix: derive the advertised endpoint counts from the registry so the
+  // top-level description can never drift from the manifest again. The
+  // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
+  // POST) when search-all-accessible-sites was added without updating it.
+  const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET').length;
+  const postCommandNames = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.graphMethod === 'POST')
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+  const surfaceDescription = `Microsoft Graph CLI. READ-ONLY: this CLI cannot send mail, modify or create calendar items, write files, or perform any mutating action — there is no send-mail / create-event / upload-file command. ${getEndpointCount} GET endpoints + ${postCommandNames.length} POST (${postCommandNames.join(', ')} — searches, not mutations). Safe default for LLM autonomy.`;
+
   program
     .name('ask-marcel')
-    .description(
-      'Microsoft Graph CLI. READ-ONLY: this CLI cannot send mail, modify or create calendar items, write files, or perform any mutating action — there is no send-mail / create-event / upload-file command. 164 GET endpoints + 1 POST (microsoft-search-query, which is a search). Safe default for LLM autonomy.'
-    )
+    .description(surfaceDescription)
     .version(version ?? '0.0.0')
     // Audit Alex-session §B: override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
