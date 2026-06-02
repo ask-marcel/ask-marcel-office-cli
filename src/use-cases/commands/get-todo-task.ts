@@ -1,18 +1,31 @@
 import { z } from 'zod';
-import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { err } from '../../domain/result.ts';
+import type { Command, CommandMeta } from './command-types.ts';
+import { formatZodError } from './format-zod-error.ts';
+import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
+import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 
 // Audit v1.0.0 §B9: sibling single-resource GETs (get-my-manager,
 // get-user-manager, get-mail-message, etc.) all expose `--select`/`--expand`
 // so an LLM can slim a fetched resource. This command was the only Microsoft
-// task-list "get" without them — switch to the selectable builder.
-const baseSchema = z.object({ todoTaskListId: z.string().min(1), todoTaskId: z.string().min(1) });
-const { execute, schema } = buildSelectableCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/${p.todoTaskId}`, baseSchema);
+// task-list "get" without them. It also hits the same `/tasks` endpoint as its
+// list sibling, so a `--select` that includes `title` trips the same
+// RequestBroker--ParseUri quirk — rewrite it via the shared helper.
+const schema = z.object({ todoTaskListId: z.string().min(1), todoTaskId: z.string().min(1) }).extend(selectExpandSchema.shape);
+
+const execute: Command['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks/${parsed.data.todoTaskId}`, parsed.data);
+  const result = await graph.get(path);
+  if (result.ok) return result;
+  const rewritten = rewriteTodoTitleQuirk(result.error, parsed.data);
+  return rewritten ? err(rewritten) : result;
+};
 
 const meta: CommandMeta = {
   summary:
-    'Get a single Microsoft To Do task by its ID and its parent list ID. Use `--select` to slim the response (e.g. `--select id,title,status`) or `--expand checklistItems` / `--expand linkedResources` to inline child collections.',
+    'Get a single Microsoft To Do task by its ID and its parent list ID. Use `--select` to slim the response (e.g. `--select id,status`) or `--expand checklistItems` / `--expand linkedResources` to inline child collections. Known Graph quirk: any `--select` combo that includes `title` trips `RequestBroker--ParseUri` on this endpoint; the CLI rewrites that opaque error to a hint.',
   category: 'tasks',
   graphMethod: 'GET',
   graphPathTemplate: '/me/todo/lists/{todo-task-list-id}/tasks/{todo-task-id}',

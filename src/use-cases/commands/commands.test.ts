@@ -804,10 +804,12 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const r = await cmd.execute(graph, { todoTaskListId: 'l1', orderby: 'title asc' });
     expect(r.ok).toBe(false);
-    if (!r.ok && r.error.type === 'api_error') {
-      expect(r.error.message).toContain('Graph rejected --orderby=title asc');
-      expect(r.error.message).toContain('sorting on `title` is unsupported');
-    }
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toContain('Graph rejected --orderby=title asc');
+    expect(r.error.message).toContain('sorting on `title` is unsupported');
+    expect(r.error.code).toBe('cli_rewrite_todo_orderby_title');
   });
 
   it('list-todo-tasks passes through RequestBroker--ParseUri unchanged when neither --select nor --orderby is set (no false rewrite)', async () => {
@@ -831,6 +833,97 @@ describe('commands', () => {
       expect(r.error.message).toContain('RequestBroker--ParseUri');
       expect(r.error.message).not.toContain('Drop `title`');
     }
+  });
+
+  it('get-todo-task rewrites the opaque RequestBroker--ParseUri error to the title-quirk hint when --select includes title', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks/t1?$select=id%2Ctitle',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['get-todo-task'];
+    if (!cmd) throw new Error('get-todo-task not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', todoTaskId: 't1', select: 'id,title' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toContain('Graph rejected --select=id,title');
+    expect(r.error.message).toContain('Drop `title` from --select');
+    expect(r.error.message).toContain('slim the response client-side');
+    expect(r.error.message).not.toContain('per-task');
+    expect(r.error.code).toBe('cli_rewrite_todo_select_title');
+  });
+
+  it('get-todo-task passes through RequestBroker--ParseUri unchanged when no --select is set (no false rewrite)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks/t1',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: 'RequestBroker--ParseUri', message: 'Invalid request' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['get-todo-task'];
+    if (!cmd) throw new Error('get-todo-task not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', todoTaskId: 't1' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toContain('RequestBroker--ParseUri');
+    expect(r.error.message).not.toContain('Graph rejected');
+    expect(r.error.message).not.toContain('Drop `title`');
+  });
+
+  it('get-todo-task passes through a non-ParseUri error unchanged', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks/t1',
+        method: 'GET',
+        response: () => new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'bad token' } }), { status: 401, headers: { 'content-type': 'application/json' } }),
+      },
+    ]);
+    const cmd = cmdMap['get-todo-task'];
+    if (!cmd) throw new Error('get-todo-task not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', todoTaskId: 't1' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toBe('Unauthorized: bad token');
+  });
+
+  it('get-todo-task does NOT rewrite a non-ParseUri error even when --select is set (only the title quirk is special-cased)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks/t1?$select=id%2Ctitle',
+        method: 'GET',
+        response: () => new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'bad token' } }), { status: 401, headers: { 'content-type': 'application/json' } }),
+      },
+    ]);
+    const cmd = cmdMap['get-todo-task'];
+    if (!cmd) throw new Error('get-todo-task not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { todoTaskListId: 'l1', todoTaskId: 't1', select: 'id,title' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toBe('Unauthorized: bad token');
+    expect(r.error.message).not.toContain('Drop `title`');
   });
 
   it('list-calendar-event-instances rewrites the opaque ExpandSeries error to a seriesMaster hint (audit v1.0.0 Issue 9)', async () => {
@@ -1028,10 +1121,12 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const r = await cmd.execute(graph, { todoTaskListId: 'l1', orderby: 'title asc' });
     expect(r.ok).toBe(false);
-    if (!r.ok && r.error.type === 'api_error') {
-      expect(r.error.message).toContain('Graph rejected --orderby=title asc');
-      expect(r.error.message).toContain('sorting on `title` is unsupported');
-    }
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    if (r.error.type !== 'api_error') return;
+    expect(r.error.message).toContain('Graph rejected --orderby=title asc');
+    expect(r.error.message).toContain('sorting on `title` is unsupported');
+    expect(r.error.code).toBe('cli_rewrite_todo_orderby_title');
   });
 
   it('list-incomplete-todo-tasks rewrites the title-quirk RequestBroker--ParseUri error like its sibling (audit round-8 §1.1)', async () => {
@@ -1062,10 +1157,11 @@ describe('commands', () => {
     if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { todoTaskListId: 'tasks', filter: "subject eq 'x'" });
     expect(r.ok).toBe(false);
-    if (!r.ok && r.error.type === 'validation_error') {
-      expect(r.error.message).toContain('--filter is not supported on list-incomplete-todo-tasks');
-      expect(r.error.message).toContain('list-todo-tasks');
-    }
+    if (r.ok) return;
+    expect(r.error.type).toBe('validation_error');
+    if (r.error.type !== 'validation_error') return;
+    expect(r.error.message).toContain('--filter is not supported on list-incomplete-todo-tasks');
+    expect(r.error.message).toContain('list-todo-tasks');
   });
 
   it('list-incomplete-planner-tasks rejects --filter with a pointer at list-planner-tasks (audit round-6 §2.7)', async () => {

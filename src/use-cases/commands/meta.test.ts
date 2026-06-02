@@ -42,10 +42,14 @@ describe('command meta — invariants on every registered command', () => {
         expect(optionKeys).toEqual(keys);
       });
 
-      it('uses kebab-case `name` matching the camelCase `key` in every option', () => {
+      it('uses kebab-case `name` matching the camelCase `key` in every option, with non-empty alias name/key pairs', () => {
         for (const opt of cmd.meta.options) {
           expect(opt.name).toBe(camelToKebab(opt.key));
           expect(opt.description.trim().length).toBeGreaterThan(0);
+          for (const alias of opt.aliases ?? []) {
+            expect(alias.name.trim().length).toBeGreaterThan(0);
+            expect(alias.key.trim().length).toBeGreaterThan(0);
+          }
         }
       });
 
