@@ -25,7 +25,7 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 
 ### Read-only by design
 
-**This is the most important property.** 164 GET endpoints + 1 POST (search). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. A hallucinated command can't break anything — the worst case is a 404. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 169 GET endpoints + 2 POST (searches). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. A hallucinated command can't break anything — the worst case is a 404. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -172,9 +172,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Roadmap
 
-Read-only stays the default forever. The list below is additive coverage and convenience — concrete next steps, ordered by how often they come up in real LLM workflows. Each line carries a rough implementation-effort tag: **[S]** small (reuses existing machinery), **[M]** medium (new orchestration, no new infra), **[L]** large (new infra/deps or a scope investigation).
-
-- **[L] Streaming pagination output** — write each page to stdout as it arrives instead of accumulating, so long delta walks don't hold gigabytes in memory and an agent can start processing page 1 while page 2 is in flight.
+Read-only stays the default forever. There's no fixed feature backlog — coverage grows out of real LLM workflows as they come up.
 
 Suggestions, requests, and pull requests welcome — see the [issues page](https://github.com/vdelacou/ask-marcel-office-cli/issues).
 

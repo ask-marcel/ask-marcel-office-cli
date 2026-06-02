@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand(() => '/me/insights/used', baseSche
 
 const meta: CommandMeta = {
   summary:
-    "List documents the signed-in user has *personally* used recently (Microsoft's machine-learning recency signal — distinct from `list-recent-files` which is the OneDrive recency feed). Returns `usageDetails` with `lastAccessedDateTime` + `lastModifiedDateTime`.",
+    "List documents the signed-in user has *personally* used recently (Microsoft's machine-learning recency signal — distinct from `list-recent-files` which is the OneDrive recency feed). Each item carries a `lastUsed` (a `usageDetails` object) with `lastAccessedDateTime` + `lastModifiedDateTime`.",
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/me/insights/used',
