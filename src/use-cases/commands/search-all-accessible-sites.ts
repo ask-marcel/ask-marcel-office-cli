@@ -60,7 +60,9 @@ const execute: Command['execute'] = async (graph, params) => {
     if (page === MAX_PAGES - 1) truncated = true;
   }
 
-  // Drop archived sites (auto-archived OneDrives surface as `423 resourceLocked`).
+  // Drop sites the user cannot open: archived (auto-archived OneDrives surface as
+  // `423 resourceLocked`), non-navigable URL shapes (add-in app domains,
+  // `/contentstorage/` containers, `/_layouts/` pages), and probes that 404.
   const filtered = await filterOutArchivedSites(graph, value);
 
   // Best-effort: the index's accessible-file (driveItem) count.
@@ -70,6 +72,8 @@ const execute: Command['execute'] = async (graph, params) => {
     value: filtered.value,
     count: filtered.value.length,
     ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
+    ...(filtered.nonNavigableExcluded > 0 ? { nonNavigableExcluded: filtered.nonNavigableExcluded } : {}),
+    ...(filtered.notFoundExcluded > 0 ? { notFoundExcluded: filtered.notFoundExcluded } : {}),
     ...(filtered.probeErrors > 0 ? { archiveProbeErrors: filtered.probeErrors } : {}),
     ...(filtered.probeTruncated ? { archiveProbeTruncated: true } : {}),
     ...(fileEstimate !== undefined ? { fileEstimate } : {}),
@@ -79,7 +83,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: ["site"]`) using `from`/`size`, following the index\'s own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Archived sites are EXCLUDED: each returned site is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` (the signal an auto-archived OneDrive of a departed/unlicensed user returns) — see `archivedExcluded`. Optional `--query` narrows the index (default `*` = all accessible sites) and keeps the per-site probe cheap.',
+    'Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: ["site"]`) using `from`/`size`, following the index\'s own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Sites you cannot open are EXCLUDED so the list is not polluted with 404s: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining site is probed (`GET /sites/{id}?$select=…,siteCollection`) and `archivedExcluded` drops archived / `423 resourceLocked` sites (e.g. an auto-archived OneDrive of a departed user) while `notFoundExcluded` drops probes that 404. Active personal OneDrives are kept. All three counters are omitted when 0. Optional `--query` narrows the index (default `*` = all accessible sites) and keeps the per-site probe cheap.',
   category: 'sharepoint',
   graphMethod: 'POST',
   graphPathTemplate: '/search/query',

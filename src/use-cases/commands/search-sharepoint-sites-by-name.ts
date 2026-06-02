@@ -14,9 +14,10 @@ const sitesOf = (body: unknown): ReadonlyArray<unknown> => {
   return Array.isArray(value) ? value : [];
 };
 
-// Wrap the raw `/sites?search=` GET to drop archived sites (e.g. a departed user's
-// auto-archived OneDrive, which 423s on access). The cap (~25 matches) never trips
-// the probe ceiling, so only `archivedExcluded` / `archiveProbeErrors` can appear.
+// Wrap the raw `/sites?search=` GET to drop sites the user cannot open: archived
+// ones (e.g. a departed user's auto-archived OneDrive, which 423s), non-navigable
+// URL shapes (add-in app domains, `/contentstorage/` containers, `/_layouts/`
+// pages), and probes that 404. The cap (~25 matches) never trips the probe ceiling.
 const execute: Command['execute'] = async (graph, params) => {
   const r = await built.execute(graph, params);
   if (!r.ok) return r;
@@ -24,6 +25,8 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({
     value: filtered.value,
     ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
+    ...(filtered.nonNavigableExcluded > 0 ? { nonNavigableExcluded: filtered.nonNavigableExcluded } : {}),
+    ...(filtered.notFoundExcluded > 0 ? { notFoundExcluded: filtered.notFoundExcluded } : {}),
     ...(filtered.probeErrors > 0 ? { archiveProbeErrors: filtered.probeErrors } : {}),
   });
 };
@@ -45,7 +48,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel search-sharepoint-sites-by-name --query 'marketing'",
   responseShape:
-    'collection of Microsoft Graph `site` resources under `value[]` (up to 25). Archived sites are excluded: each match is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` (an auto-archived OneDrive). `archivedExcluded` (omitted when 0) counts the drops; `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason.',
+    'collection of Microsoft Graph `site` resources under `value[]` (up to 25). Sites you cannot open are excluded: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining match is probed (`GET /sites/{id}?$select=…,siteCollection`) and `archivedExcluded` drops archived / `423 resourceLocked` sites while `notFoundExcluded` drops probes that 404. All three counters are omitted when 0. `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason. Active personal OneDrives are kept.',
   pagination: true,
 };
 

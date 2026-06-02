@@ -197,3 +197,96 @@ describe('filterOutArchivedSites — archive signal detection', () => {
     expect(await verdictFor(ok({ siteCollection: { hostname: 'contoso.sharepoint.com' } }))).toEqual({ kept: true, archived: 0, errors: 0 });
   });
 });
+
+describe('filterOutArchivedSites — non-navigable + not-found exclusion', () => {
+  it('excludes a SharePoint Add-in app-domain site by its webUrl WITHOUT probing it', async () => {
+    const probed: Array<string> = [];
+    const sites = [
+      { id: 'addin', webUrl: 'https://contoso-d870846bb167ac.sharepoint.com/sites/Apps/_layouts/15/AddinDeprecationAnnoucement.aspx' },
+      { id: 'live', webUrl: 'https://contoso.sharepoint.com/sites/Team' },
+    ];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, probed),
+      sites
+    );
+    expect(ids(result.value)).toEqual(['live']);
+    expect(result.nonNavigableExcluded).toBe(1);
+    expect(probed).not.toContain('/sites/addin?$select=id,webUrl,siteCollection');
+  });
+
+  it('excludes a SharePoint Embedded /contentstorage/ container by its webUrl', async () => {
+    const sites = [
+      { id: 'cs', webUrl: 'https://contoso.sharepoint.com/contentstorage/coJsE0OdIkqu2uEOCncHOTHn9Wdld5BMqhxRcKelXVg' },
+      { id: 'live', webUrl: 'https://contoso.sharepoint.com/sites/Team' },
+    ];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, []),
+      sites
+    );
+    expect(ids(result.value)).toEqual(['live']);
+    expect(result.nonNavigableExcluded).toBe(1);
+  });
+
+  it('excludes a bare /_layouts/ system URL on an otherwise-normal host', async () => {
+    const sites = [
+      { id: 'sys', webUrl: 'https://contoso.sharepoint.com/sites/X/_layouts/15/viewlsts.aspx' },
+      { id: 'live', webUrl: 'https://contoso.sharepoint.com/sites/Team' },
+    ];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, []),
+      sites
+    );
+    expect(ids(result.value)).toEqual(['live']);
+    expect(result.nonNavigableExcluded).toBe(1);
+  });
+
+  it('excludes a site whose probe returns HTTP 404, counted separately from archived', async () => {
+    const graph = graphProbing((id) => (id === 'gone' ? err({ type: 'api_error', status: 404, message: 'itemNotFound: site not found' }) : active), []);
+    const sites = [
+      { id: 'gone', webUrl: 'https://contoso.sharepoint.com/sites/Gone' },
+      { id: 'live', webUrl: 'https://contoso.sharepoint.com/sites/Team' },
+    ];
+    const result = await filterOutArchivedSites(graph, sites);
+    expect(ids(result.value)).toEqual(['live']);
+    expect(result.notFoundExcluded).toBe(1);
+    expect(result.archivedExcluded).toBe(0);
+    expect(result.probeErrors).toBe(0);
+  });
+
+  it('keeps an active personal OneDrive that probes ok — OneDrives are not dropped by URL shape', async () => {
+    const probed: Array<string> = [];
+    const sites = [{ id: 'od', webUrl: 'https://contoso-my.sharepoint.com/personal/b_departed_user_hk_fabrikam_com' }];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, probed),
+      sites
+    );
+    expect(ids(result.value)).toEqual(['od']);
+    expect(result.nonNavigableExcluded).toBe(0);
+    expect(result.notFoundExcluded).toBe(0);
+    expect(probed).toContain('/sites/od?$select=id,webUrl,siteCollection');
+  });
+
+  it('excludes an add-in app-domain host even with a normal path (no /_layouts/ or /contentstorage/ marker)', async () => {
+    const probed: Array<string> = [];
+    const sites = [{ id: 'addin2', webUrl: 'https://contoso-18dd384baca361.sharepoint.com/sites/Apps' }];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, probed),
+      sites
+    );
+    expect(ids(result.value)).toEqual([]);
+    expect(result.nonNavigableExcluded).toBe(1);
+    expect(probed).not.toContain('/sites/addin2?$select=id,webUrl,siteCollection');
+  });
+
+  it('keeps a host whose hyphen-suffix is too short to be an app domain (boundary on the hex-run length)', async () => {
+    const probed: Array<string> = [];
+    const sites = [{ id: 'short', webUrl: 'https://contoso-a.sharepoint.com/sites/X' }];
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, probed),
+      sites
+    );
+    expect(ids(result.value)).toEqual(['short']);
+    expect(result.nonNavigableExcluded).toBe(0);
+    expect(probed).toContain('/sites/short?$select=id,webUrl,siteCollection');
+  });
+});
