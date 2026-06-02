@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildDeps } from './build-deps.ts';
@@ -32,7 +35,11 @@ describe('buildDeps composition root', () => {
   });
 
   it('returns a cached token via the default Bun filesystem adapter when run under Bun', async () => {
-    const tmpCache = `/tmp/atelier-build-deps-cache-${Date.now()}.json`;
+    // Unique temp dir per run so parallel `bun test` processes can't collide on a
+    // shared path (a `Date.now()`-suffixed path repeats across processes in the
+    // same millisecond, and one process's cleanup then deletes another's file).
+    const dir = mkdtempSync(join(tmpdir(), 'atelier-build-deps-'));
+    const tmpCache = join(dir, 'cache.json');
     const future = Math.floor(Date.now() / 1000) + 3600;
     const header = btoa(JSON.stringify({ alg: 'RS256' }));
     const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
@@ -44,7 +51,7 @@ describe('buildDeps composition root', () => {
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.value).toBe(seededToken as never);
     } finally {
-      await Bun.file(tmpCache).delete();
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
