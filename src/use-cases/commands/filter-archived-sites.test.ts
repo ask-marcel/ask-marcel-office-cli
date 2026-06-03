@@ -34,7 +34,7 @@ describe('filterOutArchivedSites', () => {
     const result = await filterOutArchivedSites(graph, [{ id: 's1' }, { id: 's2' }, { id: 's3' }]);
     expect(ids(result.value)).toEqual(['s1', 's3']);
     expect(result.archivedExcluded).toBe(1);
-    expect(probed).toContain('/sites/s2?$select=id,webUrl,siteCollection');
+    expect(probed).toContain('/sites/s2?$select=id,webUrl,siteCollection&$expand=drive($select=quota)');
   });
 
   it('excludes recently-archived and reactivating sites as well', async () => {
@@ -79,6 +79,23 @@ describe('filterOutArchivedSites', () => {
     expect(result.probeTruncated).toBe(false);
   });
 
+  it('attaches per-site size from the expanded drive quota onto a kept site', async () => {
+    const probeResp = ok({ id: 's1', webUrl: 'https://contoso.sharepoint.com/sites/Team', drive: { quota: { used: 9000 } } });
+    const result = await filterOutArchivedSites(
+      graphProbing(() => probeResp, []),
+      [{ id: 's1', webUrl: 'https://contoso.sharepoint.com/sites/Team' }]
+    );
+    expect(result.value).toEqual([{ id: 's1', webUrl: 'https://contoso.sharepoint.com/sites/Team', size: 9000 }]);
+  });
+
+  it('keeps a site without a size field when the probe returns no drive quota', async () => {
+    const result = await filterOutArchivedSites(
+      graphProbing(() => active, []),
+      [{ id: 's1', webUrl: 'https://contoso.sharepoint.com/sites/Team' }]
+    );
+    expect((result.value[0] as { size?: number }).size).toBeUndefined();
+  });
+
   it('keeps a null hit without probing or throwing', async () => {
     const probed: Array<string> = [];
     const result = await filterOutArchivedSites(
@@ -87,7 +104,7 @@ describe('filterOutArchivedSites', () => {
     );
     expect(result.value.length).toBe(2);
     expect(result.archivedExcluded).toBe(0);
-    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection']); // null was never probed
+    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection&$expand=drive($select=quota)']); // null was never probed
   });
 
   it('keeps a hit that has no id without probing it', async () => {
@@ -97,7 +114,7 @@ describe('filterOutArchivedSites', () => {
       [{ name: 'no id' }, { id: 's1' }]
     );
     expect(result.value.length).toBe(2);
-    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection']);
+    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection&$expand=drive($select=quota)']);
   });
 
   it('probes every site across multiple concurrency chunks', async () => {
@@ -118,7 +135,7 @@ describe('filterOutArchivedSites', () => {
       [{ id: 's1' }, { id: 's2' }],
       { probeMax: 1 }
     );
-    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection']); // s2 never probed
+    expect(probed).toEqual(['/sites/s1?$select=id,webUrl,siteCollection&$expand=drive($select=quota)']); // s2 never probed
     expect(result.probeTruncated).toBe(true);
     expect(ids(result.value)).toEqual(['s2']); // s1 dropped (archived), s2 kept unprobed
     expect(result.archivedExcluded).toBe(1);
@@ -211,7 +228,7 @@ describe('filterOutArchivedSites — non-navigable + not-found exclusion', () =>
     );
     expect(ids(result.value)).toEqual(['live']);
     expect(result.nonNavigableExcluded).toBe(1);
-    expect(probed).not.toContain('/sites/addin?$select=id,webUrl,siteCollection');
+    expect(probed).not.toContain('/sites/addin?$select=id,webUrl,siteCollection&$expand=drive($select=quota)');
   });
 
   it('excludes a SharePoint Embedded /contentstorage/ container by its webUrl', async () => {
@@ -263,7 +280,7 @@ describe('filterOutArchivedSites — non-navigable + not-found exclusion', () =>
     expect(ids(result.value)).toEqual(['od']);
     expect(result.nonNavigableExcluded).toBe(0);
     expect(result.notFoundExcluded).toBe(0);
-    expect(probed).toContain('/sites/od?$select=id,webUrl,siteCollection');
+    expect(probed).toContain('/sites/od?$select=id,webUrl,siteCollection&$expand=drive($select=quota)');
   });
 
   it('excludes an add-in app-domain host even with a normal path (no /_layouts/ or /contentstorage/ marker)', async () => {
@@ -275,7 +292,7 @@ describe('filterOutArchivedSites — non-navigable + not-found exclusion', () =>
     );
     expect(ids(result.value)).toEqual([]);
     expect(result.nonNavigableExcluded).toBe(1);
-    expect(probed).not.toContain('/sites/addin2?$select=id,webUrl,siteCollection');
+    expect(probed).not.toContain('/sites/addin2?$select=id,webUrl,siteCollection&$expand=drive($select=quota)');
   });
 
   it('keeps a host whose hyphen-suffix is too short to be an app domain (boundary on the hex-run length)', async () => {
@@ -287,6 +304,6 @@ describe('filterOutArchivedSites — non-navigable + not-found exclusion', () =>
     );
     expect(ids(result.value)).toEqual(['short']);
     expect(result.nonNavigableExcluded).toBe(0);
-    expect(probed).toContain('/sites/short?$select=id,webUrl,siteCollection');
+    expect(probed).toContain('/sites/short?$select=id,webUrl,siteCollection&$expand=drive($select=quota)');
   });
 });

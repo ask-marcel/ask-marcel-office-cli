@@ -48,7 +48,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel search-sharepoint-sites-by-name --query 'marketing'",
   responseShape:
-    'collection of Microsoft Graph `site` resources under `value[]` (up to 25). Sites you cannot open are excluded: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining match is probed (`GET /sites/{id}?$select=…,siteCollection`) and `archivedExcluded` drops archived / `423 resourceLocked` sites while `notFoundExcluded` drops probes that 404. All three counters are omitted when 0. `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason. Active personal OneDrives are kept.',
+    "collection of Microsoft Graph `site` resources under `value[]` (up to 25), each carrying `size?` — its default document library's total bytes used (`drive.quota.used`, recursive), folded onto the same probe for free (a data-volume signal, not a file count; omitted when the site has no default drive). Sites you cannot open are excluded: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining match is probed (`GET /sites/{id}?$select=…,siteCollection&$expand=drive($select=quota)`) and `archivedExcluded` drops archived / `423 resourceLocked` sites while `notFoundExcluded` drops probes that 404. All three counters are omitted when 0. `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason. Active personal OneDrives are kept.",
   pagination: true,
 };
 

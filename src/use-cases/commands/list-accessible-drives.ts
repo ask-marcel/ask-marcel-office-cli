@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { addEstimatedFileCounts } from './file-counts.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { searchIndexTotal } from './search-index-total.ts';
 
@@ -31,14 +32,15 @@ const DEFAULT_MAX_GROUPS = 100;
 const MAX_PAGES = 25;
 
 type Source = 'activity' | 'channel' | 'joinedTeam' | 'memberOfGroup' | 'personal' | 'sharedWithMe' | 'siteLibrary';
-type DriveResource = { readonly id?: string; readonly name?: string; readonly driveType?: string; readonly webUrl?: string };
-type Accumulator = { name: string; driveType: string; webUrl: string; groupId: string | null; readonly sources: Set<Source> };
+type DriveResource = { readonly id?: string; readonly name?: string; readonly driveType?: string; readonly webUrl?: string; readonly quota?: { readonly used?: number } };
+type Accumulator = { name: string; driveType: string; webUrl: string; groupId: string | null; size: number | null; readonly sources: Set<Source> };
 
 const schema = z.object({
   maxGroups: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
     .optional(),
+  countFiles: z.enum(['true', 'false']).optional(),
 });
 
 const stripPrefix = (nextLink: string): string => (nextLink.startsWith(`${GRAPH_PREFIX}/`) ? nextLink.slice(GRAPH_PREFIX.length) : nextLink);
@@ -88,12 +90,17 @@ const sharedDriveIds = (body: unknown): ReadonlyArray<string> => {
 // silently; only actionable failures (auth, throttling, 5xx, network) surface in partialErrors[].
 const isUnreachable = (e: GraphError): boolean => e.type === 'api_error' && [400, 403, 404, 423].includes(e.status);
 
+// `size` (total bytes used, recursive) comes free from the drive resource's
+// default `quota` — every drive endpoint we already call returns it, so no
+// extra request. Absent for the rare drive without a quota facet.
+const driveSize = (d: DriveResource): number | null => (typeof d.quota?.used === 'number' ? d.quota.used : null);
+
 const upsert = (drives: Map<string, Accumulator>, drive: DriveResource, source: Source, groupId: string | null): void => {
   const id = drive.id;
   if (typeof id !== 'string') return;
   const cur = drives.get(id);
   if (cur === undefined) {
-    drives.set(id, { name: drive.name ?? '', driveType: drive.driveType ?? '', webUrl: drive.webUrl ?? '', groupId, sources: new Set([source]) });
+    drives.set(id, { name: drive.name ?? '', driveType: drive.driveType ?? '', webUrl: drive.webUrl ?? '', groupId, size: driveSize(drive), sources: new Set([source]) });
     return;
   }
   cur.sources.add(source);
@@ -325,11 +332,23 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // Seventh vector: every OTHER document library of each known SharePoint site (not just the default).
   if (await addSiteLibraries(graph, drives, maxGroups, partialErrors)) truncated = true;
 
-  const value = [...drives.entries()]
-    .map(([id, d]) => ({ id, name: d.name, driveType: d.driveType, webUrl: d.webUrl, sources: [...d.sources].sort(), ...(d.groupId !== null ? { groupId: d.groupId } : {}) }))
+  const baseValue = [...drives.entries()]
+    .map(([id, d]) => ({
+      id,
+      name: d.name,
+      driveType: d.driveType,
+      webUrl: d.webUrl,
+      sources: [...d.sources].sort(),
+      ...(d.groupId !== null ? { groupId: d.groupId } : {}),
+      ...(d.size !== null ? { size: d.size } : {}),
+    }))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  if (value.length === 0 && partialErrors.length > 0) return err(partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all drive-discovery sub-requests failed' });
+  if (baseValue.length === 0 && partialErrors.length > 0)
+    return err(partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all drive-discovery sub-requests failed' });
+
+  // Opt-in (`--count-files true`): one path-scoped driveItem Search query per drive → `estimatedFileCount`.
+  const value = parsed.data.countFiles === 'true' ? await addEstimatedFileCounts(graph, baseValue, (e) => (e as { webUrl?: string }).webUrl) : baseValue;
 
   // Best-effort index-wide file count (driveItems) for context — NOT scoped to the drives above.
   const fileEstimate = await searchIndexTotal(graph, 'driveItem');
@@ -360,10 +379,17 @@ const meta: CommandMeta = {
         'Safety cap on each fan-out (positive integer; default 100): the per-group `/groups/{id}/drive` calls, the per-team `/teams/{id}/channels` enumeration, the per-private/shared-channel `filesFolder` lookups, the per-site `/sites/{id}/drives` enumeration, and the `/drives/{id}` enrichment for shared-, channel-, and activity-only drives. A user in hundreds of teams/groups/sites would otherwise issue hundreds of parallel requests (429 risk). When any cap is hit the response carries `truncated: true`.',
       argumentHint: { kind: 'magicValue', values: ['100'] },
     },
+    {
+      name: 'count-files',
+      key: 'countFiles',
+      required: false,
+      description:
+        "Pass `--count-files true` to add `estimatedFileCount` to each drive — the Microsoft Search index's security-trimmed `driveItem` total (files + folders) scoped to that drive's `webUrl` via KQL `path:`. OFF by default because it issues ONE extra Search query per drive (chunked, capped at 200) — a real fan-out with 429-throttling risk on large drive sets. It is an estimate, not an exact count.",
+    },
   ],
   example: 'ask-marcel list-accessible-drives --output json',
   responseShape:
-    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"|"siteLibrary"], groupId? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index\'s security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign "can\'t reach this one" results (404/403/423/400) are dropped, not listed.',
+    '`{ value: [{ id, name, driveType, webUrl, sources: ["activity"|"channel"|"joinedTeam"|"memberOfGroup"|"personal"|"sharedWithMe"|"siteLibrary"], groupId?, size?, estimatedFileCount? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each drive, omitted past the 200-drive count cap or when the per-drive query fails. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `size` (when present) is the drive\'s total bytes used (`quota.used`, recursive) — surfaced free from the drive resource, omitted for the rare drive without a quota facet; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index\'s security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign "can\'t reach this one" results (404/403/423/400) are dropped, not listed.',
 };
 
 export { execute, meta, schema };

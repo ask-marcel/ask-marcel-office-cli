@@ -21,7 +21,11 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
  * OneDrives are kept — they are not dropped by URL shape, only by a failing probe.
  */
 
-const PROBE_PATH = '?$select=id,webUrl,siteCollection';
+// `$expand=drive($select=quota)` rides on the SAME probe so each kept site gets
+// its default library's `quota.used` (total bytes, recursive) for free — no extra
+// call. The site $select still includes siteCollection, so archive detection is
+// unaffected; a site with no default drive simply comes back without `drive`.
+const PROBE_PATH = '?$select=id,webUrl,siteCollection&$expand=drive($select=quota)';
 const ARCHIVE_PROBE_MAX = 250;
 const PROBE_CHUNK = 15;
 
@@ -35,6 +39,7 @@ type FilterResult = {
   readonly probeTruncated: boolean;
 };
 type Verdict = 'keep' | 'archived' | 'nonNavigable' | 'notFound' | 'error';
+type ProbeOutcome = { readonly verdict: Verdict; readonly size?: number };
 
 const siteId = (resource: unknown): string | undefined => {
   if (resource === null || typeof resource !== 'object') return undefined;
@@ -54,41 +59,55 @@ const errorFields = (e: GraphError): { status?: number; code?: string; message?:
   message: e.message,
 });
 
-const probe = async (graph: GraphClient, resource: unknown): Promise<Verdict> => {
-  const url = siteWebUrl(resource);
-  if (url !== undefined && isNonNavigableSiteUrl(url)) return 'nonNavigable';
-  const id = siteId(resource);
-  if (id === undefined) return 'keep';
-  const r = await graph.get(`/sites/${id}${PROBE_PATH}`);
-  if (r.ok) return isArchivedSite(r.value) ? 'archived' : 'keep';
-  if (errorIndicatesArchived(errorFields(r.error))) return 'archived';
-  if (r.error.type === 'api_error' && r.error.status === 404) return 'notFound';
-  return 'error';
+const driveSize = (body: unknown): number | undefined => {
+  if (body === null || typeof body !== 'object') return undefined;
+  const used = (body as { drive?: { quota?: { used?: unknown } } }).drive?.quota?.used;
+  return typeof used === 'number' ? used : undefined;
 };
 
-const verdictsFor = async (graph: GraphClient, sites: ReadonlyArray<unknown>, probeMax: number, chunkSize: number): Promise<ReadonlyArray<Verdict>> => {
-  const out: Array<Verdict> = [];
+const probe = async (graph: GraphClient, resource: unknown): Promise<ProbeOutcome> => {
+  const url = siteWebUrl(resource);
+  if (url !== undefined && isNonNavigableSiteUrl(url)) return { verdict: 'nonNavigable' };
+  const id = siteId(resource);
+  if (id === undefined) return { verdict: 'keep' };
+  const r = await graph.get(`/sites/${id}${PROBE_PATH}`);
+  if (r.ok) return { verdict: isArchivedSite(r.value) ? 'archived' : 'keep', size: driveSize(r.value) };
+  if (errorIndicatesArchived(errorFields(r.error))) return { verdict: 'archived' };
+  if (r.error.type === 'api_error' && r.error.status === 404) return { verdict: 'notFound' };
+  return { verdict: 'error' };
+};
+
+const verdictsFor = async (graph: GraphClient, sites: ReadonlyArray<unknown>, probeMax: number, chunkSize: number): Promise<ReadonlyArray<ProbeOutcome>> => {
+  const out: Array<ProbeOutcome> = [];
   for (let start = 0; start < sites.length; start += chunkSize) {
     const chunk = sites.slice(start, start + chunkSize);
-    const done = await Promise.all(chunk.map((site, j) => (start + j < probeMax ? probe(graph, site) : Promise.resolve<Verdict>('keep'))));
+    const done = await Promise.all(chunk.map((site, j) => (start + j < probeMax ? probe(graph, site) : Promise.resolve<ProbeOutcome>({ verdict: 'keep' }))));
     out.push(...done);
   }
   return out;
 };
 
-const countVerdict = (verdicts: ReadonlyArray<Verdict>, target: Verdict): number => verdicts.filter((v) => v === target).length;
+const countVerdict = (outcomes: ReadonlyArray<ProbeOutcome>, target: Verdict): number => outcomes.filter((o) => o.verdict === target).length;
+
+// Merge the per-site size onto a kept site resource (only when known and the
+// resource is an object); leaves the resource untouched otherwise.
+const withSize = (resource: unknown, size: number | undefined): unknown =>
+  size !== undefined && resource !== null && typeof resource === 'object' ? { ...resource, size } : resource;
 
 const filterOutArchivedSites = async (graph: GraphClient, sites: ReadonlyArray<unknown>, options?: FilterOptions): Promise<FilterResult> => {
   const probeMax = options?.probeMax ?? ARCHIVE_PROBE_MAX;
   const chunkSize = options?.chunkSize ?? PROBE_CHUNK;
-  const verdicts = await verdictsFor(graph, sites, probeMax, chunkSize);
-  const value = sites.filter((_, i) => verdicts[i] === 'keep' || verdicts[i] === 'error');
+  const outcomes = await verdictsFor(graph, sites, probeMax, chunkSize);
+  const value = sites
+    .map((site, i) => ({ site, outcome: outcomes[i] }))
+    .filter((e) => e.outcome?.verdict === 'keep' || e.outcome?.verdict === 'error')
+    .map((e) => withSize(e.site, e.outcome?.size));
   return {
     value,
-    archivedExcluded: countVerdict(verdicts, 'archived'),
-    nonNavigableExcluded: countVerdict(verdicts, 'nonNavigable'),
-    notFoundExcluded: countVerdict(verdicts, 'notFound'),
-    probeErrors: countVerdict(verdicts, 'error'),
+    archivedExcluded: countVerdict(outcomes, 'archived'),
+    nonNavigableExcluded: countVerdict(outcomes, 'nonNavigable'),
+    notFoundExcluded: countVerdict(outcomes, 'notFound'),
+    probeErrors: countVerdict(outcomes, 'error'),
     probeTruncated: sites.length > probeMax,
   };
 };

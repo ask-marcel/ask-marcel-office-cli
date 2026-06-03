@@ -107,6 +107,10 @@ describe('command meta — invariants on every registered command', () => {
           // `list-accessible-drives --max-groups` caps the per-group drive
           // fan-out; runtime-additive, not a URL placeholder.
           'max-groups',
+          // `--count-files` on list-accessible-drives / search-all-accessible-sites
+          // opts into per-entry path-scoped driveItem Search queries; a runtime
+          // toggle, not a URL placeholder.
+          'count-files',
           // `convert-mail-to-markdown --keep-quoted true` is a post-fetch
           // processing toggle (skip the quoted-reply-chain strip on the HTML
           // body before turndown); not a URL placeholder.

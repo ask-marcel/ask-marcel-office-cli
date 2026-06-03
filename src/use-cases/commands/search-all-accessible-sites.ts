@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { addEstimatedFileCounts } from './file-counts.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { searchIndexTotal } from './search-index-total.ts';
@@ -19,7 +20,7 @@ import { searchIndexTotal } from './search-index-total.ts';
 const PAGE_SIZE = 25;
 const MAX_PAGES = 60;
 
-const schema = z.object({ query: z.string().min(1).optional() });
+const schema = z.object({ query: z.string().min(1).optional(), countFiles: z.enum(['true', 'false']).optional() });
 
 type Hit = { readonly resource?: unknown };
 type HitsContainer = { readonly total?: unknown; readonly moreResultsAvailable?: unknown; readonly hits?: ReadonlyArray<Hit> };
@@ -31,6 +32,12 @@ const siteId = (resource: unknown): string | undefined => {
   if (resource === null || typeof resource !== 'object') return undefined;
   const id = (resource as { id?: unknown }).id;
   return typeof id === 'string' ? id : undefined;
+};
+
+const siteWebUrl = (resource: unknown): string | undefined => {
+  if (resource === null || typeof resource !== 'object') return undefined;
+  const url = (resource as { webUrl?: unknown }).webUrl;
+  return typeof url === 'string' ? url : undefined;
 };
 
 const execute: Command['execute'] = async (graph, params) => {
@@ -65,12 +72,15 @@ const execute: Command['execute'] = async (graph, params) => {
   // `/contentstorage/` containers, `/_layouts/` pages), and probes that 404.
   const filtered = await filterOutArchivedSites(graph, value);
 
+  // Opt-in (`--count-files true`): one path-scoped driveItem Search query per kept site → `estimatedFileCount`.
+  const sites = parsed.data.countFiles === 'true' ? await addEstimatedFileCounts(graph, filtered.value, siteWebUrl) : filtered.value;
+
   // Best-effort: the index's accessible-file (driveItem) count.
   const fileEstimate = await searchIndexTotal(graph, 'driveItem');
 
   return ok({
-    value: filtered.value,
-    count: filtered.value.length,
+    value: sites,
+    count: sites.length,
     ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
     ...(filtered.nonNavigableExcluded > 0 ? { nonNavigableExcluded: filtered.nonNavigableExcluded } : {}),
     ...(filtered.notFoundExcluded > 0 ? { notFoundExcluded: filtered.notFoundExcluded } : {}),
@@ -96,12 +106,19 @@ const meta: CommandMeta = {
       description:
         'Optional KQL filter applied to the site index (default `*` = every site you can access). Examples: a name fragment like `budget`, or `contentclass:STS_Site` to restrict to site collections. Free text is matched against site title/url.',
     },
+    {
+      name: 'count-files',
+      key: 'countFiles',
+      required: false,
+      description:
+        "Pass `--count-files true` to add `estimatedFileCount` to each kept site — the Microsoft Search index's security-trimmed `driveItem` total (files + folders) scoped to that site's `webUrl` via KQL `path:`. OFF by default because it issues ONE extra Search query per site (chunked, capped at 200) — a real fan-out with 429-throttling risk; narrow with `--query` first. It is an estimate, not an exact count.",
+    },
   ],
   example: 'ask-marcel search-all-accessible-sites --output json',
   bodyTemplate:
     "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
   responseShape:
-    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, … }>], count, fileEstimate?, truncated?: true }`. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
+    "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, size?, estimatedFileCount?, … }>], count, fileEstimate?, archivedExcluded?, nonNavigableExcluded?, notFoundExcluded?, archiveProbeErrors?, truncated?: true, archiveProbeTruncated?: true }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each site, omitted past the 200-site count cap or when the per-site query fails. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `size` (when present) is the site's DEFAULT document library's total bytes used (`drive.quota.used`, recursive) — folded onto the same per-site probe for free, omitted for sites past the probe ceiling or without a default drive; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe; `nonNavigableExcluded` counts sites dropped by URL shape (add-in app domains, `/contentstorage/` SharePoint Embedded containers, `/_layouts/` system pages); `notFoundExcluded` counts sites whose probe returned 404. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
 };
 
 export { execute, meta, schema };

@@ -78,6 +78,61 @@ describe('list-accessible-drives', () => {
     });
   });
 
+  it('surfaces each drive size from quota.used (free, no extra calls) and omits it when absent', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives')
+        return ok({
+          value: [
+            { id: 'p1', name: 'OneDrive', driveType: 'business', webUrl: 'up', quota: { used: 4096 } },
+            { id: 'p2', name: 'NoQuota', driveType: 'business', webUrl: 'uq' },
+          ],
+        });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<Record<string, unknown>> };
+    expect(v.value).toEqual([
+      { id: 'p1', name: 'OneDrive', driveType: 'business', webUrl: 'up', sources: ['personal'], size: 4096 },
+      { id: 'p2', name: 'NoQuota', driveType: 'business', webUrl: 'uq', sources: ['personal'] },
+    ]);
+  });
+
+  it('adds estimatedFileCount to each drive when --count-files true (one path-scoped search each)', async () => {
+    const routes: Route = (path) => {
+      if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OneDrive', driveType: 'business', webUrl: 'https://x/personal/me/Documents' }] });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      return emptyActivity(path);
+    };
+    const graph: GraphClient = {
+      ...routeGraph(routes),
+      post: async (_p, body) => {
+        const qs = (body as { requests?: ReadonlyArray<{ query?: { queryString?: string } }> }).requests?.[0]?.query?.queryString ?? '';
+        const total = qs.includes('path:"https://x/personal/me/Documents"') ? 137 : 0;
+        return ok({ value: [{ hitsContainers: [{ total }] }] });
+      },
+    };
+    const result = await execute(graph, { countFiles: 'true' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<Record<string, unknown>> };
+    expect(v.value[0]?.estimatedFileCount).toBe(137);
+  });
+
+  it('does not add estimatedFileCount by default (flag off)', async () => {
+    const result = await execute(routeGraph(fullRoutes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<Record<string, unknown>> };
+    expect(v.value.every((d) => d.estimatedFileCount === undefined)).toBe(true);
+  });
+
   it('drops a group whose drive 404s (no provisioned library) without recording a partial error', async () => {
     const routes: Route = (path) => (path === '/groups/g1/drive' ? err({ type: 'api_error', status: 404, message: 'no drive' }) : fullRoutes(path));
     const result = await execute(routeGraph(routes), {});

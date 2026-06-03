@@ -25,7 +25,7 @@ const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveI
   getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
 });
 
-const page = (sites: ReadonlyArray<{ id: string }>, more: boolean, total: number): Result<unknown, GraphError> =>
+const page = (sites: ReadonlyArray<{ id: string; webUrl?: string }>, more: boolean, total: number): Result<unknown, GraphError> =>
   ok({ value: [{ hitsContainers: [{ total, moreResultsAvailable: more, hits: sites.map((s) => ({ resource: s })) }] }] });
 
 const queryStringOf = (body: unknown): string => (body as { requests: ReadonlyArray<{ query: { queryString: string } }> }).requests[0].query.queryString;
@@ -215,6 +215,36 @@ describe('search-all-accessible-sites', () => {
     expect(v.count).toBe(TOTAL); // all kept (all active), but only the first 250 were probed
     expect(v.archiveProbeTruncated).toBe(true);
     expect(v.archivedExcluded).toBeUndefined();
+  });
+
+  it('adds estimatedFileCount to each kept site when --count-files true (one path-scoped search each)', async () => {
+    const graph: GraphClient = {
+      ...graphWith(() => page([], false, 0)),
+      post: async (_p, body) => {
+        const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number; query?: { queryString?: string } }> }).requests[0];
+        if (req?.entityTypes?.[0] === 'driveItem') {
+          const qs = req?.query?.queryString ?? '';
+          return ok({ value: [{ hitsContainers: [{ total: qs.includes('path:"https://x/sites/A"') ? 321 : 0 }] }] });
+        }
+        const from = req?.from ?? 0;
+        return from === 0 ? page([{ id: 's1', webUrl: 'https://x/sites/A' }], false, 1) : page([], false, 1);
+      },
+    };
+    const result = await execute(graph, { countFiles: 'true' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { value: ReadonlyArray<Record<string, unknown>> };
+    expect(v.value[0]?.estimatedFileCount).toBe(321);
+  });
+
+  it('does not add estimatedFileCount by default (flag off)', async () => {
+    const result = await execute(
+      graphWith((from) => (from === 0 ? page([{ id: 's1', webUrl: 'https://x/sites/A' }], false, 1) : page([], false, 1))),
+      {}
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.value as { value: ReadonlyArray<Record<string, unknown>> }).value[0]?.estimatedFileCount).toBeUndefined();
   });
 
   it('searches sites via POST /search/query per its meta', () => {
