@@ -11,7 +11,8 @@ describe('pdfToMarkdown', () => {
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/plain');
     expect(result.value.text).toContain('Hello from the');
-    expect(result.value.size).toBeGreaterThan(0);
+    // size = byte length of the produced text, NOT the source PDF (audit B3)
+    expect(result.value.size).toBe(new TextEncoder().encode(result.value.text).byteLength);
   });
 
   it('errs 415 with the caller’s vision-model hint when the PDF has no text layer (scanned / image-only)', async () => {

@@ -9,7 +9,8 @@ describe('docToMarkdown', () => {
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/plain');
     expect(result.value.text).toContain('Hello from the legacy doc');
-    expect(result.value.size).toBeGreaterThan(0);
+    // size = byte length of the extracted text, NOT the source .doc (audit B3)
+    expect(result.value.size).toBe(new TextEncoder().encode(result.value.text).byteLength);
   });
 
   it('propagates the extraction error for bytes that are not a parseable .doc', async () => {

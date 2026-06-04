@@ -11,10 +11,11 @@ type DocTextEnvelope = { readonly contentType: 'text/plain'; readonly size: numb
  * no structure this CLI recovers. A parse failure propagates as the infra api_error.
  */
 const docToMarkdown = async (bytes: Uint8Array): Promise<Result<DocTextEnvelope, GraphError>> => {
-  const size = bytes.byteLength;
-  const text = await extractDocText(bytes);
-  if (!text.ok) return text;
-  return ok({ contentType: 'text/plain', size, text: text.value });
+  const extracted = await extractDocText(bytes);
+  if (!extracted.ok) return extracted;
+  // size = byte length of the extracted text (what --output-path writes), consistent
+  // with the other converters — not the source .doc's byte count.
+  return ok({ contentType: 'text/plain', size: new TextEncoder().encode(extracted.value).byteLength, text: extracted.value });
 };
 
 export { docToMarkdown };
