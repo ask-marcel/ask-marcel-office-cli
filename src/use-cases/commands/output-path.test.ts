@@ -214,7 +214,7 @@ describe('persistMediaIfRequested', () => {
     if (!result.ok) expect(result.error.type).toBe('empty_path');
   });
 
-  it('writes every image to <dir>/<basename> and replaces each base64 with savedTo (trailing slash trimmed)', async () => {
+  it('writes every image to <dir>/<flattened-path> and replaces each base64 with savedTo (trailing slash trimmed)', async () => {
     const fs = createFileSystemFake();
     const result = await persistMediaIfRequested(fs, '/work/imgs/', mediaEnvelope);
     expect(result.ok).toBe(true);
@@ -222,13 +222,32 @@ describe('persistMediaIfRequested', () => {
       expect(result.value).toEqual({
         count: 2,
         media: [
-          { path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2, savedTo: '/work/imgs/image1.png' },
-          { path: 'word/media/photo.jpeg', contentType: 'image/jpeg', sizeBytes: 2, savedTo: '/work/imgs/photo.jpeg' },
+          { path: 'ppt/media/image1.png', contentType: 'image/png', sizeBytes: 2, savedTo: '/work/imgs/ppt_media_image1.png' },
+          { path: 'word/media/photo.jpeg', contentType: 'image/jpeg', sizeBytes: 2, savedTo: '/work/imgs/word_media_photo.jpeg' },
         ],
       });
     }
-    expect(Array.from(fs.snapshotBytes('/work/imgs/image1.png') ?? [])).toEqual([0x89, 0x50]);
-    expect(Array.from(fs.snapshotBytes('/work/imgs/photo.jpeg') ?? [])).toEqual([0xff, 0xd8]);
+    expect(Array.from(fs.snapshotBytes('/work/imgs/ppt_media_image1.png') ?? [])).toEqual([0x89, 0x50]);
+    expect(Array.from(fs.snapshotBytes('/work/imgs/word_media_photo.jpeg') ?? [])).toEqual([0xff, 0xd8]);
+  });
+
+  it('keeps page-scoped PDF images distinct: same XObject key on two pages writes two files, not one overwrite (audit A4)', async () => {
+    const fs = createFileSystemFake();
+    const pdfMedia = {
+      count: 2,
+      media: [
+        { path: 'pdf/page1/Im0.png', contentType: 'image/png', base64: PNG_B64 },
+        { path: 'pdf/page2/Im0.png', contentType: 'image/png', base64: JPG_B64 },
+      ],
+    };
+    const result = await persistMediaIfRequested(fs, '/out', pdfMedia);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const saved = (result.value as { media: ReadonlyArray<{ savedTo: string }> }).media.map((m) => m.savedTo);
+      expect(saved).toEqual(['/out/pdf_page1_Im0.png', '/out/pdf_page2_Im0.png']); // distinct — no collision
+    }
+    expect(Array.from(fs.snapshotBytes('/out/pdf_page1_Im0.png') ?? [])).toEqual([0x89, 0x50]); // page 1 survived
+    expect(Array.from(fs.snapshotBytes('/out/pdf_page2_Im0.png') ?? [])).toEqual([0xff, 0xd8]); // page 2 survived
   });
 
   it('returns no_media when --output-dir is set but the response has no media array', async () => {

@@ -1037,9 +1037,9 @@ describe('buildCli command surface', () => {
       cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
     );
     expect(out).toContain('savedTo');
-    expect(out).toContain('/work/imgs/image1.png');
+    expect(out).toContain('/work/imgs/word_media_image1.png'); // full path flattened, not basename (audit A4)
     expect(out).not.toContain('base64');
-    expect(Array.from(fs.snapshotBytes('/work/imgs/image1.png') ?? [])).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    expect(Array.from(fs.snapshotBytes('/work/imgs/word_media_image1.png') ?? [])).toEqual([0x89, 0x50, 0x4e, 0x47]);
   });
 
   it('--output-dir on a command that returns no media array emits a clear error pointing at the image-extraction commands', async () => {

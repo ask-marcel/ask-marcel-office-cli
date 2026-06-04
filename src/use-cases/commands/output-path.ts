@@ -99,9 +99,12 @@ const isMediaItem = (value: unknown): value is MediaItem => isPlainRecord(value)
  * Sibling of `persistIfRequested` for the global `--output-dir` flag. When a
  * command returns a `media` array (`{ count, media: [{ path, base64, ... }] }`,
  * from the image-extraction commands) and `--output-dir` is set, write each
- * image to `<dir>/<basename>` and replace its `base64` with `savedTo`. The
- * filesystem port auto-creates the directory. Anything without a media array
- * returns `no_media` so the CLI can surface a clear error.
+ * image to `<dir>/<flattened-path>` and replace its `base64` with `savedTo`.
+ * The media `path` is flattened (`pdf/page2/Im0.png` → `pdf_page2_Im0.png`)
+ * rather than reduced to its basename, because PDF page-image keys (`Im0`, …)
+ * repeat across pages — `basename` alone would collide and silently overwrite.
+ * The filesystem port auto-creates the directory. Anything without a media
+ * array returns `no_media` so the CLI can surface a clear error.
  */
 export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string | undefined, data: unknown): Promise<Result<unknown, OutputDirError>> => {
   if (outputDir === undefined) return ok(data);
@@ -110,7 +113,9 @@ export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string 
   const media = data['media'];
   if (!Array.isArray(media) || !media.every(isMediaItem)) return err({ type: 'no_media' });
 
-  const destOf = (item: MediaItem): string => posix.join(outputDir, posix.basename(item.path));
+  // Flatten the full media path (not basename) so page-scoped PDF images with
+  // repeating XObject keys (pdf/page1/Im0.png, pdf/page2/Im0.png) don't collide.
+  const destOf = (item: MediaItem): string => posix.join(outputDir, item.path.replace(/\//g, '_'));
   const writes = await Promise.all(media.map((item) => fs.writeBytes(destOf(item), decodeBase64(item.base64))));
   const failed = writes.find((w) => !w.ok);
   if (failed !== undefined && !failed.ok) return err({ type: 'write_failed', message: failed.error.type === 'io_failed' ? failed.error.message : failed.error.type });
