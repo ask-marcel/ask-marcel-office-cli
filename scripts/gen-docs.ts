@@ -24,7 +24,7 @@ const MANIFEST_PATH = 'docs/commands.json';
 const COMMANDS_DOC_BEGIN = '<!-- AUTO-GENERATED-COMMANDS:BEGIN -->';
 const COMMANDS_DOC_END = '<!-- AUTO-GENERATED-COMMANDS:END -->';
 
-const buildManifest = (): CommandManifest => {
+const buildManifest = (generatedAt: string): CommandManifest => {
   const entries: CommandManifestEntry[] = [];
   for (const [name, cmd] of Object.entries(commands)) {
     const m = cmd.meta;
@@ -44,12 +44,19 @@ const buildManifest = (): CommandManifest => {
     });
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
-  return {
-    package: pkg.name,
-    version: pkg.version,
-    generatedAt: new Date().toISOString(),
-    commands: entries,
-  };
+  return { package: pkg.name, version: pkg.version, generatedAt, commands: entries };
+};
+
+// Reuse the committed manifest's `generatedAt` when nothing but the timestamp
+// would change — so a no-op run (e.g. the build prebuild) leaves the file byte-
+// identical instead of dirtying git with a timestamp-only diff. A real content
+// change (a new/edited command) stamps a fresh timestamp.
+const resolveGeneratedAt = async (draft: CommandManifest): Promise<string> => {
+  const file = Bun.file(MANIFEST_PATH);
+  if (!(await file.exists())) return new Date().toISOString();
+  const prev = (await file.json()) as Partial<CommandManifest>;
+  const sameContent = JSON.stringify({ ...draft, generatedAt: '' }) === JSON.stringify({ ...prev, generatedAt: '' });
+  return sameContent && typeof prev.generatedAt === 'string' ? prev.generatedAt : new Date().toISOString();
 };
 
 const writeManifest = async (manifest: CommandManifest): Promise<void> => {
@@ -82,6 +89,7 @@ const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
   process.stderr.write(`gen-docs: rewrote ${COMMANDS_DOC_PATH} command tables\n`);
 };
 
-const manifest = buildManifest();
+const draft = buildManifest('');
+const manifest = buildManifest(await resolveGeneratedAt(draft));
 await writeManifest(manifest);
 await rewriteCommandsDoc(manifest);
