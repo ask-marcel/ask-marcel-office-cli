@@ -457,6 +457,18 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
+  it('applies the --max-cells cap on the standalone .csv path (a large csv no longer OOMs — audit A2)', async () => {
+    const csv = 'a,b,c\nd,e,f\ng,h,i';
+    const csvBytes = new TextEncoder().encode(csv);
+    const graph = noopGraph({ getBinary: async () => ok({ contentType: 'text/csv', size: csvBytes.byteLength, base64: toBase64(csvBytes) }) });
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'data.csv', { maxCells: 4 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const env = result.value as { text: string };
+    expect(env.text).not.toContain('| --- |'); // table omitted
+    expect(env.text).toContain('get-excel-range'); // band-by-band hint instead
+  });
+
   it('propagates getBinary api_error from the csv path', async () => {
     const graph = noopGraph({
       getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'forbidden' } }),

@@ -644,6 +644,7 @@ const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   // Legacy OLE formats: .xls extracted via sheetjs, .doc via word-extractor, .ppt noted (convert-to-pdf).
   zip.file('legacy.xls', buildLegacyXls());
   zip.file('legacy.doc', await buildSampleDoc());
+  zip.file('corrupt.doc', new Uint8Array([0xff, 0xfe, 0xfd])); // not a valid OLE → word-extractor throws → "conversion failed" note
   zip.file('legacy.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE magic; .ppt is noted without parsing
   // Genuinely-binary payload (invalid UTF-8, no lead-byte continuation) → content-sniffs as non-text → skip note.
   zip.file('data.bin', new Uint8Array([0xff, 0xfe, 0xfd, 0x80]));

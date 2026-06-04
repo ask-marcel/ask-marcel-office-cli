@@ -4069,7 +4069,7 @@ describe('convert-drive-item-zip', () => {
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
     const at = (p: string): { contentType?: string; text?: string; note?: string } => v.files.find((f) => f.path === p) ?? {};
-    expect(v.count).toBe(14);
+    expect(v.count).toBe(15);
     expect(v.truncated).toBeUndefined(); // under the cap → no truncation flag
     expect(at('report.docx').text).toContain('# Sample Heading');
     expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
@@ -4089,6 +4089,7 @@ describe('convert-drive-item-zip', () => {
     expect(at('legacy.xls').text).toContain('## Legacy');
     expect(at('legacy.doc').text).toContain('Hello from the legacy doc');
     expect(at('legacy.doc').contentType).toBe('text/plain');
+    expect(at('corrupt.doc').note).toContain('conversion failed'); // word-extractor throws on non-OLE bytes → noted, not failed
     expect(at('legacy.ppt').note).toContain('convert it to PDF');
     expect(at('data.bin').note).toContain('bin is not a convertible'); // binary bytes → skip note
     // A dotless entry with valid-UTF-8 bytes now content-sniffs to text (no extension list to consult).

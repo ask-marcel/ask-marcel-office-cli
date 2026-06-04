@@ -11,7 +11,7 @@ import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { decodeUtf8Text } from './text-passthrough.ts';
-import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 /**
  * Strategy dispatcher for `*-as-markdown` commands. Picks the right
@@ -61,7 +61,9 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
     const csv = new TextDecoder().decode(bytes.value);
-    const md = csvToMarkdownTable(csv);
+    // renderCsvCapped (not csvToMarkdownTable): a large standalone `.csv` is
+    // subject to the same `--max-cells` OOM cap as an xlsx sheet (audit A2).
+    const md = renderCsvCapped(csv, opts.maxCells);
     // size = UTF-8 byte count of the markdown output (matches what
     // --output-path would write to disk). `md.length` is UTF-16 code units
     // and undercounts files with non-ASCII content (audit §2.1).

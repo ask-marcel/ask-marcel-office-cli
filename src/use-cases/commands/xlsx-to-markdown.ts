@@ -16,72 +16,81 @@ type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxC
 // table — and the cell count is measured WITHOUT materialising the table.
 const DEFAULT_MAX_CELLS = 50_000;
 
-const splitCsvLine = (line: string): ReadonlyArray<string> => {
-  const cells: string[] = [];
-  let current = '';
+// Parse CSV into records, quote-aware ACROSS newlines — so a quoted cell with an
+// embedded newline (Excel Alt+Enter) stays one cell instead of splitting the row.
+// Fast path when there are no quotes at all: no field can contain a separator, so
+// a plain comma/line split is exact AND allocation-light for the huge-sheet case.
+const parseCsvRecords = (csv: string): string[][] => {
+  if (!csv.includes('"')) return csv.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line).split(','));
+  const records: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
   let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
+  for (let i = 0; i < csv.length; i += 1) {
+    const ch = csv[i];
+    if (inQuotes) {
+      if (ch === '"' && csv[i + 1] === '"') {
+        cell += '"';
         i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      cells.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
+      } else if (ch === '"') inQuotes = false;
+      else cell += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\n') {
+      row.push(cell);
+      records.push(row);
+      row = [];
+      cell = '';
+    } else if (ch !== '\r') cell += ch;
   }
-  cells.push(current);
-  return cells;
+  row.push(cell);
+  records.push(row);
+  return records;
+};
+
+// Drop blank records (a lone empty cell from a blank line / trailing newline).
+const parseNonEmptyRecords = (csv: string): string[][] => parseCsvRecords(csv).filter((r) => !(r.length === 1 && r[0] === ''));
+
+// A markdown table cell cannot contain a raw `|` (splits the column) or a newline
+// (breaks the row) — escape the pipe, fold embedded newlines to a single space.
+const escapeCell = (cell: string): string => cell.replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
+
+const renderTable = (records: ReadonlyArray<ReadonlyArray<string>>, colCount: number): string => {
+  const padRow = (row: ReadonlyArray<string>): string => `| ${Array.from({ length: colCount }, (_unused, i) => escapeCell(row[i] ?? '')).join(' | ')} |`;
+  const separator = `| ${Array.from({ length: colCount }, () => '---').join(' | ')} |`;
+  return [padRow(records[0] ?? []), separator, ...records.slice(1).map(padRow)].join('\n');
 };
 
 const csvToMarkdownTable = (csv: string): string => {
-  const lines = csv.split('\n').filter((line) => line.length > 0);
-  if (lines.length === 0) return '';
-  const rows = lines.map((line) => splitCsvLine(line));
+  const records = parseNonEmptyRecords(csv);
+  if (records.length === 0) return '';
   // Reduce, not `Math.max(...rows.map(…))`: spreading a huge sheet's row-lengths
-  // as call arguments overflows the engine's argument limit (RangeError: Maximum
-  // call stack size exceeded) once a sheet exceeds ~1M rows.
-  const colCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
-  const padRow = (row: ReadonlyArray<string>): string => {
-    const cells = Array.from({ length: colCount }, (_unused, i) => row[i] ?? '');
-    return `| ${cells.join(' | ')} |`;
-  };
-  const header = padRow(rows[0] ?? []);
-  const separator = `| ${Array.from({ length: colCount }, () => '---').join(' | ')} |`;
-  const body = rows.slice(1).map((r) => padRow(r));
-  return [header, separator, ...body].join('\n');
-};
-
-// Newline count via `charCodeAt` (10 = `\n`) — an O(1)-memory scan that never
-// allocates the per-row array `csvToMarkdownTable` builds, so an oversized sheet
-// is detected before it can blow up the heap. `\n` is 0x0A in every encoding the
-// sheetjs CSV writer emits.
-const countNewlines = (csv: string): number => {
-  let count = 0;
-  for (let i = 0; i < csv.length; i += 1) if (csv.charCodeAt(i) === 10) count += 1;
-  return count;
+  // overflows the engine's argument limit once a sheet exceeds ~1M rows.
+  const colCount = records.reduce((max, r) => Math.max(max, r.length), 0);
+  return renderTable(records, colCount);
 };
 
 const truncationHint = (rows: number, columns: number, maxCells: number): string =>
   `> _Table omitted: this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap — rendering it would build a multi-hundred-MB string. Read it band-by-band: \`get-excel-used-range\` for the populated bounding box, then \`get-excel-range --address 'A1:Cn'\` per band — or raise the cap with \`--max-cells <N>\`._`;
 
-// One `## SheetName` section per sheet, capping oversized sheets to a hint. Cell
-// count is estimated cheaply (columns from the first row, rows from a newline
-// scan) so an over-cap sheet is skipped before `csvToMarkdownTable` materialises it.
+// Render a CSV to a markdown table, or a truncation hint when the cell count
+// (rows × the widest row) exceeds `maxCells`. Parsing allocates ~O(input); the
+// expensive O(rows×cols) table string is built only under the cap — so emitting
+// the hint, not the table, is what protects against the multi-hundred-MB OOM.
+const renderCsvCapped = (csv: string, maxCells: number = DEFAULT_MAX_CELLS): string => {
+  const records = parseNonEmptyRecords(csv);
+  if (records.length === 0) return '';
+  const columns = records.reduce((max, r) => Math.max(max, r.length), 0);
+  if (records.length * columns > maxCells) return truncationHint(records.length, columns, maxCells);
+  return renderTable(records, columns);
+};
+
+// One `## SheetName` section per sheet, capping oversized sheets to a hint.
 const csvToMarkdownSection = (name: string, csv: string, maxCells: number = DEFAULT_MAX_CELLS): string => {
-  const newlineAt = csv.indexOf('\n');
-  const firstLine = newlineAt === -1 ? csv : csv.slice(0, newlineAt);
-  const columns = splitCsvLine(firstLine).length;
-  const rows = countNewlines(csv) + 1;
-  if (rows * columns > maxCells) return `## ${name}\n\n${truncationHint(rows, columns, maxCells)}`;
-  const table = csvToMarkdownTable(csv);
-  return table.length === 0 ? `## ${name}` : `## ${name}\n\n${table}`;
+  const body = renderCsvCapped(csv, maxCells);
+  return body === '' ? `## ${name}` : `## ${name}\n\n${body}`;
 };
 
 const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
@@ -99,5 +108,5 @@ const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 
-export { csvToMarkdownSection, csvToMarkdownTable, xlsxToMarkdown };
+export { csvToMarkdownSection, csvToMarkdownTable, renderCsvCapped, xlsxToMarkdown };
 export type { XlsxToMarkdownOptions };

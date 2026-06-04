@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { buildMalformedXlsx, buildRichXlsx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
-import { csvToMarkdownSection, csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { csvToMarkdownSection, csvToMarkdownTable, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 describe('xlsxToMarkdown', () => {
   it('converts an xlsx into one `## SheetName` section per sheet, each with a markdown table', async () => {
@@ -142,6 +142,43 @@ describe('csvToMarkdownTable', () => {
     const md = csvToMarkdownTable('a,b,c\n1\n2,3');
     expect(md).toContain('| 1 |  |  |');
     expect(md).toContain('| 2 | 3 |  |');
+  });
+
+  it('keeps a quoted cell with an embedded newline (Excel Alt+Enter) as ONE row instead of splitting it into a phantom row', () => {
+    const md = csvToMarkdownTable('Name,Note\nAlice,"line1\nline2"\nBob,ok');
+    expect(md).toBe('| Name | Note |\n| --- | --- |\n| Alice | line1 line2 |\n| Bob | ok |');
+    expect(md).not.toContain('| line2 |'); // no phantom row, no misalignment of Bob
+  });
+
+  it('escapes EVERY literal pipe inside a cell so it does not split the markdown column', () => {
+    expect(csvToMarkdownTable('a,b\nx|y|z,2')).toContain('| x\\|y\\|z | 2 |');
+  });
+
+  it('drops a blank line but keeps a row of genuinely-empty cells (a line that is just commas)', () => {
+    // The blank middle line is dropped; the `,` line is two real empty cells and is kept.
+    expect(csvToMarkdownTable('a,b\n\n,\nc,d')).toBe('| a | b |\n| --- | --- |\n|  |  |\n| c | d |');
+  });
+
+  it('strips the trailing CR from CRLF input so no `\\r` leaks into the last cell of each row', () => {
+    const md = csvToMarkdownTable('a,b\r\n1,2');
+    expect(md).toBe('| a | b |\n| --- | --- |\n| 1 | 2 |');
+  });
+});
+
+describe('renderCsvCapped', () => {
+  it('renders the table when the cell count is within the cap', () => {
+    expect(renderCsvCapped('a,b\nc,d', 4)).toBe('| a | b |\n| --- | --- |\n| c | d |');
+  });
+
+  it('returns the truncation hint (not the table) for a column-skewed CSV whose true width is hidden by a narrow first row', () => {
+    // First row is 1 column, but later rows are 5 — the real cell count (10) is over the cap of 4.
+    const out = renderCsvCapped('a\nb,c,d,e,f\ng,h,i,j,k', 4);
+    expect(out).not.toContain('| --- |');
+    expect(out).toContain('get-excel-range');
+  });
+
+  it('returns an empty string for an empty CSV', () => {
+    expect(renderCsvCapped('', 4)).toBe('');
   });
 
   // 30 s ceiling: building a 1.05M-row table is sub-second normally, but Stryker's
