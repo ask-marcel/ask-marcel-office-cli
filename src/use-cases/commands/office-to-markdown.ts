@@ -27,9 +27,9 @@ import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
  *                                         HTML conversion actually accepts)
  * - anything else                       → content-sniff: bytes that decode as
  *                                         valid UTF-8 are returned as text (any
- *                                         text file, no extension list); a
- *                                         known-binary ext or non-UTF-8 bytes
- *                                         err pointing at the *-as-pdf command
+ *                                         text file, no extension list); non-UTF-8
+ *                                         (binary) bytes err pointing at the
+ *                                         *-as-pdf command — no short-circuit list
  */
 
 const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx', 'whiteboard']);
@@ -40,42 +40,11 @@ const PDF_NO_TEXT_HINT =
 const LEGACY_PPT_HINT =
   'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown here — there is no pure-JS parser for the format. Convert it to PDF first with `download-drive-item-as-pdf` (Graph renders legacy .ppt), then read the PDF with a vision-capable model.';
 
-// Extensions Graph's `?format=pdf` does NOT accept — pointing the user at
-// `*-as-pdf` for these would trade one InputFormatNotSupported error for
-// another. Surfaced here as a no-conversion-path-exists hint so the user
-// can fetch raw bytes via `get-mail-attachment` / `download-onedrive-file-content`
-// and process locally.
-const PDF_UNSUPPORTED: ReadonlySet<string> = new Set([
-  'zip',
-  'rar',
-  '7z',
-  'tar',
-  'gz',
-  'tgz',
-  'mp3',
-  'mp4',
-  'mov',
-  'wav',
-  'avi',
-  'mkv',
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'bmp',
-  'svg',
-  'exe',
-  'dmg',
-  'iso',
-]);
-
-const GENERIC_HINT = (ext: string): string => {
-  if (PDF_UNSUPPORTED.has(ext)) {
-    return `${ext} cannot be converted to markdown OR pdf — Graph rejects this extension on both paths. Fetch the raw bytes via \`get-mail-attachment\` (mail context) or \`download-onedrive-file-content\` (drive context) and process locally; pair with \`--output-path\` to land them on disk.`;
-  }
-  return `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`;
-};
+// The hint for anything that reaches the fallback as non-UTF-8 binary. No
+// dedicated archive/media short-circuit list: a known-binary extension is
+// fetched and content-sniffed like everything else, then lands here.
+const GENERIC_HINT = (ext: string): string =>
+  `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`;
 
 const extensionOf = (filename: string): string => {
   const dot = filename.lastIndexOf('.');
@@ -149,9 +118,6 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   }
 
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: LEGACY_PPT_HINT });
-
-  // Known-binary extensions: hint straight away, no wasted download.
-  if (PDF_UNSUPPORTED.has(ext)) return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext) });
 
   // Fallback: content-sniff — any file whose bytes decode as valid UTF-8 comes
   // back as text (a .txt/.md/.conf, or even an extensionless README, with no

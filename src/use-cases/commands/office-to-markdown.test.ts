@@ -278,29 +278,26 @@ describe('officeToMarkdown — extension dispatch', () => {
     expect(result.error.message).toContain('download-drive-item-as-pdf');
   });
 
-  it('errs with a "fetch raw bytes" hint for archive / image / binary extensions Graph rejects on BOTH `*-as-markdown` AND `*-as-pdf` (zip is the canonical case — audit v1.0.0 §2.8)', async () => {
-    const graph = noopGraph({});
+  it('a known-binary extension (zip, mp4, …) is fetched and content-sniffed, then errs 415 with the generic *-as-pdf hint — no dedicated short-circuit list', async () => {
+    const graph = bytesGraph(BINARY_BYTES);
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'sources.zip');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('zip cannot be converted to markdown OR pdf');
-      expect(result.error.message).toContain('get-mail-attachment');
-      expect(result.error.message).toContain('download-onedrive-file-content');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('zip not supported');
+    expect(result.error.message).toContain('38 input extensions');
   });
 
-  it('routes every PDF_UNSUPPORTED extension to the "cannot be converted to markdown OR pdf" hint', async () => {
-    const graph = noopGraph({});
-    const unsupported = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'mp3', 'mp4', 'mov', 'wav', 'avi', 'mkv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'exe', 'dmg', 'iso'];
-    for (const ext of unsupported) {
-      const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', `file.${ext}`);
-      expect(result.ok).toBe(false);
-      if (result.ok) continue;
-      expect(result.error.type).toBe('api_error');
-      expect(result.error.message).toContain(`${ext} cannot be converted to markdown OR pdf`);
-      expect(result.error.message).toContain('get-mail-attachment');
-    }
+  it('an .svg (which is XML text) content-sniffs to text/plain rather than being rejected as binary', async () => {
+    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><text>org chart label</text></svg>');
+    const graph = bytesGraph(svg);
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'diagram.svg');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const env = result.value as { contentType: string; text: string };
+    expect(env.contentType).toBe('text/plain');
+    expect(env.text).toContain('<text>org chart label</text>');
   });
 
   it('threads includeMetadata into the docx and xlsx converters (appends the metadata block when true)', async () => {
