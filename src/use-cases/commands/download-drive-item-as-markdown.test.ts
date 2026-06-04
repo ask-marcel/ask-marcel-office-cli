@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
+import { buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './download-drive-item-as-markdown.ts';
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -59,5 +59,17 @@ describe('download-drive-item-as-markdown', () => {
     const graph = graphWith({ get: () => ok({ name: 'r.docx' }), getBinary: () => ok({ contentType: 'application/octet-stream', size: docx.byteLength, base64: toBase64(docx) }) });
     expect(asText(await execute(graph, { ...params, includeMetadata: 'true' }))).toContain('## DOCX metadata');
     expect(asText(await execute(graph, { ...params, includeMetadata: 'false' }))).not.toContain('## DOCX metadata');
+  });
+
+  it('threads --max-cells through to the xlsx converter so an oversized sheet is truncated to a hint instead of the full table', async () => {
+    const xlsx = buildSampleXlsx();
+    const graph = graphWith({
+      get: () => ok({ name: 'big.xlsx' }),
+      getBinary: () => ok({ contentType: 'application/octet-stream', size: xlsx.byteLength, base64: toBase64(xlsx) }),
+    });
+    const text = asText(await execute(graph, { ...params, maxCells: '4' }));
+    expect(text).toContain('## Sheet1');
+    expect(text).not.toContain('Alice');
+    expect(text).toContain('get-excel-range');
   });
 });

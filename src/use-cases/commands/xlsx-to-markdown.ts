@@ -6,7 +6,15 @@ import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
 
-type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean };
+type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number };
+
+// A dense sheet renders a markdown table proportional to rows × cols, so a 49 MB
+// workbook with a genuinely large used range builds a multi-hundred-MB string and
+// OOMs the process (exit 144). Mirroring `get-excel-used-range --max-cells`, any
+// sheet whose estimated cell count exceeds this cap is emitted as a header + a
+// one-line hint pointing at the band-by-band Excel range commands, never the full
+// table — and the cell count is measured WITHOUT materialising the table.
+const DEFAULT_MAX_CELLS = 50_000;
 
 const splitCsvLine = (line: string): ReadonlyArray<string> => {
   const cells: string[] = [];
@@ -50,13 +58,37 @@ const csvToMarkdownTable = (csv: string): string => {
   return [header, separator, ...body].join('\n');
 };
 
+// Newline count via `charCodeAt` (10 = `\n`) — an O(1)-memory scan that never
+// allocates the per-row array `csvToMarkdownTable` builds, so an oversized sheet
+// is detected before it can blow up the heap. `\n` is 0x0A in every encoding the
+// sheetjs CSV writer emits.
+const countNewlines = (csv: string): number => {
+  let count = 0;
+  for (let i = 0; i < csv.length; i += 1) if (csv.charCodeAt(i) === 10) count += 1;
+  return count;
+};
+
+const truncationHint = (rows: number, columns: number, maxCells: number): string =>
+  `> _Table omitted: this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap — rendering it would build a multi-hundred-MB string. Read it band-by-band: \`get-excel-used-range\` for the populated bounding box, then \`get-excel-range --address 'A1:Cn'\` per band — or raise the cap with \`--max-cells <N>\`._`;
+
+// One `## SheetName` section per sheet, capping oversized sheets to a hint. Cell
+// count is estimated cheaply (columns from the first row, rows from a newline
+// scan) so an over-cap sheet is skipped before `csvToMarkdownTable` materialises it.
+const csvToMarkdownSection = (name: string, csv: string, maxCells: number = DEFAULT_MAX_CELLS): string => {
+  const newlineAt = csv.indexOf('\n');
+  const firstLine = newlineAt === -1 ? csv : csv.slice(0, newlineAt);
+  const columns = splitCsvLine(firstLine).length;
+  const rows = countNewlines(csv) + 1;
+  if (rows * columns > maxCells) return `## ${name}\n\n${truncationHint(rows, columns, maxCells)}`;
+  const table = csvToMarkdownTable(csv);
+  return table.length === 0 ? `## ${name}` : `## ${name}\n\n${table}`;
+};
+
 const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const sheets = readSheetsAsCsv(bytes);
   if (!sheets.ok) return sheets;
-  const sections = sheets.value.map(({ name, csv }) => {
-    const table = csvToMarkdownTable(csv);
-    return table.length === 0 ? `## ${name}` : `## ${name}\n\n${table}`;
-  });
+  const maxCells = opts.maxCells ?? DEFAULT_MAX_CELLS;
+  const sections = sheets.value.map(({ name, csv }) => csvToMarkdownSection(name, csv, maxCells));
   let md = sections.join('\n\n');
   if (opts.includeMetadata === true) {
     const meta = await extractXlsxMetadata(bytes);
@@ -67,5 +99,5 @@ const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 
-export { csvToMarkdownTable, xlsxToMarkdown };
+export { csvToMarkdownSection, csvToMarkdownTable, xlsxToMarkdown };
 export type { XlsxToMarkdownOptions };

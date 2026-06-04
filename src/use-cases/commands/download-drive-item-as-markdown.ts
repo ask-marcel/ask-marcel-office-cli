@@ -11,6 +11,10 @@ const schema = z.object({
   itemId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
+  maxCells: z
+    .string()
+    .regex(/^[1-9]\d*$/, 'must be a positive integer')
+    .optional(),
 });
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -19,17 +23,18 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const { driveId, itemId } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const inlineImages = parsed.data.inlineImages === 'true';
+  const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
 
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
 
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown; embedded images are replaced with `[image]` placeholders by default — pass `--inline-images true` to embed them as base64 `data:` URIs, or pull the full-resolution originals with `extract-drive-item-images`; tables become GFM pipe tables), xlsx (one markdown table per sheet via sheetjs), csv (rendered as a markdown table), odt/ods/odp (OpenDocument body walked from content.xml — headings, lists, tables, named sheets, per-slide text, including style-hidden content), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — the bytes are followed through any CDN redirect and returned inline as `{ contentType: "text/plain", size, text }` so the LLM never needs a separate fetch step. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.',
+    'Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown; embedded images are replaced with `[image]` placeholders by default — pass `--inline-images true` to embed them as base64 `data:` URIs, or pull the full-resolution originals with `extract-drive-item-images`; tables become GFM pipe tables), xlsx (one markdown table per sheet via sheetjs; any sheet whose used range exceeds the `--max-cells` cap, default 50 000, is summarised with a band-by-band read hint instead of a multi-hundred-MB table), csv (rendered as a markdown table), odt/ods/odp (OpenDocument body walked from content.xml — headings, lists, tables, named sheets, per-slide text, including style-hidden content), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — the bytes are followed through any CDN redirect and returned inline as `{ contentType: "text/plain", size, text }` so the LLM never needs a separate fetch step. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. For pdf/rtf/etc. also use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content?format=html',
@@ -58,6 +63,13 @@ const meta: CommandMeta = {
       description:
         "Pass `--inline-images true` to embed a docx's images as base64 `data:` URIs (self-contained markdown). Default is `false` — each image becomes an `[image: <alt>]` placeholder that keeps its position in the text without the base64 bloat (a single embedded photo can dwarf the prose). To get the actual pictures, run `extract-drive-item-images` on the same drive/item — it returns the full-resolution, un-cropped originals as files (via `--output-dir`). No-op on non-docx sources (xlsx/csv/odf have no inline images).",
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+    },
+    {
+      name: 'max-cells',
+      key: 'maxCells',
+      required: false,
+      description:
+        'Per-sheet cell cap (positive integer; default 50 000) for xlsx sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on non-xlsx sources.',
     },
   ],
   example: "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
