@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { buildMalformedDocx, buildRichDocx, buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
-import { docxToMarkdown, promoteFirstRowToThead } from './docx-to-markdown.ts';
+import { docxToMarkdown, promoteFirstRowToThead, stripInlineImages } from './docx-to-markdown.ts';
 
 describe('docxToMarkdown', () => {
-  it('converts a docx into a markdown envelope with heading, bold/italic, table, and inline image as data URI', async () => {
+  it('converts a docx into a markdown envelope with heading, bold/italic, table, and an [image] placeholder (base64 stripped by default)', async () => {
     const bytes = await buildSampleDocx();
     const result = await docxToMarkdown(bytes);
     expect(result.ok).toBe(true);
@@ -14,8 +14,15 @@ describe('docxToMarkdown', () => {
       expect(result.value.text).toContain('**world**');
       expect(result.value.text).toContain('_italic_');
       expect(result.value.text).toMatch(/\|\s*A\s*\|\s*B\s*\|/);
-      expect(result.value.text).toContain('data:image/png;base64,');
+      expect(result.value.text).not.toContain('data:image');
+      expect(result.value.text).toContain('[image');
     }
+  });
+
+  it('keeps base64 data: URIs when inlineImages is true (opt-in self-contained output)', async () => {
+    const result = await docxToMarkdown(await buildSampleDocx(), { inlineImages: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.text).toContain('data:image/png;base64,');
   });
 
   it('propagates the api_error from the mammoth adapter when the input is not a valid docx', async () => {
@@ -116,6 +123,24 @@ describe('docxToMarkdown — with --include-metadata true', () => {
       // mammoth fails first on a corrupted zip — that error wins over the metadata-extractor zip error
       expect(result.error.message).toContain('docx conversion failed');
     }
+  });
+});
+
+describe('stripInlineImages', () => {
+  it('replaces a base64 data: image that has no alt text with a bare [image] placeholder', () => {
+    expect(stripInlineImages('before ![](data:image/png;base64,AAAABBBB) after')).toBe('before [image] after');
+  });
+
+  it('keeps the alt text in the placeholder when the image has one ([image: <alt>])', () => {
+    expect(stripInlineImages('![Org chart](data:image/png;base64,AAAA)')).toBe('[image: Org chart]');
+  });
+
+  it('leaves a normal (non-data:) image link untouched', () => {
+    expect(stripInlineImages('![alt](https://example.com/pic.png)')).toBe('![alt](https://example.com/pic.png)');
+  });
+
+  it('leaves an ordinary markdown link untouched (only images are matched)', () => {
+    expect(stripInlineImages('see [the report](data:text/plain;base64,AAAA)')).toBe('see [the report](data:text/plain;base64,AAAA)');
   });
 });
 

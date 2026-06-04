@@ -77,7 +77,7 @@ const extensionOf = (filename: string): string => {
   return filename.slice(dot + 1).toLowerCase();
 };
 
-type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean };
+type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean };
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   if (isPlainTextFilename(filename)) {
@@ -107,7 +107,7 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   if (DOCX_FAMILY.has(ext)) {
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
-    return docxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
+    return docxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
   }
 
   if (XLSX_FAMILY.has(ext)) {

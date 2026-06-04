@@ -7,7 +7,16 @@ import { extractDocxMetadata } from './docx-metadata.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 
 type MarkdownEnvelope = { readonly contentType: 'text/markdown'; readonly size: number; readonly text: string };
-type DocxToMarkdownOptions = { readonly includeMetadata?: boolean };
+type DocxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly inlineImages?: boolean };
+
+// By default the docx's images are NOT embedded — mammoth inlines each as a huge
+// base64 `data:` URI, which bloats the markdown and duplicates what
+// `extract-drive-item-images` already returns (full-resolution originals as
+// files). Replace every such image with an `[image: <alt>]` placeholder so its
+// position in the text survives. `inlineImages: true` keeps the base64. The
+// alt/data captures are bounded character classes (no catastrophic backtracking).
+const stripInlineImages = (markdown: string): string =>
+  markdown.replaceAll(/!\[([^\]]*)\]\(data:[^)]*\)/g, (_match, alt: string) => (alt.length > 0 ? `[image: ${alt}]` : '[image]'));
 
 /**
  * Mammoth emits docx tables as `<table><tr>...</tr>...</table>` with no
@@ -63,7 +72,7 @@ const docxToMarkdown = async (bytes: Uint8Array, opts: DocxToMarkdownOptions = {
   if (!html.ok) return html;
   const md = htmlToMarkdown(promoteFirstRowToThead(html.value));
   if (!md.ok) return md;
-  let text = md.value;
+  let text = opts.inlineImages === true ? md.value : stripInlineImages(md.value);
   if (opts.includeMetadata === true) {
     const meta = await extractDocxMetadata(bytes);
     if (!meta.ok) return meta;
@@ -73,5 +82,5 @@ const docxToMarkdown = async (bytes: Uint8Array, opts: DocxToMarkdownOptions = {
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 
-export { docxToMarkdown, promoteFirstRowToThead };
+export { docxToMarkdown, promoteFirstRowToThead, stripInlineImages };
 export type { DocxToMarkdownOptions, MarkdownEnvelope };
