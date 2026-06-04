@@ -43,7 +43,7 @@ A typical "read this email" loop in raw Graph: GET the message → GET the attac
 
 Feed any Office-shaped file (docx, xlsx, pptx, csv, rtf, odt, …) into the local conversion pipeline OR through Graph's `?format=pdf` when slide layout and images matter:
 
-- `download-drive-item-as-markdown` — docx via mammoth (with inline images as data URIs), xlsx as one markdown table per sheet, csv as a table, odt/ods/odp via content.xml (headings, lists, tables, named sheets, per-slide text, with `office:annotation` comments folded inline), plain-text passthrough
+- `download-drive-item-as-markdown` — docx via mammoth (embedded images become `[image]` placeholders by default — `--inline-images true` to embed them as base64, or pull the full-resolution originals with `extract-drive-item-images`), xlsx as one markdown table per sheet, csv as a table, odt/ods/odp via content.xml (headings, lists, tables, named sheets, per-slide text, with `office:annotation` comments folded inline), plain-text passthrough
 - `download-drive-item-as-pdf` — Graph PDF conversion for anything it supports (preserves slide layout, images, charts — the right call for pptx and image-heavy docs)
 - `convert-mail-attachment-to-markdown` / `convert-mail-attachment-to-pdf` — same pipelines but starting from an email attachment
 - `extract-sharepoint-links-in-documents` — the doc-side sibling of `extract-sharepoint-links-in-mail`: resolve every `*.sharepoint.com` URL embedded in a docx/xlsx/pptx (read from the package's relationship parts) or an odt/ods/odp (read from the inline `xlink:href` links in content.xml) to its driveItem, so an agent can follow references out of a document the same way it follows them out of an email
