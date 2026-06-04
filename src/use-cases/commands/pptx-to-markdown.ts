@@ -4,22 +4,31 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatPptxMetadata } from './pptx-metadata-to-markdown.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
+import type { Slide } from './pptx-slides.ts';
 
 /**
- * pptx has no convertible markdown body in this CLI (slide visuals go through
- * the `*-as-pdf` commands, which a vision model reads more reliably than
- * flattened bullets). When `--include-metadata true` is set, this returns the
- * side-channel / authored content as a standalone markdown document instead,
- * led by a note pointing at the PDF sibling for the rendered deck.
+ * Renders a .pptx to markdown: one `## Slide N` section per slide carrying the
+ * visible slide text (title, bullets, text boxes, table cells) with the speaker
+ * notes inline beneath it. With `includeMetadata`, the `## PPTX metadata` side-
+ * channel block (properties, external links, slide tags, comments) is appended.
+ *
+ * Caveat: slide text comes out in document order, not guaranteed visual reading
+ * order, and layout / images / charts are lost — use the `*-as-pdf` sibling +
+ * a vision model when the rendered deck matters.
  */
 
-const PDF_NOTE =
-  '> PowerPoint slide visuals (layout, images, charts) are not converted here — use the corresponding `*-as-pdf` command for the rendered deck. This document carries the side-channel / authored content only: properties, speaker notes, comments, hidden slides, slide tags, and external links.';
+const slideSection = (slide: Slide, index: number): string => {
+  const parts = [`## Slide ${index + 1}${slide.hidden ? ' (hidden)' : ''}`];
+  if (slide.text.trim() !== '') parts.push(slide.text);
+  if (slide.notes.trim() !== '') parts.push(`**Speaker notes:** ${slide.notes}`);
+  return parts.join('\n\n');
+};
 
-const pptxToMarkdown = async (bytes: Uint8Array): Promise<Result<MarkdownEnvelope, GraphError>> => {
+const pptxToMarkdown = async (bytes: Uint8Array, options: { readonly includeMetadata?: boolean } = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const meta = await extractPptxMetadata(bytes);
   if (!meta.ok) return meta;
-  const text = `${PDF_NOTE}\n\n${formatPptxMetadata(meta.value)}`;
+  const body = meta.value.slides.map(slideSection).join('\n\n');
+  const text = options.includeMetadata === true ? `${body}\n\n${formatPptxMetadata(meta.value)}` : body;
   // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };

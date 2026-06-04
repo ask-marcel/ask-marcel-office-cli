@@ -96,9 +96,12 @@ describe('convert-mail-attachment-to-markdown — fileAttachment formats', () =>
     expect(asEnv(await execute(fileAttachment('d.xlsx', xlsx), { ...params, includeMetadata: 'true' })).text).toContain('## Workbook metadata');
   });
 
-  it('rejects pptx without --include-metadata and extracts metadata with it', async () => {
+  it('extracts pptx slide text by default; appends the PPTX metadata block with --include-metadata', async () => {
     const pptx = await buildRichPptx();
-    expectApiErr(await execute(fileAttachment('deck.pptx', pptx), params), 'pptx attachment not supported', 415);
+    const plain = await execute(fileAttachment('deck.pptx', pptx), params);
+    expect(asEnv(plain).text).toContain('## Slide 1');
+    expect(asEnv(plain).text).toContain('Quarterly Review');
+    expect(asEnv(plain).text).not.toContain('## PPTX metadata');
     expect(asEnv(await execute(fileAttachment('deck.pptx', pptx), { ...params, includeMetadata: 'true' })).text).toContain('## PPTX metadata');
   });
 

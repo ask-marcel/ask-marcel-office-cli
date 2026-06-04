@@ -46,11 +46,10 @@ const extensionOf = (name: string): string => {
 
 // Convert one Office entry to markdown, or return undefined if the extension
 // isn't an Office family (caller then tries the plain-text / skip paths).
-// pptx carries no includeMetadata knob (its body IS its metadata).
 const officeConvert = (ext: string, bytes: Uint8Array, includeMetadata: boolean): Promise<Result<MarkdownEnvelope, GraphError>> | undefined => {
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata });
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
-  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes);
+  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
   return undefined;
 };
@@ -125,7 +124,7 @@ const meta: CommandMeta = {
       key: 'includeMetadata',
       required: false,
       description:
-        'Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## OpenDocument metadata`, etc.) after its body.',
+        'Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

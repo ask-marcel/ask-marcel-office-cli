@@ -33,9 +33,6 @@ import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx', 'whiteboard']);
 
-const PPTX_HINT =
-  'pptx not supported by `*-as-markdown`. Use the corresponding `*-as-pdf` command — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
-
 const PDF_NO_TEXT_HINT =
   'pdf has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). This command extracts the embedded text layer, not pixels. Use `download-drive-item-as-pdf` to fetch the PDF and read it with a vision-capable model, or run OCR.';
 
@@ -115,10 +112,9 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   }
 
   if (PPTX_FAMILY.has(ext)) {
-    if (opts.includeMetadata !== true) return err({ type: 'api_error', status: 415, message: PPTX_HINT });
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
-    return pptxToMarkdown(bytes.value);
+    return pptxToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
   if (ODF_FAMILY.has(ext)) {

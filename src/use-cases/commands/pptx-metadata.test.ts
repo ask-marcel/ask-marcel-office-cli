@@ -3,7 +3,6 @@ import JSZip from 'jszip';
 import { buildMalformedPptx, buildMinimalPptx, buildRichPptx } from '../../test-helpers/office-fixtures.ts';
 import { formatPptxMetadata } from './pptx-metadata-to-markdown.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
-import { pptxToMarkdown } from './pptx-to-markdown.ts';
 
 describe('extractPptxMetadata', () => {
   it('collects p:tag entries ONLY from ppt/tags/tag{N}.xml parts — the ^/$ anchored path filter excludes look-alike paths and p:tags elsewhere in the package', async () => {
@@ -111,22 +110,5 @@ describe('formatPptxMetadata', () => {
     const md = formatPptxMetadata(extracted.value);
     expect(md).toContain('### Slide tags\n\n_(none)_');
     expect(md).toContain('### Comments\n\n_(none)_');
-  });
-});
-
-describe('pptxToMarkdown', () => {
-  it('wraps the metadata in a text/markdown envelope that leads with a use-the-PDF note', async () => {
-    const result = await pptxToMarkdown(await buildRichPptx());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.contentType).toBe('text/markdown');
-    expect(result.value.size).toBeGreaterThan(0);
-    expect(result.value.text).toContain('*-as-pdf');
-    expect(result.value.text).toContain('## PPTX metadata');
-  });
-
-  it('propagates the zip-parse error for a malformed deck', async () => {
-    const result = await pptxToMarkdown(buildMalformedPptx());
-    expect(result.ok).toBe(false);
   });
 });

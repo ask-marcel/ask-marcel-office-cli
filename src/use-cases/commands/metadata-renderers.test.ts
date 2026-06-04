@@ -213,8 +213,8 @@ describe('formatPptxMetadata — exact output', () => {
         { author: 'Bo', date: 'dt2', text: 'note' },
       ],
       slides: [
-        { name: 'slide1.xml', hidden: false, title: 'T1', notes: 'N1' },
-        { name: 'slide2.xml', hidden: true, title: 'T2', notes: '' },
+        { name: 'slide1.xml', hidden: false, title: 'T1', notes: 'N1', text: 'T1\nbody one' },
+        { name: 'slide2.xml', hidden: true, title: 'T2', notes: '', text: 'T2' },
       ],
       macros: ['word/vbaProject.bin'],
     };

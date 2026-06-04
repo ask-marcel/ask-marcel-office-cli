@@ -441,6 +441,57 @@ const buildMediaSamples = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+/**
+ * An adversarial deck built to exercise every branch of slide extraction:
+ *  - slides added out of numeric order (slide10 before slide2) and two-digit, so
+ *    numeric sort is distinguishable from list / lexical order;
+ *  - slide10 puts a BODY placeholder before its title (slideTitle must skip
+ *    non-title placeholders) and includes a whitespace-only paragraph (slideBodyText
+ *    must filter blanks before joining);
+ *  - slide2 is hidden and its notesSlide relationship is the SECOND rel, not the
+ *    first (notesPathFor can't just grab rel #1), with multi-paragraph notes
+ *    including a blank (notesText must filter, then join with a space).
+ */
+const buildAdversarialPptx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'ppt/slides/slide10.xml',
+    `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS}><p:cSld><p:spTree>` +
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Body"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>body first</a:t></a:r></a:p><a:p><a:r><a:t> </a:t></a:r></a:p></p:txBody></p:sp>' +
+      '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>The Title</a:t></a:r></a:p></p:txBody></p:sp>' +
+      '</p:spTree></p:cSld></p:sld>'
+  );
+  zip.file(
+    'ppt/slides/slide2.xml',
+    `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS} show="0"><p:cSld><p:spTree>` +
+      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>Second</a:t></a:r></a:p></p:txBody></p:sp>' +
+      '</p:spTree></p:cSld></p:sld>'
+  );
+  zip.file(
+    'ppt/slides/_rels/slide2.xml.rels',
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide2.xml"/>' +
+      '</Relationships>'
+  );
+  zip.file(
+    'ppt/notesSlides/notesSlide2.xml',
+    `<?xml version="1.0"?><p:notes ${PPTX_SLIDE_NS}><p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/>` +
+      '<a:p><a:r><a:t>note one</a:t></a:r></a:p><a:p><a:r><a:t> </a:t></a:r></a:p><a:p><a:r><a:t>note two</a:t></a:r></a:p>' +
+      '</p:txBody></p:sp></p:spTree></p:cSld></p:notes>'
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/** A deck whose single slide has no shapes at all — empty title, body text, and notes. */
+const buildEmptyPptx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file('ppt/slides/slide1.xml', `<?xml version="1.0"?><p:sld ${PPTX_SLIDE_NS}><p:cSld><p:spTree></p:spTree></p:cSld></p:sld>`);
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 /** A barebones deck: one visible, untitled slide with no tags, comments, notes, or custom props. */
 const buildMinimalPptx = async (): Promise<Uint8Array> => {
   const zip = new JSZip();
@@ -631,6 +682,8 @@ const buildDocxWithSharepointLinks = async (): Promise<Uint8Array> => {
 };
 
 export {
+  buildAdversarialPptx,
+  buildEmptyPptx,
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,

@@ -35,9 +35,6 @@ const decodeBase64 = (b64: string): Uint8Array => {
   return bytes;
 };
 
-const PPTX_HINT =
-  'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
-
 // A born-digital PDF attachment's text layer is extracted via unpdf (pdfToMarkdown).
 // Only a scanned / image-only PDF (no text layer) falls back to this hint: the bytes
 // hold pixels, not text, so a vision model / OCR is the right tool.
@@ -66,7 +63,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   const ext = extensionOf(name);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata });
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
-  if (PPTX_FAMILY.has(ext)) return includeMetadata ? pptxToMarkdown(bytes) : err({ type: 'api_error', status: 415, message: PPTX_HINT });
+  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
   if (ext === 'pdf') return pdfToMarkdown(bytes, PDF_NO_TEXT_HINT);
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
@@ -159,7 +156,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx attachments, `convert-mail-attachment-to-pdf` is recommended (Graph PDF preserves slide layout). A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
+    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',

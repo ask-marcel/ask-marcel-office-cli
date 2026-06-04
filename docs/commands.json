@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-04T06:21:07.684Z",
+  "generatedAt": "2026-06-04T07:06:45.922Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -88,7 +88,7 @@
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
-          "description": "Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## OpenDocument metadata`, etc.) after its body.",
+          "description": "Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -103,7 +103,7 @@
     },
     {
       "name": "convert-mail-attachment-to-markdown",
-      "summary": "Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx attachments, `convert-mail-attachment-to-pdf` is recommended (Graph PDF preserves slide layout). A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).",
+      "summary": "Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -201,7 +201,7 @@
     },
     {
       "name": "download-drive-item-as-markdown",
-      "summary": "Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown; embedded images are replaced with `[image]` placeholders by default — pass `--inline-images true` to embed them as base64 `data:` URIs, or pull the full-resolution originals with `extract-drive-item-images`; tables become GFM pipe tables), xlsx (one markdown table per sheet via sheetjs; any sheet whose used range exceeds the `--max-cells` cap, default 50 000, is summarised with a band-by-band read hint instead of a multi-hundred-MB table), csv (rendered as a markdown table), odt/ods/odp (OpenDocument body walked from content.xml — headings, lists, tables, named sheets, per-slide text, including style-hidden content), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — the bytes are followed through any CDN redirect and returned inline as `{ contentType: \"text/plain\", size, text }` so the LLM never needs a separate fetch step. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). For pptx use `download-drive-item-as-pdf` — Graph PDF preserves slide layout, and a vision-capable LLM reads it more reliably than flattened bullets. pdf has its text layer extracted locally (via unpdf) and returned as `{ contentType: \"text/plain\", size, text }`; a scanned / image-only PDF with no text layer points you at `download-drive-item-as-pdf` + a vision model. For rtf/etc. use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.",
+      "summary": "Download a OneDrive / SharePoint file converted to markdown via local conversion pipelines. Supported: docx (mammoth → turndown; embedded images are replaced with `[image]` placeholders by default — pass `--inline-images true` to embed them as base64 `data:` URIs, or pull the full-resolution originals with `extract-drive-item-images`; tables become GFM pipe tables), xlsx (one markdown table per sheet via sheetjs; any sheet whose used range exceeds the `--max-cells` cap, default 50 000, is summarised with a band-by-band read hint instead of a multi-hundred-MB table), csv (rendered as a markdown table), odt/ods/odp (OpenDocument body walked from content.xml — headings, lists, tables, named sheets, per-slide text, including style-hidden content), plus plain-text passthrough (txt/md/html/json/yaml/log/xml/etc.) — the bytes are followed through any CDN redirect and returned inline as `{ contentType: \"text/plain\", size, text }` so the LLM never needs a separate fetch step. Loop/Fluid/Whiteboard files use Graph `?format=html` (the four inputs Microsoft documents — https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format). pptx is flattened to per-slide text (titles, bullets, text-box / table text, with speaker notes inline) as `## Slide N` sections — document order, not guaranteed visual order; for layout / images / charts, `download-drive-item-as-pdf` + a vision-capable LLM reads the rendered deck better. pdf has its text layer extracted locally (via unpdf) and returned as `{ contentType: \"text/plain\", size, text }`; a scanned / image-only PDF with no text layer points you at `download-drive-item-as-pdf` + a vision model. For rtf/etc. use `download-drive-item-as-pdf` — Graph `?format=pdf` accepts 38 input extensions.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content?format=html",

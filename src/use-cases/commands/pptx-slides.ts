@@ -9,7 +9,7 @@ import { attrOf, collectText, findAll, parseXml } from './ooxml-xml-walker.ts';
  * presenter-authored text that never appears on the rendered slide.
  */
 
-type Slide = { readonly name: string; readonly hidden: boolean; readonly title: string; readonly notes: string };
+type Slide = { readonly name: string; readonly hidden: boolean; readonly title: string; readonly notes: string; readonly text: string };
 
 const SLIDE_RE = /^ppt\/slides\/slide(\d+)\.xml$/;
 
@@ -48,6 +48,15 @@ const notesText = (zip: OoxmlZip, slidePath: string): string => {
     .join(' ');
 };
 
+// Every visible text paragraph on the slide (title placeholder, body bullets,
+// text boxes, table cells), one line per `<a:p>`, in document order. Document
+// order is not guaranteed visual reading order — the lossy-flatten caveat.
+const slideBodyText = (slideRoot: unknown): string =>
+  findAll(slideRoot, 'a:p')
+    .map((p) => collectText(p, 'a:t'))
+    .filter((t) => t.trim() !== '')
+    .join('\n');
+
 const toSlide = (zip: OoxmlZip, slidePath: string): Slide => {
   const root = parseXml(zip.read(slidePath));
   const sld = findAll(root, 'p:sld')[0];
@@ -56,6 +65,7 @@ const toSlide = (zip: OoxmlZip, slidePath: string): Slide => {
     hidden: sld !== undefined && attrOf(sld, 'show') === '0',
     title: slideTitle(root),
     notes: notesText(zip, slidePath),
+    text: slideBodyText(root),
   };
 };
 

@@ -3852,10 +3852,12 @@ describe('commands', () => {
     expect(deleteCalled).toBe(false);
   });
 
-  it('convert-mail-attachment-to-markdown errs with the pptx-specific PDF hint for a pptx fileAttachment', async () => {
+  it('convert-mail-attachment-to-markdown extracts pptx slide text from a pptx fileAttachment', async () => {
+    let bin = '';
+    for (const b of await buildRichPptx()) bin += String.fromCharCode(b);
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aPptx')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentBytes: btoa('zzz') });
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentBytes: btoa(bin) });
       }
       throw new Error(`unexpected ${url}`);
     };
@@ -3863,11 +3865,12 @@ describe('commands', () => {
     if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPptx' });
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('pptx attachment');
-      expect(result.error.message).toContain('convert-mail-attachment-to-pdf');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/markdown');
+      expect(v.text).toContain('## Slide 1');
+      expect(v.text).toContain('Quarterly Review');
     }
   });
 
@@ -4071,7 +4074,8 @@ describe('convert-drive-item-zip', () => {
     expect(at('report.docx').text).toContain('# Sample Heading');
     expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
     expect(at('data.xlsx').text).toContain('## Sheet1');
-    expect(at('deck.pptx').text).toContain('## PPTX metadata');
+    expect(at('deck.pptx').text).toContain('## Slide 1'); // pptx slide text extracted inline (no metadata block without the flag)
+    expect(at('deck.pptx').text).not.toContain('## PPTX metadata');
     expect(at('plan.odt').text).toContain('# Heading One');
     expect(at('notes.txt').text).toBe('hello from the archive');
     expect(at('notes.txt').contentType).toBe('text/plain');
@@ -4098,6 +4102,7 @@ describe('convert-drive-item-zip', () => {
     const files = (withMeta.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files;
     expect(files.find((f) => f.path === 'report.docx')?.text).toContain('## DOCX metadata');
     expect(files.find((f) => f.path === 'data.xlsx')?.text).toContain('## Workbook metadata');
+    expect(files.find((f) => f.path === 'deck.pptx')?.text).toContain('## PPTX metadata');
     expect(files.find((f) => f.path === 'plan.odt')?.text).toContain('## OpenDocument metadata');
     // `false` is an accepted enum value and must omit the metadata blocks
     const explicitFalse = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(await buildSampleZipArchive())), {
