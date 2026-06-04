@@ -452,27 +452,18 @@ const buildMinimalPptx = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
-// Minimal valid PDF (correct xref offsets); `withImage` paints one 2x2 RGB image (FlateDecode).
-const buildPdf = (withImage: boolean): Uint8Array => {
-  const enc = (s: string): Buffer => Buffer.from(s, 'latin1');
-  const content = withImage ? enc('q 50 0 0 50 25 25 cm /Im0 Do Q') : enc('BT ET');
-  const page = withImage
-    ? '<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents 4 0 R/Resources<</XObject<</Im0 5 0 R>>>>>>'
-    : '<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents 4 0 R/Resources<<>>>>';
+const enc = (s: string): Buffer => Buffer.from(s, 'latin1');
+
+// Minimal valid PDF (correct xref offsets) from a content stream, the page's
+// Resources dict, and an optional object #5 (an image XObject or a font).
+const buildPdf = (content: Buffer, resources: string, obj5?: Buffer): Uint8Array => {
   const objs: Record<number, Buffer> = {
     1: enc('<</Type/Catalog/Pages 2 0 R>>'),
     2: enc('<</Type/Pages/Kids[3 0 R]/Count 1>>'),
-    3: enc(page),
+    3: enc(`<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents 4 0 R/Resources${resources}>>`),
     4: Buffer.concat([enc(`<</Length ${content.length}>>\nstream\n`), content, enc('\nendstream')]),
   };
-  if (withImage) {
-    const img = deflateSync(Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]));
-    objs[5] = Buffer.concat([
-      enc(`<</Type/XObject/Subtype/Image/Width 2/Height 2/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode/Length ${img.length}>>\nstream\n`),
-      img,
-      enc('\nendstream'),
-    ]);
-  }
+  if (obj5 !== undefined) objs[5] = obj5;
   const ids = Object.keys(objs)
     .map(Number)
     .sort((a, b) => a - b);
@@ -489,8 +480,22 @@ const buildPdf = (withImage: boolean): Uint8Array => {
   return new Uint8Array(Buffer.concat([pdf, xref, enc(`trailer\n<</Size ${size}/Root 1 0 R>>\nstartxref\n${xrefAt}\n%%EOF`)]));
 };
 
-const buildPdfWithImage = (): Uint8Array => buildPdf(true);
-const buildPdfNoImages = (): Uint8Array => buildPdf(false);
+const buildImageXObject = (): Buffer => {
+  const img = deflateSync(Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]));
+  return Buffer.concat([
+    enc(`<</Type/XObject/Subtype/Image/Width 2/Height 2/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode/Length ${img.length}>>\nstream\n`),
+    img,
+    enc('\nendstream'),
+  ]);
+};
+
+// `withImage` paints one 2x2 RGB image (FlateDecode); no-image paints an empty text object.
+const buildPdfWithImage = (): Uint8Array => buildPdf(enc('q 50 0 0 50 25 25 cm /Im0 Do Q'), '<</XObject<</Im0 5 0 R>>>>', buildImageXObject());
+const buildPdfNoImages = (): Uint8Array => buildPdf(enc('BT ET'), '<<>>');
+// A born-digital PDF with a real text layer (Helvetica + a Tj string) — extractable by pdfjs/unpdf.
+// (pdfjs drops the final glyph of this minimal no-/Widths font, so tests assert on a leading substring.)
+const buildPdfWithText = (): Uint8Array =>
+  buildPdf(enc('BT /F1 12 Tf 10 50 Td (Hello from the PDF) Tj ET'), '<</Font<</F1 5 0 R>>>>', enc('<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>'));
 
 // A docx whose only text lives in surfaces mammoth drops: a header, a footer, and a
 // text box (w:txbxContent). Hand-rolled raw OOXML because the `docx` lib can't emit text boxes.
@@ -640,6 +645,7 @@ export {
   buildMinimalPptx,
   buildPdfNoImages,
   buildPdfWithImage,
+  buildPdfWithText,
   buildRichDocx,
   buildRichOdp,
   buildRichOds,
