@@ -3,6 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
+import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import {
   embeddedContactToMarkdown,
@@ -41,6 +42,9 @@ const decodeBase64 = (b64: string): Uint8Array => {
 const PDF_NO_TEXT_HINT =
   'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.';
 
+const LEGACY_PPT_HINT =
+  'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown — there is no pure-JS parser for the format. Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to render it, then read the PDF with a vision-capable model.';
+
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
 
 const imageHint = (ext: string): string =>
@@ -66,6 +70,9 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
   if (ext === 'pdf') return pdfToMarkdown(bytes, PDF_NO_TEXT_HINT);
+  if (ext === 'xls') return xlsxToMarkdown(bytes, {}); // legacy Excel — sheetjs auto-detects BIFF; no OOXML side-channel
+  if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — word-extractor (text only)
+  if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: LEGACY_PPT_HINT });
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
 
   // Content-sniff: an attachment whose bytes are valid UTF-8 is returned as text
@@ -156,7 +163,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
+    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',

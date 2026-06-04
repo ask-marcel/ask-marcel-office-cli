@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { buildPdfNoImages, buildPdfWithText, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import {
+  buildLegacyXls,
+  buildPdfNoImages,
+  buildPdfWithText,
+  buildRichOdt,
+  buildRichPptx,
+  buildSampleDoc,
+  buildSampleDocx,
+  buildSampleXlsx,
+} from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
@@ -224,6 +233,49 @@ describe('officeToMarkdown — extension dispatch', () => {
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
     expect(result.error.type === 'api_error' ? result.error.message : '').toContain('pdf not found');
+  });
+
+  it('converts a legacy .xls (BIFF / OLE) through the sheetjs pipeline to a markdown table', async () => {
+    const graph = bytesGraph(buildLegacyXls());
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'budget.xls');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const env = result.value as { contentType: string; text: string };
+    expect(env.contentType).toBe('text/markdown');
+    expect(env.text).toContain('## Legacy'); // the sheet name
+    expect(env.text).toContain('Alice');
+  });
+
+  it('extracts a legacy .doc (OLE binary) body as a text/plain envelope', async () => {
+    const graph = bytesGraph(await buildSampleDoc());
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'memo.doc');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const env = result.value as { contentType: string; text: string };
+    expect(env.contentType).toBe('text/plain');
+    expect(env.text).toContain('Hello from the legacy doc');
+  });
+
+  it('propagates a getBinary api_error from the legacy .xls and .doc paths', async () => {
+    const xlsGraph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'xls forbidden' } }) });
+    const xls = await officeToMarkdown(xlsGraph, '/drives/d1/items/i1/content', 'old.xls');
+    expect(xls.ok).toBe(false);
+    expect(!xls.ok && xls.error.type === 'api_error' ? xls.error.message : '').toContain('xls forbidden');
+    const docGraph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 403, message: 'doc forbidden' } }) });
+    const doc = await officeToMarkdown(docGraph, '/drives/d1/items/i1/content', 'old.doc');
+    expect(doc.ok).toBe(false);
+    expect(!doc.ok && doc.error.type === 'api_error' ? doc.error.message : '').toContain('doc forbidden');
+  });
+
+  it('errs 415 for a legacy .ppt pointing at the convert-to-PDF-first workflow', async () => {
+    const graph = noopGraph({});
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.ppt');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('ppt (legacy PowerPoint');
+    expect(result.error.message).toContain('download-drive-item-as-pdf');
   });
 
   it('errs with a "fetch raw bytes" hint for archive / image / binary extensions Graph rejects on BOTH `*-as-markdown` AND `*-as-pdf` (zip is the canonical case — audit v1.0.0 §2.8)', async () => {

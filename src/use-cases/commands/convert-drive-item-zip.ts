@@ -9,6 +9,7 @@ import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { docToMarkdown } from './doc-to-markdown.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
 import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
@@ -21,9 +22,10 @@ import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
  * file through the same local conversion pipelines the `*-as-markdown` commands
  * use — so an agent reading "the project handover archive" doesn't have to shell
  * out to `unzip` and convert each file separately. Office files (docx/xlsx/pptx/
- * odt/ods/odp + variants) become markdown; plain-text entries are decoded inline;
+ * odt/ods/odp + variants) become markdown; legacy OLE .xls / .doc are extracted
+ * too (.ppt is noted, no pure-JS path); plain-text entries are decoded inline;
  * PDFs have their text layer extracted; everything else (images, binaries, nested
- * archives — plus scanned/image-only PDFs with no text) is listed with a note
+ * archives — plus scanned/image-only PDFs and legacy .ppt) is listed with a note
  * rather than failing the whole archive.
  */
 
@@ -51,6 +53,7 @@ const officeConvert = (ext: string, bytes: Uint8Array, includeMetadata: boolean)
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
+  if (ext === 'xls') return xlsxToMarkdown(bytes, {}); // legacy Excel (BIFF / OLE) — sheetjs auto-detects; no OOXML side-channel
   return undefined;
 };
 
@@ -71,6 +74,20 @@ const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<
       `${entry.path}: pdf has no extractable text layer (scanned / image-only) — fetch it with \`download-drive-item-as-pdf\` and read it with a vision model`
     );
     return pdf.ok ? { path: entry.path, contentType: pdf.value.contentType, size: pdf.value.size, text: pdf.value.text } : { path: entry.path, note: pdf.error.message };
+  }
+  // Legacy Word (.doc, OLE binary) → body text via word-extractor (text/plain), or a note on parse failure.
+  if (ext === 'doc') {
+    const doc = await docToMarkdown(entry.bytes);
+    return doc.ok
+      ? { path: entry.path, contentType: doc.value.contentType, size: doc.value.size, text: doc.value.text }
+      : { path: entry.path, note: `conversion failed: ${doc.error.message}` };
+  }
+  // Legacy PowerPoint (.ppt, OLE binary) has no pure-JS markdown path — note it, don't fail the archive.
+  if (ext === 'ppt') {
+    return {
+      path: entry.path,
+      note: `${entry.path}: ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF with \`download-drive-item-as-pdf\`, then read it with a vision model`,
+    };
   }
   // Content-sniff: a zip entry whose bytes are valid UTF-8 is unpacked as text
   // (any text file, no extension list); binary entries are skipped with a note.
@@ -105,7 +122,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; PDFs have their text layer extracted (text/plain); images, binaries, nested archives, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
+    'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) are extracted; PDFs have their text layer extracted (text/plain); images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',

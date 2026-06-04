@@ -2,7 +2,16 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Result } from '../../domain/result.ts';
-import { buildPdfNoImages, buildPdfWithText, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import {
+  buildLegacyXls,
+  buildPdfNoImages,
+  buildPdfWithText,
+  buildRichOdt,
+  buildRichPptx,
+  buildSampleDoc,
+  buildSampleDocx,
+  buildSampleXlsx,
+} from '../../test-helpers/office-fixtures.ts';
 import { execute } from './convert-mail-attachment-to-markdown.ts';
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -122,6 +131,23 @@ describe('convert-mail-attachment-to-markdown — fileAttachment formats', () =>
 
   it('rejects a scanned / image-only PDF attachment (no text layer) with a vision-model hint', async () => {
     expectApiErr(await execute(fileAttachment('scan.pdf', buildPdfNoImages()), params), 'no extractable text layer', 415);
+  });
+
+  it('converts a legacy .xls attachment through sheetjs to a markdown table', async () => {
+    const result = await execute(fileAttachment('budget.xls', buildLegacyXls()), params);
+    expect(asEnv(result).contentType).toBe('text/markdown');
+    expect(asEnv(result).text).toContain('## Legacy'); // the sheet name
+    expect(asEnv(result).text).toContain('Alice');
+  });
+
+  it('extracts a legacy .doc attachment body as a text/plain envelope', async () => {
+    const result = await execute(fileAttachment('memo.doc', await buildSampleDoc()), params);
+    expect(asEnv(result).contentType).toBe('text/plain');
+    expect(asEnv(result).text).toContain('Hello from the legacy doc');
+  });
+
+  it('rejects a legacy .ppt attachment with the convert-to-PDF-first hint', async () => {
+    expectApiErr(await execute(fileAttachment('deck.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])), params), 'ppt (legacy PowerPoint', 415);
   });
 
   it('rejects every image extension with the image-specific hint', async () => {

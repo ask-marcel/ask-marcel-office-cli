@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
@@ -35,6 +36,9 @@ const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx'
 
 const PDF_NO_TEXT_HINT =
   'pdf has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). This command extracts the embedded text layer, not pixels. Use `download-drive-item-as-pdf` to fetch the PDF and read it with a vision-capable model, or run OCR.';
+
+const LEGACY_PPT_HINT =
+  'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown here — there is no pure-JS parser for the format. Convert it to PDF first with `download-drive-item-as-pdf` (Graph renders legacy .ppt), then read the PDF with a vision-capable model.';
 
 // Extensions Graph's `?format=pdf` does NOT accept — pointing the user at
 // `*-as-pdf` for these would trade one InputFormatNotSupported error for
@@ -128,6 +132,23 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     if (!bytes.ok) return bytes;
     return pdfToMarkdown(bytes.value, PDF_NO_TEXT_HINT);
   }
+
+  if (ext === 'xls') {
+    // Legacy Excel (BIFF / OLE binary) — sheetjs `XLSX.read` auto-detects it; legacy
+    // has no OOXML side-channel, so `--include-metadata` is not threaded here.
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    return xlsxToMarkdown(bytes.value, { maxCells: opts.maxCells });
+  }
+
+  if (ext === 'doc') {
+    // Legacy Word (OLE binary) — word-extractor; mammoth only reads the .docx zip.
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    return docToMarkdown(bytes.value);
+  }
+
+  if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: LEGACY_PPT_HINT });
 
   // Known-binary extensions: hint straight away, no wasted download.
   if (PDF_UNSUPPORTED.has(ext)) return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext) });

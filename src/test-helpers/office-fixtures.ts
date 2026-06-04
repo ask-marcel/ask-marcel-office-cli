@@ -90,6 +90,24 @@ const buildSampleXlsx = (): Uint8Array => {
   return new Uint8Array(arrayBuffer);
 };
 
+// A legacy Excel 97-2003 .xls (BIFF8 OLE binary) — sheetjs writes it via bookType:'xls'
+// and reads it back through the same XLSX.read auto-detection the .xlsx pipeline uses.
+const buildLegacyXls = (): Uint8Array => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['Name', 'Age'],
+    ['Alice', 30],
+    ['Bob', 25],
+  ]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Legacy');
+  return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xls' }) as ArrayBuffer);
+};
+
+// A legacy Word 97-2003 .doc (OLE binary) — vendored as a real fixture (built once via
+// `textutil -convert doc`) because nothing in the toolchain WRITES the binary format.
+// Body text: "Hello from the legacy doc.\nSecond paragraph here."
+const buildSampleDoc = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/legacy-sample.doc`).arrayBuffer());
+
 // A sheet with a fully-blank middle row — what Excel leaves behind when the used
 // range is padded past the real data. Default `sheet_to_csv` emits it as a bare
 // `,` line; the adapter drops it via `blankrows: false`.
@@ -623,6 +641,10 @@ const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   // A born-digital PDF → its text layer is extracted inline; a no-text PDF → skip note.
   zip.file('scan.pdf', buildPdfWithText());
   zip.file('blank.pdf', buildPdfNoImages());
+  // Legacy OLE formats: .xls extracted via sheetjs, .doc via word-extractor, .ppt noted (convert-to-pdf).
+  zip.file('legacy.xls', buildLegacyXls());
+  zip.file('legacy.doc', await buildSampleDoc());
+  zip.file('legacy.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE magic; .ppt is noted without parsing
   // Genuinely-binary payload (invalid UTF-8, no lead-byte continuation) → content-sniffs as non-text → skip note.
   zip.file('data.bin', new Uint8Array([0xff, 0xfe, 0xfd, 0x80]));
   // A dotless entry whose bytes ARE valid UTF-8 → the sniffer unpacks it as text (no extension needed).
@@ -684,6 +706,8 @@ const buildDocxWithSharepointLinks = async (): Promise<Uint8Array> => {
 export {
   buildAdversarialPptx,
   buildEmptyPptx,
+  buildLegacyXls,
+  buildSampleDoc,
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,
