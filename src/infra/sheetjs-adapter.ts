@@ -11,7 +11,10 @@ const readSheetsAsCsv = (bytes: Uint8Array): Result<ReadonlyArray<SheetCsv>, Gra
     const sheets = workbook.SheetNames.map((name) => {
       const sheet = workbook.Sheets[name];
       if (!sheet) return { name, csv: '' };
-      return { name, csv: XLSX.utils.sheet_to_csv(sheet) };
+      // `blankrows: false` drops fully-blank rows — Excel routinely pads the used
+      // range far past the real data, and those empty rows otherwise emit millions
+      // of bare-`,` lines (a 49 MB workbook crashed the markdown builder this way).
+      return { name, csv: XLSX.utils.sheet_to_csv(sheet, { blankrows: false }) };
     });
     return ok(sheets);
   } catch (e) {

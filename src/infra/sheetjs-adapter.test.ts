@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildMalformedXlsx, buildSampleXlsx } from '../test-helpers/office-fixtures.ts';
+import { buildMalformedXlsx, buildSampleXlsx, buildXlsxWithBlankRow } from '../test-helpers/office-fixtures.ts';
 import { readSheetsAsCsv } from './sheetjs-adapter.ts';
 
 describe('readSheetsAsCsv', () => {
@@ -15,6 +15,13 @@ describe('readSheetsAsCsv', () => {
       expect(result.value[1]?.csv).toContain('Product,Price');
       expect(result.value[1]?.csv).toContain('Widget,9.99');
     }
+  });
+
+  it('drops fully-blank rows so an inflated/padded used range does not bloat the CSV (no `,`-only filler lines)', () => {
+    const result = readSheetsAsCsv(buildXlsxWithBlankRow());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value[0]?.csv).toBe('Name,Age\nAlice,30');
   });
 
   it('returns err({ type: api_error }) when the bytes are not a valid xlsx archive', () => {

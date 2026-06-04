@@ -36,7 +36,10 @@ const csvToMarkdownTable = (csv: string): string => {
   const lines = csv.split('\n').filter((line) => line.length > 0);
   if (lines.length === 0) return '';
   const rows = lines.map((line) => splitCsvLine(line));
-  const colCount = Math.max(...rows.map((r) => r.length));
+  // Reduce, not `Math.max(...rows.map(…))`: spreading a huge sheet's row-lengths
+  // as call arguments overflows the engine's argument limit (RangeError: Maximum
+  // call stack size exceeded) once a sheet exceeds ~1M rows.
+  const colCount = rows.reduce((max, r) => Math.max(max, r.length), 0);
   const padRow = (row: ReadonlyArray<string>): string => {
     const cells = Array.from({ length: colCount }, (_unused, i) => row[i] ?? '');
     return `| ${cells.join(' | ')} |`;

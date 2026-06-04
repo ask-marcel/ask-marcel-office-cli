@@ -90,6 +90,16 @@ const buildSampleXlsx = (): Uint8Array => {
   return new Uint8Array(arrayBuffer);
 };
 
+// A sheet with a fully-blank middle row — what Excel leaves behind when the used
+// range is padded past the real data. Default `sheet_to_csv` emits it as a bare
+// `,` line; the adapter drops it via `blankrows: false`.
+const buildXlsxWithBlankRow = (): Uint8Array => {
+  const sheet = XLSX.utils.aoa_to_sheet([['Name', 'Age'], [], ['Alice', 30]]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1');
+  return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer);
+};
+
 const buildMalformedDocx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00]);
 
 const buildMalformedXlsx = (): Uint8Array => new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xff, 0xff, 0xff]);
@@ -633,4 +643,5 @@ export {
   buildRichXlsx,
   buildSampleDocx,
   buildSampleXlsx,
+  buildXlsxWithBlankRow,
 };

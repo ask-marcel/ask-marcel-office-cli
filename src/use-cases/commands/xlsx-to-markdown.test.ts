@@ -80,4 +80,10 @@ describe('csvToMarkdownTable', () => {
     expect(md).toContain('| 1 |  |  |');
     expect(md).toContain('| 2 | 3 |  |');
   });
+
+  it('renders a table from a sheet with more rows than the spread-argument limit without crashing (regression: Math.max(...rows) RangeError on a huge xlsx)', () => {
+    const csv = Array.from({ length: 1_050_000 }, () => 'a,b').join('\n');
+    const md = csvToMarkdownTable(csv);
+    expect(md.startsWith('| a | b |\n| --- | --- |\n| a | b |')).toBe(true);
+  });
 });
