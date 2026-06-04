@@ -6,6 +6,7 @@ import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
+import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { decodeUtf8Text } from './text-passthrough.ts';
@@ -34,6 +35,9 @@ const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx'
 
 const PPTX_HINT =
   'pptx not supported by `*-as-markdown`. Use the corresponding `*-as-pdf` command — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
+
+const PDF_NO_TEXT_HINT =
+  'pdf has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). This command extracts the embedded text layer, not pixels. Use `download-drive-item-as-pdf` to fetch the PDF and read it with a vision-capable model, or run OCR.';
 
 // Extensions Graph's `?format=pdf` does NOT accept — pointing the user at
 // `*-as-pdf` for these would trade one InputFormatNotSupported error for
@@ -121,6 +125,12 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     const bytes = await fetchRawBytes(graph, contentPath, opts);
     if (!bytes.ok) return bytes;
     return odfToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
+  }
+
+  if (ext === 'pdf') {
+    const bytes = await fetchRawBytes(graph, contentPath, opts);
+    if (!bytes.ok) return bytes;
+    return pdfToMarkdown(bytes.value, PDF_NO_TEXT_HINT);
   }
 
   // Known-binary extensions: hint straight away, no wasted download.

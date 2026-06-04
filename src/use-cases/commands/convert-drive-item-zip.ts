@@ -10,6 +10,7 @@ import { docxToMarkdown } from './docx-to-markdown.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
+import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { decodeUtf8Text } from './text-passthrough.ts';
@@ -21,8 +22,9 @@ import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
  * use — so an agent reading "the project handover archive" doesn't have to shell
  * out to `unzip` and convert each file separately. Office files (docx/xlsx/pptx/
  * odt/ods/odp + variants) become markdown; plain-text entries are decoded inline;
- * everything else (pdf, images, binaries, nested archives) is listed with a skip
- * note rather than failing the whole archive.
+ * PDFs have their text layer extracted; everything else (images, binaries, nested
+ * archives — plus scanned/image-only PDFs with no text) is listed with a note
+ * rather than failing the whole archive.
  */
 
 const schema = z.object({
@@ -62,6 +64,15 @@ const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<
       ? { path: entry.path, contentType: r.value.contentType, size: r.value.size, text: r.value.text }
       : { path: entry.path, note: `conversion failed: ${r.error.message}` };
   }
+  // A pdf entry's text layer is extracted inline; a scanned / image-only pdf (no text
+  // layer) or an unparseable one is listed with a note instead of failing the archive.
+  if (ext === 'pdf') {
+    const pdf = await pdfToMarkdown(
+      entry.bytes,
+      `${entry.path}: pdf has no extractable text layer (scanned / image-only) — fetch it with \`download-drive-item-as-pdf\` and read it with a vision model`
+    );
+    return pdf.ok ? { path: entry.path, contentType: pdf.value.contentType, size: pdf.value.size, text: pdf.value.text } : { path: entry.path, note: pdf.error.message };
+  }
   // Content-sniff: a zip entry whose bytes are valid UTF-8 is unpacked as text
   // (any text file, no extension list); binary entries are skipped with a note.
   const text = decodeUtf8Text(entry.bytes);
@@ -70,7 +81,7 @@ const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<
   }
   return {
     path: entry.path,
-    note: `skipped — ${ext === '' ? 'no extension' : ext} is not a convertible Office/text format (pdf, images, binaries, and nested archives are not unpacked here)`,
+    note: `skipped — ${ext === '' ? 'no extension' : ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
   };
 };
 
@@ -95,7 +106,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; pdf, images, binaries, and nested archives are listed with a skip note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
+    'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; PDFs have their text layer extracted (text/plain); images, binaries, nested archives, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',

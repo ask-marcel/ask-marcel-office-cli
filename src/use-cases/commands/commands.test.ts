@@ -12,6 +12,7 @@ import {
   buildOdtWithSharepointLinks,
   buildOversizedZipArchive,
   buildPdfWithImage,
+  buildPdfWithText,
   buildRichOdt,
   buildRichPptx,
   buildSampleDocx,
@@ -3915,10 +3916,12 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-markdown errs on a PDF fileAttachment with a no-PDF→markdown-path hint pointing at vision models or external tools (audit v1.0.0 §bug-6 — the convert-…-to-pdf fallback is circular for PDF inputs)', async () => {
+  it('convert-mail-attachment-to-markdown extracts a born-digital PDF fileAttachment’s text layer (text/plain)', async () => {
+    let bin = '';
+    for (const b of buildPdfWithText()) bin += String.fromCharCode(b);
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aPdf')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: btoa('zzz') });
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: btoa(bin) });
       }
       throw new Error(`unexpected ${url}`);
     };
@@ -3926,11 +3929,11 @@ describe('commands', () => {
     if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPdf' });
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('pdf attachment cannot be converted to markdown');
-      expect(result.error.message).toContain('vision-capable model');
-      expect(result.error.message).toContain('external PDF→text tool');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.text).toContain('Hello from the');
     }
   });
 
@@ -4063,7 +4066,7 @@ describe('convert-drive-item-zip', () => {
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
     const at = (p: string): { contentType?: string; text?: string; note?: string } => v.files.find((f) => f.path === p) ?? {};
-    expect(v.count).toBe(10);
+    expect(v.count).toBe(11);
     expect(v.truncated).toBeUndefined(); // under the cap → no truncation flag
     expect(at('report.docx').text).toContain('# Sample Heading');
     expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
@@ -4073,7 +4076,11 @@ describe('convert-drive-item-zip', () => {
     expect(at('notes.txt').text).toBe('hello from the archive');
     expect(at('notes.txt').contentType).toBe('text/plain');
     expect(at('broken.docx').note).toContain('conversion failed');
-    expect(at('scan.pdf').note).toContain('pdf is not a convertible'); // binary bytes → skip note names the extension
+    // A born-digital pdf entry → its text layer is extracted inline.
+    expect(at('scan.pdf').text).toContain('Hello from the');
+    expect(at('scan.pdf').contentType).toBe('text/plain');
+    // A pdf with no text layer (scanned / image-only) → noted, not failed.
+    expect(at('blank.pdf').note).toContain('no extractable text layer');
     expect(at('data.bin').note).toContain('bin is not a convertible'); // binary bytes → skip note
     // A dotless entry with valid-UTF-8 bytes now content-sniffs to text (no extension list to consult).
     expect(at('LICENSE').text).toBe('a dotless, no-extension entry');

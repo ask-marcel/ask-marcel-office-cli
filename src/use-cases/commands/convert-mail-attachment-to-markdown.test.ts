@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Result } from '../../domain/result.ts';
-import { buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildPdfNoImages, buildPdfWithText, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './convert-mail-attachment-to-markdown.ts';
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -110,8 +110,15 @@ describe('convert-mail-attachment-to-markdown — fileAttachment formats', () =>
     expect(asEnv(await execute(fileAttachment('plan.odt', odt), { ...params, includeMetadata: 'true' })).text).toContain('## OpenDocument metadata');
   });
 
-  it('rejects a pdf attachment with the no-PDF-parser hint', async () => {
-    expectApiErr(await execute(fileAttachment('scan.pdf', new Uint8Array([1])), params), 'does not bundle a PDF parser', 415);
+  it('extracts a born-digital PDF attachment’s text layer as a text/plain envelope', async () => {
+    const result = await execute(fileAttachment('doc.pdf', buildPdfWithText()), params);
+    expect(result.ok).toBe(true);
+    expect(asEnv(result).contentType).toBe('text/plain');
+    expect(asEnv(result).text).toContain('Hello from the');
+  });
+
+  it('rejects a scanned / image-only PDF attachment (no text layer) with a vision-model hint', async () => {
+    expectApiErr(await execute(fileAttachment('scan.pdf', buildPdfNoImages()), params), 'no extractable text layer', 415);
   });
 
   it('rejects every image extension with the image-specific hint', async () => {

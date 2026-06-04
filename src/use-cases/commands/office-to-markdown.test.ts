@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
+import { buildPdfNoImages, buildPdfWithText, buildRichOdt, buildRichPptx, buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
@@ -183,15 +183,45 @@ describe('officeToMarkdown — extension dispatch', () => {
     }
   });
 
-  it('errs with the generic 38-input-set hint for every other extension (pdf, rtf, etc.)', async () => {
-    const graph = bytesGraph(BINARY_BYTES, 'application/pdf');
+  it('errs with the generic 38-input-set hint for a non-pdf extension Graph accepts on the pdf path (rtf, etc.)', async () => {
+    const graph = bytesGraph(BINARY_BYTES);
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'notes.rtf');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('rtf not supported');
+    expect(result.error.message).toContain('38 input extensions');
+  });
+
+  it('extracts a born-digital PDF’s text layer as a text/plain envelope', async () => {
+    const graph = bytesGraph(buildPdfWithText(), 'application/pdf');
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { contentType: string; text: string };
+    expect(v.contentType).toBe('text/plain');
+    expect(v.text).toContain('Hello from the');
+  });
+
+  it('errs 415 with a vision-model hint for a scanned / image-only PDF (no text layer)', async () => {
+    const graph = bytesGraph(buildPdfNoImages(), 'application/pdf');
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'scan.pdf');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('no extractable text layer');
+    expect(result.error.message).toContain('download-drive-item-as-pdf');
+  });
+
+  it('propagates a getBinary api_error from the pdf path', async () => {
+    const graph = noopGraph({ getBinary: async () => ({ ok: false, error: { type: 'api_error' as const, status: 404, message: 'pdf not found' } }) });
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.status).toBe(415);
-      expect(result.error.message).toContain('pdf not supported');
-      expect(result.error.message).toContain('38 input extensions');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.message : '').toContain('pdf not found');
   });
 
   it('errs with a "fetch raw bytes" hint for archive / image / binary extensions Graph rejects on BOTH `*-as-markdown` AND `*-as-pdf` (zip is the canonical case — audit v1.0.0 §2.8)', async () => {

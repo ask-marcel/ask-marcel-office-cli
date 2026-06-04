@@ -14,6 +14,7 @@ import {
 } from './embedded-item-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
+import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
@@ -37,13 +38,11 @@ const decodeBase64 = (b64: string): Uint8Array => {
 const PPTX_HINT =
   'pptx attachment not supported by `convert-mail-attachment-to-markdown`. Use `convert-mail-attachment-to-pdf` — Graph PDF conversion preserves slide layout, and a vision-capable LLM reads it more reliably than flattened slide-by-slide bullets. Or pass `--include-metadata true` to extract the side-channel content (speaker notes, comments, hidden slides, properties, tags, links) as a `## PPTX metadata` document.';
 
-// Audit v1.0.0 §bug-6: there is no PDF→markdown path in this CLI (no bundled
-// PDF parser). The previous fallback pointed users at convert-…-to-pdf which
-// just returns the PDF bytes unchanged — circular. Surface a hint explaining
-// the actual workflow: get the bytes, then feed them to a vision-capable
-// model OR run an external PDF→text tool locally.
-const PDF_NO_MARKDOWN_HINT =
-  'pdf attachment cannot be converted to markdown — this CLI does not bundle a PDF parser, and `convert-mail-attachment-to-pdf` would just return the same PDF bytes unchanged. Use `get-mail-attachment --message-id <id> --attachment-id <id>` to fetch the bytes (base64) or pair `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land them on disk, then feed the PDF into a vision-capable model directly (recommended) or run an external PDF→text tool (pdftotext, pdf-parse, etc.).';
+// A born-digital PDF attachment's text layer is extracted via unpdf (pdfToMarkdown).
+// Only a scanned / image-only PDF (no text layer) falls back to this hint: the bytes
+// hold pixels, not text, so a vision model / OCR is the right tool.
+const PDF_NO_TEXT_HINT =
+  'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.';
 
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
 
@@ -69,7 +68,7 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
   if (PPTX_FAMILY.has(ext)) return includeMetadata ? pptxToMarkdown(bytes) : err({ type: 'api_error', status: 415, message: PPTX_HINT });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
-  if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
+  if (ext === 'pdf') return pdfToMarkdown(bytes, PDF_NO_TEXT_HINT);
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
 
   // Content-sniff: an attachment whose bytes are valid UTF-8 is returned as text
@@ -160,7 +159,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx attachments, `convert-mail-attachment-to-pdf` is recommended (Graph PDF preserves slide layout). For pdf/rtf/etc. also use the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
+    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pdf via text-layer extraction (unpdf → text/plain), plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx attachments, `convert-mail-attachment-to-pdf` is recommended (Graph PDF preserves slide layout). A scanned / image-only PDF (no text layer) and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
