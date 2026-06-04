@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'bun:test';
-import { isPlainTextFilename } from './text-passthrough.ts';
+import { decodeUtf8Text, isPlainTextFilename } from './text-passthrough.ts';
+
+describe('decodeUtf8Text — content-sniff: valid UTF-8 returns the text, binary returns undefined', () => {
+  it('returns the decoded string for valid UTF-8 bytes, including multi-byte characters', () => {
+    expect(decodeUtf8Text(new TextEncoder().encode('hello — café 文'))).toBe('hello — café 文');
+  });
+
+  it('returns an empty string for empty input (a zero-length document is valid UTF-8)', () => {
+    expect(decodeUtf8Text(new Uint8Array([]))).toBe('');
+  });
+
+  it('returns undefined for bytes that are not valid UTF-8 (binary)', () => {
+    expect(decodeUtf8Text(new Uint8Array([0xff, 0xfe, 0xfd]))).toBeUndefined();
+    expect(decodeUtf8Text(new Uint8Array([0x80]))).toBeUndefined();
+    expect(decodeUtf8Text(new Uint8Array([0xc3, 0x28]))).toBeUndefined();
+  });
+});
 
 describe('isPlainTextFilename — Graph cannot convert these formats; the conversion commands must short-circuit and return raw bytes', () => {
   it('recognises the plain-text extensions Graph will reject', () => {

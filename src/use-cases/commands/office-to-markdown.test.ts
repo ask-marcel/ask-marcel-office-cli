@@ -25,6 +25,13 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
+// 0xff/0xfe never start a valid UTF-8 sequence; 0x80/0x81 are stray continuation
+// bytes — so these content-sniff as binary (used where a non-Office file must hit
+// the hint rather than the text fallback).
+const BINARY_BYTES = new Uint8Array([0xff, 0xfe, 0xfd, 0x80, 0x81]);
+const bytesGraph = (bytes: Uint8Array, contentType = 'application/octet-stream'): GraphClient =>
+  noopGraph({ getBinary: async () => ok({ contentType, size: bytes.byteLength, base64: toBase64(bytes) }) });
+
 describe('officeToMarkdown — extension dispatch', () => {
   it('inlines plain-text source bytes (txt/md/json/etc.) as { contentType: "text/plain", size, text } when Graph returns them directly', async () => {
     const graph = noopGraph({
@@ -177,7 +184,7 @@ describe('officeToMarkdown — extension dispatch', () => {
   });
 
   it('errs with the generic 38-input-set hint for every other extension (pdf, rtf, etc.)', async () => {
-    const graph = noopGraph({});
+    const graph = bytesGraph(BINARY_BYTES, 'application/pdf');
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'report.pdf');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
@@ -227,20 +234,37 @@ describe('officeToMarkdown — extension dispatch', () => {
   });
 
   it('errs with `<no-extension>` placeholder when the filename has no dot', async () => {
-    const graph = noopGraph({});
+    const graph = bytesGraph(BINARY_BYTES);
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'README');
+    // Unconditional assertions (no `type === 'api_error'` guard, which would let an
+    // ObjectLiteral / StringLiteral mutant on the error envelope skip the check — see LESSONS.md).
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('<no-extension>');
-    }
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('<no-extension>');
   });
 
   it('errs with `<no-extension>` placeholder when the filename ends with a dot but no extension', async () => {
-    const graph = noopGraph({});
+    const graph = bytesGraph(BINARY_BYTES);
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'oddfile.');
     expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') {
-      expect(result.error.message).toContain('<no-extension>');
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('<no-extension>');
+  });
+
+  it('returns any UTF-8-decodable file as text/plain via content-sniffing — any extension, none, or an unlisted one (no plain-text list)', async () => {
+    const textBytes = new TextEncoder().encode('server {\n  listen 80;\n}\n');
+    const graph = bytesGraph(textBytes);
+    for (const name of ['nginx.conf', 'README', 'notes.txt', 'data.weirdext']) {
+      const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', name);
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.text).toContain('listen 80');
     }
   });
 

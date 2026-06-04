@@ -18,7 +18,7 @@ import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-exte
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
-import { isPlainTextFilename } from './text-passthrough.ts';
+import { decodeUtf8Text } from './text-passthrough.ts';
 import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 const schema = z.object({
@@ -64,15 +64,6 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   const contentBytes = attachment.contentBytes ?? '';
   const bytes = decodeBase64(contentBytes);
 
-  if (isPlainTextFilename(name)) {
-    return ok({
-      contentType: 'text/plain',
-      size: bytes.byteLength,
-      base64: contentBytes,
-      note: `pre-checked plain-text source (${name}); raw bytes returned without conversion`,
-    });
-  }
-
   const ext = extensionOf(name);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata });
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
@@ -80,6 +71,11 @@ const convertFileAttachment = async (attachment: { name?: string; contentBytes?:
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
   if (ext === 'pdf') return err({ type: 'api_error', status: 415, message: PDF_NO_MARKDOWN_HINT });
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
+
+  // Content-sniff: an attachment whose bytes are valid UTF-8 is returned as text
+  // (any text file, no extension list); anything else gets the generic hint.
+  const text = decodeUtf8Text(bytes);
+  if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });
   return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
 };
 

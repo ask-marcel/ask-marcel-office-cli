@@ -677,13 +677,30 @@ describe('commands', () => {
     if (result.ok) expect(result.value).toEqual({ value: [{ id: 'v1' }] });
   });
 
-  it('download-onedrive-file-content inlines the bytes (no longer returns the bare downloadUrl envelope)', async () => {
-    const result = await callCommand('download-onedrive-file-content', { driveId: 'd1', itemId: 'i1' }, { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' });
+  it('download-onedrive-file-content returns binary bytes as faithful inline base64 (content-sniffed — not coerced to text)', async () => {
+    const binaryB64 = btoa(String.fromCharCode(0xff, 0xfe, 0xfd, 0x80, 0x81)); // invalid UTF-8 → sniffs binary
+    const result = await callCommand('download-onedrive-file-content', { driveId: 'd1', itemId: 'i1' }, { contentType: 'application/octet-stream', size: 5, base64: binaryB64 });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; base64: string };
       expect(v.contentType).toBe('application/octet-stream');
-      expect(atob(v.base64)).toBe('%PDF-');
+      expect(v.base64).toBe(binaryB64); // bytes returned intact, never mangled into `�`
+    }
+  });
+
+  it('download-onedrive-file-content returns valid-UTF-8 bytes as text (content-sniffed, regardless of extension)', async () => {
+    const utf8 = new TextEncoder().encode('hi 文'); // multi-byte: proves the sniffer decodes real UTF-8, not just ASCII
+    const textB64 = btoa(String.fromCharCode(...utf8));
+    const result = await callCommand(
+      'download-onedrive-file-content',
+      { driveId: 'd1', itemId: 'i1' },
+      { contentType: 'application/octet-stream', size: utf8.byteLength, base64: textB64 }
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; text: string };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.text).toBe('hi 文');
     }
   });
 
@@ -3346,7 +3363,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-markdown short-circuits a plain-text fileAttachment to a raw envelope', async () => {
+  it('convert-mail-attachment-to-markdown content-sniffs a UTF-8 fileAttachment to an inline text envelope', async () => {
     const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'README.md', contentBytes: btoa('# Hi') });
     const cmd = cmdMap['convert-mail-attachment-to-markdown'];
     if (!cmd) throw new Error('convert-mail-attachment-to-markdown not registered');
@@ -3354,9 +3371,9 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aText' });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as { contentType: string; note?: string };
+      const v = result.value as { contentType: string; text?: string };
       expect(v.contentType).toBe('text/plain');
-      expect(v.note).toContain('plain-text source');
+      expect(v.text).toBe('# Hi');
     }
   });
 
@@ -3917,10 +3934,10 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-markdown errs with `<no-extension>` placeholder for fileAttachments without a recognizable extension', async () => {
+  it('convert-mail-attachment-to-markdown errs with `<no-extension>` placeholder for a dotless-name BINARY fileAttachment (content-sniff fails)', async () => {
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aNoExt')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'README', contentBytes: btoa('zzz') });
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'README', contentBytes: btoa(String.fromCharCode(0xff, 0xfe, 0xfd)) });
       }
       throw new Error(`unexpected ${url}`);
     };
@@ -4046,7 +4063,7 @@ describe('convert-drive-item-zip', () => {
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
     const at = (p: string): { contentType?: string; text?: string; note?: string } => v.files.find((f) => f.path === p) ?? {};
-    expect(v.count).toBe(9);
+    expect(v.count).toBe(10);
     expect(v.truncated).toBeUndefined(); // under the cap → no truncation flag
     expect(at('report.docx').text).toContain('# Sample Heading');
     expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
@@ -4056,9 +4073,14 @@ describe('convert-drive-item-zip', () => {
     expect(at('notes.txt').text).toBe('hello from the archive');
     expect(at('notes.txt').contentType).toBe('text/plain');
     expect(at('broken.docx').note).toContain('conversion failed');
-    expect(at('scan.pdf').note).toContain('pdf is not a convertible'); // the false branch names the extension
-    expect(at('data.bin').note).toContain('bin is not a convertible');
-    expect(at('LICENSE').note).toContain('no extension'); // dotless entry → the ext === '' branch
+    expect(at('scan.pdf').note).toContain('pdf is not a convertible'); // binary bytes → skip note names the extension
+    expect(at('data.bin').note).toContain('bin is not a convertible'); // binary bytes → skip note
+    // A dotless entry with valid-UTF-8 bytes now content-sniffs to text (no extension list to consult).
+    expect(at('LICENSE').text).toBe('a dotless, no-extension entry');
+    expect(at('LICENSE').contentType).toBe('text/plain');
+    // A dotless entry with BINARY bytes → skipped via the `ext === ''` → "no extension" branch.
+    expect(at('rawblob').note).toContain('no extension');
+    expect(at('rawblob').text).toBeUndefined();
   });
 
   it('appends each Office file’s metadata block when --include-metadata true (and accepts an explicit false)', async () => {
@@ -4996,9 +5018,9 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   {
     name: 'download-drive-item-as-markdown',
     params: { driveId: 'd1', itemId: 'i1' },
-    // No-extension metadata response from fakeFetch makes the dispatcher fall into the unsupported branch
-    // before any /content fetch — so the LAST URL hit is the metadata GET.
-    expectedPath: '/drives/d1/items/i1',
+    // No-extension metadata response → the dispatcher content-sniffs the bytes, so
+    // the LAST URL hit is the /content fetch (sniff fallback), not the metadata GET.
+    expectedPath: '/drives/d1/items/i1/content',
   },
   { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'report' }, expectedPath: "/drives/d1/search(q='report')" },
   { name: 'search-my-documents', params: { query: 'budget' }, expectedPath: "/me/drive/search(q='budget')" },

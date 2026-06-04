@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-04T00:57:49.476Z",
+  "generatedAt": "2026-06-04T05:37:16.028Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -332,7 +332,7 @@
     },
     {
       "name": "download-onedrive-file-content",
-      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Pre-checks the filename: if it matches the plain-text set (txt/md/html/json/yaml/log/xml/etc.), decodes the bytes as UTF-8 and returns `{contentType: \"text/plain\", size, text}` instead of base64 — avoids ~33% bloat on text payloads.",
+      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: \"text/plain\", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
@@ -352,7 +352,7 @@
         }
       ],
       "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"text/plain\", size, text }` for plain-text source extensions; `{ contentType, size, base64 }` for everything else. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files."
+      "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files."
     },
     {
       "name": "extract-drive-item-images",

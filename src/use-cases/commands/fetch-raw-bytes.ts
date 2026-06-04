@@ -43,14 +43,16 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
+export const base64ToBytes = (b64: string): Uint8Array => {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+};
+
 const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, GraphError> => {
   const b64 = blob['base64'];
-  if (typeof b64 === 'string') {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return ok(bytes);
-  }
+  if (typeof b64 === 'string') return ok(base64ToBytes(b64));
   const text = blob['text'];
   if (typeof text === 'string') {
     return ok(new TextEncoder().encode(text));

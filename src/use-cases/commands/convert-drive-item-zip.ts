@@ -12,7 +12,7 @@ import { formatZodError } from './format-zod-error.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
-import { isPlainTextFilename } from './text-passthrough.ts';
+import { decodeUtf8Text } from './text-passthrough.ts';
 import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 /**
@@ -62,8 +62,11 @@ const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<
       ? { path: entry.path, contentType: r.value.contentType, size: r.value.size, text: r.value.text }
       : { path: entry.path, note: `conversion failed: ${r.error.message}` };
   }
-  if (isPlainTextFilename(entry.path)) {
-    return { path: entry.path, contentType: 'text/plain', size: entry.bytes.byteLength, text: new TextDecoder().decode(entry.bytes) };
+  // Content-sniff: a zip entry whose bytes are valid UTF-8 is unpacked as text
+  // (any text file, no extension list); binary entries are skipped with a note.
+  const text = decodeUtf8Text(entry.bytes);
+  if (text !== undefined) {
+    return { path: entry.path, contentType: 'text/plain', size: entry.bytes.byteLength, text };
   }
   return {
     path: entry.path,

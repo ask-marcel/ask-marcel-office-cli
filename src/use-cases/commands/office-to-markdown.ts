@@ -8,14 +8,13 @@ import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-exte
 import { odfToMarkdown } from './odf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
-import { isPlainTextFilename } from './text-passthrough.ts';
+import { decodeUtf8Text } from './text-passthrough.ts';
 import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 /**
  * Strategy dispatcher for `*-as-markdown` commands. Picks the right
  * conversion path based on the file extension and routes through it:
  *
- * - plain-text (txt/md/json/yaml/etc.)  → raw bytes envelope, no conversion
  * - csv                                 → csvToMarkdownTable (markdown table)
  * - docx                                → mammoth → turndown
  * - xlsx                                → sheetjs → markdown table per sheet
@@ -24,9 +23,11 @@ import { csvToMarkdownTable, xlsxToMarkdown } from './xlsx-to-markdown.ts';
  * - loop / fluid / wbtx / whiteboard    → existing Graph ?format=html
  *                                         pipeline (the only inputs Graph
  *                                         HTML conversion actually accepts)
- * - everything else (pptx, pdf, rtf, …) → err pointing at the
- *                                              corresponding *-as-pdf
- *                                              command (38 input extensions)
+ * - anything else                       → content-sniff: bytes that decode as
+ *                                         valid UTF-8 are returned as text (any
+ *                                         text file, no extension list); a
+ *                                         known-binary ext or non-UTF-8 bytes
+ *                                         err pointing at the *-as-pdf command
  */
 
 const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx', 'whiteboard']);
@@ -80,17 +81,6 @@ const extensionOf = (filename: string): string => {
 type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean };
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
-  if (isPlainTextFilename(filename)) {
-    // Plain-text passthrough: follow the CDN redirect (just like csv/docx/xlsx
-    // do) and return the bytes inline as `{ contentType: "text/plain", size,
-    // text }` instead of the raw `{ "@microsoft.graph.downloadUrl": "..." }`
-    // envelope. Audit §1.11: an LLM consuming the JSON shouldn't need a
-    // separate fetch tool to actually read a txt/md/html body.
-    const bytes = await fetchRawBytes(graph, contentPath, opts);
-    if (!bytes.ok) return bytes;
-    const text = new TextDecoder().decode(bytes.value);
-    return ok({ contentType: 'text/plain', size: bytes.value.byteLength, text });
-  }
   const ext = extensionOf(filename);
 
   if (ext === 'csv') {
@@ -133,6 +123,16 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
     return odfToMarkdown(bytes.value, { includeMetadata: opts.includeMetadata });
   }
 
+  // Known-binary extensions: hint straight away, no wasted download.
+  if (PDF_UNSUPPORTED.has(ext)) return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext) });
+
+  // Fallback: content-sniff — any file whose bytes decode as valid UTF-8 comes
+  // back as text (a .txt/.md/.conf, or even an extensionless README, with no
+  // extension list to maintain); genuinely binary input gets the hint.
+  const bytes = await fetchRawBytes(graph, contentPath, opts);
+  if (!bytes.ok) return bytes;
+  const text = decodeUtf8Text(bytes.value);
+  if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.value.byteLength, text });
   return err({ type: 'api_error', status: 415, message: GENERIC_HINT(ext === '' ? '<no-extension>' : ext) });
 };
 

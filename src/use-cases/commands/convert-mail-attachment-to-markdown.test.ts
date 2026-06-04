@@ -68,11 +68,17 @@ describe('convert-mail-attachment-to-markdown — validation + dispatch', () => 
 });
 
 describe('convert-mail-attachment-to-markdown — fileAttachment formats', () => {
-  it('returns a raw plain-text passthrough envelope (with a note) for a text source', async () => {
+  it('returns the decoded text for a UTF-8 attachment, content-sniffed (no plain-text extension list)', async () => {
     const result = await execute(fileAttachment('notes.txt', new TextEncoder().encode('hello')), params);
     expect(result.ok).toBe(true);
     expect(asEnv(result).contentType).toBe('text/plain');
-    expect(asEnv(result).note).toContain('pre-checked plain-text source (notes.txt)');
+    expect(asEnv(result).text).toBe('hello');
+  });
+
+  it('content-sniffs a dotless-name attachment as text when its bytes are valid UTF-8 (was a 415 under the old extension list)', async () => {
+    const result = await execute(fileAttachment('READMEFILE', new TextEncoder().encode('readme body')), params);
+    expect(result.ok).toBe(true);
+    expect(asEnv(result).text).toBe('readme body');
   });
 
   it('converts docx; threads includeMetadata into the DOCX metadata block when true', async () => {
@@ -114,9 +120,9 @@ describe('convert-mail-attachment-to-markdown — fileAttachment formats', () =>
     }
   });
 
-  it('rejects an unknown extension with the generic hint and a <no-extension> placeholder for a dotless name', async () => {
-    expectApiErr(await execute(fileAttachment('archive.bespoke', new Uint8Array([1])), params), 'bespoke attachment not supported', 415);
-    expectApiErr(await execute(fileAttachment('READMEFILE', new Uint8Array([1])), params), '<no-extension> attachment not supported', 415);
+  it('rejects an unknown-extension BINARY attachment with the generic hint and a <no-extension> placeholder for a dotless binary name', async () => {
+    expectApiErr(await execute(fileAttachment('archive.bespoke', new Uint8Array([0xff, 0xfe])), params), 'bespoke attachment not supported', 415);
+    expectApiErr(await execute(fileAttachment('READMEFILE', new Uint8Array([0xff, 0xfe])), params), '<no-extension> attachment not supported', 415);
   });
 });
 

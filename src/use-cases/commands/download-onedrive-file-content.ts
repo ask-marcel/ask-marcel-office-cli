@@ -3,9 +3,9 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { fetchRawBytes, inlineBinary } from './fetch-raw-bytes.ts';
+import { base64ToBytes, inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { isPlainTextFilename } from './text-passthrough.ts';
+import { decodeUtf8Text } from './text-passthrough.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 
@@ -14,12 +14,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
 
-  // Audit v1.0.0 §bug-3: download-onedrive-file-content was returning text/
-  // markdown / .txt files as `application/octet-stream` + base64 because the
-  // CDN often serves SharePoint files with a generic content-type. Pre-fetch
-  // metadata, and if the filename matches our plain-text set, decode the
-  // bytes as UTF-8 and return a `{contentType: "text/plain", size, text}`
-  // envelope instead of base64-bloating a 33% larger payload.
+  // Pre-fetch metadata only to detect a folder target (the /content endpoint
+  // returns 200 + empty bytes for a folder); the name is NOT used to decide
+  // text-vs-binary — that's content-sniffed below.
   const metaResult = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!metaResult.ok) return metaResult;
   const item = metaResult.value as { name?: string; folder?: unknown };
@@ -37,18 +34,18 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     });
   }
 
-  if (isPlainTextFilename(name)) {
-    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
-    if (!bytes.ok) return bytes;
-    const text = new TextDecoder().decode(bytes.value);
-    return ok({ contentType: 'text/plain', size: bytes.value.byteLength, text });
-  }
-  return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+  // Content-sniff (not the extension): fetch the bytes once, return them as text
+  // when they decode as valid UTF-8, otherwise as faithful base64. A binary file
+  // named `.txt` therefore comes back intact instead of mangled into `�`.
+  const blob = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+  if (!blob.ok) return blob;
+  const text = decodeUtf8Text(base64ToBytes(blob.value.base64));
+  return ok(text !== undefined ? { contentType: 'text/plain', size: blob.value.size, text } : blob.value);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Pre-checks the filename: if it matches the plain-text set (txt/md/html/json/yaml/log/xml/etc.), decodes the bytes as UTF-8 and returns `{contentType: "text/plain", size, text}` instead of base64 — avoids ~33% bloat on text payloads.',
+    'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: "text/plain", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',
@@ -59,7 +56,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
-    '`{ contentType: "text/plain", size, text }` for plain-text source extensions; `{ contentType, size, base64 }` for everything else. Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.',
+    '`{ contentType: "text/plain", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.',
   producesBytes: true,
 };
 

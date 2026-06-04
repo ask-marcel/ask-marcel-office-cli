@@ -564,9 +564,14 @@ const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   zip.file('plan.odt', await buildRichOdt());
   zip.file('notes.txt', new TextEncoder().encode('hello from the archive'));
   zip.file('broken.docx', buildMalformedDocx());
-  zip.file('scan.pdf', new Uint8Array([0x25, 0x50, 0x44, 0x46]));
-  zip.file('data.bin', new Uint8Array([0x00, 0x01, 0x02, 0x03]));
+  // Genuinely-binary payloads (invalid UTF-8) so the content-sniff classifies them as non-text:
+  // '%PDF-1.4\n' followed by a raw JPEG SOI marker, and a run of high bytes with no lead-byte continuation.
+  zip.file('scan.pdf', new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a, 0xff, 0xd8, 0xff]));
+  zip.file('data.bin', new Uint8Array([0xff, 0xfe, 0xfd, 0x80]));
+  // A dotless entry whose bytes ARE valid UTF-8 → the sniffer unpacks it as text (no extension needed).
   zip.file('LICENSE', new TextEncoder().encode('a dotless, no-extension entry'));
+  // A dotless entry whose bytes are NOT valid UTF-8 → exercises the `ext === ''` skip-note branch ("no extension").
+  zip.file('rawblob', new Uint8Array([0xff, 0xfe, 0xfd, 0x80]));
   return zip.generateAsync({ type: 'uint8array' });
 };
 

@@ -31,4 +31,24 @@ const isPlainTextFilename = (name: string): boolean => PLAIN_TEXT_EXTENSIONS.has
 
 const isPdfSource = (name: string): boolean => extensionOf(name) === 'pdf';
 
-export { isPdfSource, isPlainTextFilename, PLAIN_TEXT_EXTENSIONS };
+/**
+ * Content-sniff for text — decode bytes STRICTLY as UTF-8. Returns the decoded
+ * string when the bytes are valid UTF-8, `undefined` when they are not (i.e.
+ * binary). The conversion / content commands use this instead of trusting a
+ * file extension: it detects any text file regardless of name AND can never
+ * mangle binary into `�` (the non-fatal decoder's silent corruption — the bug
+ * a binary file named `.txt` triggered). Non-UTF-8-encoded text (UTF-16, etc.)
+ * is reported as binary, which is faithful (base64) rather than lossy.
+ *
+ * `{ fatal: true }` makes `decode` throw on the first invalid sequence; the
+ * try/catch is a pure-domain fallback around a native synchronous thrower.
+ */
+const decodeUtf8Text = (bytes: Uint8Array): string | undefined => {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+};
+
+export { decodeUtf8Text, isPdfSource, isPlainTextFilename, PLAIN_TEXT_EXTENSIONS };
