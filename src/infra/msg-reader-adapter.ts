@@ -71,6 +71,13 @@ const mapRawMsg = (raw: RawMsg, attachmentContents: readonly (Uint8Array | undef
 
 type AttachmentReader = { readonly getAttachment: (index: number) => { readonly content?: unknown } };
 
+// msgreader is a CJS default-export class. The dynamic-import `default` resolves to a
+// constructable type under the dev tsconfig but to the module namespace under the
+// declaration-emit tsconfig (a CJS/ESM interop quirk). Pin the shape we use so both
+// configs agree and the constructor is always callable.
+type MsgReaderInstance = AttachmentReader & { readonly getFileData: () => unknown };
+type MsgReaderCtor = new (input: ArrayBuffer | DataView) => MsgReaderInstance;
+
 const readAttachmentContent = (reader: AttachmentReader, index: number): Uint8Array | undefined => {
   try {
     const content = reader.getAttachment(index).content;
@@ -82,11 +89,11 @@ const readAttachmentContent = (reader: AttachmentReader, index: number): Uint8Ar
 
 const extractMsg = async (bytes: Uint8Array): Promise<Result<ParsedMsg, GraphError>> => {
   try {
-    const { default: MsgReader } = await import('@kenjiuno/msgreader');
-    // MsgReader's constructor type is `ArrayBuffer | DataView`; wrap the (possibly
-    // offset) view zero-copy rather than copying the bytes into a fresh buffer.
+    const MsgReader = (await import('@kenjiuno/msgreader')).default as unknown as MsgReaderCtor;
+    // The constructor accepts `ArrayBuffer | DataView`; wrap the (possibly offset)
+    // view zero-copy rather than copying the bytes into a fresh buffer.
     const reader = new MsgReader(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
-    const data = reader.getFileData() as unknown as RawMsg;
+    const data = reader.getFileData() as RawMsg;
     const contents = (data.attachments ?? []).map((_attachment, index) => readAttachmentContent(reader, index));
     return ok(mapRawMsg(data, contents));
   } catch (e) {
