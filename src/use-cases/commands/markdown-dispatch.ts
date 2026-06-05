@@ -3,6 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
+import { msgToMarkdown } from './msg-to-markdown.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { pdfToMarkdown } from './pdf-to-markdown.ts';
@@ -23,7 +24,9 @@ type ConversionHints = {
   readonly generic: (ext: string) => string;
 };
 
-type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly inlineImages?: boolean };
+// `depth` is internal recursion plumbing for `.msg` attachments (a .msg can attach
+// another .msg); callers never set it. It caps `.msg`-inside-`.msg` nesting.
+type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly inlineImages?: boolean; readonly depth?: number };
 
 const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<unknown, GraphError> => {
   const md = renderCsvCapped(new TextDecoder().decode(bytes), maxCells);
@@ -35,8 +38,10 @@ const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<un
  * bytes already in hand: download-drive-item-as-markdown fetches them, convert-mail
  * decodes the attachment, convert-drive-item-zip unpacks the entry. Loop/Fluid/
  * Whiteboard (`?format=html`) need a Graph round-trip and are handled by the drive
- * caller BEFORE this — they never reach here. `hints` carry the caller-specific
- * messages; a non-text result is an `err` the caller surfaces (a 415, or a zip note).
+ * caller BEFORE this — they never reach here. An Outlook `.msg` is rendered to markdown
+ * (headers + body) with each of its own attachments recursed through this dispatch.
+ * `hints` carry the caller-specific messages; a non-text result is an `err` the caller
+ * surfaces (a 415, or a zip note).
  */
 const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
@@ -49,6 +54,12 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells }); // legacy Excel — no OOXML side-channel
   if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: hints.legacyPpt });
+  if (ext === 'msg') {
+    // Outlook .msg: render headers + body and recurse each attachment through this
+    // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't loop.
+    const depth = opts.depth ?? 0;
+    return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, hints));
+  }
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);
   if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });

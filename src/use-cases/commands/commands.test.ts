@@ -16,6 +16,7 @@ import {
   buildRichOdt,
   buildRichPptx,
   buildSampleDocx,
+  buildSampleMsg,
   buildSampleXlsx,
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
@@ -1308,6 +1309,30 @@ describe('commands', () => {
       expect(v.contentType).toBe('text/markdown');
       expect(v.text).toContain('# Sample Heading');
     }
+  });
+
+  it('download-drive-item-as-markdown renders an Outlook .msg with its attachment recursed inline', async () => {
+    const msgBytes = await buildSampleMsg();
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iMsg', method: 'GET', response: Response.json({ name: 'email.msg' }) },
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iMsg/content',
+        method: 'GET',
+        response: () => new Response(msgBytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
+      },
+    ]);
+    const cmd = cmdMap['download-drive-item-as-markdown'];
+    if (!cmd) throw new Error('download-drive-item-as-markdown not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iMsg' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { contentType: string; text: string };
+    expect(v.contentType).toBe('text/markdown');
+    expect(v.text).toContain('# Quarterly Report — Q3 Summary');
+    expect(v.text).toContain('**From:** Jordan Avery <jordan.avery@example.com>');
+    expect(v.text).toContain('## Attachments');
+    expect(v.text).toContain('### summary.txt');
+    expect(v.text).toContain('Attachment body text'); // the .txt attachment recursed to text/plain
   });
 
   it('extract-drive-item-images returns a base64 media envelope of the images (raster + svg) embedded in a pptx', async () => {
@@ -4115,7 +4140,7 @@ describe('convert-drive-item-zip', () => {
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
     const at = (p: string): { contentType?: string; text?: string; note?: string } => v.files.find((f) => f.path === p) ?? {};
-    expect(v.count).toBe(16);
+    expect(v.count).toBe(17);
     expect(v.truncated).toBeUndefined(); // under the cap → no truncation flag
     expect(at('report.docx').text).toContain('# Sample Heading');
     expect(at('report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
@@ -4137,6 +4162,13 @@ describe('convert-drive-item-zip', () => {
     expect(at('legacy.doc').contentType).toBe('text/plain');
     expect(at('corrupt.doc').note).toContain('text extraction failed'); // word-extractor throws on non-OLE bytes → noted, not failed
     expect(at('legacy.ppt').note).toContain('convert it to PDF');
+    // An Outlook .msg entry → rendered to markdown (headers + body) with its own
+    // attachment ("summary.txt") recursed through the same dispatch and inlined.
+    expect(at('mail.msg').text).toContain('# Quarterly Report');
+    expect(at('mail.msg').text).toContain('**From:** Jordan Avery <jordan.avery@example.com>');
+    expect(at('mail.msg').text).toContain('### summary.txt');
+    expect(at('mail.msg').text).toContain('Attachment body text');
+    expect(at('mail.msg').contentType).toBe('text/markdown');
     expect(at('photo.png').note).toContain('png is an image'); // raster image → noted, not unpacked
     expect(at('data.bin').note).toContain('bin is not a convertible'); // binary bytes → skip note
     // A dotless entry with valid-UTF-8 bytes now content-sniffs to text (no extension list to consult).

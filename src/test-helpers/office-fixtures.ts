@@ -108,6 +108,15 @@ const buildLegacyXls = (): Uint8Array => {
 // Body text: "Hello from the legacy doc.\nSecond paragraph here."
 const buildSampleDoc = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/legacy-sample.doc`).arrayBuffer());
 
+// A synthetic Outlook .msg (OLE/CFBF container) — vendored as a real 4 KB fixture
+// because nothing in the toolchain WRITES the MAPI format. Built once with fake data
+// (no tenant content) via @kenjiuno/msgreader's low-level `burn()` CFBF writer, with
+// these MAPI streams: subject "Quarterly Report — Q3 Summary", sender "Jordan Avery
+// <jordan.avery@example.com>", one recipient "Sam Rivera <sam.rivera@example.com>"
+// (no recipType property → kind 'unknown'), a plain-text body, and one file
+// attachment "summary.txt" (text content). Round-trips cleanly through MsgReader.
+const buildSampleMsg = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/sample.msg`).arrayBuffer());
+
 // A sheet with a fully-blank middle row — what Excel leaves behind when the used
 // range is padded past the real data. Default `sheet_to_csv` emits it as a bare
 // `,` line; the adapter drops it via `blankrows: false`.
@@ -627,9 +636,10 @@ const buildSideChannelDocx = async (): Promise<Uint8Array> => {
 
 // A .zip carrying one of every entry kind the zip-conversion command branches on:
 // each Office family (docx/xlsx/pptx/odt → markdown), a plain-text file (decoded
-// inline), a malformed docx (conversion-failed note), and two non-convertible
-// entries (a pdf + a raw binary → skip-note). Hand-rolled so the entry set is
-// deterministic and exercises every dispatch branch.
+// inline), a malformed docx (conversion-failed note), an Outlook .msg (rendered with
+// its attachment recursed), and non-convertible entries (a pdf + a raw binary →
+// skip-note). Hand-rolled so the entry set is deterministic and exercises every
+// dispatch branch.
 const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   const zip = new JSZip();
   zip.file('report.docx', await buildSampleDocx());
@@ -646,6 +656,9 @@ const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   zip.file('legacy.doc', await buildSampleDoc());
   zip.file('corrupt.doc', new Uint8Array([0xff, 0xfe, 0xfd])); // not a valid OLE → word-extractor throws → "conversion failed" note
   zip.file('legacy.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE magic; .ppt is noted without parsing
+  // An Outlook .msg entry → rendered to markdown (headers + body) with its own
+  // attachment recursed through the same dispatch (end-to-end .msg coverage).
+  zip.file('mail.msg', await buildSampleMsg());
   // A raster image entry → noted with the image hint (not unpacked here).
   zip.file('photo.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
   // Genuinely-binary payload (invalid UTF-8, no lead-byte continuation) → content-sniffs as non-text → skip note.
@@ -711,6 +724,7 @@ export {
   buildEmptyPptx,
   buildLegacyXls,
   buildSampleDoc,
+  buildSampleMsg,
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,
