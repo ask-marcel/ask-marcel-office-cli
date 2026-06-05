@@ -2892,9 +2892,10 @@ describe('commands', () => {
     const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aText' });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as { contentType: string; size: number; base64: string; note: string };
+      const v = result.value as { contentType: string; size: number; base64: string; note: string; passthrough: boolean };
       expect(v.contentType).toBe('text/plain');
       expect(v.note).toContain('pre-checked source');
+      expect(v.passthrough).toBe(true); // so --output-path guard blocks writing text into a .pdf (audit A5)
       expect(atob(v.base64)).toBe('# Hello');
     }
   });
@@ -2955,6 +2956,30 @@ describe('commands', () => {
       expect(atob(v.base64)).toBe('%PDF-');
     }
     expect(formatPdfCalled).toBe(false);
+  });
+
+  it('convert-mail-attachment-to-pdf tags a plain-text referenceAttachment short-circuit as passthrough so --output-path cannot write it into a .pdf (audit A5)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefTxt')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/notes.txt' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-txt', name: 'notes.txt', parentReference: { driveId: 'd1' } });
+      }
+      if (url.endsWith('/drives/d1/items/i-txt/content')) {
+        return new Response('plain text body', { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRefTxt' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; passthrough: boolean };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.passthrough).toBe(true);
+    }
   });
 
   it('convert-mail-attachment-to-pdf resolves a referenceAttachment via /shares/{token}/driveItem, converts in place, and inlines the PDF bytes (CDN redirect followed internally)', async () => {

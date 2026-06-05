@@ -53,10 +53,15 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
   // (CDN responds 406 InputFormatNotSupported on pdf → pdf), and the
   // user already has what they want — the raw PDF bytes.
   if (isPlainTextFilename(name) || isPdfSource(name)) {
+    const pdf = isPdfSource(name);
     return ok({
-      contentType: isPdfSource(name) ? 'application/pdf' : 'text/plain',
+      contentType: pdf ? 'application/pdf' : 'text/plain',
       size: bytes.byteLength,
       base64: contentBytes,
+      // A non-pdf body is a passthrough (raw source bytes, not a real PDF conversion),
+      // so output-path's guard blocks writing e.g. a .txt body into a `.pdf` (audit A5).
+      // Mirrors tagPdfPassthrough on the reference path, which also only tags non-pdf.
+      ...(pdf ? {} : { passthrough: true }),
       note: `pre-checked source (${name}); raw bytes returned without Graph conversion`,
     });
   }
@@ -113,7 +118,9 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
     return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
   }
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    return inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+    // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard
+    // blocks writing it into a `.pdf` — same protection as the fileAttachment path (audit A5).
+    return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`), name);
   }
   const refExt = extensionOf(name);
   if (IMAGE_EXTENSIONS.has(refExt)) return err({ type: 'api_error', status: 415, message: imageHint(refExt) });
