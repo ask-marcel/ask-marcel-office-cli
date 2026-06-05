@@ -1,0 +1,59 @@
+import type { Result } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import { docToMarkdown } from './doc-to-markdown.ts';
+import { docxToMarkdown } from './docx-to-markdown.ts';
+import { odfToMarkdown } from './odf-to-markdown.ts';
+import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { pdfToMarkdown } from './pdf-to-markdown.ts';
+import { pptxToMarkdown } from './pptx-to-markdown.ts';
+import { decodeUtf8Text, extensionOf } from './text-passthrough.ts';
+import { renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+
+// Image extensions that have no markdown text representation. NOTE: `svg` is NOT
+// here — an SVG is XML text, so it content-sniffs to text/plain like any text file.
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'ico']);
+
+// Context-specific hint messages. The dispatch ladder is shared; each caller (drive /
+// mail / zip) supplies its own wording (which sibling command to use, raw-bytes route).
+type ConversionHints = {
+  readonly pdfNoText: string;
+  readonly legacyPpt: string;
+  readonly image: (ext: string) => string;
+  readonly generic: (ext: string) => string;
+};
+
+type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly inlineImages?: boolean };
+
+const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<unknown, GraphError> => {
+  const md = renderCsvCapped(new TextDecoder().decode(bytes), maxCells);
+  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
+};
+
+/**
+ * The single extension→converter dispatch for every markdown command, operating on
+ * bytes already in hand: download-drive-item-as-markdown fetches them, convert-mail
+ * decodes the attachment, convert-drive-item-zip unpacks the entry. Loop/Fluid/
+ * Whiteboard (`?format=html`) need a Graph round-trip and are handled by the drive
+ * caller BEFORE this — they never reach here. `hints` carry the caller-specific
+ * messages; a non-text result is an `err` the caller surfaces (a 415, or a zip note).
+ */
+const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
+  const ext = extensionOf(filename);
+  if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
+  if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
+  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells });
+  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
+  if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
+  if (ext === 'pdf') return pdfToMarkdown(bytes, hints.pdfNoText);
+  if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells }); // legacy Excel — no OOXML side-channel
+  if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
+  if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: hints.legacyPpt });
+  if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: hints.image(ext) });
+  const text = decodeUtf8Text(bytes);
+  if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });
+  return err({ type: 'api_error', status: 415, message: hints.generic(ext === '' ? '<no-extension>' : ext) });
+};
+
+export { bytesToMarkdown, IMAGE_EXTENSIONS };
+export type { BytesToMarkdownOptions, ConversionHints };

@@ -3,8 +3,6 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { docToMarkdown } from './doc-to-markdown.ts';
-import { docxToMarkdown } from './docx-to-markdown.ts';
 import {
   embeddedContactToMarkdown,
   embeddedEventToMarkdown,
@@ -13,15 +11,12 @@ import {
   type EmbeddedEvent,
   type EmbeddedMessage,
 } from './embedded-item-to-markdown.ts';
+import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { odfToMarkdown } from './odf-to-markdown.ts';
-import { pdfToMarkdown } from './pdf-to-markdown.ts';
-import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { bytesToMarkdown } from './markdown-dispatch.ts';
+import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
-import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
-import { decodeUtf8Text } from './text-passthrough.ts';
-import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),
@@ -29,58 +24,21 @@ const schema = z.object({
   includeMetadata: z.enum(['true', 'false']).optional(),
 });
 
-const decodeBase64 = (b64: string): Uint8Array => {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+const MAIL_HINTS: ConversionHints = {
+  pdfNoText:
+    'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.',
+  legacyPpt:
+    'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown — there is no pure-JS parser for the format. Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to render it, then read the PDF with a vision-capable model.',
+  image: (ext) =>
+    `${ext} attachment is an image and cannot be converted to markdown. Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded) and feed them into a vision-capable model directly — that's the right shape for image content. (\`convert-mail-attachment-to-pdf\` is NOT a workaround: Graph's format=pdf rejects images with InputFormatNotSupported.)`,
+  generic: (ext) =>
+    `${ext} attachment not supported by \`convert-mail-attachment-to-markdown\`. Use \`convert-mail-attachment-to-pdf\` — Graph \`?format=pdf\` accepts 38 input extensions.`,
 };
 
-// A born-digital PDF attachment's text layer is extracted via unpdf (pdfToMarkdown).
-// Only a scanned / image-only PDF (no text layer) falls back to this hint: the bytes
-// hold pixels, not text, so a vision model / OCR is the right tool.
-const PDF_NO_TEXT_HINT =
-  'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.';
-
-const LEGACY_PPT_HINT =
-  'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown — there is no pure-JS parser for the format. Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to render it, then read the PDF with a vision-capable model.';
-
-const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']);
-
-const imageHint = (ext: string): string =>
-  `${ext} attachment is an image and cannot be converted to markdown. Use \`get-mail-attachment --message-id <id> --attachment-id <id>\` to fetch the bytes (returned base64-encoded) and feed them into a vision-capable model directly — that's the right shape for image content. (\`convert-mail-attachment-to-pdf\` is NOT a workaround: Graph's format=pdf rejects images with InputFormatNotSupported.)`;
-
-const genericHint = (ext: string): string =>
-  `${ext} attachment not supported by \`convert-mail-attachment-to-markdown\`. Use \`convert-mail-attachment-to-pdf\` — Graph \`?format=pdf\` accepts 38 input extensions.`;
-
-const extensionOf = (filename: string): string => {
-  const dot = filename.lastIndexOf('.');
-  if (dot === -1 || dot === filename.length - 1) return '';
-  return filename.slice(dot + 1).toLowerCase();
-};
-
-const convertFileAttachment = async (attachment: { name?: string; contentBytes?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
-  const name = attachment.name ?? 'unnamed';
-  const contentBytes = attachment.contentBytes ?? '';
-  const bytes = decodeBase64(contentBytes);
-
-  const ext = extensionOf(name);
-  if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata });
-  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
-  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
-  if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
-  if (ext === 'pdf') return pdfToMarkdown(bytes, PDF_NO_TEXT_HINT);
-  if (ext === 'xls') return xlsxToMarkdown(bytes, {}); // legacy Excel — sheetjs auto-detects BIFF; no OOXML side-channel
-  if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — word-extractor (text only)
-  if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: LEGACY_PPT_HINT });
-  if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: imageHint(ext) });
-
-  // Content-sniff: an attachment whose bytes are valid UTF-8 is returned as text
-  // (any text file, no extension list); anything else gets the generic hint.
-  const text = decodeUtf8Text(bytes);
-  if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });
-  return err({ type: 'api_error', status: 415, message: genericHint(ext === '' ? '<no-extension>' : ext) });
-};
+// fileAttachment carries the bytes inline (base64) — decode and run them through the
+// shared dispatch (docx/xlsx/pptx/odf/csv/pdf/legacy + content-sniff), same as drive.
+const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> =>
+  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', { includeMetadata }, MAIL_HINTS);
 
 const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;

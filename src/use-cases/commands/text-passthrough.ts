@@ -51,4 +51,4 @@ const decodeUtf8Text = (bytes: Uint8Array): string | undefined => {
   }
 };
 
-export { decodeUtf8Text, isPdfSource, isPlainTextFilename, PLAIN_TEXT_EXTENSIONS };
+export { decodeUtf8Text, extensionOf, isPdfSource, isPlainTextFilename, PLAIN_TEXT_EXTENSIONS };

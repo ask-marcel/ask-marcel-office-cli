@@ -268,7 +268,7 @@ describe('officeToMarkdown — extension dispatch', () => {
   });
 
   it('errs 415 for a legacy .ppt pointing at the convert-to-PDF-first workflow', async () => {
-    const graph = noopGraph({});
+    const graph = bytesGraph(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE bytes are fetched, then the ppt branch errs
     const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'deck.ppt');
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -287,6 +287,17 @@ describe('officeToMarkdown — extension dispatch', () => {
     expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
     expect(result.error.message).toContain('zip not supported');
     expect(result.error.message).toContain('38 input extensions');
+  });
+
+  it('errs 415 with the image hint for a raster image (png), pointing at extract-drive-item-images / a vision model', async () => {
+    const graph = bytesGraph(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+    const result = await officeToMarkdown(graph, '/drives/d1/items/i1/content', 'photo.png');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(415);
+    expect(result.error.message).toContain('png is an image');
+    expect(result.error.message).toContain('extract-drive-item-images');
   });
 
   it('an .svg (which is XML text) content-sniffs to text/plain rather than being rejected as binary', async () => {

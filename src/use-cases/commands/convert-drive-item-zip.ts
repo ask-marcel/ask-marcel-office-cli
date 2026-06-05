@@ -5,17 +5,10 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { openZipEntries } from '../../infra/zip-reader.ts';
 import type { ZipEntry } from '../../infra/zip-reader.ts';
 import type { CommandMeta } from './command-types.ts';
-import type { MarkdownEnvelope } from './docx-to-markdown.ts';
-import { docxToMarkdown } from './docx-to-markdown.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { docToMarkdown } from './doc-to-markdown.ts';
-import { odfToMarkdown } from './odf-to-markdown.ts';
-import { pdfToMarkdown } from './pdf-to-markdown.ts';
-import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
-import { pptxToMarkdown } from './pptx-to-markdown.ts';
-import { decodeUtf8Text } from './text-passthrough.ts';
-import { xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { bytesToMarkdown } from './markdown-dispatch.ts';
+import type { ConversionHints } from './markdown-dispatch.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -41,64 +34,21 @@ const MAX_ENTRIES = 100;
 
 type FileResult = { readonly path: string; readonly contentType?: string; readonly size?: number; readonly text?: string; readonly note?: string };
 
-const extensionOf = (name: string): string => {
-  const dot = name.lastIndexOf('.');
-  return dot === -1 ? '' : name.slice(dot + 1).toLowerCase();
-};
-
-// Convert one Office entry to markdown, or return undefined if the extension
-// isn't an Office family (caller then tries the plain-text / skip paths).
-const officeConvert = (ext: string, bytes: Uint8Array, includeMetadata: boolean): Promise<Result<MarkdownEnvelope, GraphError>> | undefined => {
-  if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata });
-  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata });
-  if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata });
-  if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata });
-  if (ext === 'xls') return xlsxToMarkdown(bytes, {}); // legacy Excel (BIFF / OLE) — sheetjs auto-detects; no OOXML side-channel
-  return undefined;
+// The zip lists unconvertible entries with a note instead of failing the whole
+// archive, so every dispatch `err` becomes a `note` — these hints are phrased as
+// notes (no path prefix; the FileResult already carries the entry path).
+const ZIP_HINTS: ConversionHints = {
+  pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — fetch it with `download-drive-item-as-pdf` and read it with a vision model',
+  legacyPpt: 'ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF with `download-drive-item-as-pdf`, then read it with a vision model',
+  image: (ext) => `${ext} is an image — not unpacked here; pull images embedded in a document with \`extract-drive-item-images\`, or read it with a vision model`,
+  generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
 };
 
 const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<FileResult> => {
-  const ext = extensionOf(entry.path);
-  const office = officeConvert(ext, entry.bytes, includeMetadata);
-  if (office !== undefined) {
-    const r = await office;
-    return r.ok
-      ? { path: entry.path, contentType: r.value.contentType, size: r.value.size, text: r.value.text }
-      : { path: entry.path, note: `conversion failed: ${r.error.message}` };
-  }
-  // A pdf entry's text layer is extracted inline; a scanned / image-only pdf (no text
-  // layer) or an unparseable one is listed with a note instead of failing the archive.
-  if (ext === 'pdf') {
-    const pdf = await pdfToMarkdown(
-      entry.bytes,
-      `${entry.path}: pdf has no extractable text layer (scanned / image-only) — fetch it with \`download-drive-item-as-pdf\` and read it with a vision model`
-    );
-    return pdf.ok ? { path: entry.path, contentType: pdf.value.contentType, size: pdf.value.size, text: pdf.value.text } : { path: entry.path, note: pdf.error.message };
-  }
-  // Legacy Word (.doc, OLE binary) → body text via word-extractor (text/plain), or a note on parse failure.
-  if (ext === 'doc') {
-    const doc = await docToMarkdown(entry.bytes);
-    return doc.ok
-      ? { path: entry.path, contentType: doc.value.contentType, size: doc.value.size, text: doc.value.text }
-      : { path: entry.path, note: `conversion failed: ${doc.error.message}` };
-  }
-  // Legacy PowerPoint (.ppt, OLE binary) has no pure-JS markdown path — note it, don't fail the archive.
-  if (ext === 'ppt') {
-    return {
-      path: entry.path,
-      note: `${entry.path}: ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF with \`download-drive-item-as-pdf\`, then read it with a vision model`,
-    };
-  }
-  // Content-sniff: a zip entry whose bytes are valid UTF-8 is unpacked as text
-  // (any text file, no extension list); binary entries are skipped with a note.
-  const text = decodeUtf8Text(entry.bytes);
-  if (text !== undefined) {
-    return { path: entry.path, contentType: 'text/plain', size: entry.bytes.byteLength, text };
-  }
-  return {
-    path: entry.path,
-    note: `skipped — ${ext === '' ? 'no extension' : ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
-  };
+  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata }, ZIP_HINTS);
+  if (!r.ok) return { path: entry.path, note: r.error.message };
+  const env = r.value as { contentType: string; size: number; text: string };
+  return { path: entry.path, contentType: env.contentType, size: env.size, text: env.text };
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {

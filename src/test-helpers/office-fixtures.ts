@@ -646,6 +646,8 @@ const buildSampleZipArchive = async (): Promise<Uint8Array> => {
   zip.file('legacy.doc', await buildSampleDoc());
   zip.file('corrupt.doc', new Uint8Array([0xff, 0xfe, 0xfd])); // not a valid OLE → word-extractor throws → "conversion failed" note
   zip.file('legacy.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])); // OLE magic; .ppt is noted without parsing
+  // A raster image entry → noted with the image hint (not unpacked here).
+  zip.file('photo.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
   // Genuinely-binary payload (invalid UTF-8, no lead-byte continuation) → content-sniffs as non-text → skip note.
   zip.file('data.bin', new Uint8Array([0xff, 0xfe, 0xfd, 0x80]));
   // A dotless entry whose bytes ARE valid UTF-8 → the sniffer unpacks it as text (no extension needed).

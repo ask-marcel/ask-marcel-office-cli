@@ -150,8 +150,23 @@ describe('convert-mail-attachment-to-markdown — fileAttachment formats', () =>
     expectApiErr(await execute(fileAttachment('deck.ppt', new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])), params), 'ppt (legacy PowerPoint', 415);
   });
 
-  it('rejects every image extension with the image-specific hint', async () => {
-    for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico']) {
+  it('renders a .csv attachment as a markdown table — not raw text (audit B1; now matches the drive command)', async () => {
+    const result = await execute(fileAttachment('data.csv', new TextEncoder().encode('Name,Age\nAlice,30')), params);
+    expect(asEnv(result).contentType).toBe('text/markdown');
+    expect(asEnv(result).text).toContain('| Name | Age |');
+    expect(asEnv(result).text).toContain('| --- | --- |');
+    expect(asEnv(result).text).toContain('| Alice | 30 |');
+  });
+
+  it('content-sniffs an .svg attachment to text/plain (svg is XML text, not a raster image — consistent with the drive command)', async () => {
+    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><text>label</text></svg>');
+    const result = await execute(fileAttachment('chart.svg', svg), params);
+    expect(asEnv(result).contentType).toBe('text/plain');
+    expect(asEnv(result).text).toContain('<text>label</text>');
+  });
+
+  it('rejects every raster image extension with the image-specific hint', async () => {
+    for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'ico']) {
       expectApiErr(await execute(fileAttachment(`pic.${ext}`, new Uint8Array([1])), params), `${ext} attachment is an image and cannot be converted to markdown`, 415);
     }
   });
