@@ -39,4 +39,3 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
 };
 
 export { officeToMarkdown };
-export type { FetchOptions, OfficeToMarkdownOptions };

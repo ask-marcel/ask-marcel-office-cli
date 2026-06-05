@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
+import { base64ToBytes, inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
@@ -12,13 +12,6 @@ const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
 });
-
-const decodeBase64 = (b64: string): Uint8Array => {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-};
 
 const safeExtension = (name: string): string => {
   const dot = name.lastIndexOf('.');
@@ -46,7 +39,7 @@ const extensionOf = (name: string): string => {
 const convertFileAttachment = async (graph: GraphClient, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
   const name = attachment.name ?? 'unnamed';
   const contentBytes = attachment.contentBytes ?? '';
-  const bytes = decodeBase64(contentBytes);
+  const bytes = base64ToBytes(contentBytes);
 
   // Plain-text source OR pdf source: skip the upload-convert dance,
   // return raw bytes. PDF is not in Graph's `format=pdf` input list

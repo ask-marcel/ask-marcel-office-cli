@@ -2,6 +2,7 @@ import { posix } from 'node:path';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
+import { base64ToBytes } from './fetch-raw-bytes.ts';
 
 /**
  * Generic interceptor used by the global `--output-path` flag in `cli.ts`.
@@ -37,13 +38,6 @@ type MediaItem = { readonly path: string; readonly base64: string };
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const decodeBase64 = (b64: string): Uint8Array => {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-};
-
 const looksLikeDirectoryPath = (path: string): boolean => path.endsWith('/') || path.endsWith('\\');
 
 // Audit v1.0.0 §B4: when a *-as-pdf command silently falls back to raw source
@@ -72,7 +66,7 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
     if (passthrough === true && typeof contentType === 'string' && isPdfExtension(outputPath) && !isPdfContentType(contentType)) {
       return err({ type: 'passthrough_extension_mismatch', contentType, requestedExtension: '.pdf' });
     }
-    const written = await fs.writeBytes(outputPath, decodeBase64(base64));
+    const written = await fs.writeBytes(outputPath, base64ToBytes(base64));
     if (!written.ok) return err({ type: 'write_failed', message: written.error.type === 'io_failed' ? written.error.message : written.error.type });
     return ok({ ...withoutKey(data, 'base64'), savedTo: outputPath });
   }
@@ -116,7 +110,7 @@ export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string 
   // Flatten the full media path (not basename) so page-scoped PDF images with
   // repeating XObject keys (pdf/page1/Im0.png, pdf/page2/Im0.png) don't collide.
   const destOf = (item: MediaItem): string => posix.join(outputDir, item.path.replace(/\//g, '_'));
-  const writes = await Promise.all(media.map((item) => fs.writeBytes(destOf(item), decodeBase64(item.base64))));
+  const writes = await Promise.all(media.map((item) => fs.writeBytes(destOf(item), base64ToBytes(item.base64))));
   const failed = writes.find((w) => !w.ok);
   if (failed !== undefined && !failed.ok) return err({ type: 'write_failed', message: failed.error.type === 'io_failed' ? failed.error.message : failed.error.type });
 
