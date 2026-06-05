@@ -1360,7 +1360,10 @@ describe('commands', () => {
   });
 
   it('extract-drive-item-images rejects an unsupported source with a 415 that names the extension and points at download-onedrive-file-content', async () => {
-    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt', method: 'GET', response: Response.json({ name: 'notes.txt' }) }]);
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt/content', method: 'GET', response: () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }) },
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt', method: 'GET', response: Response.json({ name: 'notes.txt' }) },
+    ]);
     const cmd = cmdMap['extract-drive-item-images'];
     if (!cmd) throw new Error('extract-drive-item-images not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
@@ -1432,8 +1435,26 @@ describe('commands', () => {
     }
   });
 
+  it('extract-drive-item-images errs 400 with a list-folder-files hint when the item is a folder (mirrors download-drive-item-as-pdf)', async () => {
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'My Folder', folder: { childCount: 3 } }) },
+    ]);
+    const cmd = cmdMap['extract-drive-item-images'];
+    if (!cmd) throw new Error('extract-drive-item-images not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iFolder' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.type === 'api_error' ? result.error.status : -1).toBe(400);
+    expect(result.error.type === 'api_error' ? result.error.message : '').toContain("'My Folder' is a folder");
+    expect(result.error.type === 'api_error' ? result.error.message : '').toContain('list-folder-files');
+  });
+
   it('extract-drive-item-images returns a 415 api_error with the <no-extension> placeholder when the driveItem name has no extension', async () => {
-    const fetchFn = stagedFetch([{ urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iNoExt', method: 'GET', response: Response.json({ name: 'README' }) }]);
+    const fetchFn = stagedFetch([
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iNoExt/content', method: 'GET', response: () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }) },
+      { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iNoExt', method: 'GET', response: Response.json({ name: 'README' }) },
+    ]);
     const cmd = cmdMap['extract-drive-item-images'];
     if (!cmd) throw new Error('extract-drive-item-images not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'iNoExt' });

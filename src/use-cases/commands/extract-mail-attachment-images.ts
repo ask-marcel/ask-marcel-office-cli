@@ -1,60 +1,19 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
-import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
 import type { CommandMeta } from './command-types.ts';
-import { fetchRawBytes } from './fetch-raw-bytes.ts';
+import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { buildMediaResponse } from './media-files.ts';
-import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { extractImagesFromBytes } from './image-extraction.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 
 const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1) });
 
-const decodeBase64 = (b64: string): Uint8Array => {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-};
-
-const extensionOf = (filename: string): string => {
-  const dot = filename.lastIndexOf('.');
-  // A trailing dot needs no special case: slice(dot + 1) is already '' for it.
-  return dot === -1 ? '' : filename.slice(dot + 1).toLowerCase();
-};
-
-const isOoxml = (ext: string): boolean => DOCX_FAMILY.has(ext) || XLSX_FAMILY.has(ext) || PPTX_FAMILY.has(ext);
-
-// Pick the media extractor by extension: PDF via unpdf, OOXML via the zip media parts, else unsupported.
-const extractorFor = (ext: string): typeof extractPdfImages | undefined => {
-  if (ext === 'pdf') return extractPdfImages;
-  if (isOoxml(ext)) return extractOoxmlMedia;
-  return undefined;
-};
-
-const unsupportedFormat = (ext: string): Result<unknown, GraphError> => ({
-  ok: false,
-  error: {
-    type: 'api_error',
-    status: 415,
-    message: `${ext === '' ? '<no-extension>' : ext} is not a supported document — image extraction supports pdf and docx / xlsx / pptx (and their macro-enabled / template variants). For other attachments, fetch the bytes via \`get-mail-attachment\` and process locally.`,
-  },
-});
-
-const extractFromBytes = async (bytes: Uint8Array, name: string): Promise<Result<unknown, GraphError>> => {
-  const ext = extensionOf(name);
-  const extractor = extractorFor(ext);
-  if (extractor === undefined) return unsupportedFormat(ext);
-  const media = await extractor(bytes);
-  if (!media.ok) return media;
-  return ok(buildMediaResponse(media.value));
-};
+const FETCH_HINT = 'For other attachments, fetch the bytes via `get-mail-attachment` and process locally.';
 
 const fromFileAttachment = (attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> =>
-  extractFromBytes(decodeBase64(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed');
+  extractImagesFromBytes(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', FETCH_HINT);
 
 const fromReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
@@ -67,7 +26,7 @@ const fromReferenceAttachment = async (graph: GraphClient, attachment: { sourceU
   if (typeof driveId !== 'string' || typeof itemId !== 'string') return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
-  return extractFromBytes(bytes.value, item.name ?? '');
+  return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -106,7 +65,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
   responseShape:
-    '`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo`. `count: 0` means the attachment embeds no extractable images.',
+    '`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).',
   producesMedia: true,
 };
 
