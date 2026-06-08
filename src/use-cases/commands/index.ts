@@ -87,6 +87,7 @@ import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-ev
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
+import * as convertMailAttachmentZip from './convert-mail-attachment-zip.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as listChats from './list-chats.ts';
@@ -231,6 +232,7 @@ const commands: Record<string, Command> = {
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-drive-item-zip': convertDriveItemZip,
+  'convert-mail-attachment-zip': convertMailAttachmentZip,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,

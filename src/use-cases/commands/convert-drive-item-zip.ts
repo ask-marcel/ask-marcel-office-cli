@@ -1,14 +1,12 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { openZipEntries } from '../../infra/zip-reader.ts';
-import type { ZipEntry } from '../../infra/zip-reader.ts';
 import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
+import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -28,27 +26,15 @@ const schema = z.object({
   includeMetadata: z.enum(['true', 'false']).optional(),
 });
 
-// Bound the fan-out: the whole archive is buffered in memory and converted
-// entry-by-entry, so a pathological archive can't run unbounded.
-const MAX_ENTRIES = 100;
-
-type FileResult = { readonly path: string; readonly contentType?: string; readonly size?: number; readonly text?: string; readonly note?: string };
-
 // The zip lists unconvertible entries with a note instead of failing the whole
 // archive, so every dispatch `err` becomes a `note` — these hints are phrased as
-// notes (no path prefix; the FileResult already carries the entry path).
+// notes (no path prefix; the FileResult already carries the entry path) and point
+// at the drive-item sibling commands.
 const ZIP_HINTS: ConversionHints = {
   pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — fetch it with `download-drive-item-as-pdf` and read it with a vision model',
   legacyPpt: 'ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF with `download-drive-item-as-pdf`, then read it with a vision model',
   image: (ext) => `${ext} is an image — not unpacked here; pull images embedded in a document with \`extract-drive-item-images\`, or read it with a vision model`,
   generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
-};
-
-const convertEntry = async (entry: ZipEntry, includeMetadata: boolean): Promise<FileResult> => {
-  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata }, ZIP_HINTS);
-  if (!r.ok) return { path: entry.path, note: r.error.message };
-  const env = r.value as { contentType: string; size: number; text: string };
-  return { path: entry.path, contentType: env.contentType, size: env.size, text: env.text };
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -59,15 +45,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
-  const entries = await openZipEntries(bytes.value);
-  if (!entries.ok) return entries;
-
-  const capped = entries.value.slice(0, MAX_ENTRIES);
-  const files = await Promise.all(capped.map((entry) => convertEntry(entry, includeMetadata)));
-  if (entries.value.length > MAX_ENTRIES) {
-    return ok({ count: files.length, totalEntries: entries.value.length, truncated: true, files });
-  }
-  return ok({ count: files.length, files });
+  return convertZipArchive(bytes.value, includeMetadata, ZIP_HINTS);
 };
 
 const meta: CommandMeta = {

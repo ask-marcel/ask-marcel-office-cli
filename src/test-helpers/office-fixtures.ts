@@ -677,6 +677,60 @@ const buildOversizedZipArchive = async (): Promise<Uint8Array> => {
   return zip.generateAsync({ type: 'uint8array' });
 };
 
+// A hand-built .zip with ONE stored entry whose filename is GBK-encoded and whose
+// UTF-8 flag (general-purpose bit 11) is cleared — what WinRAR / Windows Explorer
+// produce for Chinese names. JSZip cannot WRITE such an entry (it always sets the
+// UTF-8 flag), so we assemble the local header + central directory + EOCD by hand.
+// The name bytes 0xB6 0xB7 0xCF 0xF3 are GBK for "斗象"; the entry is "斗象.txt".
+// CRC-32 is left 0 (JSZip's loadAsync default is `checkCRC32: false`).
+const buildGbkNameZip = (): Uint8Array => {
+  const name = Uint8Array.from([0xb6, 0xb7, 0xcf, 0xf3, 0x2e, 0x74, 0x78, 0x74]); // 斗象.txt (GBK)
+  const data = new TextEncoder().encode('Vendor red-team capability deck (placeholder).\n');
+  const nLen = name.length;
+  const dLen = data.length;
+  const local = new Uint8Array(30 + nLen + dLen);
+  const lv = new DataView(local.buffer);
+  lv.setUint32(0, 0x04034b50, true); // local file header signature
+  lv.setUint16(4, 20, true); // version needed
+  lv.setUint16(6, 0x0000, true); // flags — bit 11 (UTF-8) deliberately CLEARED
+  lv.setUint16(8, 0, true); // compression: stored
+  lv.setUint32(14, 0, true); // crc-32 (unchecked)
+  lv.setUint32(18, dLen, true); // compressed size
+  lv.setUint32(22, dLen, true); // uncompressed size
+  lv.setUint16(26, nLen, true); // file name length
+  lv.setUint16(28, 0, true); // extra length
+  local.set(name, 30);
+  local.set(data, 30 + nLen);
+
+  const central = new Uint8Array(46 + nLen);
+  const cv = new DataView(central.buffer);
+  cv.setUint32(0, 0x02014b50, true); // central directory header signature
+  cv.setUint16(4, 20, true); // version made by
+  cv.setUint16(6, 20, true); // version needed
+  cv.setUint16(8, 0x0000, true); // flags — UTF-8 bit cleared here too
+  cv.setUint16(10, 0, true); // compression
+  cv.setUint32(16, 0, true); // crc-32
+  cv.setUint32(20, dLen, true); // compressed size
+  cv.setUint32(24, dLen, true); // uncompressed size
+  cv.setUint16(28, nLen, true); // file name length
+  cv.setUint32(42, 0, true); // local header offset
+  central.set(name, 46);
+
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true); // end of central directory signature
+  ev.setUint16(8, 1, true); // entries on this disk
+  ev.setUint16(10, 1, true); // total entries
+  ev.setUint32(12, central.length, true); // central directory size
+  ev.setUint32(16, local.length, true); // central directory offset
+
+  const out = new Uint8Array(local.length + central.length + eocd.length);
+  out.set(local, 0);
+  out.set(central, local.length);
+  out.set(eocd, local.length + central.length);
+  return out;
+};
+
 // A minimal OpenDocument (.odt) carrying inline `xlink:href` hyperlinks in
 // content.xml: one SharePoint link (twice, for dedup) and one non-SharePoint
 // link (filtered out). The `mimetype` entry marks it as ODF so the command
@@ -729,6 +783,7 @@ export {
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,
   buildSampleZipArchive,
+  buildGbkNameZip,
   buildOversizedZipArchive,
   buildSideChannelDocx,
   buildMacroDocm,
