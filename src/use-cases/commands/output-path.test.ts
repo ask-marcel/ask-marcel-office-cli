@@ -39,6 +39,23 @@ describe('persistIfRequested', () => {
     if (written) expect(Array.from(written)).toEqual([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
   });
 
+  it('also strips the raw `contentBytes` mirror (get-mail-attachment) so the multi-MB payload never reaches stdout when the file is written', async () => {
+    const fs = createFileSystemFake();
+    // get-mail-attachment surfaces Graph's `contentBytes` AND a `base64` mirror of it.
+    // When --output-path lands the file, neither raw-byte field may survive in stdout.
+    const data = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentType: 'application/pptx', size: 5, contentBytes: 'JVBERi0=', base64: 'JVBERi0=' };
+    const result = await persistIfRequested(fs, '/work/test-output/deck.pptx', data);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentType: 'application/pptx', size: 5, savedTo: '/work/test-output/deck.pptx' });
+      expect(result.value).not.toHaveProperty('contentBytes');
+      expect(result.value).not.toHaveProperty('base64');
+    }
+    const written = fs.snapshotBytes('/work/test-output/deck.pptx');
+    expect(written).toBeDefined();
+    if (written) expect(Array.from(written)).toEqual([0x25, 0x50, 0x44, 0x46, 0x2d]);
+  });
+
   it('writes text content via writeText when the data carries a text field instead of base64', async () => {
     const fs = createFileSystemFake();
     const data = { contentType: 'text/markdown', size: 14, text: '# Hello world\n' };

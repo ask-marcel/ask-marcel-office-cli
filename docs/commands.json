@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-05T04:38:18.531Z",
+  "generatedAt": "2026-06-08T09:57:10.324Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -174,7 +174,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`."
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias."
         },
         {
           "name": "inline-images",
@@ -444,7 +450,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`."
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias."
         }
       ],
       "example": "ask-marcel extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
@@ -1124,7 +1136,7 @@
     },
     {
       "name": "get-mail-attachment",
-      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call. Use `--select id,name,contentType,size` to fetch metadata only and skip the multi-MB `contentBytes` payload.",
+      "summary": "Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call — and when an output-path is set the CLI strips BOTH `contentBytes` and `base64` from stdout, leaving a compact metadata envelope with `savedTo` (the file is on disk; no multi-MB base64 in the terminal). When you only want metadata, use `--select id,name,contentType,size` to skip the `contentBytes` payload.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -1156,7 +1168,7 @@
         }
       ],
       "example": "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; itemAttachments and referenceAttachments are returned unchanged."
+      "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged."
     },
     {
       "name": "get-mail-message",
@@ -1170,7 +1182,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`."
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias."
         },
         {
           "name": "select",
@@ -1200,7 +1218,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Outlook message ID. Returned by `list-mail-messages` or `search-mail-messages`."
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Outlook message ID. Returned by `list-mail-messages` or `search-mail-messages`. Accepts `--id` as an alias."
         }
       ],
       "example": "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
@@ -3990,7 +4014,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`."
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias."
         },
         {
           "name": "top",

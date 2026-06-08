@@ -269,6 +269,30 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
+  it('accepts --id as an alias for --message-id on sole-message-id commands (P3)', async () => {
+    let capturedPath = '';
+    const captureGraph: GraphClient = {
+      get: async (path: string) => {
+        capturedPath = path;
+        return { ok: true, value: { id: 'AAMkAGI2', subject: 'hi' } };
+      },
+      post: async () => ({ ok: true, value: {} }),
+      getBinary: async () => ({ ok: true, value: {} }),
+      getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ({ ok: true, value: {} }),
+      teamsChatIc3: async () => ({ ok: true, value: {} }),
+      getBinaryElevated: async () => ({ ok: true, value: {} }),
+      fetchUrl: async () => ({ ok: true, value: {} }),
+      put: async () => ({ ok: true, value: {} }),
+      delete: async () => ({ ok: true, value: {} }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
+    };
+    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-mail-message', '--id', 'AAMkAGI2']));
+    // --id maps to messageId → the message path (a default $select is appended by the command).
+    expect(capturedPath.startsWith('/me/messages/AAMkAGI2')).toBe(true);
+  });
+
   it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
     const captureGraph: GraphClient = {
       get: async () => ({ ok: true, value: { value: [] } }),
@@ -823,9 +847,12 @@ describe('buildCli command surface', () => {
   it('routes commander parser errors (missing required option) to the JSON envelope on stdout (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    // get-mail-attachment keeps commander `requiredOption` (its flags carry no
+    // aliases). get-mail-message can't be used here any more — its `--id` alias
+    // moves required-ness to schema validation (commander no longer throws).
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-mail-message']);
+        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-mail-attachment']);
       } catch {
         /* expected */
       }

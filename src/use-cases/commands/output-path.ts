@@ -68,7 +68,12 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
     }
     const written = await fs.writeBytes(outputPath, base64ToBytes(base64));
     if (!written.ok) return err({ type: 'write_failed', message: written.error.type === 'io_failed' ? written.error.message : written.error.type });
-    return ok({ ...withoutKey(data, 'base64'), savedTo: outputPath });
+    // Audit 2026-06 §P1: get-mail-attachment surfaces Graph's raw `contentBytes`
+    // AND a `base64` mirror of it. Stripping only `base64` left the multi-MB
+    // `contentBytes` in stdout (13 MB observed for two PDFs already on disk).
+    // Drop both raw-byte fields once the bytes are landed — `contentBytes` is
+    // always a base64 mirror in these envelopes, so removing it is safe.
+    return ok({ ...withoutKeys(data, ['base64', 'contentBytes']), savedTo: outputPath });
   }
 
   const text = data['text'];
@@ -84,6 +89,13 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
 const withoutKey = (data: Record<string, unknown>, key: string): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) if (k !== key) out[k] = v;
+  return out;
+};
+
+const withoutKeys = (data: Record<string, unknown>, keys: ReadonlyArray<string>): Record<string, unknown> => {
+  const drop = new Set(keys);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) if (!drop.has(k)) out[k] = v;
   return out;
 };
 

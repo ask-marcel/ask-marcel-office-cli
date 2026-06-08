@@ -22,7 +22,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/messages/{message-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-get',
   options: [
-    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`.' },
+    { name: 'message-id', key: 'messageId', required: true, aliases: [{ name: 'id', key: 'id' }], description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.' },
     ...selectExpandOptions,
   ],
   example: "ask-marcel get-mail-message --message-id 'AAMkAGI2...'",

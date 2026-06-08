@@ -29,7 +29,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/messages/{message-id}/attachments',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-list-attachments',
   options: [
-    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`.' },
+    { name: 'message-id', key: 'messageId', required: true, aliases: [{ name: 'id', key: 'id' }], description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.' },
     ...odataQueryOptions,
   ],
   example: "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",

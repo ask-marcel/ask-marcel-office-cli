@@ -29,7 +29,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call. Use `--select id,name,contentType,size` to fetch metadata only and skip the multi-MB `contentBytes` payload.',
+    'Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call — and when an output-path is set the CLI strips BOTH `contentBytes` and `base64` from stdout, leaving a compact metadata envelope with `savedTo` (the file is on disk; no multi-MB base64 in the terminal). When you only want metadata, use `--select id,name,contentType,size` to skip the `contentBytes` payload.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
@@ -41,7 +41,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
   responseShape:
-    'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; itemAttachments and referenceAttachments are returned unchanged.',
+    'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.',
   producesBytes: true,
 };
 
