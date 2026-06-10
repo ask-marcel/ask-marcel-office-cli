@@ -180,3 +180,22 @@ describe('Node filesystem adapter', () => {
     }
   });
 });
+
+describe('Node filesystem adapter — chmod', () => {
+  it('restricts a secret file to owner-only (0600) so other local users cannot read cached tokens', async () => {
+    const path = join(tmp, 'token-cache.json');
+    writeFileSync(path, '{"access_token":"secret"}');
+    const fs = createNodeFileSystem();
+    const result = await fs.chmod(path, 0o600);
+    expect(result.ok).toBe(true);
+    const { statSync } = await import('node:fs');
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+
+  it('returns io_failed when the target does not exist', async () => {
+    const fs = createNodeFileSystem();
+    const result = await fs.chmod(join(tmp, 'missing.json'), 0o600);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+});

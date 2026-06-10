@@ -1330,3 +1330,25 @@ describe('stderrProgress (the production onProgress sink)', () => {
     expect(outCaptured).toBe('');
   });
 });
+
+describe('token-cache permissions (QA-001)', () => {
+  it('every cache write restricts the file to owner-only 0600 — refresh rung and browser rung alike', async () => {
+    const past = Math.floor(Date.now() / 1000) - 100;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'rt' }));
+    const mock = installFetchMock([
+      {
+        match: (url) => url.includes('/token'),
+        respond: () => new Response(JSON.stringify({ access_token: futureToken().accessToken, expires_in: 3600, refresh_token: 'rt2' })),
+      },
+    ]);
+    try {
+      const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+      const result = await auth.getAccessToken();
+      expect(result.ok).toBe(true);
+    } finally {
+      mock.restore();
+    }
+    expect(fs.snapshotMode(CACHE_PATH)).toBe(0o600);
+  });
+});

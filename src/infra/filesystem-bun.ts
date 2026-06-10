@@ -50,6 +50,18 @@ export const createBunFileSystem = (): FileSystem => ({
       return err({ type: 'io_failed', message: formatError(e) });
     }
   },
+  // Bun has no native chmod primitive — the permission-bits call lives on
+  // fs/promises, lazy-imported here (same Rule-20 boundary exception as the
+  // recursive delete below).
+  chmod: async (path, mode) => {
+    try {
+      const { chmod } = await import('node:fs/promises');
+      await chmod(path, mode);
+      return ok(undefined);
+    } catch (e) {
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
   // Login-fix round-1 Wave B: wipe the Playwright persistent browser
   // profile during `logout`. Bun.file is per-file only; the recursive
   // variant lives on fs/promises so we lazy-import it here. Best-effort

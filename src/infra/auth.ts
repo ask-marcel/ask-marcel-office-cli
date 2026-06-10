@@ -137,6 +137,9 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
 
   const writeCache = async (next: CachedToken): Promise<void> => {
     await fs.writeText(cachePath, JSON.stringify(next));
+    // QA-001: the cache holds access + refresh tokens — owner-only. Best-effort:
+    // a chmod failure must not fail the auth flow (the write itself succeeded).
+    await fs.chmod(cachePath, 0o600);
   };
 
   const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<void> => {
@@ -211,7 +214,7 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       expires_on: Math.floor(Date.now() / 1000) + json.expires_in,
       refresh_token: json.refresh_token ?? cached.refresh_token,
     };
-    await fs.writeText(cachePath, JSON.stringify(token));
+    await writeCache(token);
     logger.info('auth.ladder.rung', { rung: 'refresh' });
     return ok(validated.value);
   };

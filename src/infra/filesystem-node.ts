@@ -13,7 +13,7 @@
  * either runtime directly.
  */
 
-import { mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
@@ -57,6 +57,14 @@ export const createNodeFileSystem = (): FileSystem => ({
     try {
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, bytes);
+      return ok(undefined);
+    } catch (e) {
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
+  chmod: async (path, mode) => {
+    try {
+      await chmod(path, mode);
       return ok(undefined);
     } catch (e) {
       return err({ type: 'io_failed', message: formatError(e) });

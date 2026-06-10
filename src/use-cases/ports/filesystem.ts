@@ -11,6 +11,11 @@ export type FileSystem = {
   readonly readBytes: (path: string) => Promise<Result<Uint8Array, FileSystemError>>;
   readonly writeText: (path: string, content: string) => Promise<Result<void, FileSystemError>>;
   readonly writeBytes: (path: string, bytes: Uint8Array) => Promise<Result<void, FileSystemError>>;
+  /**
+   * Restrict a file's permission bits (e.g. 0o600 on the token cache so
+   * other local users cannot read cached secrets — QA-001).
+   */
+  readonly chmod: (path: string, mode: number) => Promise<Result<void, FileSystemError>>;
   readonly deleteIfExists: (path: string) => Promise<Result<void, FileSystemError>>;
   /**
    * Recursively delete a directory (and all its contents). Used by `logout`

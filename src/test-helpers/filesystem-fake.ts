@@ -6,12 +6,14 @@ export type FileSystemFake = FileSystem & {
   readonly seedBytes: (path: string, bytes: Uint8Array) => void;
   readonly snapshot: (path: string) => string | undefined;
   readonly snapshotBytes: (path: string) => Uint8Array | undefined;
+  readonly snapshotMode: (path: string) => number | undefined;
   readonly has: (path: string) => boolean;
 };
 
 export const createFileSystemFake = (): FileSystemFake => {
   const store = new Map<string, string>();
   const bytesStore = new Map<string, Uint8Array>();
+  const modes = new Map<string, number>();
 
   return {
     readJson: async <T>(path: string) => {
@@ -40,6 +42,11 @@ export const createFileSystemFake = (): FileSystemFake => {
       store.delete(path);
       return ok(undefined);
     },
+    chmod: async (path, mode) => {
+      if (!store.has(path) && !bytesStore.has(path)) return err({ type: 'io_failed', message: `ENOENT: chmod target missing: ${path}` });
+      modes.set(path, mode);
+      return ok(undefined);
+    },
     deleteIfExists: async (path) => {
       store.delete(path);
       bytesStore.delete(path);
@@ -66,6 +73,7 @@ export const createFileSystemFake = (): FileSystemFake => {
     },
     snapshot: (path) => store.get(path),
     snapshotBytes: (path) => bytesStore.get(path),
+    snapshotMode: (path) => modes.get(path),
     has: (path) => store.has(path) || bytesStore.has(path),
   };
 };
