@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/drives/{drive-id}/root',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-get',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID. Returned by `ask-marcel list-drives` in the `id` field.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.' },
     ...selectExpandOptions,
   ],
   example: "ask-marcel get-drive-root-item --drive-id 'b!1234'",

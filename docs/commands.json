@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-10T07:01:52.386Z",
+  "generatedAt": "2026-06-10T08:54:25.829Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -712,7 +712,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -773,7 +773,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -984,7 +984,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives` in the `id` field."
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "select",
@@ -1086,7 +1086,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -1128,7 +1128,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -2814,7 +2814,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -3150,7 +3150,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -3205,7 +3205,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -3394,7 +3394,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -3486,7 +3486,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "item-id",
@@ -6896,7 +6896,7 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
-          "description": "Microsoft Graph drive ID to search inside. Returned by `ask-marcel list-drives`."
+          "description": "Microsoft Graph drive ID to search inside. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
           "name": "query",

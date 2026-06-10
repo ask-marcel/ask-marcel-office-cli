@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/delta()',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-delta',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID. Returned by `ask-marcel list-drives`.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.' },
     {
       name: 'item-id',
       key: 'itemId',

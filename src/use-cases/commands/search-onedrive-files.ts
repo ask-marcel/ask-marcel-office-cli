@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: "/drives/{drive-id}/search(q='{query}')",
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-search',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID to search inside. Returned by `ask-marcel list-drives`.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID to search inside. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.' },
     { name: 'query', key: 'query', required: true, description: 'Free-text search query. Matches filename, content, and metadata.' },
     ...noSkipOptions,
   ],
