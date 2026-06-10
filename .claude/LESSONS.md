@@ -108,3 +108,13 @@ Affects: `src/infra/browser-auth.ts` `acquireElevatedToken` flow; the brief Edge
 
 When `bun test --coverage` reports a file at 99.x% but the per-tier 100% gate fails, the text reporter sometimes prints an empty `Uncovered Line #s` cell, leaving you blind. Switch the bunfig coverage reporter to `lcov`, re-run, and grep `coverage/lcov.info` for `DA:N,0` lines to find the exact missing line numbers. Used to spot line 186 of `auth.ts` (a closing `}` of a nested `if`) — the fix was flattening the nested if so the closing brace stopped existing as a separately-instrumented line.
 Rule for next time: don't add throwaway tests for impossible branches; reshape the source so the uncovered line stops being a distinct instrumented unit.
+
+## [gotcha] 2026-06-10 | Bun bundler vs runtime CJS-default interop: dist/cli.js can crash where every test passes
+
+A dep-importing infra adapter is NOT verified until `dist/cli.js` (the bundle) has executed the code path on a real input — under both `bun` and `node`. Bun's RUNTIME `import('@kenjiuno/msgreader').default` yields the class, so all 3600+ source-run tests passed; Bun's BUNDLER (node-mode `__toESM`) sets `.default` to the whole CJS exports object, leaving the class at `.default.default` — ".msg → Object is not a constructor" shipped broken in 1.4.0 for ~2 days. Packages with `exports.default = class` + `__esModule` are affected; `module.exports = class` (word-extractor) is immune. Fix pattern: `const Ctor = typeof d === 'function' ? d : d.default` with both shapes unit-tested. The QA playbook's A7 bundle-exec smoke now guards the class.
+Affects: every lazy `await import()` of a CJS dependency in `src/infra/**`; `bun run build` consumers.
+
+## [decision] 2026-06-10 | Non-Graph registry commands use the optional `executeLocal(fs, params)` field on Command
+
+`convert-local-file` established the pattern: a registry command whose input is the local filesystem exports BOTH the registry-typed `execute` (returns a redirect error pointing library consumers at the local variant) AND `executeLocal(fs, params)`; `cli.ts` routes at the single execute call site (`cmd.executeLocal !== undefined ? executeLocal(fs, …) : execute(graph, …)`), reusing the whole option/validation/output-path pipeline. Register such commands in graph-scopes.test's COMMANDS_WITHOUT_SCOPES. Side gotcha: adding option `aliases` switches commander from `requiredOption` to `option` (required-ness moves to the zod schema), so commander-level "missing required option" tests must target an alias-free command.
+Affects: any future offline/local command; `src/composition/cli.ts` execute dispatch.
