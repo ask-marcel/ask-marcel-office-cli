@@ -18,8 +18,8 @@ bun add -g ask-marcel-office-cli
 ask-marcel login
 
 # the rest is discoverable
-ask-marcel --help                                # ~28 KB, one-sentence summaries
-ask-marcel help-json --terse --category mail     # ~12 KB JSON for one category
+ask-marcel --help                                # ~31 KB, one-sentence summaries
+ask-marcel help-json --terse --category mail     # ~16 KB JSON for one category
 ask-marcel docs list-mail-messages               # full per-command Markdown
 ```
 
@@ -139,7 +139,7 @@ ask-marcel convert-mail-attachment-to-pdf \
 #   {"ok":true,"data":{"contentType":"application/pdf","size":4837291,"savedTo":"/tmp/deck.pdf"}}
 ```
 
-`--output-path` decodes `base64` (or writes `text`) to the path and replaces the inline field with `savedTo: <path>` in the response. Parent directories are created on demand. Applying the flag to a command that returns plain JSON (no `base64` / no `text` field — e.g. `get-current-user`) returns a clear `--output-path: <cmd> did not return inlined bytes …` error rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake. The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
+`--output-path` decodes `base64` (or writes `text`) to the path and replaces the inline field with `savedTo: <path>` in the response — stripping **every** raw-byte field, including the `contentBytes` mirror on `get-mail-attachment`, so stdout stays a compact metadata envelope regardless of payload size. Parent directories are created on demand. Applying the flag to a command that returns plain JSON (no `base64` / no `text` field — e.g. `get-current-user`) returns a clear `--output-path: <cmd> did not return inlined bytes …` error rather than silently writing nothing — a JSON-only command paired with this flag is almost certainly a mistake. The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
 
 `help-json` and `docs <cmd>` also honour `--output-path` (the manifest JSON and per-command Markdown are written to disk and the envelope reports `savedTo`). Paths ending in `/` or `\` are rejected upfront with "must be a file path, not a directory" instead of leaking Node's `EISDIR`. When a `*-as-pdf` command falls back to raw source bytes (`passthrough: true`), the CLI refuses to write a `.pdf` extension — pick the source extension instead, so a corrupt save is impossible.
 
@@ -185,6 +185,13 @@ const graph = createGraphClient({
 const me = await commands['get-current-user'].execute(graph, {});
 ```
 
+One special case: `convert-local-file` reads the **local filesystem**, not Graph — its registry-typed `execute` returns a redirect error, and the real entry point is the optional `executeLocal(fs, params)` on the same command object (the CLI wires this automatically; library consumers pass their own `FileSystem`):
+
+```ts
+import { commands, createNodeFileSystem } from 'ask-marcel-office-cli';
+const md = await commands['convert-local-file'].executeLocal?.(createNodeFileSystem(), { path: './report.docx' });
+```
+
 The full export list (registry, factories, `Result`, branded types, ports) is in [`src/index.ts`](../src/index.ts). The machine-readable manifest is also available as a JSON subpath import:
 
 ```ts
@@ -206,7 +213,7 @@ src/
 - **Auth**: Three-rung recovery ladder — file-based cached JWT → OAuth refresh_token exchange → Playwright browser intercepting Teams login
 - **Client ID**: `5e3ce6c0-2b1f-4285-8d4b-75ee78787346` (Teams Web)
 - **Scopes**: `https://graph.microsoft.com/.default openid profile offline_access`
-- **Token cache**: `~/.ask-marcel/token-cache.json` (overridable via `BuildDepsConfig.cachePath`)
+- **Token cache**: `~/.ask-marcel/token-cache.json`, written `0600` (overridable via `BuildDepsConfig.cachePath`)
 - **Browser profile**: `~/.ask-marcel/browser-profile` (overridable via `ASKMARCEL_BROWSER_PROFILE`)
 - **Output**: YAML-ish text by default (LLM-readable, generally smaller than the JSON envelope on long listings, parity on small projected pages); compact JSON envelope via `--output json` for tool-chaining and `jq` pipelines
 
@@ -231,7 +238,7 @@ Environment variables read at composition time:
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun test           # full suite (2800+ tests)
+bun test           # full suite (3700+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
