@@ -228,4 +228,4 @@ Then — separately, after the report — propose the fix plan and **wait for ap
 | Date | Version / commit | Auditor | P1 | P2 | P3 | R | I | F new | Verdict | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-06-08 | 1.4.0 | plugin session (pre-playbook) | 1 | 1 | 1 | 0 | 2 | 2 | DEGRADED | plugin audit doc |
-| 2026-06-10 | 1.4.0 / 444c4fc | Claude (first full playbook run) | 1 (carried: login-hang) | 0 | 5 | 0 | 6 | 6 | HEALTHY | .claude/qa-reports/2026-06-10.md — 173/173 cmds, 146 ok + 4 by-design + 7 SSO-blocked + 14 nodata; offline matrix 128×4 pass; leak scan clean; OneNote unblocked; Stryker full run pending at close |
+| 2026-06-10 | 1.4.0 / 444c4fc | Claude (first full playbook run) | 1 (carried: login-hang) | 0 | 5 | 0 | 6 | 6 | HEALTHY | .claude/qa-reports/2026-06-10.md — 173/173 cmds ALL live-verified (blocked subset closed after maintainer re-login); offline matrix 128×4 pass; leak scan clean; OneNote unblocked. Same-day fix wave shipped: QA-010 P1 + 001/002/003/005/006/007/008/009 fixed, 011/013 closed-as-correct (cd6e74e..fd7332b, scoped mutation 96.3%); full A5 aborted (pre-fix sandbox) — rerun next audit |
