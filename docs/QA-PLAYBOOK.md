@@ -80,6 +80,8 @@ for (const c of m.commands) {
 wc -l /tmp/qa-param-worklist.txt
 ```
 
+**Probe discipline (run-1 lesson):** every probe must parse the JSON envelope and assert `ok === true` explicitly — never `2>/dev/null`, never count array lengths without checking `ok` first. A missing-required-flag error envelope silently read as "0 results" nearly became a false P1 in run 1. Derive flags from the manifest, not memory — ~12 hand-typed flags were wrong in run 1 (all caught by the CLI's own error UX, which is itself evidence worth recording).
+
 For **every command**, exercise each row of this table (live against the tenant for Graph commands — use IDs harvested in Phase E1; offline for `convert-local-file`, `resolve-*`, `docs`, `help-json`):
 
 | Case | Expectation |
@@ -146,9 +148,10 @@ Microsoft moves things. Each run, re-verify the full endpoint surface AND the kn
 |---|---|---|
 | `list-teams-chat*` / `get-teams-chat-message` (chatsvcagg→csa substrate) | Microsoft-internal API, moved 2026-05 (`/api/csa/<region>/api/v{1,3}`) | working 2026-06 |
 | 3 `download-drive-item-version*` commands (ODSP allow-list, elevated token) | needs M365ChatClient-identity token from login's second capture | working 2026-06 |
-| `?format=pdf` input list (38 extensions) | CDN-side list drifts; pdf→pdf rejected | working 2026-05 |
+| `?format=pdf` input list (38 extensions) | CDN-side list drifts; pdf→pdf rejected | working 2026-06-10 (docx→pdf live) |
 | `?format=html` input set (loop/fluid/wbtx/whiteboard only) | Office docs always `Sandbox_InputFormatNotSupported` | confirmed 2026-05 |
-| OneNote reads on >5K-item doc libraries | Graph blocks ALL OneNote reads (tenant-side) | known limitation |
+| OneNote reads on >5K-item doc libraries | Graph blocks ALL OneNote reads (tenant-side) | **UNBLOCKED 2026-06-10** — notebooks/sections/pages/page-content all 200 live |
+| Elevated + Teams-substrate token capture in NON-interactive sessions | silent SSO (IdP-federated) times out without a user at the browser → list-chats/get-chat/list-chat-members/list-teams-chat\*/find-chats-with-user/download-drive-item-version BLOCKED | observed 2026-06-10; plan audits with an interactive warm-up or accept the blocked subset |
 | `/me/followedSites`, `/sites/delta` | always 403 on delegated; commands use `/sites?search=` | avoided by design |
 | Archived sites | 423 `resourceLocked` on GET /sites/{id}; site-search probes & excludes | working 2026-06 |
 | Elevated-token capture (visible Edge, IdP-federated SSO) | headless refused; federated IdP needs the 5-min deadline | working 2026-05 |
@@ -194,6 +197,15 @@ Precedent: the 3 `download-drive-item-version-*` commands consolidated into one 
 | meta.test: validate backticked command references against registry (phantom-name class) | F | QA 2026-06 | open |
 | Friendlier commander error for bare-word flag typos (`item--id`) | I | session 2026-06 | open |
 | Recycle-bin listing (metadata-only — no content API on delegated) | — | probe 2026-06 | dropped (Graph can't) |
+| Fix `login` hang after silent token refresh (browser teardown; stderr "waiting on user" line) | **P1** | plugin doc 2026-06-08, confirmed open QA 2026-06-10 | open |
+| chmod 0600 on token-cache.json at write (docs already claim it) | P3 | QA 2026-06-10 (QA-001) | open |
+| One shared `--drive-id` description constant (11 commands lack the SharePoint pointer) | P3 | QA 2026-06-10 (QA-003) | open |
+| Password-protected PDF: honest dedicated message | P3 | QA 2026-06-10 (QA-006) | open |
+| Container-neutral hints for attachments nested in .msg/zip | I | QA 2026-06-10 (QA-007) | open |
+| One-time cleanup + prevention for orphaned `ask-marcel-temp` (un-dotted) root folder | P3 | QA 2026-06-10 (QA-008) | open |
+| Align OData `--top` support within command families (list-site-columns vs list-site-content-types; microsoft-search-query page-size) | P3 | QA 2026-06-10 (QA-013) | open |
+| Cold-start reduction (~1.2 s node: lazier imports / precompiled registry) | I | QA 2026-06-10 (QA-012) | open |
+| SSO-timeout errors should suggest `ask-marcel login` explicitly | I | QA 2026-06-10 (QA-011) | open |
 
 ## H. Report template
 
@@ -216,4 +228,4 @@ Then — separately, after the report — propose the fix plan and **wait for ap
 | Date | Version / commit | Auditor | P1 | P2 | P3 | R | I | F new | Verdict | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-06-08 | 1.4.0 | plugin session (pre-playbook) | 1 | 1 | 1 | 0 | 2 | 2 | DEGRADED | plugin audit doc |
-| | | | | | | | | | | |
+| 2026-06-10 | 1.4.0 / 444c4fc | Claude (first full playbook run) | 1 (carried: login-hang) | 0 | 5 | 0 | 6 | 6 | HEALTHY | .claude/qa-reports/2026-06-10.md — 173/173 cmds, 146 ok + 4 by-design + 7 SSO-blocked + 14 nodata; offline matrix 128×4 pass; leak scan clean; OneNote unblocked; Stryker full run pending at close |
