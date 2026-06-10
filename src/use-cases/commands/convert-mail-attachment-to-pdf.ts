@@ -89,17 +89,22 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
 };
 
 const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
-  const children = await graph.get('/me/drive/root:/.ask-marcel-temp:/children?$top=1&$select=id');
-  if (!children.ok) return;
-  const body = children.value as { readonly value?: ReadonlyArray<unknown> };
-  if ((body.value ?? []).length > 0) return;
-  await graph.delete('/me/drive/root:/.ask-marcel-temp');
+  // QA-008: pre-rename versions used an un-dotted `ask-marcel-temp` folder and
+  // never removed it — QA run-1 found one orphaned (empty) at a real tenant's
+  // OneDrive root. Sweep BOTH names, best-effort, only when empty.
+  for (const folder of ['.ask-marcel-temp', 'ask-marcel-temp']) {
+    const children = await graph.get(`/me/drive/root:/${folder}:/children?$top=1&$select=id`);
+    if (!children.ok) continue;
+    const body = children.value as { readonly value?: ReadonlyArray<unknown> };
+    if ((body.value ?? []).length > 0) continue;
+    await graph.delete(`/me/drive/root:/${folder}`);
+  }
 };
 
 const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
-    return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl' });
+    return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl — Graph returned incomplete link metadata (the linked file may have been deleted or the share revoked). Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.' });
   }
   const resolved = await graph.get(`/shares/${buildShareToken(sourceUrl)}/driveItem`);
   if (!resolved.ok) return resolved;
@@ -108,7 +113,7 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   const itemId = item.id;
   const name = item.name ?? '';
   if (typeof driveId !== 'string' || typeof itemId !== 'string') {
-    return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
+    return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.' });
   }
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard

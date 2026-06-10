@@ -6,7 +6,7 @@ import { selectExpandOptions } from './odata-query.ts';
 // Audit Alex-session §A: a full Graph `message` resource is 41+ KB by default
 // (huge `body.content`, full `internetMessageHeaders`, `uniqueBody`, etc.). LLM
 // callers almost always want subject + sender + preview; the body itself is
-// usually re-fetched via `get-mail-message-content` only when the preview is
+// usually re-fetched via `convert-mail-to-markdown` only when the preview is
 // not enough. Ship a slim default `--select` so the unflagged invocation
 // returns ~2-3 KB instead of 41 KB. User `--select foo,bar` always wins.
 const DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview';

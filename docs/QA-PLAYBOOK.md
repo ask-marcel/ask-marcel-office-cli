@@ -132,7 +132,7 @@ The conversion pipeline is the CLI's core value. Two passes:
 | binary, unknown/no extension | 415 generic hint (`<no-extension>` case) | same | note | same | Graph attempt or clear error |
 | loop/fluid/wbtx/whiteboard | Graph `?format=html` round-trip | n/a | n/a | **cannot** (documented) | n/a |
 
-Cross-command consistency rule: the **same file** through drive / mail / zip / local must produce the same converter output (zip maps errors to notes — that's the only sanctioned divergence).
+Cross-command consistency rule: the **same file** through drive / mail / zip / local must produce the same converter output. Sanctioned divergences (maintainer-approved 2026-06-10): (1) zip maps errors to notes; (2) unconvertible-input HINT WORDING is context-specific by design — top-level callers point at their own sibling commands, while files NESTED inside a container (zip entry, .msg attachment) always get the container-neutral `NESTED_HINTS` wording (QA-007). The converted CONTENT itself must never diverge.
 
 **D2 — Real-tenant samples (live).** Via `search-onedrive-files` / `search-my-documents` / `list-mail-attachments`, locate ≥1 real instance of each format above (prior runs used real .msg, GBK-named vendor zips, scanned PDFs) and convert it. Synthetic fixtures miss real-world quirks: X500 sender addresses, compressedRtf-only bodies, TrueType hinting warnings, fonts with no `glyf` table.
 

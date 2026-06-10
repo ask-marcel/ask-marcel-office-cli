@@ -5,7 +5,6 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import type { ConversionHints } from './markdown-dispatch.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
@@ -23,16 +22,6 @@ const schema = z.object({
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
 });
-
-// Notes for unconvertible entries. The inner files of the archive aren't directly
-// addressable by a sibling command (they live inside the zip), so the guidance is
-// generic — extract + read with a vision model — rather than pointing at one.
-const MAIL_ZIP_HINTS: ConversionHints = {
-  pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — read it with a vision model',
-  legacyPpt: 'ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF, then read it with a vision model',
-  image: (ext) => `${ext} is an image — not unpacked here; read it with a vision model`,
-  generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
-};
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
@@ -56,7 +45,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (typeof contentBytes !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
   }
-  return convertZipArchive(base64ToBytes(contentBytes), includeMetadata, MAIL_ZIP_HINTS);
+  return convertZipArchive(base64ToBytes(contentBytes), includeMetadata);
 };
 
 const meta: CommandMeta = {

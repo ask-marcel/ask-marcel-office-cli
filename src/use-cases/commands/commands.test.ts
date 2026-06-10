@@ -2893,6 +2893,29 @@ describe('commands', () => {
     expect(calls.some((c) => c.url.includes('/.ask-marcel-temp:/children'))).toBe(true);
   });
 
+  it('convert-mail-attachment-to-pdf also sweeps the legacy un-dotted `ask-marcel-temp` folder when empty (QA-008: pre-rename orphan found at a real tenant root)', async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchFn: FetchFn = async (url, init) => {
+      calls.push({ url, method: init?.method });
+      if (url.endsWith('/attachments/aPdf')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') });
+      }
+      if (url.includes(':/content') && init?.method === 'PUT') return Response.json({ id: 'temp-i8', name: 'plan-temp' });
+      if (url.endsWith('/content?format=pdf')) return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      if (url.endsWith('/items/temp-i8') && init?.method === 'DELETE') return new Response(null, { status: 204 });
+      // BOTH temp folders report empty → both get the best-effort delete.
+      if (url.includes('-temp:/children')) return Response.json({ value: [] });
+      if (url.endsWith('-temp') && init?.method === 'DELETE') return new Response(null, { status: 204 });
+      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm8', attachmentId: 'aPdf' });
+    expect(result.ok).toBe(true);
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/.ask-marcel-temp'))).toBe(true);
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/root:/ask-marcel-temp'))).toBe(true); // the legacy un-dotted orphan
+  });
+
   it('convert-mail-attachment-to-pdf does NOT delete the parent folder when it still contains other files (concurrent invocation safety)', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
@@ -4170,6 +4193,11 @@ describe('convert-drive-item-zip', () => {
     expect(at('mail.msg').text).toContain('Attachment body text');
     expect(at('mail.msg').contentType).toBe('text/markdown');
     expect(at('photo.png').note).toContain('png is an image'); // raster image → noted, not unpacked
+    // QA-007: entries INSIDE a container get container-neutral guidance — the
+    // sibling commands can only address top-level drive items, never zip entries.
+    expect(at('photo.png').note).toContain('extract it from the archive/message');
+    expect(at('photo.png').note).not.toContain('extract-drive-item-images');
+    expect(at('blank.pdf').note).not.toContain('download-drive-item-as-pdf');
     expect(at('data.bin').note).toContain('bin is not a convertible'); // binary bytes → skip note
     // A dotless entry with valid-UTF-8 bytes now content-sniffs to text (no extension list to consult).
     expect(at('LICENSE').text).toBe('a dotless, no-extension entry');

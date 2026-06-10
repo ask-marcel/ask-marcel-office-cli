@@ -5,7 +5,6 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import type { ConversionHints } from './markdown-dispatch.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
@@ -26,17 +25,6 @@ const schema = z.object({
   includeMetadata: z.enum(['true', 'false']).optional(),
 });
 
-// The zip lists unconvertible entries with a note instead of failing the whole
-// archive, so every dispatch `err` becomes a `note` — these hints are phrased as
-// notes (no path prefix; the FileResult already carries the entry path) and point
-// at the drive-item sibling commands.
-const ZIP_HINTS: ConversionHints = {
-  pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — fetch it with `download-drive-item-as-pdf` and read it with a vision model',
-  legacyPpt: 'ppt (legacy PowerPoint, OLE binary) has no markdown path — convert it to PDF with `download-drive-item-as-pdf`, then read it with a vision model',
-  image: (ext) => `${ext} is an image — not unpacked here; pull images embedded in a document with \`extract-drive-item-images\`, or read it with a vision model`,
-  generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
-};
-
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -45,7 +33,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
-  return convertZipArchive(bytes.value, includeMetadata, ZIP_HINTS);
+  return convertZipArchive(bytes.value, includeMetadata);
 };
 
 const meta: CommandMeta = {

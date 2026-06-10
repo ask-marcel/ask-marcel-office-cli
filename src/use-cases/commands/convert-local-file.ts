@@ -63,7 +63,7 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   }
 
   const name = basename(path);
-  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, includeMetadata, LOCAL_HINTS);
+  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, includeMetadata);
   return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells }, LOCAL_HINTS);
 };
 

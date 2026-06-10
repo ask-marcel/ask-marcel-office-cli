@@ -28,6 +28,18 @@ type ConversionHints = {
 // another .msg); callers never set it. It caps `.msg`-inside-`.msg` nesting.
 type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly inlineImages?: boolean; readonly depth?: number };
 
+// Hints for files NESTED inside a container (zip entry, .msg attachment). The
+// caller-specific hints point at sibling commands (`download-drive-item-as-pdf`,
+// `extract-drive-item-images`, …) that can only address top-level drive items /
+// attachments — they cannot reach a file INSIDE a container (QA-007). Nested
+// conversions therefore always use this container-neutral wording.
+const NESTED_HINTS: ConversionHints = {
+  pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — extract it from the archive/message first, then read it with a vision-capable model',
+  legacyPpt: 'ppt (legacy PowerPoint, OLE binary) has no markdown path — extract it, convert it to PDF first (e.g. upload to OneDrive and use `download-drive-item-as-pdf`), then read it with a vision model',
+  image: (ext) => `${ext} is an image — extract it from the archive/message first, then read it with a vision-capable model`,
+  generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
+};
+
 const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<unknown, GraphError> => {
   const md = renderCsvCapped(new TextDecoder().decode(bytes), maxCells);
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
@@ -56,9 +68,11 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: hints.legacyPpt });
   if (ext === 'msg') {
     // Outlook .msg: render headers + body and recurse each attachment through this
-    // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't loop.
+    // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't
+    // loop. Attachments are NESTED files — container-neutral hints, not the
+    // caller's (QA-007: a png inside a .msg must not point at drive-item commands).
     const depth = opts.depth ?? 0;
-    return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, hints));
+    return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
   }
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);
@@ -66,5 +80,5 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   return err({ type: 'api_error', status: 415, message: hints.generic(ext === '' ? '<no-extension>' : ext) });
 };
 
-export { bytesToMarkdown, IMAGE_EXTENSIONS };
+export { bytesToMarkdown, IMAGE_EXTENSIONS, NESTED_HINTS };
 export type { BytesToMarkdownOptions, ConversionHints };

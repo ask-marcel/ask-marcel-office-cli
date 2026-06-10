@@ -17,13 +17,13 @@ const fromFileAttachment = (attachment: { name?: string; contentBytes?: string }
 
 const fromReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
-  if (typeof sourceUrl !== 'string' || sourceUrl === '') return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl' });
+  if (typeof sourceUrl !== 'string' || sourceUrl === '') return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl — Graph returned incomplete link metadata (the linked file may have been deleted or the share revoked). Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.' });
   const resolved = await graph.get(`/shares/${buildShareToken(sourceUrl)}/driveItem`);
   if (!resolved.ok) return resolved;
   const item = resolved.value as { id?: string; name?: string; parentReference?: { driveId?: string } };
   const driveId = item.parentReference?.driveId;
   const itemId = item.id;
-  if (typeof driveId !== 'string' || typeof itemId !== 'string') return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId' });
+  if (typeof driveId !== 'string' || typeof itemId !== 'string') return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.' });
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
   return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT);
