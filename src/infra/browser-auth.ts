@@ -70,6 +70,14 @@ type BothTokensResult = {
   readonly elevated: ElevatedTokenResult;
   readonly chatsvcagg: ChatsvcaggTokenResult;
   readonly ic3: Ic3TokenResult;
+  /**
+   * Set when the Teams poll short-circuited because `freshCachedToken`
+   * found a token written by a concurrent process (QA-010). The caller
+   * must NOT persist this result — the cache is already the source of
+   * truth, and `refreshToken` is null here (persisting would clobber the
+   * winner's rotated refresh token).
+   */
+  readonly fromCache?: true;
 };
 
 type BrowserAuth = {
@@ -186,6 +194,21 @@ type BrowserAuthConfig = {
   readonly logger: Logger;
   readonly fs: FileSystem;
   readonly trace?: TraceFn;
+  /**
+   * QA-010 (login hang): probe for a fresh token that landed in the cache
+   * WHILE the browser capture is polling. AAD SPA refresh tokens rotate, so
+   * when two processes race, the loser's refresh fails and it falls into the
+   * full multi-minute browser dance — while the winner's fresh token sits in
+   * the cache the whole time. The Teams poll loop calls this every interval
+   * and short-circuits (closing the browser) the moment it returns a token.
+   */
+  readonly freshCachedToken?: () => Promise<string | null>;
+  /**
+   * User-visible progress sink (stderr in production). The browser capture
+   * can legitimately take minutes (federated SSO, interactive sign-in); these
+   * one-liners are what separates "waiting on the user" from "hung" (QA-010).
+   */
+  readonly onProgress?: (line: string) => void;
   readonly profileDir?: string;
   readonly initialSettleMs?: number;
   readonly postReloginSettleMs?: number;
@@ -361,6 +384,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
   const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
   const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? 15_000;
+  const freshCachedToken = config.freshCachedToken ?? (async () => null);
+  const onProgress = config.onProgress ?? (() => {});
 
   let context: ContextLike | null = null;
   let page: PageLike | null = null;
@@ -881,11 +906,30 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       await sleep(postReloginSettleMs);
     }
 
-    // Poll until Teams token captured OR poll-deadline expires (5 min).
+    // Poll until Teams token captured OR poll-deadline expires (5 min) OR a
+    // concurrent process lands a fresh token in the cache (QA-010 short-circuit).
     trace(`[DEBUG] acquireBothTokens: polling for Teams token, ${pollDeadlineMs / 1000}s deadline\n`);
+    onProgress(`Browser window open — if a sign-in screen appears, complete it there (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`);
     const teamsDeadline = Date.now() + pollDeadlineMs;
     let pollCount = 0;
     while (Date.now() < teamsDeadline && !capturedAccess) {
+      const concurrent = await freshCachedToken();
+      if (concurrent !== null) {
+        const validated = accessToken(concurrent);
+        if (validated.ok) {
+          trace('[DEBUG] acquireBothTokens: fresh cache token appeared mid-poll — short-circuiting\n');
+          logger.info('browser_poll_cache_short_circuit');
+          onProgress('Token was refreshed by another process — closing the browser.');
+          await cleanup();
+          return {
+            teams: { accessToken: validated.value, refreshToken: null },
+            fromCache: true,
+            elevated: { ok: false, reason: 'sso_timeout' },
+            chatsvcagg: { ok: false, reason: 'sso_timeout' },
+            ic3: { ok: false, reason: 'sso_timeout' },
+          };
+        }
+      }
       pollCount += 1;
       if (pollCount % 10 === 0) {
         trace(`[DEBUG] acquireBothTokens: still polling for Teams token, url=${activePage.url()}\n`);
@@ -912,6 +956,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       await sleep(pollIntervalMs);
     }
 
+    onProgress('Signed in — capturing companion tokens (Teams chat / elevated; up to ~30 s)…');
     trace(`[DEBUG] acquireBothTokens: Teams captured; navigating to elevated ${elevatedUrl}\n`);
     logger.info('browser_navigating', { url: elevatedUrl, purpose: 'elevated_same_session' });
     let navigationFailed = false;
@@ -929,6 +974,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     await cleanup();
+    onProgress('Sign-in complete — browser closed.');
 
     const teamsResult: BrowserTokenResult = { accessToken: capturedAccess, refreshToken: capturedRefresh };
     const elevatedFailureReason: ElevatedFailureReason = navigationFailed ? 'navigation_failed' : 'sso_timeout';
@@ -1098,9 +1144,15 @@ const enableTraceFromEnv = (logger: Logger): { logger: Logger; trace?: TraceFn }
   return { logger: wrapped, trace };
 };
 
-const createBrowserAuth = (deps: { logger: Logger; fs?: FileSystem }): BrowserAuth => {
+const createBrowserAuth = (deps: { logger: Logger; fs?: FileSystem; freshCachedToken?: () => Promise<string | null>; onProgress?: (line: string) => void }): BrowserAuth => {
   const { logger, trace } = enableTraceFromEnv(deps.logger);
-  return createBrowserAuthFromApi(createPlaywrightApi(loadPlaywright), { logger, fs: deps.fs ?? defaultFileSystem(), ...(trace ? { trace } : {}) });
+  return createBrowserAuthFromApi(createPlaywrightApi(loadPlaywright), {
+    logger,
+    fs: deps.fs ?? defaultFileSystem(),
+    ...(trace ? { trace } : {}),
+    ...(deps.freshCachedToken ? { freshCachedToken: deps.freshCachedToken } : {}),
+    ...(deps.onProgress ? { onProgress: deps.onProgress } : {}),
+  });
 };
 
 export { createBrowserAuth, createBrowserAuthFromApi, createPlaywrightApi };

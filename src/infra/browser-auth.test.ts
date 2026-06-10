@@ -950,6 +950,69 @@ describe('browser auth — single-session acquireBothTokens (login-fix round-2)'
     expect(captured).toContain('[INFO] browser_auth_close');
   });
 
+  it('a token refreshed by a concurrent process short-circuits the Teams poll: browser closes, cache token returned, nothing waits out the 5-min deadline (QA-010)', async () => {
+    // Page never emits any token — without the short-circuit this would poll
+    // until pollDeadlineMs. A "concurrent process" lands a fresh token in the
+    // cache on the third probe call.
+    const { api, state } = makeFakeApi({ pageOpts: { urlsAfterGoto: ['https://login.microsoftonline.com/...'] } });
+    const concurrentToken = graphTokenJwt();
+    let probeCalls = 0;
+    const progress: string[] = [];
+    const browser = createBrowserAuthFromApi(
+      api,
+      fastConfig({
+        pollDeadlineMs: 60_000, // far beyond test runtime — only the short-circuit can end the poll quickly
+        freshCachedToken: async () => {
+          probeCalls += 1;
+          return probeCalls >= 3 ? concurrentToken : null;
+        },
+        onProgress: (line) => progress.push(line),
+      })
+    );
+    const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(result.fromCache).toBe(true);
+    expect(String(result.teams?.accessToken)).toBe(concurrentToken);
+    expect(result.teams?.refreshToken).toBeNull();
+    expect(state.contextClosed).toBe(true); // no orphaned Edge
+    expect(probeCalls).toBeGreaterThanOrEqual(3);
+    expect(progress.some((l) => l.includes('another process'))).toBe(true);
+  });
+
+  it('an EXPIRED token in the cache does not short-circuit the poll — only a genuinely fresh one ends the browser wait', async () => {
+    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: ['https://login.microsoftonline.com/...'] } });
+    const expired = makeJwt({ exp: Math.floor(Date.now() / 1000) - 60, aud: 'https://graph.microsoft.com' });
+    let probeCalls = 0;
+    const browser = createBrowserAuthFromApi(
+      api,
+      fastConfig({
+        pollDeadlineMs: 30,
+        freshCachedToken: async () => {
+          probeCalls += 1;
+          return expired; // always stale — must never satisfy the poll
+        },
+      })
+    );
+    const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(result.fromCache).toBeUndefined();
+    expect(result.teams).toBeNull(); // deadline expired normally
+    expect(probeCalls).toBeGreaterThan(0);
+  });
+
+  it('emits user-visible progress lines while the browser capture runs (sign-in guidance + capture phases)', async () => {
+    const progress: string[] = [];
+    const { api } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ onProgress: (line) => progress.push(line), elevatedRecaptureTimeoutMs: 30 }));
+    await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
+    expect(progress.some((l) => /sign[- ]?in/i.test(l))).toBe(true); // "complete the sign-in in the browser window"
+    expect(progress.some((l) => /signed in|captur/i.test(l))).toBe(true); // post-capture phase line
+    expect(progress.some((l) => /browser closed/i.test(l))).toBe(true); // teardown confirmation
+  });
+
   it('survives a navigation error on the initial Teams goto when the response listener still fires (non-fatal)', async () => {
     const { api } = makeFakeApi({
       pageOpts: {

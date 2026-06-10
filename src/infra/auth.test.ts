@@ -5,7 +5,7 @@ import { ok } from '../domain/result.ts';
 import { installFetchMock } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createAuthManager, createAuthManagerFromApi } from './auth.ts';
+import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 
 const CACHE_PATH = '/virtual/token-cache.json';
@@ -19,6 +19,7 @@ const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
 // branches.
 const fakeBrowserAuth = (config?: {
   acquireResult?: BrowserTokenResult | null;
+  fromCache?: boolean;
   acquireError?: Error;
   elevatedResult?: AccessToken | null;
   elevatedFailure?: ElevatedFailureReason;
@@ -76,6 +77,9 @@ const fakeBrowserAuth = (config?: {
       if (config?.acquireError) throw config.acquireError;
       const ic3 = ic3Result();
       const teams = config?.acquireResult ?? null;
+      if (teams && config?.fromCache) {
+        return { teams, fromCache: true as const, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const }, ic3 };
+      }
       if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
       const v = config?.elevatedResult;
       if (config?.elevatedFailure !== undefined) {
@@ -189,6 +193,21 @@ describe('auth manager recovery ladder', () => {
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
+  });
+
+  it('a browser dance short-circuited by a concurrent refresh (fromCache) returns the cached token WITHOUT persisting — the winner’s rotated refresh token survives (QA-010)', async () => {
+    const fs = createFileSystemFake();
+    const cacheToken = futureToken();
+    const logger = createLoggerFake();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: cacheToken, fromCache: true }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs);
+
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(cacheToken.accessToken);
+    // No persist: the concurrent process owns the cache (its refresh_token is the live one).
+    expect(fs.has(CACHE_PATH)).toBe(false);
+    // No browser-tested elevated outcome — consumers must not think elevated state was probed.
+    expect(auth.getLastElevatedOutcome()).toBeNull();
   });
 
   it('returns auth_cancelled when browser returns null', async () => {
@@ -1262,5 +1281,52 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
     expect(cached.ok && cached.value.ic3_access_token).toBe(ic3);
     expect(cached.ok && cached.value.access_token).toBe('');
     expect(cached.ok && cached.value.chatsvcagg_region).toBe('apac');
+  });
+});
+
+describe('createFreshCachedTokenProbe (QA-010 short-circuit input)', () => {
+  it('returns the cached access token when it is fresh', async () => {
+    const fs = createFileSystemFake();
+    const fresh = futureToken().accessToken;
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: fresh, expires_on: 9999999999, refresh_token: 'rt' }));
+    expect(await createFreshCachedTokenProbe(fs, CACHE_PATH)()).toBe(fresh);
+  });
+
+  it('returns null when the cache file is missing, the token field is absent, or the token is expired', async () => {
+    const fs = createFileSystemFake();
+    const probe = createFreshCachedTokenProbe(fs, CACHE_PATH);
+    expect(await probe()).toBeNull(); // missing file
+    fs.seed(CACHE_PATH, JSON.stringify({ refresh_token: 'rt' }));
+    expect(await probe()).toBeNull(); // no access_token field
+    const past = Math.floor(Date.now() / 1000) - 100;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: past, aud: 'https://graph.microsoft.com' }));
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: past, refresh_token: 'rt' }));
+    expect(await probe()).toBeNull(); // expired
+  });
+});
+
+describe('stderrProgress (the production onProgress sink)', () => {
+  it('writes the line + newline to stderr, never stdout', () => {
+    const originalErr = process.stderr.write;
+    const originalOut = process.stdout.write;
+    let errCaptured = '';
+    let outCaptured = '';
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      errCaptured += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      outCaptured += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      stderrProgress('Signed in — capturing companion tokens…');
+    } finally {
+      process.stderr.write = originalErr;
+      process.stdout.write = originalOut;
+    }
+    expect(errCaptured).toBe('Signed in — capturing companion tokens…\n');
+    expect(outCaptured).toBe('');
   });
 });

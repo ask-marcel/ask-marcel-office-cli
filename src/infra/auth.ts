@@ -241,8 +241,16 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg, ic3 } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
       if (!result) return err({ type: 'auth_cancelled' });
+      // QA-010: the poll short-circuited because a concurrent process landed a
+      // fresh token in the cache. Do NOT persist (refreshToken is null here —
+      // writing would clobber the winner's rotated refresh token) and leave the
+      // elevated/chatsvcagg outcomes null: no browser-tested state to report.
+      if (fromCache === true) {
+        logger.info('auth.ladder.rung', { rung: 'browser_cache_short_circuit' });
+        return ok(result.accessToken);
+      }
       const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
       if (elevated.ok) {
         logger.info('auth.elevated.captured_at_login');
@@ -559,11 +567,39 @@ const defaultBrowserProfileDir = (): string => {
   return `${base}/.ask-marcel/browser-profile`;
 };
 
+/**
+ * QA-010: probe the token cache for a fresh access token. Handed to the
+ * browser capture so its poll loop can short-circuit the multi-minute dance
+ * when a concurrent process refreshes first (AAD rotates SPA refresh tokens,
+ * so the loser of the race cannot refresh and falls into the browser leg).
+ * Exported for the composition test; pure read, never writes.
+ */
+const createFreshCachedTokenProbe = (fs: FileSystem, cachePath: string): (() => Promise<string | null>) => {
+  return async () => {
+    const cached = await fs.readJson<{ access_token?: string }>(cachePath);
+    if (!cached.ok || typeof cached.value.access_token !== 'string') return null;
+    const validated = accessToken(cached.value.access_token);
+    return validated.ok ? validated.value : null;
+  };
+};
+
+// Progress lines go to stderr so "waiting on the user's sign-in" is
+// distinguishable from a hang; stdout stays reserved for the JSON envelope.
+const stderrProgress = (line: string): void => {
+  process.stderr.write(`${line}\n`);
+};
+
 const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileSystem; browserProfileDir?: string }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
-  return createAuthManagerFromApi(createBrowserAuth({ logger: deps.logger, fs }), deps.cachePath, browserProfileDir, deps.logger, fs);
+  const browserAuth = createBrowserAuth({
+    logger: deps.logger,
+    fs,
+    freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
+    onProgress: stderrProgress,
+  });
+  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs);
 };
 
-export { createAuthManager, createAuthManagerFromApi };
+export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };
 export type { AuthError, AuthManager, ElevatedOutcome };
