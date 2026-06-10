@@ -29,7 +29,7 @@ The first launch prints a one-time notice if a newer version is on npm.
 
 ## Output formats — `--output text` (default) vs `--output json`
 
-Every command writes its output as a single document to **stdout** (success or error — there is no stderr output). `process.exitCode` is `0` on success and `1` on any failure. Pick the format with the global `--output <text|json>` flag.
+Every command writes its output as a single document to **stdout** (success or error). stderr carries only diagnostics — log lines when `ASKMARCEL_LOG_LEVEL` is raised, and `login`'s sign-in progress ("Browser window open — complete the sign-in…") so a long interactive capture is distinguishable from a hang — never command output. `process.exitCode` is `0` on success and `1` on any failure. Pick the format with the global `--output <text|json>` flag.
 
 ### Text (default, LLM-readable)
 
