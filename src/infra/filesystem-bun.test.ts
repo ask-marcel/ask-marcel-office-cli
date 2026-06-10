@@ -83,6 +83,44 @@ describe('Bun filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 
+  it('reads a binary file as raw bytes (a local .docx handed to convert-local-file)', async () => {
+    const path = join(tmp, 'report.docx');
+    writeFileSync(path, Buffer.from([0x50, 0x4b, 0x03, 0x04])); // PK zip magic
+    const fs = createBunFileSystem();
+    const result = await fs.readBytes(path);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(Array.from(result.value)).toEqual([0x50, 0x4b, 0x03, 0x04]);
+  });
+
+  it('returns not_found when reading bytes of a missing file', async () => {
+    const fs = createBunFileSystem();
+    const result = await fs.readBytes(join(tmp, 'missing.docx'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('not_found');
+  });
+
+  it('reports a directory path as not_found (Bun.file.exists() is false for directories — "not a readable file")', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const dir = join(tmp, 'a-directory');
+    mkdirSync(dir);
+    const fs = createBunFileSystem();
+    const result = await fs.readBytes(dir);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('not_found');
+  });
+
+  it('returns io_failed when reading bytes of an unreadable file', async () => {
+    const { chmodSync } = await import('node:fs');
+    const path = join(tmp, 'forbidden.bin');
+    writeFileSync(path, 'secret');
+    chmodSync(path, 0o000);
+    const fs = createBunFileSystem();
+    const result = await fs.readBytes(path);
+    chmodSync(path, 0o600);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+
   it('writes raw bytes to a new file (round-trips a 5-byte PDF magic header)', async () => {
     const path = join(tmp, 'nested', 'doc.pdf');
     const fs = createBunFileSystem();

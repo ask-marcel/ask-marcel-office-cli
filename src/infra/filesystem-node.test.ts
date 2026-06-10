@@ -56,6 +56,33 @@ describe('Node filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 
+  it('reads a binary file as raw bytes (a local .docx handed to convert-local-file)', async () => {
+    const path = join(tmp, 'report.docx');
+    writeFileSync(path, Buffer.from([0x50, 0x4b, 0x03, 0x04])); // PK zip magic
+    const fs = createNodeFileSystem();
+    const result = await fs.readBytes(path);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(Array.from(result.value)).toEqual([0x50, 0x4b, 0x03, 0x04]);
+  });
+
+  it('returns not_found when reading bytes of a missing file', async () => {
+    const fs = createNodeFileSystem();
+    const result = await fs.readBytes(join(tmp, 'missing.docx'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('not_found');
+  });
+
+  it('returns io_failed when reading bytes of an unreadable file', async () => {
+    const path = join(tmp, 'forbidden.bin');
+    writeFileSync(path, 'secret');
+    chmodSync(path, 0o000);
+    const fs = createNodeFileSystem();
+    const result = await fs.readBytes(path);
+    chmodSync(path, 0o600);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+
   it('writes text to a new file, creating parent directories on demand', async () => {
     const path = join(tmp, 'nested', 'sub', 'cache.json');
     const fs = createNodeFileSystem();

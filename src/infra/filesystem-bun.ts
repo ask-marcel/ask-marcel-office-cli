@@ -14,6 +14,17 @@ export const createBunFileSystem = (): FileSystem => ({
       return err({ type: 'parse_failed', message: formatError(e) });
     }
   },
+  readBytes: async (path) => {
+    const file = Bun.file(path);
+    // `exists()` is false for directories too — a directory path reports
+    // not_found rather than reaching `bytes()` (matches "not a readable file").
+    if (!(await file.exists())) return err({ type: 'not_found' });
+    try {
+      return ok(await file.bytes());
+    } catch (e) {
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
   writeText: async (path, content) => {
     try {
       await Bun.write(path, content);

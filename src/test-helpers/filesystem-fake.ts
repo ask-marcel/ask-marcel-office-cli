@@ -3,6 +3,7 @@ import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 
 export type FileSystemFake = FileSystem & {
   readonly seed: (path: string, content: string) => void;
+  readonly seedBytes: (path: string, bytes: Uint8Array) => void;
   readonly snapshot: (path: string) => string | undefined;
   readonly snapshotBytes: (path: string) => Uint8Array | undefined;
   readonly has: (path: string) => boolean;
@@ -21,6 +22,13 @@ export const createFileSystemFake = (): FileSystemFake => {
       } catch (e) {
         return err({ type: 'parse_failed', message: e instanceof Error ? e.message : String(e) });
       }
+    },
+    readBytes: async (path) => {
+      const bytes = bytesStore.get(path);
+      if (bytes !== undefined) return ok(bytes);
+      const text = store.get(path);
+      if (text !== undefined) return ok(new TextEncoder().encode(text));
+      return err({ type: 'not_found' });
     },
     writeText: async (path, content) => {
       store.set(path, content);
@@ -52,6 +60,9 @@ export const createFileSystemFake = (): FileSystemFake => {
     },
     seed: (path, content) => {
       store.set(path, content);
+    },
+    seedBytes: (path, bytes) => {
+      bytesStore.set(path, bytes);
     },
     snapshot: (path) => store.get(path),
     snapshotBytes: (path) => bytesStore.get(path),

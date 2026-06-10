@@ -36,6 +36,14 @@ export const createNodeFileSystem = (): FileSystem => ({
       return err({ type: 'parse_failed', message: formatError(e) });
     }
   },
+  readBytes: async (path) => {
+    try {
+      return ok(new Uint8Array(await readFile(path)));
+    } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') return err({ type: 'not_found' });
+      return err({ type: 'io_failed', message: formatError(e) });
+    }
+  },
   writeText: async (path, content) => {
     try {
       await mkdir(dirname(path), { recursive: true });
