@@ -87,9 +87,22 @@ const readAttachmentContent = (reader: AttachmentReader, index: number): Uint8Ar
   }
 };
 
+/**
+ * Resolve the MsgReader class from the dynamic import's `default`, whichever
+ * interop shape it arrives in. msgreader is CJS with `exports.default = class`
+ * (+ `__esModule`): Bun's RUNTIME import hands us the class directly, but Bun's
+ * BUNDLER (node-mode `__toESM`) sets `default` to the whole exports object —
+ * so in `dist/cli.js` the class sits one level deeper at `default.default`
+ * ("Object is not a constructor" at runtime, invisible to source-run tests).
+ */
+const resolveMsgReaderCtor = (defaultExport: unknown): MsgReaderCtor => {
+  if (typeof defaultExport === 'function') return defaultExport as unknown as MsgReaderCtor;
+  return (defaultExport as { readonly default: MsgReaderCtor }).default;
+};
+
 const extractMsg = async (bytes: Uint8Array): Promise<Result<ParsedMsg, GraphError>> => {
   try {
-    const MsgReader = (await import('@kenjiuno/msgreader')).default as unknown as MsgReaderCtor;
+    const MsgReader = resolveMsgReaderCtor((await import('@kenjiuno/msgreader')).default);
     // The constructor accepts `ArrayBuffer | DataView`; wrap the (possibly offset)
     // view zero-copy rather than copying the bytes into a fresh buffer.
     const reader = new MsgReader(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
@@ -101,5 +114,5 @@ const extractMsg = async (bytes: Uint8Array): Promise<Result<ParsedMsg, GraphErr
   }
 };
 
-export { extractMsg, mapRawMsg, readAttachmentContent };
+export { extractMsg, mapRawMsg, readAttachmentContent, resolveMsgReaderCtor };
 export type { MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg };

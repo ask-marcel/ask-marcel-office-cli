@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { buildSampleMsg } from '../test-helpers/office-fixtures.ts';
-import { extractMsg, mapRawMsg, readAttachmentContent } from './msg-reader-adapter.ts';
+import { extractMsg, mapRawMsg, readAttachmentContent, resolveMsgReaderCtor } from './msg-reader-adapter.ts';
 
 describe('extractMsg', () => {
   it('parses a real .msg (Outlook OLE/CFBF container) into subject, sender, recipients, body and attachments', async () => {
@@ -67,6 +67,18 @@ describe('mapRawMsg', () => {
     expect(parsed.senderEmail).toBe('/O=EXCHANGELABS/CN=ALICE');
     expect(parsed.date).toBe('Fri, 16 May 2025 08:50:00 GMT');
     expect(parsed.recipients[0]?.email).toBe('/O=EXCHANGELABS/CN=BOB');
+  });
+});
+
+describe('resolveMsgReaderCtor', () => {
+  const fakeCtor = (() => undefined) as unknown as ReturnType<typeof resolveMsgReaderCtor>;
+
+  it('uses the default export directly when it is already the class (Bun runtime import)', () => {
+    expect(resolveMsgReaderCtor(fakeCtor)).toBe(fakeCtor);
+  });
+
+  it('unwraps one more level when the bundler hands the whole CJS exports object as default (dist/cli.js)', () => {
+    expect(resolveMsgReaderCtor({ __esModule: true, default: fakeCtor })).toBe(fakeCtor);
   });
 });
 
