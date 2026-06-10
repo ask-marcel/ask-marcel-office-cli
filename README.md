@@ -170,6 +170,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 - **[All 173 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
+- **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
 
 ## Roadmap
 

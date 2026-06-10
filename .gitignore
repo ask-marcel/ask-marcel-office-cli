@@ -115,3 +115,6 @@ Thumbs.db
 skills-lock.json
 .claude/skills/atelier
 .vscode/settings.json
+
+# QA audit raw reports — may contain tenant data (file names, subjects, IDs); never commit
+.claude/qa-reports/
