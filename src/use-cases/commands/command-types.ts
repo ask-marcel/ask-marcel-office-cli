@@ -156,6 +156,13 @@ type Command = {
   readonly schema: CommandSchema;
   readonly execute: CommandExecute;
   readonly meta: CommandMeta;
+  /**
+   * Present on the rare command whose input is the LOCAL filesystem instead of
+   * Graph (`convert-local-file`). The CLI routes execution here, passing its
+   * composition-selected FileSystem; `execute` stays as the registry-typed
+   * fallback that redirects library consumers to this variant.
+   */
+  readonly executeLocal?: (fs: import('../ports/filesystem.ts').FileSystem, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
 };
 
 export type {

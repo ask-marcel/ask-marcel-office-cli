@@ -1,6 +1,6 @@
 # ask-marcel-office-cli
 
-**A Microsoft Graph CLI built for LLMs.** 172 read-only commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+**A Microsoft Graph CLI built for LLMs.** 173 read-only commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus a local-file converter that needs no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
 
 ```bash
 npm i -g ask-marcel-office-cli
@@ -25,7 +25,7 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 
 ### Read-only by design
 
-**This is the most important property.** 170 GET endpoints + 2 POST (searches). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. A hallucinated command can't break anything — the worst case is a 404. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 171 GET endpoints + 2 POST (searches). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. A hallucinated command can't break anything — the worst case is a 404. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -46,6 +46,7 @@ Feed any Office-shaped file (docx, xlsx, pptx, csv, rtf, odt, …) into the loca
 - `download-drive-item-as-markdown` — docx via mammoth (embedded images become `[image]` placeholders by default — `--inline-images true` to embed them as base64, or pull the full-resolution originals with `extract-drive-item-images`), xlsx as one markdown table per sheet (a sheet whose used range exceeds the `--max-cells` cap, default 50 000, becomes a band-by-band read hint instead of a multi-hundred-MB table that would OOM), csv as a table, odt/ods/odp via content.xml (headings, lists, tables, named sheets, per-slide text, with `office:annotation` comments folded inline), **pptx** flattened to per-slide text (titles + bullets + text boxes + table cells, speaker notes inline, as `## Slide N` sections — `download-drive-item-as-pdf` + a vision model when layout / images matter), **pdf** via text-layer extraction ([unpdf](https://github.com/unjs/unpdf) → `text/plain`; a scanned / image-only PDF with no text layer points you at `download-drive-item-as-pdf` + a vision model), **legacy OLE Office** (`.xls` read by sheetjs like `.xlsx`; `.doc` extracted by [word-extractor](https://www.npmjs.com/package/word-extractor) as plain text; `.ppt` has no pure-JS path → convert to PDF first), plain-text passthrough
 - `download-drive-item-as-pdf` — Graph PDF conversion for anything it supports (preserves slide layout, images, charts — the right call for pptx and image-heavy docs)
 - `convert-mail-attachment-to-markdown` / `convert-mail-attachment-to-pdf` — same pipelines but starting from an email attachment
+- `convert-local-file` — same pipelines but starting from a file **on disk** (`--path ./report.docx`); the only command that never calls Graph (works offline, no login). A `.zip` is unpacked with every contained file converted in one call. The two things it can't do locally — convert **to** PDF and Loop/Fluid/Whiteboard sources — need Graph's server-side renderer (upload to OneDrive and use the drive-item siblings)
 - `extract-sharepoint-links-in-documents` — the doc-side sibling of `extract-sharepoint-links-in-mail`: resolve every `*.sharepoint.com` URL embedded in a docx/xlsx/pptx (read from the package's relationship parts) or an odt/ods/odp (read from the inline `xlink:href` links in content.xml) to its driveItem, so an agent can follow references out of a document the same way it follows them out of an email
 
 Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachment-to-markdown`) command to surface the side-channel content the rendered body hides. For **docx** (`## DOCX metadata`): core/app/custom doc properties, people registry, external hyperlinks, comments (each quoting the document text span it annotates), tracked changes, hidden text (`w:vanish`), MERGEFIELD / HYPERLINK / DOCVARIABLE instructions, bookmarks. For **xlsx** (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, legacy + threaded cell comments (each tagged with its cell), the persons registry. For **pptx** (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern, each anchored to its slide), and per-slide title / speaker notes / hidden flag — appended after the per-slide text body (use `download-drive-item-as-pdf` + a vision model for slide visuals / layout). Each family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, and surfaces a `### Macros (VBA)` section flagging an embedded `vbaProject.bin` (the file can execute code on open). For **OpenDocument** (`.odt` / `.ods` / `.odp`) the flag appends a `## OpenDocument metadata` block (Dublin Core + ODF properties, keywords, user-defined custom fields) after the converted body. No-op on other sources.
@@ -166,7 +167,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Deep docs
 
-- **[All 172 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
+- **[All 173 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 

@@ -269,6 +269,34 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
+  it('convert-local-file reads the file through the CLI-wired filesystem and never touches Graph', async () => {
+    let graphCalled = false;
+    const tripwireGraph: GraphClient = {
+      get: async () => {
+        graphCalled = true;
+        return { ok: true, value: {} };
+      },
+      post: async () => ({ ok: true, value: {} }),
+      getBinary: async () => ({ ok: true, value: {} }),
+      getElevated: async () => ({ ok: true, value: {} }),
+      teamsChat: async () => ({ ok: true, value: {} }),
+      teamsChatIc3: async () => ({ ok: true, value: {} }),
+      getBinaryElevated: async () => ({ ok: true, value: {} }),
+      fetchUrl: async () => ({ ok: true, value: {} }),
+      put: async () => ({ ok: true, value: {} }),
+      delete: async () => ({ ok: true, value: {} }),
+      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
+    };
+    const fs = createFileSystemFake();
+    fs.seed('/work/data.csv', 'name,age\nAlice,30');
+    const cli = buildCli({ auth: okAuth(), graph: tripwireGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; data: { text: string } };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.data.text).toContain('| Alice | 30 |');
+    expect(graphCalled).toBe(false);
+  });
+
   it('accepts --id as an alias for --message-id on sole-message-id commands (P3)', async () => {
     let capturedPath = '';
     const captureGraph: GraphClient = {

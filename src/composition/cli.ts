@@ -495,7 +495,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
             }
           }
         }
-        const result = await cmd.execute(graph, normalized);
+        // `convert-local-file` is the one command whose input is the local
+        // filesystem, not Graph — route it to executeLocal with the
+        // composition-selected FileSystem (the same instance --output-path uses).
+        const result = cmd.executeLocal !== undefined ? await cmd.executeLocal(fs, normalized) : await cmd.execute(graph, normalized);
         if (!result.ok) {
           let message = result.error.message;
           for (const [canonical, alias] of Object.entries(aliasUsedFor)) {

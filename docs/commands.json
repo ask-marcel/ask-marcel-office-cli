@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-08T10:10:43.661Z",
+  "generatedAt": "2026-06-10T05:46:39.856Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -100,6 +100,56 @@
       ],
       "example": "ask-marcel convert-drive-item-zip --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
+    },
+    {
+      "name": "convert-local-file",
+      "summary": "Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.",
+      "category": "meta",
+      "graphMethod": "GET",
+      "graphPathTemplate": "(local) reads {path} from the local filesystem; not a Graph endpoint",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/",
+      "options": [
+        {
+          "name": "path",
+          "key": "path",
+          "required": true,
+          "description": "Filesystem path of the file to convert (absolute, or relative to the current working directory). E.g. `./report.docx`, `/tmp/handover.zip`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append the converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body. Applies inside a `.zip` too.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "inline-images",
+          "key": "inlineImages",
+          "required": false,
+          "description": "Pass `--inline-images true` to embed a docx's images as base64 `data:` URIs. Default `false` — each image becomes an `[image: <alt>]` placeholder. No-op on non-docx sources.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "max-cells",
+          "key": "maxCells",
+          "required": false,
+          "description": "Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources."
+        }
+      ],
+      "example": "ask-marcel convert-local-file --path ./report.docx",
+      "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk."
     },
     {
       "name": "convert-mail-attachment-to-markdown",

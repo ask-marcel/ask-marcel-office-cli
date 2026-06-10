@@ -9,6 +9,7 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
   'next-page', // inherits from cursor target
   'microsoft-search-query', // varies by entity types
   'scopes-check', // no Graph call
+  'convert-local-file', // reads the local filesystem — no Graph call
   // chatsvcagg-tier commands — not Graph; auth gates server-side on the
   // captured Teams client identity, not on delegated Graph scopes.
   'list-teams-chats-with-messages',
