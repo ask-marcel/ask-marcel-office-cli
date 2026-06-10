@@ -21,7 +21,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/workbook/tables/{table-id}/rows',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/workbooktable-list-rows',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.' },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     { name: 'table-id', key: 'tableId', required: true, description: 'Workbook table ID or table name. Returned by `ask-marcel list-excel-tables`.' },
     ...pickODataOptions(TABLE_ROWS_ODATA_KEYS),

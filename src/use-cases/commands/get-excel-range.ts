@@ -64,7 +64,7 @@ const meta: CommandMeta = {
   graphPathTemplate: "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/range(address='{address}')",
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/worksheet-range',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID containing the workbook. Returned by `ask-marcel list-drives`.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.' },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     {
       name: 'worksheet-id',
