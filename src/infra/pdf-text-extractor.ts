@@ -24,6 +24,24 @@ import type { GraphError } from './graph-client.ts';
  * quirky font. We lower it at the boundary because the noise originates inside
  * pdfjs — the `no-console` rule keeps us from emitting or intercepting it ourselves.
  */
+/**
+ * Map a pdfjs throw to an actionable message. The special case is an encrypted
+ * PDF: pdfjs raises `PasswordException` ("No password given") — QA run-1 found a
+ * real tenant file surfacing that raw string with zero guidance. Password
+ * handling is genuinely unsupported (and Graph's `format=pdf` cannot unlock
+ * encrypted sources either), so say that honestly instead of leaking pdfjs
+ * internals. Pure and exported: the branch is unit-tested with shaped errors —
+ * no encrypted-PDF fixture exists in the toolchain.
+ */
+const pdfErrorMessage = (e: unknown): string => {
+  const name = e instanceof Error ? e.name : '';
+  const detail = e instanceof Error ? e.message : String(e);
+  if (name === 'PasswordException' || /password/i.test(detail)) {
+    return 'pdf is password-protected — its text layer cannot be read without the password, and Graph’s format=pdf cannot unlock encrypted sources either. Ask the sender for an unprotected copy, or open it locally with the password and re-save it without encryption.';
+  }
+  return `pdf text extraction failed: ${detail}`;
+};
+
 const extractPdfText = async (bytes: Uint8Array): Promise<Result<string, GraphError>> => {
   try {
     const { extractText, getDocumentProxy } = await import('unpdf');
@@ -31,8 +49,8 @@ const extractPdfText = async (bytes: Uint8Array): Promise<Result<string, GraphEr
     const { text } = await extractText(doc, { mergePages: true });
     return ok(text);
   } catch (e) {
-    return err({ type: 'api_error', status: 500, message: `pdf text extraction failed: ${e instanceof Error ? e.message : String(e)}` });
+    return err({ type: 'api_error', status: 415, message: pdfErrorMessage(e) });
   }
 };
 
-export { extractPdfText };
+export { extractPdfText, pdfErrorMessage };
