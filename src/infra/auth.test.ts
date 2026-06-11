@@ -81,7 +81,13 @@ const fakeBrowserAuth = (config?: {
       const ic3 = ic3Result();
       const teams = config?.acquireResult ?? null;
       if (teams && config?.fromCache) {
-        return { teams, fromCache: true as const, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const }, ic3 };
+        return {
+          teams,
+          fromCache: true as const,
+          elevated: { ok: false as const, reason: 'sso_timeout' as const },
+          chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+          ic3,
+        };
       }
       if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
       const v = config?.elevatedResult;
