@@ -162,7 +162,10 @@ type Command = {
    * composition-selected FileSystem; `execute` stays as the registry-typed
    * fallback that redirects library consumers to this variant.
    */
-  readonly executeLocal?: (fs: import('../ports/filesystem.ts').FileSystem, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
+  readonly executeLocal?: (
+    fs: import('../ports/filesystem.ts').FileSystem,
+    params: Record<string, string>
+  ) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
 };
 
 export type {

@@ -55,9 +55,15 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description: 'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description:
+        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
     },
-    { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.' },
+    {
+      name: 'item-id',
+      key: 'itemId',
+      required: true,
+      description: 'driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.',
+    },
   ],
   example: "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:

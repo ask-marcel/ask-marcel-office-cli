@@ -82,7 +82,12 @@ const meta: CommandMeta = {
   graphPathTemplate: '(local) reads {path} from the local filesystem; not a Graph endpoint',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
   options: [
-    { name: 'path', key: 'path', required: true, description: 'Filesystem path of the file to convert (absolute, or relative to the current working directory). E.g. `./report.docx`, `/tmp/handover.zip`.' },
+    {
+      name: 'path',
+      key: 'path',
+      required: true,
+      description: 'Filesystem path of the file to convert (absolute, or relative to the current working directory). E.g. `./report.docx`, `/tmp/handover.zip`.',
+    },
     {
       name: 'include-metadata',
       key: 'includeMetadata',
@@ -95,7 +100,8 @@ const meta: CommandMeta = {
       name: 'inline-images',
       key: 'inlineImages',
       required: false,
-      description: "Pass `--inline-images true` to embed a docx's images as base64 `data:` URIs. Default `false` — each image becomes an `[image: <alt>]` placeholder. No-op on non-docx sources.",
+      description:
+        "Pass `--inline-images true` to embed a docx's images as base64 `data:` URIs. Default `false` — each image becomes an `[image: <alt>]` placeholder. No-op on non-docx sources.",
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     {

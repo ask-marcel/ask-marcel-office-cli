@@ -26,7 +26,8 @@ const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClie
     getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
   }) as GraphClient;
 
-const zipFileAttachment = (bytes: Uint8Array): GraphClient => graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
+const zipFileAttachment = (bytes: Uint8Array): GraphClient =>
+  graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
 
 const params = { messageId: 'm1', attachmentId: 'a1' };
 type ZipResult = { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
