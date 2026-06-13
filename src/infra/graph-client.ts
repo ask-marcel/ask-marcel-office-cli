@@ -58,6 +58,7 @@ type GraphClient = {
    */
   teamsChatIc3: (path: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
+  patch: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
    * Same shape as `getBinary` but signs the request with an "elevated"
@@ -276,7 +277,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
 
-  const request = async (method: 'GET' | 'POST', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+  const request = async (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
     if (!headers.ok) return headers;
 
@@ -594,6 +595,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     teamsChat,
     teamsChatIc3,
     post: (path, body) => request('POST', path, body),
+    patch: (path, body) => request('PATCH', path, body),
     getBinary,
     getBinaryElevated,
     fetchUrl,

@@ -1,6 +1,6 @@
 # ask-marcel-office-cli
 
-**A Microsoft Graph CLI built for LLMs.** 173 read-only commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus a local-file converter that needs no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+**A Microsoft Graph CLI built for LLMs.** 175 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus a local-file converter that needs no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
 
 ```bash
 npm i -g ask-marcel-office-cli
@@ -25,7 +25,7 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 
 ### Read-only by design
 
-**This is the most important property.** 171 GET endpoints + 2 POST (searches). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. A hallucinated command can't break anything — the worst case is a 404. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 171 GET endpoints + 2 POST (searches) + 1 POST (create draft) + 1 PATCH (update draft). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -66,6 +66,21 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 ### Browser-OAuth at first launch
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
+
+**Login flow:** By default, the CLI uses Playwright to open a browser for authentication. Alternatively, you can use the [Ask Marcel Companion](./browser-extension/) browser extension for faster authentication.
+
+```bash
+ask-marcel login              # default: Playwright browser
+ask-marcel login --use-extension  # use browser extension (requires setup)
+```
+
+**Browser extension setup (optional, one-time):**
+
+1. Open `chrome://extensions/` (Chrome) or `edge://extensions/` (Edge)
+2. Enable "Developer mode" (top-right toggle)
+3. Click "Load unpacked" → select the `browser-extension/` folder from this repo
+4. **Enable in incognito/inprivate mode:** Click the extension's "Details" button, then enable "Allow in incognito" (Chrome) or "Allow in InPrivate" (Edge). **This is required** — the CLI opens an incognito/inprivate window, and extensions are disabled there by default.
+5. Done — use `ask-marcel login --use-extension` to authenticate via the extension
 
 ### Stable error envelope with actionable hints
 
@@ -169,10 +184,38 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Deep docs
 
-- **[All 173 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
+- **[All 175 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
+
+
+## Agent skill (progressive disclosure)
+
+A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 165 commands into context at once.
+
+**Structure**
+
+```
+.agents/skills/ask-marcel-office/
+├── SKILL.md                          # core workflow + category index
+└── references/                       # per-domain command details, loaded on demand
+    ├── marcel-mail.md        (29 commands)
+    ├── marcel-drive.md       (30 commands)
+    ├── marcel-calendar.md    (23 commands)
+    ├── marcel-sharepoint.md  (18 commands)
+    ├── marcel-user.md        (15 commands)
+    ├── marcel-tasks.md       (15 commands)
+    ├── marcel-excel.md       (11 commands)
+    ├── marcel-notes.md       (11 commands)
+    ├── marcel-chats.md        (9 commands)
+    ├── marcel-teams.md        (7 commands)
+    └── marcel-meta.md         (5 commands)
+```
+
+**How it works**
+
+`SKILL.md` contains the authentication flow, the discovery loop (`help-json --terse --category` → `docs <cmd>` → execute), key patterns (OData passthrough, relative dates, document conversion, pagination), and a category index. The full command reference for each domain lives in `references/marcel-<category>.md` and is loaded only when the agent needs that domain — keeping the context window lean.
 
 ## Roadmap
 

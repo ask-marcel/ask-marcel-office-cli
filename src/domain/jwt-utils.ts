@@ -17,10 +17,17 @@ export const isTokenFresh = (token: string, bufferSeconds = 300): boolean => {
   return Date.now() / 1000 < exp - bufferSeconds;
 };
 
+const GRAPH_AUDIENCE_UUID = '00000003-0000-0000-c000-000000000000';
+const GRAPH_AUDIENCE_URL = 'graph.microsoft.com';
+
 export const isGraphToken = (token: string): boolean => {
   const claims = decodeJwtPayload(token);
   const aud = claims.aud;
-  if (typeof aud === 'string') return aud.includes('graph.microsoft.com');
-  if (Array.isArray(aud)) return aud.some((a) => typeof a === 'string' && a.includes('graph.microsoft.com'));
+  if (typeof aud === 'string') {
+    return aud === GRAPH_AUDIENCE_UUID || aud.includes(GRAPH_AUDIENCE_URL);
+  }
+  if (Array.isArray(aud)) {
+    return aud.some((a) => typeof a === 'string' && (a === GRAPH_AUDIENCE_UUID || a.includes(GRAPH_AUDIENCE_URL)));
+  }
   return false;
 };

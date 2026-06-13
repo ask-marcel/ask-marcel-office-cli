@@ -1,7 +1,7 @@
 {
   "name": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "description": "Microsoft Graph CLI + library — typed Bun/TypeScript wrapper around 150+ Graph operations (read + on-the-fly PDF/markdown conversion + federated Microsoft Search) reachable from a Teams browser-OAuth token.",
+  "description": "Microsoft Graph CLI + library \u2014 typed Bun/TypeScript wrapper around 150+ Graph operations (read + on-the-fly PDF/markdown conversion + federated Microsoft Search) reachable from a Teams browser-OAuth token.",
   "license": "MIT",
   "author": "Vincent Delacourt <vincent.delacourt@adama-development.com>",
   "repository": {
@@ -68,7 +68,8 @@
     "build:types": "bun --bun x tsc -p tsconfig.build.json",
     "docs:gen": "bun run scripts/gen-docs.ts",
     "build": "rm -rf dist && bun run docs:gen && bun run build:js && bun run build:types && bun run scripts/fix-dts-extensions.ts && bun run scripts/add-shebang.ts && cp docs/commands.json dist/commands.json",
-    "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage"
+    "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage",
+    "build:bin": "mkdir -p dist/bin && bun build src/main.ts --compile --target=bun-darwin-arm64 --external playwright --outfile dist/bin/ask-marcel-mac-arm64 && bun build src/main.ts --compile --target=bun-darwin-x64 --external playwright --outfile dist/bin/ask-marcel-mac-x64 && bun build src/main.ts --compile --target=bun-linux-x64 --external playwright --outfile dist/bin/ask-marcel-linux && bun build src/main.ts --compile --target=bun-windows-x64 --external playwright --outfile dist/bin/ask-marcel-windows.exe"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
