@@ -135,7 +135,7 @@ const render = (data: unknown, logger: Logger, format: OutputFormat): void => {
   else renderText(data);
 };
 
-const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource): void => {
+const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number): void => {
   // Audit round-7 Wave G: `errorCode` is an additive field — old consumers
   // keying on `error: string` continue to work; new consumers can branch on
   // the structured code (`itemNotFound`, `InvalidIdMalformed`, `MissingScope`,
@@ -167,6 +167,7 @@ const renderError = (message: string, format: OutputFormat, errorCode?: string, 
       ...(errorCode ? { errorCode } : {}),
       ...(hint ? { hint: hint.hint } : {}),
       ...(source ? { source } : {}),
+      ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
     };
     process.stdout.write(`${JSON.stringify(payload)}\n`);
     return;
@@ -174,6 +175,7 @@ const renderError = (message: string, format: OutputFormat, errorCode?: string, 
   const lines = [`error: ${message}`];
   if (hint) lines.push(`hint: ${hint.hint}`);
   if (source) lines.push(`source: ${source}`);
+  if (retryAfterSeconds !== undefined) lines.push(`retryAfter: ${retryAfterSeconds}s`);
   process.stdout.write(`${lines.join('\n')}\n`);
 };
 
