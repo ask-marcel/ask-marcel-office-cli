@@ -33,7 +33,7 @@ Every command writes its output as a single document to **stdout** (success or e
 
 ### Text (default, LLM-readable)
 
-YAML-ish `key: value` lines, generally smaller than the JSON envelope on long listings (the win grows with page size and shrinks toward parity on small projected pages — a 3-message page is ~3.3 KB in either format). Errors render as `error: <message>` followed by `hint:` and `source:` lines so an LLM can match the line shape without parsing JSON. Designed for LLMs reading and summarising; not for piping into other tools.
+YAML-ish `key: value` lines, generally smaller than the JSON envelope on long listings (the win grows with page size and shrinks toward parity on small projected pages — a 3-message page is ~3.3 KB in either format). Errors render as `error: <message>` followed by `hint:`, `source:`, and (when Graph throttles) `retryAfter: Ns` lines so an LLM can match the line shape without parsing JSON. Designed for LLMs reading and summarising; not for piping into other tools.
 
 ```bash
 $ ask-marcel get-current-user
@@ -82,11 +82,20 @@ The stable `{ok, data, nextLink?, deltaLink?, count?}` envelope, unambiguous for
   "hint": "The ID you passed isn't valid for this endpoint. Source IDs from a sibling `list-*` command…",
   "source": "graph"
 }
+
+// Error — throttled (HTTP 429 / 503): `retryAfterSeconds` carries Graph's `Retry-After`
+{
+  "ok": false,
+  "error": "TooManyRequests: Too many requests",
+  "errorCode": "TooManyRequests",
+  "source": "graph",
+  "retryAfterSeconds": 120
+}
 ```
 
 `@odata.nextLink`, `@odata.deltaLink`, and `@odata.count` from the Graph payload are lifted to the envelope's top level and removed from `data`, so consumers don't have to know the OData spelling. **Always check the top-level `nextLink` (and `deltaLink` for `*-delta` commands) — never reach into `data["@odata.nextLink"]`; it's been moved.** This applies uniformly across every paginated `list-*` / `search-*` / `*-delta` command.
 
-`source` is one of `graph` | `substrate` | `cli` | `validation`. `hint` is present when a curated rule matched the error code or message; the envelope shape is `{ok, error, errorCode?, hint?, source}` where only `hint` is conditional.
+`source` is one of `graph` | `substrate` | `cli` | `validation`. `hint` is present when a curated rule matched the error code or message; the envelope shape is `{ok, error, errorCode?, hint?, source, retryAfterSeconds?}` where `hint` and `retryAfterSeconds` are conditional. `retryAfterSeconds` appears only when Graph returned a `Retry-After` header (throttling: 429, sometimes 503) and is the integer seconds to wait before retrying — honor it instead of guessing a backoff. In text output the same value renders as a `retryAfter: Ns` line. It is omitted when the header is absent or in the rarely-seen HTTP-date form (delta-seconds only).
 
 ## OData query passthrough
 
@@ -185,11 +194,12 @@ const graph = createGraphClient({
 const me = await commands['get-current-user'].execute(graph, {});
 ```
 
-One special case: `convert-local-file` reads the **local filesystem**, not Graph — its registry-typed `execute` returns a redirect error, and the real entry point is the optional `executeLocal(fs, params)` on the same command object (the CLI wires this automatically; library consumers pass their own `FileSystem`):
+One special case: `convert-local-file` and `extract-local-file-images` read the **local filesystem**, not Graph — their registry-typed `execute` returns a redirect error, and the real entry point is the optional `executeLocal(fs, params)` on the same command object (the CLI wires this automatically; library consumers pass their own `FileSystem`):
 
 ```ts
 import { commands, createNodeFileSystem } from 'ask-marcel-office-cli';
 const md = await commands['convert-local-file'].executeLocal?.(createNodeFileSystem(), { path: './report.docx' });
+const images = await commands['extract-local-file-images'].executeLocal?.(createNodeFileSystem(), { path: './deck.pdf' });
 ```
 
 The full export list (registry, factories, `Result`, branded types, ports) is in [`src/index.ts`](../src/index.ts). The machine-readable manifest is also available as a JSON subpath import:

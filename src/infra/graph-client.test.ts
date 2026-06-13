@@ -144,6 +144,71 @@ describe('graph client', () => {
     }
   });
 
+  it('captures the Retry-After interval from a 429 so a caller can honor Graph throttling instead of guessing the backoff', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'TooManyRequests', message: 'Too many requests' } }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': '120' },
+      });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/drives');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.status).toBe(429);
+    expect(result.error.retryAfterSeconds).toBe(120);
+  });
+
+  it('captures Retry-After even when the throttled response has an empty body (503 on an HTTP/2 substrate front-end)', async () => {
+    const fetchFn: FetchFn = async () => new Response('', { status: 503, statusText: 'Service Unavailable', headers: { 'retry-after': '30' } });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.retryAfterSeconds).toBe(30);
+  });
+
+  it('treats Retry-After: 0 as an immediate-retry hint (0 is meaningful, not absent)', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'TooManyRequests', message: 'slow down' } }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': '0' },
+      });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/drives');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.retryAfterSeconds).toBe(0);
+  });
+
+  it('omits retryAfterSeconds when the error response carries no Retry-After header (caller falls back to its own backoff)', async () => {
+    const fetchFn = fakeFetch([{ match: (url) => url.includes('/me/drives'), body: { error: { code: 'itemNotFound', message: 'not found' } }, status: 404 }]);
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/drives');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.retryAfterSeconds).toBeUndefined();
+  });
+
+  it('omits retryAfterSeconds when Retry-After is the unparseable HTTP-date form (delta-seconds only; date form would need a clock)', async () => {
+    const fetchFn: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'TooManyRequests', message: 'slow down' } }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': 'Wed, 21 Oct 2026 07:28:00 GMT' },
+      });
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.get('/me/drives');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.retryAfterSeconds).toBeUndefined();
+  });
+
   it('reports an Auth cancelled message when the auth manager returns auth_cancelled', async () => {
     const cancelledAuth = {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),

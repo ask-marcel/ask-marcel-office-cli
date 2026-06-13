@@ -36,6 +36,11 @@ export default [
       ],
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+      // `_`-prefixed parameters are the deliberate "required by the contract,
+      // unused by this implementation" marker — e.g. the Graph-shaped `execute`
+      // on local-only commands (`convert-local-file`, `extract-local-file-images`),
+      // whose registry type demands `(graph, params)` it never reads.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
   ...(process.env['LINT_STRICT']
