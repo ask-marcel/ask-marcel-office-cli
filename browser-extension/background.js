@@ -50,6 +50,15 @@ chrome.webRequest.onBeforeRequest.addListener(
       const url = new URL(details.url);
       if (url.hostname !== 'teams.microsoft.com' && url.hostname !== 'teams.live.com') return;
 
+      // 从 webRequest 中解析 region（不依赖 debugger 时序）
+      if (!capturedRegion) {
+        const region = parseRegion(details.url);
+        if (region) {
+          capturedRegion = region;
+          console.log('[Ask Marcel] ✓ webRequest 捕获到 region: ' + region);
+        }
+      }
+
       const port = url.searchParams.get('ask_marcel_port');
       if (!port) return;
 

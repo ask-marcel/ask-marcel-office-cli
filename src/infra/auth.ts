@@ -250,11 +250,11 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
         lastElevatedOutcome = elevatedAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
         lastChatsvcaggOutcome = chatsvcaggAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
         await persistTeams(token, refreshToken, elevatedAccessToken ?? null);
-        if (chatsvcaggAccessToken && chatsvcaggRegion) {
-          await persistChatsvcagg(chatsvcaggAccessToken, chatsvcaggRegion);
+        if (chatsvcaggAccessToken) {
+          await persistChatsvcagg(chatsvcaggAccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
         }
-        if (ic3AccessToken && chatsvcaggRegion) {
-          await persistIc3(ic3AccessToken, chatsvcaggRegion);
+        if (ic3AccessToken) {
+          await persistIc3(ic3AccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
         }
         logger.info('auth.ladder.rung', { rung: 'system_browser' });
         return ok(token);
