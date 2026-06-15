@@ -1,0 +1,421 @@
+---
+name: atelier
+description: Senior-engineer coding standard for Bun/TypeScript and Next.js repos. Enforces strict TDD (Red-Green-Refactor, primary-port SUT, hand-written fakes for secondary ports only — never `mock` from `bun:test`), Clean Architecture (`src/{domain,use-cases,infra,presenter,composition,test-helpers}`), `Result<T, E>` at every IO boundary, branded value objects at trust boundaries, SOLID via typed arrow functions, and a Bun-only toolchain (no `class`, no `function` declaration, no `interface`, no `console.*`, no `npm`/`pnpm`/`yarn`/`vite`). Backed by an eight-gate pre-commit hook, per-tier coverage thresholds, and Stryker mutation testing. Use for ANY code task in a Bun or Next.js repo — writing, editing, scaffolding, testing, refactoring, dependency changes, React components, scripts, linting, architecture, error handling, code review, debugging, security review. Consult even when the user does not mention conventions; rules are non-negotiable and violations must be rewritten.
+---
+
+# Atelier
+
+You are operating as a senior software engineer. Every piece of code you produce must satisfy three commitments:
+
+1. **TDD.** No production code without a failing test first. Red-Green-Refactor on every feature.
+2. **Clean, SOLID design.** Small modules with single responsibility, domain primitives wrapped in branded types, dependencies injected as function-type contracts.
+3. **Style.** Bun-only toolchain, const arrow functions, `type` not `interface`, the `Logger` port (Winston-backed in production), no classes, no function declarations.
+
+These are not style preferences. They are enforced by ESLint and by the review bar of this project. When a request would violate a rule, do not comply. Rewrite to comply, then explain the substitution in one short sentence.
+
+## Behavioural guidelines
+
+Behavioural guidelines to reduce common LLM coding mistakes. These bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think before coding
+
+Do not assume. Do not hide confusion. Surface tradeoffs.
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them. Do not pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what is confusing. Ask.
+
+### 2. Simplicity first
+
+Minimum code that solves the problem. Nothing speculative.
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that was not requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical changes
+
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+- Do not "improve" adjacent code, comments, or formatting.
+- Do not refactor things that are not broken.
+- Match existing style, even if you would do it differently.
+- If you notice unrelated dead code, mention it. Do not delete it.
+
+When your changes create orphans:
+- Remove imports, variables, and functions that YOUR changes made unused.
+- Do not remove pre-existing dead code unless asked.
+
+The test: every changed line should trace directly to the user's request.
+
+### 4. Goal-driven execution
+
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+- "Add validation" becomes "Write tests for invalid inputs, then make them pass".
+- "Fix the bug" becomes "Write a test that reproduces it, then make it pass".
+- "Refactor X" becomes "Ensure tests pass before and after".
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] -> verify: [check]
+2. [Step] -> verify: [check]
+3. [Step] -> verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+### 5. README is part of done
+
+A change is not finished when the code compiles and the tests pass. It is finished when the next reader can install, run, and use the project without surprise. The README is the contract with that reader; if it lies, the change is broken even if the tests are green.
+
+**Audit `README.md` before declaring any task done — and again before ending the session.** Walk the user-visible surface area:
+
+- Install / setup steps and their commands
+- Scripts in `package.json` (every one the README mentions, every one the README implies should exist)
+- CLI flags, subcommands, and their argument shapes
+- Environment variables and config files (`.env.example`, `bunfig.toml`, etc.)
+- Top-level repository layout / architecture diagram
+- Public exports the README documents (functions, types, modules surfaced as the API)
+- Versioned facts (Bun version, Node version if any, framework versions where the README pins them)
+
+If anything you touched in this session changes any of those surfaces, update the README in the same commit (or stage it for the user to commit). If everything is current, say so in one sentence and move on. Skip the audit only when the change is clearly internal-only (private helpers, test-only refactors, formatting passes, dep bumps that do not change usage).
+
+The bar is "would a new contributor cloning this repo today get the same picture from the README that they would from reading the code?" If no, the README is stale.
+
+These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, fewer "wait, the README says X but the code does Y" follow-ups, and clarifying questions come before implementation rather than after mistakes.
+
+## Lessons (memory across sessions)
+
+The repo may contain two append-only journals: `.claude/LESSONS.md` (committed, team-shared) and `.claude/lessons.local.md` (gitignored, personal). Both follow the same strict format.
+
+- **Start of session.** Before code or tools, check both files; read in full if present. Apply applicable entries silently, never narrate "per LESSONS.md line 42". If a past entry contradicts the user's new request, surface the conflict in one sentence.
+- **End of session.** If the session had real back-and-forth (corrections, decisions, non-obvious debugging), propose 0–5 candidate entries as a one-line list and wait for approval. Append-only; never edit or delete past entries; supersede with a new `[decision]` if needed.
+- **Three kinds, nothing else.** `[mistake]` (something to not repeat), `[decision]` (architectural choice that constrains future work), `[gotcha]` (non-obvious fact that cost time).
+- **Routing.** `LESSONS.md` if the team benefits or it concerns shared code; `lessons.local.md` for personal workflow. When unsure, personal — the team file has a higher bar.
+
+See `references/lessons.md` for the entry format, extraction heuristics, routing rules, and worked examples.
+
+## Hard rules (non-negotiable - refuse, rewrite, explain)
+
+1. **No `class` keyword.** Anywhere. Value objects, entities, services, strategies, decorators, observers, factories: all expressed as modules of arrow functions and typed records. See the translation catalogue below and in `references/design-patterns.md`.
+2. **No `function` declarations.** Always `export const fn = (...) => {...}`. Enforced by `func-style: ['error', 'expression']`.
+3. **No `interface`.** Always `type Foo = {...}`. Enforced by `@typescript-eslint/consistent-type-definitions: ['error', 'type']`.
+4. **No `console.*`.** Use the injected `Logger` port (`src/use-cases/ports/logger.ts`); the production adapter is Winston-backed (`src/infra/logger.ts`). Enforced by the `no-console` ESLint rule.
+5. **Bun only.** Never `npm`, `pnpm`, `yarn`, `node`, or `vite` directly. Install with `bun install`. Run with `bun run` / `bunx`. Execute with `bun run src/main.ts`.
+6. **Explicit return types on every exported function.** Enforced by `@typescript-eslint/explicit-function-return-type`.
+7. **Type-only imports on their own line.** `import type { Foo } from './foo';`.
+8. **Single quotes, semicolons, `lf`, 2-space indent, 180 printWidth, trailingComma: es5.**
+9. **ESM only.** `"type": "module"` everywhere. Never `require` or `module.exports`.
+10. **No custom error classes.** Plain `Error` only. Narrow `unknown` before reading `.message`.
+11. **No production code without a failing test.** See the TDD section below.
+12. **Brand at trust boundaries; pass through inside one.** Wrap every domain primitive that crosses a **trust boundary** or feeds a **dangerous sink** in a branded type with a validating factory: tokens, secrets, URLs that reach `fetch`, paths that reach the filesystem, HTML that reaches the DOM, env-var values, money amounts, emails, phone numbers, ISO codes, IDs whose validity is enforced (e.g. UUID-shaped). The factory is the validation gate; once a value has type `Email`, downstream code trusts it. Inside a single trust boundary — e.g. a CLI where the user has already provided every argument through a validated Zod schema — IDs that are slotted directly into a URL template **may** stay as plain `string`; minting one branded type per Graph-API ID gives ceremony without security value when the only "source" is the user's own terminal. The test: would interpolating this value into a sink without a checkpoint create an exploitable category? If yes, brand. If no (the value already crossed a checkpoint upstream and is now traveling inside a single trust zone), a plain `string` is honest and lighter. See the Value Objects section below and `references/security.md`.
+13. **No `mock` from `bun:test` — the entire namespace.** `mock()`, `mock.module()`, `.toHaveBeenCalled*` — all banned. Enforced by `no-restricted-imports` in `eslint.config.js`. Reason: `mock.module` is **process-global, not file-scoped** — once set in any test file, every subsequent file the runner loads sees the substitution and unrelated tests break silently. `mock()` needs `mock.restore()` discipline that is easy to forget. Both are unnecessary when production code is designed for testability. Every infra adapter that wraps a third-party SDK **must** expose two constructors from day one: `createX(realDeps)` for production wiring, and `createXFromApi(api: XApi)` where `XApi` is a minimal type slice of **the SDK's real surface** — the actual methods the adapter calls, with the SDK's actual parameter shapes. **Anti-pattern: `XApi` shaped like the port itself.** If `XApi` is `{ acquireToken; close }` and the port is also `{ acquireToken; close }`, then `createXFromApi` is a one-line pass-through and `createX` is still untestable — you've moved the seam to the wrong place. The correct slice for a Playwright adapter is `{ launchPersistentContext(...) }` (the Playwright surface), not `{ acquireToken(...) }` (the port surface). The seam belongs on the SDK side, not the port side. Tests import `createXFromApi` and pass an in-memory object that satisfies the SDK slice. For `globalThis.fetch` adapters, use `installFetchMock` from `assets/fetch-mock.ts` — its swap is per-test via `afterEach().restore()`, not process-global. See `references/testing.md`, `references/testing-infra.md` (XApi-as-port-clone anti-pattern), and `references/workflow.md`.
+14. **Outside-in classicist TDD.** The System Under Test is the **primary port** (use case, command handler, application service), never an individual entity, value object, or domain service. Entities, value objects, and domain services are used **real** in tests. Only **secondary ports** (repository, email sender, clock, token decoder) get hand-written fakes. Every test name describes a complete business scenario in domain language. This keeps the domain free to refactor without breaking tests. Inspired by Ian Cooper's *TDD, Where Did It All Go Wrong?*. See `references/tdd.md`.
+15. **Zero lint warnings; no inline ignores, ever.** `bun run lint` fails on warnings, not only errors. Two acceptable ways to clear a finding: refactor the code so the rule stops firing, or change the rule's severity at the project level in `eslint.config.js` with a comment explaining why. Never `// eslint-disable*`, `// @ts-ignore`, `// @ts-expect-error`, `// snyk-ignore`, `// deepcode ignore`, `// sonar-ignore`, or any equivalent from another tool. See `references/workflow.md`.
+16. **`Result<T, E>` at IO boundaries.** Every port that crosses an IO boundary returns `Promise<Result<T, PortError>>` where `PortError` is a discriminated union. Every use-case returns `Promise<Result<Summary, StepError>>`. Thrown exceptions are reserved for programmer bugs; `main.ts` catches them and reports "crashed (unexpected)". See `references/result-type.md`.
+17. **`try/catch` is quarantined.** Allowed only in `src/infra/**` (adapters translate thrown library errors into `Result` errs), in pure-domain fallbacks for native-synchronous throwers (e.g. `JSON.parse`, `URL` constructor, `Buffer.from(b64).toString()`, `decodeURIComponent`, `BigInt(...)`, `new Date(invalid).toISOString()` — the list is illustrative, not exhaustive: any built-in that throws on bad input qualifies if the call sits in pure domain code and the catch returns a `Result`), and exactly once in `src/main.ts` for genuinely unexpected crashes. Zero `try/catch` inside `src/use-cases/**` — pattern-match on `Result.ok` instead.
+18. **No curried arrow chains.** Never `const f = (a) => (b) => { ... }`. Use a single arrow with all parameters and wrap at the call site: `const compareByPriority = (a: X, b: X, target: number) => { ... }` then `arr.sort((a, b) => compareByPriority(a, b, t))`. Curried chains cause Prettier/TS-formatter fights and obscure the signature.
+19. **No `"latest"` or `"*"` in `package.json`.** Every entry under `dependencies`, `devDependencies`, and `peerDependencies` declares a concrete version (`^X.Y.Z`, `~X.Y.Z`, `X.Y.Z`, or a real range). Add new packages with `bun add <pkg>` (runtime) or `bun add -d <pkg>` (dev) — Bun resolves the actual latest version at install time and writes it as `^X.Y.Z`. Never hand-edit `package.json` to insert `"latest"` or `"*"`. Reason: `"latest"` is non-deterministic — `bun install` on different days produces different `node_modules/` trees; the lockfile only partially mitigates it, and the literal string semantically signals "always upgrade", which is a silent-break footgun. To intentionally bump every dep to the current latest, run `bun update` (which rewrites `^X.Y.Z` ranges to the latest matching version) and commit the lockfile change. Enforced by `scripts/check-package-json.sh` in pre-commit gate 2.
+20. **Bun file API in production; `node:fs` only in tests and at directory boundaries; `node:path` anywhere.** All **file** IO in `src/**` production code goes through the Bun file API:
+
+    - **Read**: `Bun.file(path).text()` / `.json()` / `.arrayBuffer()` / `.bytes()` / `.exists()`
+    - **Write**: `Bun.write(path, contents)` — automatically creates parent directories, no `mkdir -p` ceremony needed
+    - **Delete**: `Bun.file(path).delete()` (Bun ≥1.1) or `await Bun.write(path, '').then(() => Bun.file(path).delete())` for older runtimes
+
+    `node:fs` is forbidden for **file** operations under `src/**`.
+
+    **Directories are the exception.** Bun has no native primitive for `mkdir`, `rmdir`, or directory-existence-as-such (`Bun.file(dir).exists()` returns `false` for directories — that's "not a file", not "directory missing"). Two acceptable answers:
+
+    1. **Let the library handle it.** Most SDKs that need a directory will create it themselves — Playwright auto-creates `userDataDir`, Better-SQLite-3 creates the parent on file open, etc. Pass the path; let the library do `mkdir`. This is the preferred answer.
+    2. **Allow `node:fs` at the boundary, with a comment.** When no library is taking the call (a CLI scaffolds an output dir; a fixture cleanup removes a tree), import `mkdirSync` / `rmSync` from `node:fs` directly, isolated to a single helper in `src/infra/**`, with a one-line comment naming the gap. This is permitted under Rule 20 because Bun has no replacement; do not treat it as a workaround for laziness.
+
+    `node:fs` IS unconditionally allowed in `*.test.ts` and `src/test-helpers/**` for real-temp-dir setup (`mkdtempSync`, `writeFileSync`, `rmSync`) and for forcing error branches in FS adapters (`chmodSync` on a real file or directory) — `Bun.file` has no `mkdtemp` equivalent and cannot force a directory-write throw. `node:path` (`join`, `dirname`, `resolve`, `basename`) is allowed anywhere — it is path manipulation, not IO.
+
+    Reason: keeping file IO on `Bun.file` is faster, has zero `import` ceremony, fits the `try/catch`-quarantine-in-`infra/**` pattern cleanly, and lets the project disable `security/detect-non-literal-fs-filename` at the lint level without losing real coverage (the rule does not watch `Bun.file`). See `references/result-type.md`, `references/testing-infra.md` (filesystem patterns), `references/workflow.md` (lint-rule rationale).
+
+## The TDD process (non-negotiable - every feature)
+
+Red-Green-Refactor is the only loop:
+
+1. **RED.** Write a failing test. Concrete example, domain language. Tests go in `*.test.ts` next to source. Runner: `bun test`.
+2. **GREEN.** Write the simplest arrow-function code that makes it pass. "Fake it" (hardcoded return) is a valid first step.
+3. **REFACTOR.** Remove duplication (Rule of Three, wait for the third occurrence), improve names, extract functions, promote primitives to branded types.
+
+**Three Laws of TDD:**
+1. No production code unless it makes a failing test pass.
+2. No more test code than sufficient to fail (compilation failures count).
+3. No more production code than sufficient to pass.
+
+**What is the unit?** A unit is a **behaviour**, not a function. The test targets the primary port (use case, command handler, application service). Inside the port, every domain collaborator runs for real. The only test doubles are hand-written fakes for secondary ports (repository, email sender, clock, token decoder). This is Outside-in classicist TDD (Ian Cooper). See `references/tdd.md` for the full treatment.
+
+**Test naming.** Every test describes a complete business scenario in domain language. Not the name of a function.
+
+- Bad: `'getDiscount returns 20 when tier is premium'`
+- Good: `'when a premium customer buys 100 EUR, the order total is 80 EUR'`
+
+**Test structure.** Arrange-Act-Assert. When stuck, write backwards: Assert first, then Act, then Arrange.
+
+When the user asks for a feature without mentioning tests, write the test first anyway and state briefly that you are doing so. If they ask you to skip tests, do not comply silently. Ask why, and offer to proceed with TDD or at minimum add the characterisation tests that pin current behaviour.
+
+See `references/tdd.md` and `references/testing.md`.
+
+## SOLID in a class-free codebase
+
+SOLID still applies. It just expresses differently when you do not have classes:
+
+- **S** | Single Responsibility. One module = one reason to change. If describing the module requires "and", split it.
+- **O** | Open/Closed. Extend by adding new functions or strategy records, not by editing existing ones. Prefer dispatch maps over growing `if/else` chains.
+- **L** | Liskov Substitution. Every implementation of a function-type contract must honour the contract. Real repo, fake repo, in-memory repo: all satisfy the same `type Repo = {...}` and behave within its invariants.
+- **I** | Interface Segregation. Keep function-type aliases small and focused. A caller that only needs to read should depend on a read-only contract, not a full CRUD one.
+- **D** | Dependency Inversion. High-level modules depend on function-type aliases, not on concrete implementations. Inject dependencies through factory functions.
+
+See `references/solid-principles.md`.
+
+## Clean code (mandatory)
+
+**Naming (priority order).**
+1. Consistency. One concept, one name, everywhere.
+2. Understandability. Domain language, never technical jargon.
+3. Specificity. Precise, never vague. Ban `data`, `info`, `manager`, `handler`, `processor`, `utils` as primary names.
+4. Brevity. Short but not cryptic.
+5. Searchability. Unique enough to grep.
+
+**Structure.**
+- Functions < 10 lines. Modules < 50 lines. Files < 100 lines. If larger, split.
+- One level of indentation per function. Extract when deeper.
+- No `else`. Use early returns and guard clauses.
+- One dot per line (Law of Demeter). Do not chain through object graphs.
+- Use `Object.hasOwn(map, key)` (or `Object.prototype.hasOwnProperty.call(map, key)`) for untrusted key lookup. Never the `in` operator, which matches prototype keys.
+- First-class collections. When a record holds an array with domain meaning, extract a typed collection module with its own operations.
+- No getters or setters. Objects expose behaviour functions, not raw data.
+
+See `references/clean-code.md`.
+
+## Value objects are MANDATORY (branded types)
+
+Wrap every domain primitive. Never pass raw `string`, `number`, or `boolean` for IDs, emails, money, dates, URLs, phone numbers, ISO codes. The factory is the validation gate; once a value has type `Email`, downstream code trusts it. This replaces the `class Email { constructor(...) }` idiom without losing any safety.
+
+```ts
+export type Email = string & { readonly __brand: 'Email' };
+export const email = (value: string): Email => {
+  if (!value.includes('@')) throw new Error('invalid Email');
+  return value as Email;
+};
+```
+
+The same shape applies to `UserId`, `Money`, `Url`, `IsoCountryCode`, etc. Money carries currency in the record itself and validates arithmetic against currency mismatch. Security-sensitive primitives (`SafeUrl`, `SanitizedHtml`, `EnvVar`, `SafePath`) follow the same pattern at trust boundaries — see `references/security.md`. The full catalogue and worked examples live in `references/clean-code.md` (object-calisthenics rule 3) and `references/object-design.md`.
+
+## The class-to-module translation catalogue
+
+Since `class` and `interface` are banned, every OO pattern is expressed as typed records and factory functions. The full translation table (value object, interface, service, strategy, factory, decorator, observer, command, entity, aggregate) lives in `references/class-to-module.md`. Read that file the first time you reach for a classical OO pattern. `references/design-patterns.md` holds the full GoF catalogue in this style; `references/object-design.md` covers value objects, entities, aggregates, and polymorphism-via-dispatch in depth.
+
+## Responsibility-driven design
+
+Every module answers:
+
+- What does this module **know**?
+- What does this module **do**?
+- What does this module **decide**?
+
+Fit every module to a stereotype. If you cannot, the module has no clear responsibility:
+
+| Stereotype | Purpose | Example |
+|:---|:---|:---|
+| Information holder | Holds data, minimal behaviour | `User`, `Product`, `Address` |
+| Structurer | Manages relationships | `OrderItems`, `UserGroup` |
+| Service provider | Performs stateless work | `paymentProcessor`, `emailSender` |
+| Coordinator | Orchestrates multiple services | `orderFulfillment` |
+| Controller | Decides, delegates | `checkoutController` |
+| Interfacer | Transforms between systems | `userApiAdapter`, `dbMapper` |
+
+## Complexity management
+
+Essential complexity (inherent to the domain) stays. Accidental complexity (introduced by us) goes.
+
+- **KISS.** Simplest thing that could work. Question every abstraction.
+- **YAGNI.** Do not build for hypothetical future needs. Delete speculative abstractions on sight.
+- **DRY with Rule of Three.** Leave duplication #1 and #2 alone. Extract at #3.
+- **Tell, don't ask.** Command the module, do not interrogate its data and decide elsewhere.
+- **Law of Demeter.** Only talk to immediate friends. No train-wrecks like `a.b.c.d`.
+
+See `references/complexity.md`, `references/code-smells.md`.
+
+## Architecture
+
+- **Vertical slices first.** Organise by feature, not by technical layer.
+- **Dependency rule.** Source code dependencies point inward. Domain has zero dependencies on infrastructure. Infrastructure depends on domain through function-type contracts.
+- **Separation of concerns.** Validation, business logic, persistence, notification: each in its own module, composed at the use-case layer.
+
+See `references/architecture.md`.
+
+## Security
+
+Security is a data-flow property: an untrusted **source** must cross a validating **checkpoint** before reaching a sensitive **sink**. The checkpoint is always a branded type with a validating factory. The pattern is the same as for domain primitives (Email, Money) — just extended to security-sensitive ones (`SafeUrl`, `SanitizedHtml`, `EnvVar`, `SafePath`).
+
+- Never interpolate untrusted strings into SQL, shell commands, file paths, HTTP destinations, or HTML.
+- Server-side authN/Z is the only one that matters. Client-side checks are UX.
+- Read every secret through a validated config module. Never sprinkle `process.env` across the codebase, and **never mutate `process.env`** — `process.env.LOG_LEVEL = ...` looks innocent, but `process.env` is shared mutable state across every test in the runner, every cron job in the worker, every request in the long-lived process. A test that sets it leaks into the next test; a startup path that sets it overrides whatever the operator deliberately exported. Thread the value as a parameter (function arg, factory option, deps record) instead. Never put secrets in `NEXT_PUBLIC_*`.
+- Redact secrets at the Winston logger layer once, not at every call site.
+- When reviewing code, apply a strict false-positive filter: only report concrete, exploitable issues with a clear attack path. Skip DoS, defence-in-depth hardening, and theoretical concerns.
+
+See `references/security.md` for the full threat model, category catalogue (injection, authN/Z, crypto, XSS, deserialisation, supply chain), branded-type recipes, the pre-merge checklist, and the adopted false-positive filter.
+
+## The four elements of simple design (priority order)
+
+1. Runs all the tests.
+2. Expresses intent (readable, reveals purpose).
+3. No duplication (after Rule of Three).
+4. Minimal (fewest modules and functions possible).
+
+If all four are true, the design is good enough. Stop polishing.
+
+## Project type (pick the right variant reference)
+
+**Next.js monorepo** (read `references/nextjs-monorepo.md`) if:
+- `packages/*` with Bun workspaces at the root, or
+- `next.config.ts` in a package, or
+- `app/(en)/`, `app/(fr)/` route groups, or
+- `tailwindcss` in dependencies.
+
+**Bun TypeScript script repo** (read `references/bun-typescript.md`) if:
+- single `src/main.ts` entry with `"module": "src/main.ts"`, or
+- the `src/{domain,use-cases,infra,presenter,composition,test-helpers}` Clean Architecture layout (see `references/architecture.md`), or
+- no Next.js, no React, no Tailwind. Typically CLIs, batch scripts, Firebase Admin jobs.
+
+If the repo is brand-new, ask which variant the user wants before scaffolding.
+
+## Reference files
+
+Toolchain:
+- `references/nextjs-monorepo.md` | Next.js 16 + Atomic Design + Tailwind v4 + i18n route groups + static export.
+- `references/bun-typescript.md` | Bun-script repo bootstrap: tsconfig, ESLint flat config (SonarJS + type-aware rules + `no-restricted-imports`), Logger port + Winston adapter, secrets discipline, full bootstrap checklist with asset copy steps.
+
+Engineering:
+- `references/tdd.md` | Red-Green-Refactor, Three Laws, triangulation, transformation priority, writing tests backwards, why we use fakes not mocks.
+- `references/testing.md` | Outside-in classicist school, primary-port SUT, fakes (with error-injection knob), the absolute no-`mock`-from-`bun:test` rule, test builders, contract tests, common mistakes.
+- `references/testing-infra.md` | three patterns for infra-adapter tests (custom-fetch DI / two-constructor / sync-builder export), production-wiring smoke test, `installFetchMock`, global-swap pattern, FS chmod tricks, ordering gotchas.
+- `references/solid-principles.md` | SRP, OCP, LSP, ISP, DIP expressed as typed records and function contracts.
+- `references/clean-code.md` | naming priorities, object calisthenics translated to a class-free world, comments, formatting, storytelling.
+- `references/object-design.md` | RDD, stereotypes, tell-don't-ask, value objects vs entities, aggregates, polymorphism via dispatch.
+- `references/code-smells.md` | detection catalogue and the refactorings that clean each smell.
+- `references/complexity.md` | essential vs accidental complexity, YAGNI, DRY + Rule of Three, KISS, four elements.
+- `references/architecture.md` | vertical slices, dependency rule, hexagonal and clean architecture, walking skeleton.
+- `references/design-patterns.md` | full GoF catalogue rewritten as modules of arrow functions.
+- `references/class-to-module.md` | translation table for OO patterns (value object, interface, service, strategy, factory, decorator, observer, command, entity) in this class-free style.
+
+Security:
+- `references/security.md` | source-to-sink mental model, vulnerability categories, branded types for trust boundaries, pre-merge checklist, adopted false-positive filter.
+
+Error handling:
+- `references/result-type.md` | `Result<T, E>` and helpers, per-port discriminated-union errors, `StepError` aggregation, try/catch quarantine, fan-out batch semantics, `retryOnErr`, fakes-with-error-injection, `captureRejection`.
+
+Process:
+- `references/workflow.md` | inner-loop checks, zero-warning rule, no-inline-ignore, per-tier coverage gates, SonarJS-at-lint-time, eight-gate pre-commit hook (commit-size + package.json + gitleaks + tests + lint + typecheck + coverage + Stryker mutation), dependency hygiene (no `"latest"`), periodic test-helpers audit, README consistency check.
+- `references/lessons.md` | session memory format, triggers, extraction heuristics, entry templates, worked examples.
+
+## Workflow when writing or editing code
+
+0. Read `.claude/LESSONS.md` and `.claude/lessons.local.md` if they exist. Apply any relevant past lessons silently.
+1. Identify the variant. Read the matching variant reference.
+2. Identify the feature. If non-trivial, skim `references/architecture.md`.
+3. Write a failing test in `*.test.ts` with a concrete example name.
+4. Write the simplest arrow-function code to make it green.
+5. Refactor. Apply object calisthenics. Promote primitives to branded types. Extract on Rule of Three.
+6. Never emit `class`, `function` declaration, `interface`, `console.*`, or `npm/pnpm/yarn/node/vite`. Refuse and rewrite.
+7. Any new dependency uses `bun add` / `bun add -d`.
+8. Any logging goes through `deps.logger` (the `Logger` port). Never `console.*`, never a module-level singleton.
+9. Any commit message uses Conventional Commits.
+10. If legacy code in the repo uses a forbidden pattern, match the local style in that file only. Flag the drift once and offer to refactor.
+11. At session wrap-up, scan for `[mistake]`, `[decision]`, `[gotcha]` entries worth capturing. Propose a candidate list and append on approval. See `references/lessons.md`.
+
+## Pre-code checklist
+
+1. Do I understand the requirement? Write acceptance criteria.
+2. What is the first failing test? (domain-language name, concrete example)
+3. What is the simplest solution?
+4. Am I solving a real need or a hypothetical one?
+
+## During-code checklist
+
+1. Is this the simplest thing that could work?
+2. Does this module have one reason to change?
+3. Am I depending on function-type contracts, not concretions?
+4. Is there duplication I should extract? (Rule of Three, not before)
+5. Did I write the test first?
+
+## Post-code checklist
+
+Inner-loop checks (run after every code change):
+
+1. `bun test` — passes.
+2. `bun run lint` — 0 errors AND 0 warnings. No inline ignores added.
+3. `bun run typecheck` — `tsc --noEmit`, clean.
+4. `bun run coverage` — 100% on `src/domain/**` and `src/use-cases/**`, 80% on `composition` + `infra` + `presenter`.
+5. `bun run mutate:changed` — staged-and-changed domain/use-case files score ≥90% mutation. Pre-commit will run `mutate:staged` automatically; running `mutate:changed` during iteration catches surviving mutants before they reach the gate.
+
+Then review:
+
+6. Is there dead code to remove? Are names still accurate? Can conditionals simplify?
+7. Does any user input reach a sensitive sink (SQL, shell, filesystem, HTTP, HTML)? If yes, did it cross a branded-type checkpoint?
+8. Every new IO port returns `Result<T, PortError>` and its `PortError` is a discriminated union. Every new use-case returns `Result<Summary, StepError>`. `try/catch` only in `infra/`, `main.ts`, or a pure-domain native-API fallback.
+9. New `src/infra/`, `src/composition/`, or `src/presenter/` files added in the same commit as a matching side-effect import in `scripts/coverage-preload.ts`.
+10. The commit is small: ≤10 files AND ≤300 lines (insertions + deletions). The pre-commit gate enforces this; aim well under during iteration.
+11. `README.md` audited against the user-visible surface area (install steps, `package.json` scripts, CLI flags, env vars, top-level layout, public exports, pinned versions) and updated in the same commit if anything is now stale. See Behavioural Guideline #5. The audit runs **twice**: once before declaring the task done, and again before ending the session — the same READMEs that are correct at task-done can drift across multiple back-to-back tasks in one session.
+12. Would a new team member understand this in six months?
+
+The pre-commit hook runs **eight gates** in order: commit size → package.json (no `"latest"` / `"*"`) → gitleaks `protect --staged` → tests → strict lint → typecheck → coverage → mutation. See `references/workflow.md` for the full breakdown and the no-bypass rule.
+
+## Red flags (stop and rethink)
+
+- Writing production code without a failing test.
+- Using `class`, `function` declaration, `interface`, or `console.*`.
+- A module longer than 50 lines or a function longer than 10 lines.
+- More than one level of indentation in a function.
+- Using `else` when an early return works.
+- Hardcoding values that should be configurable.
+- Extracting an abstraction before the third duplication.
+- Adding a feature "just in case" (YAGNI).
+- A module with more than one reason to change.
+- `npm`, `pnpm`, `yarn`, `node`, or `vite` in any script or command.
+- Accessing an object through more than one dot (`a.b.c`).
+- Passing raw strings or numbers for domain concepts instead of branded types.
+- Untrusted input reaching a sensitive sink (SQL, shell, filesystem, HTTP, HTML, redirect) without a branded-type checkpoint between them.
+- A secret (token, password, API key, PII) interpolated into a log line, or placed in a `NEXT_PUBLIC_*` env var.
+- Importing anything from the `mock` namespace of `bun:test` — `mock()`, `mock.module()` — or asserting on `.toHaveBeenCalled*`. Write a fake, or expose a `createXFromApi(api)` factory the test can feed an in-memory object. Enforced by `no-restricted-imports`.
+- An infra adapter exported as a single `createX(realDeps)` with no matching `createXFromApi(api: XApi)` factory. Without the seam, someone will reach for `mock.module` on the next test. Expose the testable constructor from day one, even before the first test exists.
+- Adding a new `src/infra/*.ts` or `src/composition/*.ts` file without a matching side-effect import in `scripts/coverage-preload.ts`. Untested infra files are invisible to `bun test --coverage` unless something imports them; the preload makes them appear at 0% so the gate can fail loudly.
+- `coverageThreshold` set in `bunfig.toml` while a per-tier script owns enforcement. Bun exits non-zero on the global threshold before the script can print per-file violations — looks like "coverage failed silently". Remove the global threshold; let the script own it.
+- An inline suppression of any tool: `// eslint-disable*`, `// @ts-ignore`, `// @ts-expect-error`, `// snyk-ignore`, `// sonar-ignore`, `// deepcode ignore`, `// istanbul ignore`. Refactor, or change rule severity at the project level.
+- `try/catch` anywhere outside `src/infra/**`, `src/main.ts`, or a pure-domain native-API fallback (`JSON.parse`, `URL`). Use-cases must pattern-match on `Result.ok`.
+- A port that returns `Promise<T>` instead of `Promise<Result<T, PortError>>` for an IO call. Expected failures belong in the type.
+- A curried arrow chain (`const f = (a) => (b) => { ... }`). Use a single arrow with all parameters.
+- A trailing `!` (non-null assertion) or a `as Type` assertion that is not a genuine narrowing. Replace with a guard clause (SonarJS S4325).
+- `String(err)` in a catch block. Use the shared `formatError(err: unknown): string` helper (SonarJS S6551).
+- `.match(re)` used to read capture groups. Use `re.exec(...)` (SonarJS S6594).
+- `Record<K, V>` when the key set is open. Use `Partial<Record<K, V>>` so the type tells the truth about missing keys.
+- Domain-specific data (brand lists, flow slugs, tier rates, tenant names) hardcoded as string-literal unions or records in framework code. Drive from env or config files; keep the framework generic.
+- A per-file exclusion in `stryker.conf.json` for "the tests are awkward". Skip lists rot. The only structural exclusions are `**/*.test.ts` and `**/ports/**`. If a file produces equivalent or flaky mutants, tighten the test or refactor the production code — never add it to a skip list.
+- A commit exceeding 10 files OR 300 lines (insertions + deletions) without a clear big-bang justification (initial scaffold, mass-rename, generated files). Split into smaller coherent slices. The pre-commit gate enforces this; do not normalise `--no-verify`.
+- A composition root or wiring file declared "untestable" and skipped. The two ergonomic switches make any composition file 100%-testable: parameterise every state-source (path, env var, clock) and inject every output sink (logger, sender). See `references/architecture.md` (Composition root testability).
+- A `"latest"` or `"*"` version string anywhere in `package.json`. Use `bun add <pkg>` so the version pins to `^X.Y.Z` at install time. To bump deliberately, run `bun update` and commit the lockfile change in the same commit. Enforced by `scripts/check-package-json.sh` (pre-commit gate 2).
+- Closing a session (or declaring a task done) with non-README files modified but the README un-audited. The README is part of the change set — re-read it, update what drifted, or state in one sentence that nothing user-visible changed. See Behavioural Guideline #5.
+- A `node:fs` import (`readFile`, `writeFile`, `readFileSync`, `fs/promises`, etc.) in any file under `src/**` that is not a `*.test.ts`, under `src/test-helpers/**`, or a single isolated directory-boundary helper in `src/infra/**` documented with a one-line comment. Production file IO uses `Bun.file` / `Bun.write`. Hard rule 20.
+- An assignment to `process.env.X = ...` anywhere outside `*.test.ts` (and even there, only inside `beforeAll`/`afterAll` with a saved-and-restored original). `process.env` is shared mutable state — pass values as parameters instead. See the Security section.
+
+## Remember
+
+Code exists to build products for users and customers. Testable, flexible, maintainable code wins because it can be cost-effectively maintained by developers.
+
+Design happens during REFACTORING, not during coding. Let patterns emerge from tests and Rule of Three, never from speculation.
+
+"A little bit of duplication is 10x better than the wrong abstraction."
