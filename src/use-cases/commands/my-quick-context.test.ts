@@ -2,27 +2,18 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './my-quick-context.ts';
 
 const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { graph: GraphClient; readonly calls: string[] } => {
   const calls: string[] = [];
-  const graph: GraphClient = {
+  const graph: GraphClient = fakeGraphClient({
     get: async (path: string) => {
       calls.push(path);
       if (!Object.hasOwn(responses, path)) throw new Error(`unexpected get(${path})`);
       return responses[path];
     },
-    post: async () => ok({}),
-    getBinary: async () => ok({}),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
-    getBinaryElevated: async () => ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  };
+  });
   return { graph, calls };
 };
 

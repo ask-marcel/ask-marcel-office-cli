@@ -47,7 +47,13 @@ describe('persistIfRequested', () => {
     const result = await persistIfRequested(fs, '/work/test-output/deck.pptx', data);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value).toEqual({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pptx', contentType: 'application/pptx', size: 5, savedTo: '/work/test-output/deck.pptx' });
+      expect(result.value).toEqual({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: 'deck.pptx',
+        contentType: 'application/pptx',
+        size: 5,
+        savedTo: '/work/test-output/deck.pptx',
+      });
       expect(result.value).not.toHaveProperty('contentBytes');
       expect(result.value).not.toHaveProperty('base64');
     }

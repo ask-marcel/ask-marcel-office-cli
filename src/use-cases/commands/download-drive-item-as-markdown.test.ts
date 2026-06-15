@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { buildSampleDocx, buildSampleXlsx } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './download-drive-item-as-markdown.ts';
 
@@ -12,18 +13,9 @@ const toBase64 = (bytes: Uint8Array): string => {
 };
 
 const graphWith = (handlers: { get?: (url: string) => Result<unknown, GraphError>; getBinary?: () => Result<unknown, GraphError> }): GraphClient =>
-  ({
+  fakeGraphClient({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
-    post: async () => ok({}),
     getBinary: async () => handlers.getBinary?.() ?? ok({}),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
-    getBinaryElevated: async () => ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
   }) as GraphClient;
 
 const asText = (r: Result<unknown, GraphError>): string => (r.ok ? ((r.value as { text?: string }).text ?? '') : '');

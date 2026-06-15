@@ -1,31 +1,23 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './next-page.ts';
 
 const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 'basic' | 'elevated'; readonly path: string }[] } => {
   const calls: { via: 'basic' | 'elevated'; path: string }[] = [];
   return {
     calls,
-    graph: {
+    graph: fakeGraphClient({
       get: async (path: string) => {
         calls.push({ via: 'basic', path });
         return ok({});
       },
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
       getElevated: async (path: string) => {
         calls.push({ via: 'elevated', path });
         return ok({});
       },
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ok({}),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    },
+    }),
   };
 };
 

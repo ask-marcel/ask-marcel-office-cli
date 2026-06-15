@@ -2,23 +2,12 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute, meta } from './list-accessible-drives.ts';
 
 type Route = (path: string) => Result<unknown, GraphError>;
 
-const routeGraph = (routes: Route): GraphClient => ({
-  get: async (path) => routes(path),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-});
+const routeGraph = (routes: Route): GraphClient => fakeGraphClient({ get: async (path) => routes(path) });
 
 // A full discovery scenario: one personal drive (also shared back to the user),
 // a group that is BOTH a joined team and a member group, a member-only group, a

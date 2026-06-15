@@ -2,28 +2,20 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute, meta } from './search-all-accessible-sites.ts';
 
 // A graph fake whose POST handler is driven by the `from` offset of the search body,
 // so tests can stage one response per page.
-const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveItemTotal?: number): GraphClient => ({
-  get: async () => ok({}),
-  post: async (_path, body) => {
-    const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
-    // The command issues one extra driveItem-count query for `fileEstimate`; route it separately so site-paging tests stay isolated.
-    if (req?.entityTypes?.[0] === 'driveItem') return driveItemTotal === undefined ? ok({ value: [] }) : page([], false, driveItemTotal);
-    return onPost(req?.from ?? 0);
-  },
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-});
+const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveItemTotal?: number): GraphClient =>
+  fakeGraphClient({
+    post: async (_path, body) => {
+      const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
+      // The command issues one extra driveItem-count query for `fileEstimate`; route it separately so site-paging tests stay isolated.
+      if (req?.entityTypes?.[0] === 'driveItem') return driveItemTotal === undefined ? ok({ value: [] }) : page([], false, driveItemTotal);
+      return onPost(req?.from ?? 0);
+    },
+  });
 
 const page = (sites: ReadonlyArray<{ id: string; webUrl?: string }>, more: boolean, total: number): Result<unknown, GraphError> =>
   ok({ value: [{ hitsContainers: [{ total, moreResultsAvailable: more, hits: sites.map((s) => ({ resource: s })) }] }] });

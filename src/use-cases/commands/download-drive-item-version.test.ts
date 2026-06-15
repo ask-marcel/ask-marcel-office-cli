@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './download-drive-item-version.ts';
 
@@ -15,18 +16,10 @@ const toBase64 = (bytes: Uint8Array): string => {
 // non-elevated path) errors here, so any mutant that drops `elevated: true`
 // flips to getBinary and fails — killing the elevation mutants.
 const versionGraph = (handlers: { get?: (url: string) => Result<unknown, GraphError>; elevated?: (url: string) => Result<unknown, GraphError> }): GraphClient =>
-  ({
+  fakeGraphClient({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
-    post: async () => ok({}),
     getBinary: async () => ({ ok: false, error: { type: 'api_error', status: 403, message: 'non-elevated token rejected on historical version' } }),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
     getBinaryElevated: async (url: string) => handlers.elevated?.(url) ?? ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
   }) as GraphClient;
 
 const params = { driveId: 'd1', itemId: 'i1', versionId: '2.0' };
