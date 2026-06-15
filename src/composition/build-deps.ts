@@ -20,7 +20,16 @@ export type BuildDepsConfig = {
   readonly processRunner?: ProcessRunner;
 };
 
-export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem }>;
+/**
+ * Builds an AuthManager configured for an interactive `login` run. The login
+ * command varies the browser strategy at runtime (`--use-extension`), so the
+ * composition root hands the CLI a factory rather than a single pre-built
+ * manager — keeping the concrete `createAuthManager` wiring (cache path, env)
+ * out of `cli.ts` and the action testable with an injected fake.
+ */
+export type LoginAuthFactory = (opts: { readonly useExtension: boolean }) => AuthManager;
+
+export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem; makeLoginAuth: LoginAuthFactory }>;
 
 const defaultCachePath = (home: string): string => join(home, '.ask-marcel', 'token-cache.json');
 
@@ -37,5 +46,7 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const logger = createWinstonLogger({ logLevel });
   const auth = createAuthManager({ cachePath, logger, fs });
   const graph = createGraphClient(auth);
-  return { logger, auth, graph, processRunner, fs };
+  const makeLoginAuth: LoginAuthFactory = ({ useExtension }) =>
+    createAuthManager({ cachePath, logger, fs, skipSystemBrowser: !useExtension, usePlaywrightFallback: !useExtension });
+  return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };

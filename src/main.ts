@@ -15,6 +15,7 @@ const main = async (): Promise<void> => {
     logger: deps.logger,
     processRunner: deps.processRunner,
     fs: deps.fs,
+    makeLoginAuth: deps.makeLoginAuth,
     version: pkg.version,
     onCommandError: () => {
       process.exitCode = 1;

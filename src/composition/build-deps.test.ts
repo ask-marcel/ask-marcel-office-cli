@@ -16,6 +16,13 @@ describe('buildDeps composition root', () => {
     expect(typeof deps.processRunner.runInherit).toBe('function');
   });
 
+  it('exposes a login-auth factory that builds an auth manager for both the default Playwright flow and extension mode', () => {
+    const fs = createFileSystemFake();
+    const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs });
+    expect(typeof deps.makeLoginAuth({ useExtension: false }).getAccessToken).toBe('function');
+    expect(typeof deps.makeLoginAuth({ useExtension: true }).getAccessToken).toBe('function');
+  });
+
   it('falls back to a home-derived cache path when none is provided', () => {
     const fs = createFileSystemFake();
     const deps = buildDeps({ home: '/virtual/home', logLevel: 'error', fs });

@@ -1,6 +1,5 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
-import { createAuthManager } from '../infra/auth.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
@@ -16,6 +15,7 @@ import * as update from '../use-cases/commands/update.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
+import type { LoginAuthFactory } from './build-deps.ts';
 import { detectPackageManager } from './package-manager.ts';
 
 type BuildCliDeps = {
@@ -27,6 +27,13 @@ type BuildCliDeps = {
   readonly version?: string;
   readonly packageManager?: 'npm' | 'bun';
   readonly onCommandError?: () => void;
+  /**
+   * Builds the AuthManager for an interactive `login` run from the `--use-extension`
+   * flag. Supplied by the composition root (`build-deps.ts`); when omitted (tests),
+   * the login action falls back to the injected `auth`, so a single fake drives both
+   * `login.execute` and `getLastElevatedOutcome`.
+   */
+  readonly makeLoginAuth?: LoginAuthFactory;
 };
 
 const buildCli = (deps: BuildCliDeps): Command => {
@@ -326,18 +333,12 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback).')
     .option('--use-extension', 'Use browser extension for authentication (requires Ask Marcel Companion extension)')
     .action(async (opts: { useExtension?: boolean }) => {
-      // Default: use Playwright (skipSystemBrowser: true)
-      // --use-extension: use browser extension (skipSystemBrowser: false, usePlaywrightFallback: false)
-      // Cross-platform home directory
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      // The login auth manager varies its browser strategy by `--use-extension`
+      // (default: Playwright fallback; --use-extension: the companion browser
+      // extension). The composition root supplies `makeLoginAuth`; tests omit it
+      // and the injected `auth` fake drives both execute and the elevated read.
       const useExtension = opts.useExtension ?? false;
-      const loginAuth = createAuthManager({
-        cachePath: homeDir ? `${homeDir}/.ask-marcel/token-cache.json` : '',
-        logger,
-        fs,
-        skipSystemBrowser: !useExtension,
-        usePlaywrightFallback: !useExtension,
-      });
+      const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth({ useExtension }) : auth;
       const result = await login.execute(loginAuth);
       if (!result.ok) {
         fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
@@ -351,7 +352,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       // step ran in this process) — leave the elevated field unset in
       // that case so consumers don't think the elevated state was
       // tested.
-      const outcome = auth.getLastElevatedOutcome();
+      const outcome = loginAuth.getLastElevatedOutcome();
       const envelope: { status: 'authenticated'; elevated?: 'captured' | 'failed'; elevatedReason?: string } = { status: 'authenticated' };
       if (outcome !== null) {
         if (outcome.captured) {
