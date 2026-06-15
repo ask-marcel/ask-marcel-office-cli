@@ -5,7 +5,7 @@ import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import { BINARY_TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
 type GraphError =
-  | { type: 'api_error'; status: number; message: string; code?: string }
+  | { type: 'api_error'; status: number; message: string; code?: string; retryAfterSeconds?: number }
   | { type: 'auth_failed'; message: string; code?: string }
   | { type: 'network_error'; message: string; code?: string }
   | { type: 'validation_error'; message: string; code?: string };
@@ -207,7 +207,25 @@ const contextualizeCode = (code: string | undefined, url: string): string | unde
   return `${code}_mailFolders`;
 };
 
+// RFC 9110 `Retry-After`: Graph (and its Azure front-ends) answer 429 / 503
+// with a delta-seconds integer naming how long to wait before retrying. We
+// surface it as `retryAfterSeconds` so a caller orchestrating tenant-scale
+// crawls can honor the server's interval instead of guessing a backoff (and
+// risk being re-throttled). The alternate HTTP-date form is intentionally not
+// parsed — it would need a clock and Graph does not use it for throttling;
+// when the header is absent or non-numeric the field is omitted and the caller
+// falls back to its own backoff. `0` is a valid "retry immediately" hint, so
+// the guard on the value is `!== undefined`, never truthiness.
+const parseRetryAfter = (header: string | null): number | undefined => {
+  if (header === null) return undefined;
+  const trimmed = header.trim();
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  return Number(trimmed);
+};
+
 const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphError> => {
+  const retryAfterSeconds = parseRetryAfter(res.headers.get('retry-after'));
+  const retry = retryAfterSeconds === undefined ? {} : { retryAfterSeconds };
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
@@ -225,6 +243,7 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
       message:
         'UnknownError: (Graph returned an empty error body — likely a transient backend glitch; retry once. If persistent, capture the failing request URL + body and report.)',
       code: 'UnknownError',
+      ...retry,
     };
   }
 
@@ -234,7 +253,7 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   // §2.7 flagged as malformed. Only prepend the tag if it's actually a
   // non-empty string.
   if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
-    return { type: 'api_error', status: res.status, message: truncateScopeDump(`${tag}: ${message}`), ...(code ? { code } : {}) };
+    return { type: 'api_error', status: res.status, message: truncateScopeDump(`${tag}: ${message}`), ...(code ? { code } : {}), ...retry };
   }
   // `res.url` is empty when the Response was constructed manually (Bun's
   // fakeFetch test pattern) — fall back to the URL the caller just hit.
@@ -244,7 +263,7 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
     if (res.statusText !== '') return res.statusText;
     return synthesizeEmptyBodyMessage(res.status, effectiveUrl);
   };
-  return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}) };
+  return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}), ...retry };
 };
 
 /**

@@ -1,0 +1,51 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "atelier mutation testing config. See skills/atelier/references/workflow.md (Mutation testing).",
+  "_packageManager_comment": "Stryker doesn't fully understand Bun yet; tell it npm so it doesn't probe for yarn/pnpm lockfiles.",
+  "packageManager": "npm",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bun test"
+  },
+  "_mutate_comment": "Core only: src/domain + src/use-cases. Test files have no logic to mutate; ports/ files are type-only (zero mutable code).",
+  "mutate": [
+    "src/domain/**/*.ts",
+    "src/use-cases/**/*.ts",
+    "!**/*.test.ts",
+    "!**/ports/**"
+  ],
+  "thresholds": {
+    "high": 95,
+    "low": 90,
+    "break": 90
+  },
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "concurrency": 4,
+  "timeoutMS": 30000,
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true,
+  "_ignorePatterns_comment": "Skip non-source dirs from the sandbox copy. .claude/ may contain a symlink Stryker cannot copy (ENOTSUP); the rest are pure noise.",
+  "ignorePatterns": [
+    ".claude/",
+    ".agents/",
+    ".githooks/",
+    ".vscode/",
+    ".git/",
+    "docs/",
+    "prompts/",
+    "scripts/",
+    "reports/",
+    ".stryker-tmp/",
+    "node_modules/",
+    "coverage/",
+    "*.md",
+    "*.toml",
+    "*.lock",
+    "*.json"
+  ]
+}

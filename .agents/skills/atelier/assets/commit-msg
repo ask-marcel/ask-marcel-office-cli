@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# atelier commit-msg hook — enforce Conventional Commits
+#
+# Fires after the message is composed (separate from the eight-gate
+# pre-commit hook, which inspects the staged diff). git passes the path to
+# the message file as $1; this validates the subject line against the
+# Conventional Commits grammar:
+#
+#   type(optional-scope)!: subject
+#
+# Why enforce it: the commit log is the project's changelog and `git bisect`
+# surface. A machine-readable type/scope lets tooling derive release notes,
+# group history, and flag breaking changes (the `!`). A soft convention
+# drifts; a hook keeps every commit on `main` honest.
+#
+# This is the dependency-free validator for the Bun-script variant, matching
+# the hand-rolled style of the other gate scripts. The Next.js monorepo
+# variant enforces the identical grammar through @commitlint/config-conventional
+# wired as a simple-git-hooks `commit-msg` step — see references/nextjs-monorepo.md.
+#
+# Installed via `core.hooksPath .githooks` alongside the pre-commit hook:
+#
+#   cp <skill>/assets/commit-msg .githooks/commit-msg && chmod +x .githooks/commit-msg
+#
+# Bypass with `git commit --no-verify` only when genuinely warranted; the
+# message still has to make sense to the next reader.
+#
+# See skills/atelier/references/workflow.md (Commit message format).
+
+set -euo pipefail
+
+msg_file="$1"
+
+# The header is the first line that is neither a comment nor blank.
+header=$(grep -vE '^[[:space:]]*#' "$msg_file" | grep -vE '^[[:space:]]*$' | head -n 1 || true)
+
+# git auto-generates these; Conventional Commits does not apply. Let them pass.
+case "$header" in
+  'Merge '* | 'Revert '* | 'fixup! '* | 'squash! '* | 'amend! '*)
+    exit 0
+    ;;
+esac
+
+# The @commitlint/config-conventional type set — keep in lockstep with the
+# Next.js variant so both enforce the same contract.
+types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+max_len=100
+
+# type(scope)?!?: subject   (scope and ! optional; subject required)
+pattern="^(${types})(\([a-z0-9._/-]+\))?(!)?: .+"
+
+fail() {
+  cat <<EOF >&2
+  ╳ COMMIT MESSAGE IS NOT CONVENTIONAL
+
+  ${1}
+
+  Offending header:
+      ${header:-(empty)}
+
+  Required: type(optional-scope)!: subject
+    type   one of: feat fix docs style refactor perf test build ci chore revert
+    scope  optional, lowercase, in parentheses — e.g. (auth), (api)
+    !      optional, marks a breaking change
+    subject  required, no trailing period, header ≤ ${max_len} chars
+
+  Examples:
+      feat(auth): add refresh-token rotation
+      fix: guard against empty cart total
+      refactor(orders)!: drop the legacy status field
+
+  Bypass (rare): git commit --no-verify
+EOF
+  exit 1
+}
+
+[ -n "$header" ] || fail 'The commit message is empty.'
+[ "${#header}" -le "$max_len" ] || fail "Header is ${#header} chars; the limit is ${max_len}."
+printf '%s' "$header" | grep -qE "$pattern" || fail 'Header does not match the Conventional Commits grammar.'
+
+# config-conventional's subject-full-stop rule: no trailing period.
+case "$header" in
+  *.) fail 'Subject must not end with a period.' ;;
+esac
+
+exit 0

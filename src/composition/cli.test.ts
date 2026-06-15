@@ -170,6 +170,21 @@ describe('buildCli command surface', () => {
     expect(out).toBe('error: not found\nsource: graph\n');
   });
 
+  it('threads the Retry-After interval from a throttled Graph 429 into the JSON error envelope so a crawler can honor the backoff', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({
+      auth: okAuth(),
+      graph: errGraph({ type: 'api_error', status: 429, message: 'TooManyRequests: Too many requests', code: 'TooManyRequests', retryAfterSeconds: 120 }),
+      logger,
+      processRunner: createProcessRunnerFake(),
+      fs: createFileSystemFake(),
+    });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-current-user']));
+    const parsed = JSON.parse(out.trim()) as { ok: false; retryAfterSeconds?: number };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.retryAfterSeconds).toBe(120);
+  });
+
   it('renders an Authentication cancelled error when the user closes the browser', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });

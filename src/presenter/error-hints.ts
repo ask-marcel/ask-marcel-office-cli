@@ -280,7 +280,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'TooManyRequests' || c === '429',
-    hint: 'Throttled by Graph. Wait the `Retry-After` interval and retry; for paginated walks, lower `--top` or add a delay between pages. Microsoft applies per-app and per-user limits separately.',
+    hint: 'Throttled by Graph. Wait the `retryAfterSeconds` interval on this envelope (Graph’s `Retry-After`, in seconds) before retrying; for paginated walks, lower `--top` or add a delay between pages. Microsoft applies per-app and per-user limits separately.',
   },
   // ═══ MESSAGE-PATTERN FALLBACKS (run only when no code-based rule matched) ═
   // ─── Graph: $search KQL quoting trap ─────────────────────────────────────
