@@ -547,6 +547,24 @@ describe('graph client', () => {
     }
   });
 
+  it('makes authenticated PATCH requests with a JSON-serialised body', async () => {
+    let captured: { url: string; method?: string; body?: string } | null = null;
+    const fetchFn: FetchFn = async (url, init) => {
+      captured = { url, method: init?.method, body: typeof init?.body === 'string' ? init.body : undefined };
+      return Response.json({ id: 'msg-1' });
+    };
+    const client = createGraphClient(fakeAuth(), fetchFn);
+    const result = await client.patch('/me/messages/AAMk1', { subject: 'Revised' });
+    expect(result.ok).toBe(true);
+    expect(captured).not.toBeNull();
+    if (captured !== null) {
+      const c = captured as { url: string; method?: string; body?: string };
+      expect(c.url).toBe('https://graph.microsoft.com/v1.0/me/messages/AAMk1');
+      expect(c.method).toBe('PATCH');
+      expect(c.body).toBe(JSON.stringify({ subject: 'Revised' }));
+    }
+  });
+
   it('put with body ≤ 4 MiB takes the simple PUT path with :/content suffix', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
