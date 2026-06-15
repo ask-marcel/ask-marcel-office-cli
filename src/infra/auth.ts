@@ -9,6 +9,7 @@ import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
+import { createDefaultSystemBrowserAuth } from './system-browser-loader.ts';
 
 type CachedToken = {
   access_token: string;
@@ -129,16 +130,35 @@ const TEAMS_URL = 'https://teams.microsoft.com/';
  */
 const DEFAULT_CHATSVCAGG_REGION = 'emea';
 
-type SystemBrowserAuthFn = () => Promise<Result<{ accessToken: AccessToken; refreshToken: string | null; elevatedAccessToken?: AccessToken | null; chatsvcaggAccessToken?: AccessToken | null; ic3AccessToken?: AccessToken | null; chatsvcaggRegion?: string }, { type: string; message: string }>>;
+type SystemBrowserAuthFn = () => Promise<
+  Result<
+    {
+      accessToken: AccessToken;
+      refreshToken: string | null;
+      elevatedAccessToken?: AccessToken | null;
+      chatsvcaggAccessToken?: AccessToken | null;
+      ic3AccessToken?: AccessToken | null;
+      chatsvcaggRegion?: string;
+    },
+    { type: string; message: string }
+  >
+>;
 
-const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, browserProfileDir: string, logger: Logger, fs: FileSystem, systemBrowserAuthFn?: SystemBrowserAuthFn, usePlaywrightFallback: boolean = true, skipSystemBrowser: boolean = false): AuthManager => {
-  const systemBrowserAuth = systemBrowserAuthFn ?? (async () => {
-    if (skipSystemBrowser) {
-      return { ok: false as const, error: { type: 'skipped' as const, message: 'system browser skipped' } };
-    }
-    const { authenticateViaSystemBrowser } = await import('./system-browser-auth.ts');
-    return authenticateViaSystemBrowser({ logger, extensionTimeoutMs: 10_000 });
-  });
+const createAuthManagerFromApi = (
+  browserAuth: BrowserAuth,
+  cachePath: string,
+  browserProfileDir: string,
+  logger: Logger,
+  fs: FileSystem,
+  systemBrowserAuthFn?: SystemBrowserAuthFn,
+  usePlaywrightFallback: boolean = true,
+  skipSystemBrowser: boolean = false
+): AuthManager => {
+  // The default (production) system-browser function lives in the skipped
+  // `system-browser-loader.ts` — it can't run without a real browser. Tests
+  // inject a fake `systemBrowserAuthFn`; this one line is covered at
+  // construction whenever no fake is passed (e.g. the build-deps wiring).
+  const systemBrowserAuth = systemBrowserAuthFn ?? createDefaultSystemBrowserAuth(logger, skipSystemBrowser);
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
     return r.ok ? r.value : null;
@@ -261,15 +281,16 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
       }
       // System browser failed
       logger.info('auth.system_browser.failed', { reason: systemResult.error.type });
-      
+
       // If Playwright fallback is disabled, return error immediately
       if (!usePlaywrightFallback) {
-        const errorMessage = systemResult.error.type === 'extension_timeout' 
-          ? 'Browser extension did not respond. Make sure the Ask Marcel Companion extension is installed and enabled.'
-          : systemResult.error.message;
+        const errorMessage =
+          systemResult.error.type === 'extension_timeout'
+            ? 'Browser extension did not respond. Make sure the Ask Marcel Companion extension is installed and enabled.'
+            : systemResult.error.message;
         return err({ type: 'auth_failed', message: errorMessage });
       }
-      
+
       // Fall back to Playwright
       logger.info('auth.system_browser.fallback_to_playwright', { reason: systemResult.error.type });
 
@@ -636,7 +657,15 @@ const stderrProgress = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileSystem; browserProfileDir?: string; systemBrowserAuth?: SystemBrowserAuthFn; usePlaywrightFallback?: boolean; skipSystemBrowser?: boolean }): AuthManager => {
+const createAuthManager = (deps: {
+  cachePath: string;
+  logger: Logger;
+  fs?: FileSystem;
+  browserProfileDir?: string;
+  systemBrowserAuth?: SystemBrowserAuthFn;
+  usePlaywrightFallback?: boolean;
+  skipSystemBrowser?: boolean;
+}): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
   const browserAuth = createBrowserAuth({
@@ -649,4 +678,4 @@ const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileS
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };
-export type { AuthError, AuthManager, ElevatedOutcome };
+export type { AuthError, AuthManager, ElevatedOutcome, SystemBrowserAuthFn };

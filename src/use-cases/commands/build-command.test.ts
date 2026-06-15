@@ -6,6 +6,7 @@ import { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildElev
 
 const fakeGraph: GraphClient = {
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ({ ok: true, value: {} }),
@@ -36,6 +37,7 @@ describe('buildCommand', () => {
         captured = path;
         return ok({});
       },
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ({ ok: true, value: {} }),
@@ -69,6 +71,7 @@ describe('buildElevatedCommand', () => {
     let captured = '';
     const graph: GraphClient = {
       get: async () => ok({}),
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async (path: string) => {
@@ -98,6 +101,7 @@ describe('buildListCommand', () => {
         captured = path;
         return ok({});
       },
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ok({}),
@@ -121,6 +125,7 @@ describe('buildListCommand', () => {
         called = true;
         return ok({});
       },
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async () => ok({}),
@@ -158,6 +163,7 @@ describe('buildElevatedListCommand', () => {
     let captured = '';
     const graph: GraphClient = {
       get: async () => ok({}),
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async (path: string) => {
@@ -183,6 +189,7 @@ describe('buildElevatedPickODataListCommand', () => {
     let captured = '';
     const graph: GraphClient = {
       get: async () => ok({}),
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async (path: string) => {

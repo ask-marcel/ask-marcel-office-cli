@@ -20,7 +20,20 @@ export type BuildDepsConfig = {
   readonly processRunner?: ProcessRunner;
 };
 
-export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem }>;
+export type BuiltDeps = Readonly<{
+  logger: Logger;
+  auth: AuthManager;
+  graph: GraphClient;
+  processRunner: ProcessRunner;
+  fs: FileSystem;
+  // Deferred AuthManager construction for the `login` command: the
+  // `--use-extension` flag is parsed at action time (after deps are built),
+  // and it flips the system-browser / Playwright-fallback config, so the
+  // login manager can't be the eagerly-built `auth`. The composition root
+  // owns this wiring; cli.ts only invokes the factory (or falls back to the
+  // injected `auth` in tests).
+  makeLoginAuth: (opts: { useExtension: boolean }) => AuthManager;
+}>;
 
 const defaultCachePath = (home: string): string => join(home, '.ask-marcel', 'token-cache.json');
 
@@ -35,7 +48,14 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const fs = config.fs ?? defaultFileSystem();
   const processRunner = config.processRunner ?? defaultProcessRunner();
   const logger = createWinstonLogger({ logLevel });
-  const auth = createAuthManager({ cachePath, logger, fs });
+  // The shared auth every command uses (via the graph client). It must NEVER
+  // open the user's default browser mid-command: `skipSystemBrowser: true`
+  // confines it to cache → refresh → Playwright fallback (the pre-extension
+  // behaviour). The interactive system-browser / extension flow is reached
+  // only by `login --use-extension` through `makeLoginAuth` below.
+  const auth = createAuthManager({ cachePath, logger, fs, skipSystemBrowser: true });
   const graph = createGraphClient(auth);
-  return { logger, auth, graph, processRunner, fs };
+  const makeLoginAuth = (opts: { useExtension: boolean }): AuthManager =>
+    createAuthManager({ cachePath, logger, fs, skipSystemBrowser: !opts.useExtension, usePlaywrightFallback: !opts.useExtension });
+  return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };

@@ -6,6 +6,7 @@ import { execute } from './get-my-manager.ts';
 
 const fakeGraphReturning = (response: Result<unknown, GraphError>): GraphClient => ({
   get: async () => response,
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

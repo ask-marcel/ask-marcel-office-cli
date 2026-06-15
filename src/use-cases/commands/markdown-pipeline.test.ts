@@ -5,6 +5,7 @@ import { convertToMarkdown } from './markdown-pipeline.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

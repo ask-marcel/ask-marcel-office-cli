@@ -15,6 +15,7 @@ import { officeToMarkdown } from './office-to-markdown.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

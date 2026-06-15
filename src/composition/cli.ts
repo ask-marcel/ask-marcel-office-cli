@@ -1,6 +1,5 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { AuthManager } from '../infra/auth.ts';
-import { createAuthManager } from '../infra/auth.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
@@ -24,6 +23,12 @@ type BuildCliDeps = {
   readonly logger: Logger;
   readonly processRunner: ProcessRunner;
   readonly fs: FileSystem;
+  // Factory for the `login` command's AuthManager, deferred so the
+  // `--use-extension` flag (parsed at action time) can flip the construction.
+  // Supplied by the composition root (build-deps); when absent — as in tests —
+  // the login action falls back to the injected `auth`, keeping login testable
+  // without real browser auth.
+  readonly makeLoginAuth?: (opts: { useExtension: boolean }) => AuthManager;
   readonly version?: string;
   readonly packageManager?: 'npm' | 'bun';
   readonly onCommandError?: () => void;
@@ -326,18 +331,12 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback).')
     .option('--use-extension', 'Use browser extension for authentication (requires Ask Marcel Companion extension)')
     .action(async (opts: { useExtension?: boolean }) => {
-      // Default: use Playwright (skipSystemBrowser: true)
-      // --use-extension: use browser extension (skipSystemBrowser: false, usePlaywrightFallback: false)
-      // Cross-platform home directory
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      // The login AuthManager is built by the composition root's factory so
+      // the `--use-extension` flag (default: Playwright; --use-extension: the
+      // browser extension) can flip its construction. In tests no factory is
+      // injected, so we fall back to the injected `auth` — no real browser.
       const useExtension = opts.useExtension ?? false;
-      const loginAuth = createAuthManager({
-        cachePath: homeDir ? `${homeDir}/.ask-marcel/token-cache.json` : '',
-        logger,
-        fs,
-        skipSystemBrowser: !useExtension,
-        usePlaywrightFallback: !useExtension,
-      });
+      const loginAuth = (deps.makeLoginAuth ?? (() => auth))({ useExtension });
       const result = await login.execute(loginAuth);
       if (!result.ok) {
         fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
@@ -351,7 +350,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       // step ran in this process) — leave the elevated field unset in
       // that case so consumers don't think the elevated state was
       // tested.
-      const outcome = auth.getLastElevatedOutcome();
+      const outcome = loginAuth.getLastElevatedOutcome();
       const envelope: { status: 'authenticated'; elevated?: 'captured' | 'failed'; elevatedReason?: string } = { status: 'authenticated' };
       if (outcome !== null) {
         if (outcome.captured) {

@@ -5,6 +5,7 @@ import { execute, meta, schema } from './microsoft-search-query.ts';
 
 const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
@@ -40,6 +41,7 @@ describe('microsoft-search-query', () => {
   it('sends six parallel /search/query POSTs — one per entityType — to sidestep tenant rejection of multi-entity v1.0 search', async () => {
     const captured: CapturedRequest[] = [];
     const graph = fakeGraph({
+      patch: async () => ok({}),
       post: async (path, body) => {
         expect(path).toBe('/search/query');
         const r = (body as { requests: ReadonlyArray<CapturedRequest> }).requests[0];
@@ -62,6 +64,7 @@ describe('microsoft-search-query', () => {
   it('merges the per-entity hitsContainers into one value[] when every sub-request succeeds', async () => {
     const responsePerType = (label: string): unknown => ({ value: [{ searchTerms: ['marcel'], hitsContainers: [{ total: 1, hits: [{ summary: label }] }] }] });
     const graph = fakeGraph({
+      patch: async () => ok({}),
       post: async (_path, body) => ok(responsePerType((body as { requests: ReadonlyArray<{ entityTypes: ReadonlyArray<string> }> }).requests[0]?.entityTypes[0] ?? 'unknown')),
     });
 
@@ -77,6 +80,7 @@ describe('microsoft-search-query', () => {
 
   it('returns the partial-success envelope when at least one sub-request fails but at least one succeeds', async () => {
     const graph = fakeGraph({
+      patch: async () => ok({}),
       post: async (_path, body) => {
         const entityType = (body as { requests: ReadonlyArray<{ entityTypes: ReadonlyArray<string> }> }).requests[0]?.entityTypes[0];
         if (entityType === 'person') return err({ type: 'api_error' as const, status: 403, message: 'people scope missing' });

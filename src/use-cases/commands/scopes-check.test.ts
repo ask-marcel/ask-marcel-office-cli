@@ -6,6 +6,7 @@ import { execute } from './scopes-check.ts';
 
 const fakeGraphWithTokenInfo = (tokenResult: Result<TokenInfo, GraphError>): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

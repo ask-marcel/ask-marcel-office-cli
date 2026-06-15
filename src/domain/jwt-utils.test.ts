@@ -59,4 +59,9 @@ describe('isGraphToken', () => {
     const token = makeToken({ aud: 'management.core.windows.net' });
     expect(isGraphToken(token)).toBe(false);
   });
+
+  it('returns false when the token carries no aud claim (neither string nor array)', () => {
+    const token = makeToken({ sub: 'user1' });
+    expect(isGraphToken(token)).toBe(false);
+  });
 });

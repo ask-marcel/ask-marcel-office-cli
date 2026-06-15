@@ -14,6 +14,7 @@ const toBase64 = (bytes: Uint8Array): string => {
 const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClient =>
   ({
     get: async (url: string) => get(url),
+    patch: async () => ok({}),
     post: async () => ok({}),
     getBinary: async () => ok({}),
     getElevated: async () => ok({}),

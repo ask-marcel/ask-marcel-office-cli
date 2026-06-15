@@ -6,6 +6,7 @@ import { execute } from './list-calendar-events-delta.ts';
 
 const graphReturning = (response: Result<unknown, GraphError>): GraphClient => ({
   get: async () => response,
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

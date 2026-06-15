@@ -11,6 +11,7 @@ const graphWith = (search: Result<unknown, GraphError>, onProbe: (id: string) =>
     if (path.includes(PROBE)) return onProbe(/\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '');
     return search;
   },
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),

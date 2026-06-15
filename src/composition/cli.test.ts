@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
+import { ok } from '../domain/result.ts';
 import type { AuthError, AuthManager } from '../infra/auth.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
@@ -62,6 +63,7 @@ const failedAuth = (): AuthManager => ({
 
 const okGraph = (value: unknown): GraphClient => ({
   get: async () => ({ ok: true, value }),
+  patch: async () => ok({}),
   post: async () => ({ ok: true, value }),
   getBinary: async () => ({ ok: true, value }),
   getElevated: async () => ({ ok: true, value: {} }),
@@ -76,6 +78,7 @@ const okGraph = (value: unknown): GraphClient => ({
 
 const errGraph = (error: GraphError): GraphClient => ({
   get: async () => ({ ok: false, error }),
+  patch: async () => ok({}),
   post: async () => ({ ok: false, error }),
   getBinary: async () => ({ ok: false, error }),
   getElevated: async () => ({ ok: true, value: {} }),
@@ -267,6 +270,7 @@ describe('buildCli command surface', () => {
         capturedPath = path;
         return { ok: true, value: { value: [] } };
       },
+      patch: async () => ok({}),
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
@@ -291,6 +295,7 @@ describe('buildCli command surface', () => {
         graphCalled = true;
         return { ok: true, value: {} };
       },
+      patch: async () => ok({}),
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
@@ -319,6 +324,7 @@ describe('buildCli command surface', () => {
         capturedPath = path;
         return { ok: true, value: { id: 'AAMkAGI2', subject: 'hi' } };
       },
+      patch: async () => ok({}),
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
@@ -339,6 +345,7 @@ describe('buildCli command surface', () => {
   it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
     const captureGraph: GraphClient = {
       get: async () => ({ ok: true, value: { value: [] } }),
+      patch: async () => ok({}),
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),
@@ -543,6 +550,7 @@ describe('buildCli command surface', () => {
         capturedPath = path;
         return { ok: true, value: { value: [] } };
       },
+      patch: async () => ok({}),
       post: async () => ({ ok: true, value: {} }),
       getBinary: async () => ({ ok: true, value: {} }),
       getElevated: async () => ({ ok: true, value: {} }),

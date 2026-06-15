@@ -11,6 +11,7 @@ const graphProbing = (byId: (id: string) => Result<unknown, GraphError>, probed:
     const id = /\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '';
     return byId(id);
   },
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
