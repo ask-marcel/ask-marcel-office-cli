@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-10T08:54:25.829Z",
+  "generatedAt": "2026-06-12T01:15:23.551Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -291,6 +291,85 @@
       ],
       "example": "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it)."
+    },
+    {
+      "name": "create-mail-draft",
+      "summary": "Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns the created message object with its id — use this id with update-mail-draft to modify the draft before sending.",
+      "category": "mail",
+      "graphMethod": "POST",
+      "graphPathTemplate": "/me/messages (or /me/mailFolders/{mail-folder-id}/messages)",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-post-messages",
+      "options": [
+        {
+          "name": "subject",
+          "key": "subject",
+          "required": true,
+          "description": "Email subject line."
+        },
+        {
+          "name": "body-content",
+          "key": "bodyContent",
+          "required": true,
+          "description": "Email body content. Plain text by default; pass --body-content-type HTML for rich text."
+        },
+        {
+          "name": "body-content-type",
+          "key": "bodyContentType",
+          "required": false,
+          "description": "Body format: Text (default) or HTML.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Text",
+              "HTML"
+            ]
+          }
+        },
+        {
+          "name": "to-recipients",
+          "key": "toRecipients",
+          "required": true,
+          "description": "Comma-separated list of recipient email addresses (e.g. \"alice@example.com,bob@example.com\")."
+        },
+        {
+          "name": "cc-recipients",
+          "key": "ccRecipients",
+          "required": false,
+          "description": "Comma-separated list of CC recipient email addresses."
+        },
+        {
+          "name": "bcc-recipients",
+          "key": "bccRecipients",
+          "required": false,
+          "description": "Comma-separated list of BCC recipient email addresses."
+        },
+        {
+          "name": "importance",
+          "key": "importance",
+          "required": false,
+          "description": "Email importance: Low, Normal (default), or High.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Low",
+              "Normal",
+              "High"
+            ]
+          }
+        },
+        {
+          "name": "mail-folder-id",
+          "key": "mailFolderId",
+          "required": false,
+          "description": "Target folder ID to create the draft in. Defaults to the Drafts folder. Source from list-mail-folders.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        }
+      ],
+      "example": "ask-marcel create-mail-draft --subject \"Q3 Report\" --body-content \"Please review the attached report.\" --to-recipients \"alice@example.com,bob@example.com\" --importance High",
+      "responseShape": "The created Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. The `id` field is the draft message ID — use it with `update-mail-draft` to modify before sending.",
+      "bodyTemplate": "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }"
     },
     {
       "name": "download-drive-item-as-markdown",
@@ -7048,6 +7127,85 @@
       "example": "ask-marcel search-sharepoint-sites-by-name --query 'marketing'",
       "responseShape": "collection of Microsoft Graph `site` resources under `value[]` (up to 25), each carrying `size?` — its default document library's total bytes used (`drive.quota.used`, recursive), folded onto the same probe for free (a data-volume signal, not a file count; omitted when the site has no default drive). Sites you cannot open are excluded: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining match is probed (`GET /sites/{id}?$select=…,siteCollection&$expand=drive($select=quota)`) and `archivedExcluded` drops archived / `423 resourceLocked` sites while `notFoundExcluded` drops probes that 404. All three counters are omitted when 0. `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason. Active personal OneDrives are kept.",
       "pagination": true
+    },
+    {
+      "name": "update-mail-draft",
+      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
+      "category": "mail",
+      "graphMethod": "PATCH",
+      "graphPathTemplate": "/me/messages/{message-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-update",
+      "options": [
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        },
+        {
+          "name": "subject",
+          "key": "subject",
+          "required": false,
+          "description": "New email subject line. Omit to keep the current subject."
+        },
+        {
+          "name": "body-content",
+          "key": "bodyContent",
+          "required": false,
+          "description": "New email body content. Replaces the entire body. Pass --body-content-type HTML for rich text."
+        },
+        {
+          "name": "body-content-type",
+          "key": "bodyContentType",
+          "required": false,
+          "description": "Body format for the new body: Text (default) or HTML. Only used when --body-content is provided.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Text",
+              "HTML"
+            ]
+          }
+        },
+        {
+          "name": "to-recipients",
+          "key": "toRecipients",
+          "required": false,
+          "description": "Comma-separated list of recipient email addresses. Replaces the entire toRecipients list."
+        },
+        {
+          "name": "cc-recipients",
+          "key": "ccRecipients",
+          "required": false,
+          "description": "Comma-separated list of CC recipient email addresses. Replaces the entire ccRecipients list."
+        },
+        {
+          "name": "bcc-recipients",
+          "key": "bccRecipients",
+          "required": false,
+          "description": "Comma-separated list of BCC recipient email addresses. Replaces the entire bccRecipients list."
+        },
+        {
+          "name": "importance",
+          "key": "importance",
+          "required": false,
+          "description": "Email importance: Low, Normal, or High.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Low",
+              "Normal",
+              "High"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
+      "responseShape": "The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.",
+      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent"
     }
   ]
 }

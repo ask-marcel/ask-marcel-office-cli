@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Ask Marcel Companion",
+  "version": "3.2.0",
+  "description": "Captures Microsoft 365 tokens for the ask-marcel CLI by intercepting network requests from Teams.",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*",
+    "https://login.microsoftonline.com/*",
+    "https://login.live.com/*",
+    "https://login.microsoft.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
