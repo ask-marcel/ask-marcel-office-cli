@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Result } from '../../domain/result.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import {
   buildLegacyXls,
   buildPdfNoImages,
@@ -22,18 +23,9 @@ const toBase64 = (bytes: Uint8Array): string => {
 
 // A GraphClient whose `get`/`getBinary` are driven by URL → Result handlers.
 const graphWith = (handlers: { get?: (url: string) => Result<unknown, GraphError>; getBinary?: (url: string) => Result<unknown, GraphError> }): GraphClient =>
-  ({
+  fakeGraphClient({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
-    post: async () => ok({}),
     getBinary: async (url: string) => handlers.getBinary?.(url) ?? ok({}),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
-    getBinaryElevated: async () => ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
   }) as GraphClient;
 
 // A graph that returns one fileAttachment for the attachments fetch.

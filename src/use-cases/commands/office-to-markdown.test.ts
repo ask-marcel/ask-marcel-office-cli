@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import {
   buildLegacyXls,
   buildPdfNoImages,
@@ -13,20 +14,7 @@ import {
 } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  ...overrides,
-});
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
