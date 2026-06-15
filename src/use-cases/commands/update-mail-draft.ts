@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
+import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -28,7 +28,10 @@ const execute: Command['execute'] = async (graph, params) => {
 
   // At least one field must be provided for the update.
   if (!subject && !bodyContent && !toRecipients && !ccRecipients && !bccRecipients && !importance) {
-    return err({ type: 'validation_error', message: 'At least one field must be provided to update (--subject, --body-content, --to-recipients, --cc-recipients, --bcc-recipients, or --importance)' });
+    return err({
+      type: 'validation_error',
+      message: 'At least one field must be provided to update (--subject, --body-content, --to-recipients, --cc-recipients, --bcc-recipients, or --importance)',
+    });
   }
 
   const body: Record<string, unknown> = {};
@@ -102,8 +105,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['Low', 'Normal', 'High'] },
     },
   ],
-  example:
-    'ask-marcel update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
+  example: 'ask-marcel update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
   bodyTemplate:
     "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent",
   scopesRequired: ['Mail.ReadWrite'],

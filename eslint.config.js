@@ -36,6 +36,12 @@ export default [
       ],
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+      // The rule ships no default argsIgnorePattern, so it flags deliberately-unused
+      // contract parameters (e.g. the local-only commands' redirect `execute(_graph,
+      // _params)` shims, where the Command type forces both params but the local
+      // implementation uses neither). Allow a leading underscore to mark them.
+      // Atelier rule 15: project-level severity/config, never an inline ignore.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
   ...(process.env['LINT_STRICT']
@@ -122,6 +128,9 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
+    // browser-extension/ is a vendored Chrome WebExtension (its own `chrome.*`
+    // runtime + manifest), not part of the Bun/TS CLI the gates govern — same
+    // rationale as the excluded scripts/ and .agents/ artefacts.
+    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**', 'browser-extension/**'],
   },
 ];
