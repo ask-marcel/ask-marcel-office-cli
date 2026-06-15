@@ -6,13 +6,17 @@ import { installFetchMock } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth.ts';
+import type { SystemBrowserAuthFn } from './auth.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 
 const CACHE_PATH = '/virtual/token-cache.json';
 const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
 
 // Fake system browser auth that always fails — forces fallback to Playwright (which is faked)
-const fakeSystemBrowserAuth = async () => ({ ok: false as const, error: { type: 'extension_timeout', message: 'test: no extension' } });
+const fakeSystemBrowserAuth = async (): Promise<{ ok: false; error: { type: string; message: string } }> => ({
+  ok: false,
+  error: { type: 'extension_timeout', message: 'test: no extension' },
+});
 
 // Login-fix round-1: fake browserAuth maps the legacy sentinel
 // (AccessToken | null) onto the new discriminated union — null becomes
@@ -81,7 +85,13 @@ const fakeBrowserAuth = (config?: {
       const ic3 = ic3Result();
       const teams = config?.acquireResult ?? null;
       if (teams && config?.fromCache) {
-        return { teams, fromCache: true as const, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const }, ic3 };
+        return {
+          teams,
+          fromCache: true as const,
+          elevated: { ok: false as const, reason: 'sso_timeout' as const },
+          chatsvcagg: { ok: false as const, reason: 'sso_timeout' as const },
+          ic3,
+        };
       }
       if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
       const v = config?.elevatedResult;
@@ -120,6 +130,46 @@ const futureElevated = (): AccessToken => {
 };
 
 describe('auth manager recovery ladder', () => {
+  it('returns the token from the single-session system-browser result and records the elevated outcome as captured', async () => {
+    const fs = createFileSystemFake();
+    const logger = createLoggerFake();
+    const teams = futureToken().accessToken;
+    const elevated = futureElevated();
+    const systemOk: SystemBrowserAuthFn = async () => ({
+      ok: true,
+      value: { accessToken: teams, refreshToken: 'r', elevatedAccessToken: elevated, chatsvcaggAccessToken: elevated, ic3AccessToken: elevated, chatsvcaggRegion: 'emea' },
+    });
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, systemOk, true, false);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(teams);
+    expect(auth.getLastElevatedOutcome()).toEqual({ captured: true });
+  });
+
+  it('returns an actionable extension-not-installed error when the system browser times out and Playwright fallback is disabled', async () => {
+    const fs = createFileSystemFake();
+    const logger = createLoggerFake();
+    const systemFail: SystemBrowserAuthFn = async () => ({ ok: false, error: { type: 'extension_timeout', message: 'no extension' } });
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, systemFail, false, false);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('Ask Marcel Companion');
+    }
+  });
+
+  it('returns the raw system-browser error message for a non-timeout failure when Playwright fallback is disabled', async () => {
+    const fs = createFileSystemFake();
+    const logger = createLoggerFake();
+    const systemFail: SystemBrowserAuthFn = async () => ({ ok: false, error: { type: 'navigation_failed', message: 'callback server crashed' } });
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, systemFail, false, false);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toBe('callback server crashed');
+    }
+  });
+
   it('returns cached token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     const header = btoa(JSON.stringify({ alg: 'RS256' }));
@@ -202,7 +252,16 @@ describe('auth manager recovery ladder', () => {
     const fs = createFileSystemFake();
     const cacheToken = futureToken();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: cacheToken, fromCache: true }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: cacheToken, fromCache: true }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      logger,
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -226,7 +285,16 @@ describe('auth manager recovery ladder', () => {
   it('returns auth_failed when browser throws', async () => {
     const fs = createFileSystemFake();
     const logger = createLoggerFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireError: new Error('browser launch failed') }), CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireError: new Error('browser launch failed') }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      logger,
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(false);
@@ -507,7 +575,16 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
 
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
@@ -522,7 +599,16 @@ describe('auth manager elevated token', () => {
     // elevated_access_token present, elevated_expires_on missing
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: 'orphan-token' }));
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
   });
@@ -532,7 +618,16 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: '', elevated_expires_on: future }));
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
   });
@@ -547,7 +642,16 @@ describe('auth manager elevated token', () => {
     );
 
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     const result = await auth.getElevatedAccessToken();
     expect(result).toEqual(ok(captured));
@@ -600,7 +704,16 @@ describe('auth manager elevated token', () => {
   it('persists the elevated token alongside the Teams token at login time (best-effort)', async () => {
     const fs = createFileSystemFake();
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     await auth.getAccessToken();
     const cacheRead = await fs.readJson<{ elevated_access_token?: string }>(CACHE_PATH);
@@ -612,7 +725,16 @@ describe('auth manager elevated token', () => {
 
   it('login still succeeds even when elevated capture returns null (the 80+ non-version commands do not need it)', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: null }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
 
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
@@ -658,7 +780,16 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'old-refresh' }));
 
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserToken }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
@@ -705,7 +836,16 @@ describe('auth manager elevated token', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: past, refresh_token: 'old-refresh' }));
 
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserToken }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
@@ -715,7 +855,16 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     // No cache seeded; getElevatedAccessToken called with empty FS.
     const captured = futureElevated();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: captured }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ elevatedResult: captured }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ access_token: string; elevated_access_token?: string }>(CACHE_PATH);
@@ -727,7 +876,16 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     const noExpAccessJwt = `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify({ aud: 'https://graph.microsoft.com' }))}.sig`;
     const browserResult: BrowserTokenResult = { accessToken: accessTokenUnsafe(noExpAccessJwt), refreshToken: 'rt' };
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserResult }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     await auth.getAccessToken();
     const cached = await fs.readJson<{ expires_on: number }>(CACHE_PATH);
     expect(cached.ok && cached.value.expires_on).toBe(0);
@@ -736,7 +894,16 @@ describe('auth manager elevated token', () => {
   it('persists refresh_token as empty string when browser returns null refresh (covers `refresh ?? ""` fallback)', async () => {
     const fs = createFileSystemFake();
     const browserResult: BrowserTokenResult = { accessToken: futureToken().accessToken, refreshToken: null };
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserResult }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     await auth.getAccessToken();
     const cached = await fs.readJson<{ refresh_token: string }>(CACHE_PATH);
     expect(cached.ok && cached.value.refresh_token).toBe('');
@@ -957,7 +1124,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('reports the launch_timeout-specific message when the chatsvcagg re-capture browser launch times out', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggFailure: 'launch_timeout' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -969,7 +1145,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('reports the navigation_failed-specific message when the chatsvcagg re-capture cannot reach teams.microsoft.com', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggFailure: 'navigation_failed' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -980,7 +1165,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('reports the sso_timeout fallback message when the chatsvcagg re-capture is silently denied by stale profile cookies', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'sso_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggFailure: 'sso_timeout' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -991,7 +1185,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('surfaces the underlying thrown message when the chatsvcagg re-capture throws non-Result', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggError: new Error('playwright crashed') }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggError: new Error('playwright crashed') }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1003,7 +1206,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     const fs = createFileSystemFake();
     fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'cookies');
     const chatsvcagg = futureChatsvcagg();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggResult: chatsvcagg }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggResult: chatsvcagg }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getAccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ chatsvcagg_access_token?: string }>(CACHE_PATH);
@@ -1094,7 +1306,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
       CACHE_PATH,
       JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: past, chatsvcagg_region: 'emea' })
     );
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh, chatsvcaggRegion: 'apac' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggResult: fresh, chatsvcaggRegion: 'apac' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     expect(await auth.getChatsvcaggRegion()).toBe('apac');
   });
 
@@ -1112,7 +1333,16 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
   it('persists chatsvcagg alongside an empty Teams token slot when the cache file does not exist yet (covers persistChatsvcagg default-merge branch)', async () => {
     const fs = createFileSystemFake();
     const chatsvcagg = futureChatsvcagg();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: chatsvcagg }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggResult: chatsvcagg }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ access_token?: string; chatsvcagg_access_token?: string }>(CACHE_PATH);
@@ -1173,7 +1403,16 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
 
   it('reports the launch_timeout-specific message when the IC3 re-capture browser launch times out', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Failure: 'launch_timeout' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1184,7 +1423,16 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
 
   it('reports the navigation_failed-specific message when the IC3 re-capture cannot reach teams.microsoft.com', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Failure: 'navigation_failed' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1195,7 +1443,16 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
 
   it('reports the sso_timeout fallback message when the IC3 re-capture is silently denied by stale profile cookies', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'sso_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Failure: 'sso_timeout' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1206,7 +1463,16 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
 
   it('surfaces the underlying thrown message when the IC3 re-capture throws non-Result', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Error: new Error('playwright crashed') }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Error: new Error('playwright crashed') }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1280,7 +1546,16 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
   it('persists ic3 alongside an empty Teams token slot when the cache file does not exist yet (covers persistIc3 default-merge branch)', async () => {
     const fs = createFileSystemFake();
     const ic3 = futureIc3();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: ic3, ic3Region: 'apac' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, fakeSystemBrowserAuth, true, true);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Result: ic3, ic3Region: 'apac' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      fakeSystemBrowserAuth,
+      true,
+      true
+    );
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(true);
     const cached = await fs.readJson<{ access_token?: string; ic3_access_token?: string; chatsvcagg_region?: string }>(CACHE_PATH);

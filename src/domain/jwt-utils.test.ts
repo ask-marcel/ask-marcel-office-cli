@@ -55,8 +55,23 @@ describe('isGraphToken', () => {
     expect(isGraphToken(token)).toBe(true);
   });
 
+  it('returns true when aud is the Graph resource UUID (00000003-0000-0000-c000-000000000000)', () => {
+    const token = makeToken({ aud: '00000003-0000-0000-c000-000000000000' });
+    expect(isGraphToken(token)).toBe(true);
+  });
+
+  it('returns true when aud is an array containing the Graph resource UUID', () => {
+    const token = makeToken({ aud: ['api://foo', '00000003-0000-0000-c000-000000000000'] });
+    expect(isGraphToken(token)).toBe(true);
+  });
+
   it('returns false for wrong audience', () => {
     const token = makeToken({ aud: 'management.core.windows.net' });
+    expect(isGraphToken(token)).toBe(false);
+  });
+
+  it('returns false when the token carries no audience claim at all', () => {
+    const token = makeToken({ sub: 'user1' });
     expect(isGraphToken(token)).toBe(false);
   });
 });
