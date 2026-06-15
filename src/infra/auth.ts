@@ -129,7 +129,16 @@ const TEAMS_URL = 'https://teams.microsoft.com/';
  */
 const DEFAULT_CHATSVCAGG_REGION = 'emea';
 
-const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, browserProfileDir: string, logger: Logger, fs: FileSystem): AuthManager => {
+type SystemBrowserAuthFn = () => Promise<Result<{ accessToken: AccessToken; refreshToken: string | null; elevatedAccessToken?: AccessToken | null; chatsvcaggAccessToken?: AccessToken | null; ic3AccessToken?: AccessToken | null; chatsvcaggRegion?: string }, { type: string; message: string }>>;
+
+const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, browserProfileDir: string, logger: Logger, fs: FileSystem, systemBrowserAuthFn?: SystemBrowserAuthFn, usePlaywrightFallback: boolean = true, skipSystemBrowser: boolean = false): AuthManager => {
+  const systemBrowserAuth = systemBrowserAuthFn ?? (async () => {
+    if (skipSystemBrowser) {
+      return { ok: false as const, error: { type: 'skipped' as const, message: 'system browser skipped' } };
+    }
+    const { authenticateViaSystemBrowser } = await import('./system-browser-auth.ts');
+    return authenticateViaSystemBrowser({ logger, extensionTimeoutMs: 10_000 });
+  });
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
     return r.ok ? r.value : null;
@@ -229,6 +238,41 @@ const createAuthManagerFromApi = (browserAuth: BrowserAuth, cachePath: string, b
 
   const acquireViaBrowser = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
+      // System browser + extension flow (primary): opens the user's default
+      // browser with a callback port in the URL. The ask-marcel-companion
+      // browser extension captures the token and POSTs it back to the CLI's
+      // temporary localhost server. Falls back to Playwright if the extension
+      // doesn't respond within 10 seconds.
+      logger.info('auth.system_browser.trying');
+      const systemResult = await systemBrowserAuth();
+      if (systemResult.ok) {
+        const { accessToken: token, refreshToken, elevatedAccessToken, chatsvcaggAccessToken, ic3AccessToken, chatsvcaggRegion } = systemResult.value;
+        lastElevatedOutcome = elevatedAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
+        lastChatsvcaggOutcome = chatsvcaggAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
+        await persistTeams(token, refreshToken, elevatedAccessToken ?? null);
+        if (chatsvcaggAccessToken) {
+          await persistChatsvcagg(chatsvcaggAccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
+        }
+        if (ic3AccessToken) {
+          await persistIc3(ic3AccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
+        }
+        logger.info('auth.ladder.rung', { rung: 'system_browser' });
+        return ok(token);
+      }
+      // System browser failed
+      logger.info('auth.system_browser.failed', { reason: systemResult.error.type });
+      
+      // If Playwright fallback is disabled, return error immediately
+      if (!usePlaywrightFallback) {
+        const errorMessage = systemResult.error.type === 'extension_timeout' 
+          ? 'Browser extension did not respond. Make sure the Ask Marcel Companion extension is installed and enabled.'
+          : systemResult.error.message;
+        return err({ type: 'auth_failed', message: errorMessage });
+      }
+      
+      // Fall back to Playwright
+      logger.info('auth.system_browser.fallback_to_playwright', { reason: systemResult.error.type });
+
       // Login-fix round-2: single-session capture. The old flow opened
       // a second browser at m365.cloud.microsoft for the elevated step,
       // which on federated tenants (ExampleCorp / Okta) flashed a fresh sign-in
@@ -592,7 +636,7 @@ const stderrProgress = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileSystem; browserProfileDir?: string }): AuthManager => {
+const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileSystem; browserProfileDir?: string; systemBrowserAuth?: SystemBrowserAuthFn; usePlaywrightFallback?: boolean; skipSystemBrowser?: boolean }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
   const browserAuth = createBrowserAuth({
@@ -601,7 +645,7 @@ const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileS
     freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
     onProgress: stderrProgress,
   });
-  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs);
+  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs, deps.systemBrowserAuth, deps.usePlaywrightFallback, deps.skipSystemBrowser);
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };

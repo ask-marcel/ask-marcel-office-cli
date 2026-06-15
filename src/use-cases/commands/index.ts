@@ -86,6 +86,8 @@ import * as listCalendarEventAttachments from './list-calendar-event-attachments
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
+import * as createMailDraft from './create-mail-draft.ts';
+import * as updateMailDraft from './update-mail-draft.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as convertLocalFile from './convert-local-file.ts';
 import * as convertMailAttachmentZip from './convert-mail-attachment-zip.ts';
@@ -232,6 +234,8 @@ const commands: Record<string, Command> = {
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-to-markdown': convertMailToMarkdown,
+  'create-mail-draft': createMailDraft,
+  'update-mail-draft': updateMailDraft,
   'convert-drive-item-zip': convertDriveItemZip,
   'convert-local-file': convertLocalFile,
   'convert-mail-attachment-zip': convertMailAttachmentZip,

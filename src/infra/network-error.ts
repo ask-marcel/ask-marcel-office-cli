@@ -42,7 +42,7 @@ export const networkErrorMessage = (e: unknown, label: string, timeoutLabel: str
   return `${base} (${label}) — transient; retry once before treating as permanent`;
 };
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 export type TimeoutTier = 'json' | 'binary';
 
 export const timeoutLabelFor = (tier: TimeoutTier): string => (tier === 'binary' ? BINARY_TRANSFER_TIMEOUT_LABEL : REQUEST_TIMEOUT_LABEL);
