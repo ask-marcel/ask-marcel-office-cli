@@ -137,7 +137,7 @@ export const process = (orders: Order[]): void => {
 };
 
 // GOOD - extract
-export const process = (orders: Order[]): void => {
+export const shipValidOrders = (orders: Order[]): void => {
   orders.filter(isValidOrder).forEach(processOrder);
 };
 

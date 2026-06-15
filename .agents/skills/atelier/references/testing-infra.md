@@ -148,7 +148,7 @@ describe('callGemini', () => {
 });
 ```
 
-**Cast note.** `typeof globalThis.fetch` includes `preconnect` (a recent Web Fetch API addition). A bare arrow function cannot be assigned directly, and `as typeof globalThis.fetch` fails TypeScript's overlap heuristic. Use `as unknown as typeof globalThis.fetch` — the double-cast is load-bearing and `@typescript-eslint/no-unnecessary-type-assertion` will **not** flag it because the conversion truly spans an incompatible gap.
+**Cast note.** `typeof globalThis.fetch` includes `preconnect` (a Bun-specific extension on `fetch`, not part of the WHATWG Fetch standard). A bare arrow function cannot be assigned directly, and `as typeof globalThis.fetch` fails TypeScript's overlap heuristic. Use `as unknown as typeof globalThis.fetch` — the double-cast is load-bearing and `@typescript-eslint/no-unnecessary-type-assertion` will **not** flag it because the conversion truly spans an incompatible gap.
 
 ### 2b. No custom-fetch hook → two-constructor pattern
 

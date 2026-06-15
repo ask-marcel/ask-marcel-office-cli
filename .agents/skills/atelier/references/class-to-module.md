@@ -4,6 +4,8 @@ Since `class` and `interface` are banned in this codebase, classical OO patterns
 
 The `references/design-patterns.md` file contains the full GoF catalogue in this style. `references/object-design.md` covers value objects, entities, aggregates, and polymorphism-via-dispatch in depth. This page is the quick lookup table.
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## Value object
 
 `class Money { ... }` becomes a readonly record plus operation functions:
@@ -11,7 +13,10 @@ The `references/design-patterns.md` file contains the full GoF catalogue in this
 ```ts
 export type Money = { readonly amount: number; readonly currency: string };
 
-export const money = (amount: number, currency: string): Money => ({ amount, currency });
+export const money = (amount: number, currency: string): Money => {
+  if (!Number.isFinite(amount)) throw new Error('invalid Money.amount');
+  return { amount, currency };
+};
 
 export const addMoney = (a: Money, b: Money): Money => {
   if (a.currency !== b.currency) throw new Error('CurrencyMismatch');
@@ -119,10 +124,20 @@ export const createEmitter = <T>(): Emitter<T> => {
 ```ts
 export type Command = { execute: () => void; undo: () => void };
 
-export const addItemCommand = (cart: Cart, item: Item): Command => ({
-  execute: () => addToCart(cart, item),
-  undo: () => removeFromCart(cart, item),
-});
+// addToCart/removeFromCart are immutable (they return new carts), so the
+// command closes over a mutable holder; execute/undo swap the current cart.
+export const addItemCommand = (cart: Cart, item: Item): Command & { getCart: () => Cart } => {
+  let current = cart;
+  return {
+    execute: () => {
+      current = addToCart(current, item);
+    },
+    undo: () => {
+      current = removeFromCart(current, item);
+    },
+    getCart: () => current,
+  };
+};
 ```
 
 ## Entity with state transitions

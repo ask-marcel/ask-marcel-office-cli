@@ -64,13 +64,15 @@ Applies to repos with the Bun-workspace + Next.js 16 layout. Identifiable by `pa
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "bun run --filter <package-name> lint",
+    "pre-commit": "bun run --filter <package-name> test && bun run --filter <package-name> lint",
     "commit-msg": "bunx --yes commitlint --edit $1"
   }
 }
 ```
 
 Activate hooks after install: `bun run prepare`.
+
+**This variant's hook mechanism is `simple-git-hooks`** (test + lint per package, commitlint on the message). The eight-gate `.githooks/pre-commit` from `references/workflow.md` belongs to the Bun-script variant — never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other. The commit-size, package.json, and gitleaks gates are portable here if wanted; the coverage and mutation gates are not (see SKILL.md, "What applies where").
 
 ## Package `package.json`
 
@@ -83,7 +85,8 @@ Activate hooks after install: `bun run prepare`.
     "dev": "bun next dev",
     "build": "rimraf out && bun next build",
     "start": "bunx serve ./out",
-    "lint": "eslint"
+    "test": "bun test",
+    "lint": "eslint --max-warnings=0"
   },
   "dependencies": {
     "next": "16.1.1",
@@ -99,7 +102,6 @@ Activate hooks after install: `bun run prepare`.
     "@types/node": "^20.19.27",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@types/winston": "^2.4.4",
     "baseline-browser-mapping": "^2.9.11",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.1.1",
@@ -108,7 +110,7 @@ Activate hooks after install: `bun run prepare`.
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-security": "^3.0.1",
-    "eslint-plugin-tailwindcss": "beta",
+    "eslint-plugin-tailwindcss": "^4.0.0-beta.0",
     "eslint-plugin-unicorn": "^61.0.2",
     "globals": "^17.0.0",
     "rimraf": "^6.1.2",
@@ -116,13 +118,12 @@ Activate hooks after install: `bun run prepare`.
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.51.0"
   },
-  "ignoreScripts": ["sharp", "unrs-resolver"],
   "trustedDependencies": ["sharp", "unrs-resolver"],
   "browserslist": ["> 0.5%", "last 2 versions", "not dead", "not IE 11", "not op_mini all"]
 }
 ```
 
-No `format`, `test`, or `lint:fix` script. Save-in-editor triggers ESLint autofix.
+No `format` or `lint:fix` script — save-in-editor triggers ESLint autofix. The `test` script is mandatory (see Testing below). Notes on the skeleton: `@types/winston` must NOT be added (winston 3 ships its own types; the v2 stub conflicts), and `trustedDependencies` is Bun's lifecycle-script allowlist — there is no `ignoreScripts` package.json field.
 
 ## `tsconfig.json`
 
@@ -198,6 +199,7 @@ const eslintConfig = defineConfig([
   {
     rules: {
       'func-style': ['error', 'expression'],
+      'no-console': 'error',
       'no-restricted-syntax': ['off', 'ForOfStatement'],
       'prefer-template': 'error',
       quotes: ['error', 'single', { avoidEscape: true }],
@@ -226,6 +228,26 @@ const eslintConfig = defineConfig([
     languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
     settings: { react: { version: 'detect' } },
     rules: { 'react/react-in-jsx-scope': 'off' },
+  },
+  {
+    // Hard rules 21–22: the design system imports react only, holds no state, owns all styling
+    files: ['src/components/**/*.ts', 'src/components/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['next', 'next/*'], message: 'Design-system components import react only — inject links/images as ComponentType props (hard rule 21).' },
+            { group: ['**/lib/**', '**/config/**', '**/page/**'], message: 'Design-system components must not import application code (hard rule 21).' },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'CallExpression[callee.name=/^use[A-Z]/]', message: 'No hooks inside the design system — hoist state to the page shell via src/lib/hooks (hard rule 21).' },
+        { selector: 'Program > ExpressionStatement[directive="use client"]', message: "The 'use client' boundary belongs to page shells, not design-system components (hard rule 21)." },
+      ],
+    },
   },
   pluginJs.configs.recommended,
   ...tsPlugin.configs.recommended,
@@ -261,7 +283,7 @@ const eslintConfig = defineConfig([
 export default eslintConfig;
 ```
 
-Note: `no-console` is not present here. Console calls are stripped from production builds via `next.config.ts` → `compiler.removeConsole`. Still use the Winston logger in code: calls to `console.*` silently disappear in prod.
+Note: `no-console: 'error'` is the enforcement (hard rule 4); `next.config.ts` → `compiler.removeConsole` is defence-in-depth, not a substitute — a stripped `console.*` is a violation that silently vanished, which is why the lint rule exists. Log through the Winston module (below).
 
 ## `postcss.config.mjs`
 
@@ -272,6 +294,29 @@ export default {
 ```
 
 No standalone `tailwind.config.{js,ts}`. Tailwind v4 config lives inside `app/globals.css` (CSS-first config).
+
+## `next.config.ts`
+
+The variant marker and the home of four load-bearing behaviours: static export, console stripping, unoptimised images, and page extensions.
+
+```ts
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  output: 'export',
+  pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+    reactRemoveProperties: process.env.NODE_ENV === 'production',
+  },
+  productionBrowserSourceMaps: false,
+  images: {
+    unoptimized: true, // required for static export
+  },
+};
+
+export default nextConfig;
+```
 
 ## `.vscode/settings.json`
 
@@ -378,7 +423,7 @@ module.exports = {
 };
 ```
 
-## Atomic Design (enforced)
+## Atomic Design (enforced — full doctrine in `references/atomic-design.md`)
 
 Directory model under `packages/<app>/src/components/`:
 
@@ -387,16 +432,24 @@ Directory model under `packages/<app>/src/components/`:
 - `organisms/`: may import atoms and molecules only. Example: `hero`, `faq`, `pricing`, `nav-bar`, `footer`.
 - `src/page/`: page shells consumed by `app/(lang)/page.tsx`. May import any of the above and `src/lib/*`.
 
-**Imports are strictly upward.** An atom never imports a molecule. A molecule never imports an organism. A page shell may import anything.
+**Imports are strictly upward, and the design system is logic-free** (SKILL.md hard rule 21): components under `src/components/**` are stateless `const` arrow functions — no hooks, no fetching, no translation lookups, no `next/*` imports, no `'use client'`. State lives in `src/lib/hooks/` and is wired by page shells; links and images are injected as `ComponentType` props from `src/lib/layout/wrappers.tsx`.
 
-Every component gets a `displayName`:
+**Styling is sealed inside it** (SKILL.md hard rule 22): Tailwind utilities exist only under `src/components/**`, design tokens in `app/globals.css`. Routes, page shells, `src/lib/**`, and `src/config/**` never carry a class string; component APIs expose typed variants, not `className`. The app does not know Tailwind exists.
 
-```tsx
-export const Button: FC<ButtonProps> = ({ children, variant = 'primary' }) => {
-  return <button className={...}>{children}</button>;
-};
-Button.displayName = 'Button';
-```
+Read `references/atomic-design.md` before any component work — layer table, component anatomy, interactivity ladder, injection pattern, styling seal, red flags.
+
+## Testing (what TDD means in this variant)
+
+Hard rule 11 still holds — no production logic without a failing test — and rules 21–22 are what make it tractable here: every line of logic lives in `src/lib/**` or `src/config/**`, so that is where the tests live.
+
+- Runner: `bun test`, files `*.test.ts` next to source, exactly as in the Bun variant. The package script is `"test": "bun test"` and the root pre-commit runs it.
+- **TDD-mandatory:** `src/lib/**` (i18n path helpers, guides/MDX utils, SEO builders, tag utils) and `src/config/**` factories. Red-Green-Refactor, domain-language test names.
+- **Hooks stay thin.** A hook like `useNavState` is four lines of `useState` wiring — keep it that way. The moment a hook grows real logic (derivation, branching), extract that logic into a pure function in `src/lib/**` and TDD the function; the hook remains a trivial adapter.
+- **Design-system components are not unit-tested.** Rule 21 makes them deterministic prop→JSX maps: no state, no IO, no business decisions — nothing worth owning a test. They are verified by the design-system ESLint block (above), review against `references/atomic-design.md`, and the build. Do not add React Testing Library ceremony to prove that props render.
+- Page shells are wiring; when one accumulates a mapping (e.g. a `toPlanCard` transform), extract the mapping to `src/lib/**` and test it there.
+- The mock ban (hard rule 13) applies: hand-written fakes, never `mock` from `bun:test`. Add the `no-restricted-imports` ban from `references/bun-typescript.md` to the config together with the first test file.
+
+Coverage tiers and Stryker mutation are Bun-variant gates; they do not run here (SKILL.md, "What applies where").
 
 ## Static-export data loading
 
@@ -417,7 +470,7 @@ Translations are JSON files in `data/translations/` loaded by `src/lib/i18n/`. E
 
 ## Secrets & config
 
-No credentials in source. Read from `process.env` inline. The only env vars the app currently consumes besides `NODE_ENV` are `LOG_LEVEL` and `LOG_FILE`. If you add many env vars later, centralise them in `src/lib/config/env.ts`.
+No credentials in source. Centralise env reads in `src/lib/config/env.ts` rather than sprinkling `process.env` across modules (SKILL.md, Security). The only env vars the app consumes besides `NODE_ENV` are `LOG_LEVEL` and `LOG_FILE`, read once at logger init — treat those two inline reads as part of the sanctioned logger singleton, not as a precedent for new code.
 
 `.env*` is git-ignored.
 
@@ -460,15 +513,17 @@ export default logger;
 
 Import as default: `import logger from '@/src/lib/utils/logger';`.
 
+This module-level singleton is the **sanctioned rule-4 exception** for this variant (SKILL.md hard rule 4): static export plus the React client boundary leave no composition root through which to inject a `Logger` port into client components, so the variant trades injection for one well-known module. It stays the only one — no other module-level service objects, and the Bun-script variant keeps its port + adapter + fake discipline.
+
 ## Bootstrap checklist (new package in the monorepo)
 
 1. From repo root: `mkdir -p packages/<NN>-<name> && cd packages/<NN>-<name>`.
 2. `bun init -y`, then replace `package.json` with the skeleton above (rename `name`).
-3. Create `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs` with the blocks above.
+3. Create `tsconfig.json`, `eslint.config.mjs`, `postcss.config.mjs`, and `next.config.ts` with the blocks above.
 4. Create `.vscode/settings.json` and `.vscode/extensions.json` at the repo root if not present.
 5. From repo root: `bun install`, then `bun run prepare` to install git hooks.
 6. Create `src/lib/utils/logger.ts`.
 7. Set up `app/globals.css` for Tailwind v4.
 8. Lay out `src/components/{atoms,molecules,organisms}/`, `src/page/`, `src/lib/`, `src/config/`, `src/types/`.
-9. Verify: `bun run --filter <package-name> lint` exits clean and `bun run --filter <package-name> build` succeeds.
-10. Commit with Conventional Commits.
+9. Verify: `bun run --filter <package-name> test`, `bun run --filter <package-name> lint`, and `bun run --filter <package-name> build` all exit clean.
+10. Commit with Conventional Commits — once the user confirms (rule 25).

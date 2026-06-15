@@ -1,5 +1,7 @@
 # Test-Driven Development
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## The core loop
 
 ```
@@ -8,7 +10,7 @@ RED -> GREEN -> REFACTOR -> RED -> ...
 
 ### RED phase
 
-Write a failing test that describes the behaviour you want. The test should:
+Propose a failing test that describes the behaviour you want, and get the user's confirmation before writing it (SKILL.md hard rule 24 — tests are confirmation-gated; never create, change, or delete one silently). The test should:
 
 - Use domain language, not technical jargon.
 - Describe WHAT, not HOW.

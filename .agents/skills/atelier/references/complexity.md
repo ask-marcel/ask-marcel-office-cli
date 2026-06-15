@@ -1,5 +1,7 @@
 # Managing Complexity
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## The two kinds of complexity
 
 ### Essential complexity
@@ -110,6 +112,33 @@ export type User = {
   readonly email: Email;
 };
 ```
+
+---
+
+## The lazy ladder
+
+KISS and YAGNI answer *how simple*; the lazy ladder turns them into a procedure you run *before writing code*. The cheapest, most correct, fastest-to-review code is the code you never wrote — so stop at the first rung that solves the problem:
+
+1. **Does it need to exist?** YAGNI at the top of the ladder. If no current requirement forces it, the rung is "don't build it." A deleted requirement beats an elegant implementation.
+2. **Standard library or language feature?** `Array`/`Map`/`Set`, `structuredClone`, `Intl`, `Object.groupBy`, optional chaining, etc. Reach for the language before hand-rolling.
+3. **Native runtime capability?** In a Bun repo the runtime replaces whole categories of dependency: `Bun.file`/`Bun.write` for file IO (hard rule 20), `crypto.subtle` and `crypto.randomUUID()` for crypto, the global `fetch`, `URL`/`URLSearchParams`, `Bun.password` for hashing. Prefer the platform before `bun add`.
+4. **A dependency already in `package.json`?** If something installed already does the job, use it — do not add a second library for the same capability (and never `bun add` a near-duplicate; hard rule 19).
+5. **One clear line?** If the whole thing collapses to one readable expression, that is the implementation.
+6. **Only then** write the minimum that works — the absolute smallest correct version, no speculative seams.
+
+**Tiebreaker.** When two stdlib approaches are the same size, pick the one that is edge-case-correct and more efficient (e.g. `re.exec` in a loop over `.matchAll` spread only when you need the perf; the *correct* boundary handling always wins over the cute one-liner). Two more reflexes: **delete before adding** (a diff that removes code is usually the better fix), and **boring over clever** (the next reader, possibly you in six months, pays for cleverness).
+
+### Simplicity is not negligence
+
+The ladder trims *speculation*, never *safety*. Five things stay off the chopping block no matter how lazy the rung:
+
+- **Trust-boundary validation** — branded value objects with validating factories at every source→sink crossing (see `references/security.md`, `references/object-design.md`).
+- **`Result` error handling at IO boundaries** — real failure modes belong in the type (hard rule 16). "No error handling for impossible scenarios" means skip the *impossible* ones; a network call failing is not impossible.
+- **Security** — the source-to-sink discipline is never "simplified away."
+- **Accessibility** — semantic elements, focus states, ARIA on interactive controls in the design system (see `references/atomic-design.md`).
+- **Anything the user explicitly requested** — laziness applies to *unrequested* scope, never to the actual ask.
+
+The test: would a reviewer call this *lazy* (good — minimal, used the platform) or *negligent* (bad — dropped a checkpoint)? If the latter, you cut the wrong thing.
 
 ---
 

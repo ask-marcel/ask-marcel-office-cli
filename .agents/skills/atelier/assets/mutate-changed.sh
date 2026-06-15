@@ -35,9 +35,8 @@ fi
 count=$(echo "$files" | wc -l | tr -d ' ')
 echo "mutate:changed: testing ${count} file(s) (base: ${BASE})"
 
-mutate_args=()
-while IFS= read -r f; do
-  mutate_args+=(--mutate "$f")
-done <<< "$files"
+# Stryker's --mutate takes ONE comma-separated value; repeated flags
+# overwrite each other (the CLI keeps only the last one), so join the list.
+mutate_arg=$(echo "$files" | paste -sd, -)
 
-bunx stryker run "${mutate_args[@]}"
+bunx stryker run --mutate "$mutate_arg"

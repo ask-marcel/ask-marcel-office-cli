@@ -245,7 +245,7 @@ Applies to: any future "should this job go in the monorepo" question.
 ```markdown
 ## [decision] 2026-04-23 | I install all dev CLIs through mise
 
-Need a single tool that pins per-project versions of Bun, Node, Python without
+Need a single tool that pins per-project versions of Bun and Node without
 sudo. asdf works but config is verbose; brew installs system-wide and drifts.
 Mise keeps every project's `.tool-versions` honest and stays out of PATH globals.
 Applies to: any new language runtime or CLI I need locally.
@@ -254,13 +254,13 @@ Applies to: any new language runtime or CLI I need locally.
 ### Gotcha (team-relevant)
 
 ```markdown
-## [gotcha] 2026-04-23 | bun test ignores tsconfig paths by default
+## [gotcha] 2026-04-23 | Stryker runs through npm even in a Bun-only repo
 
-Tests importing via `@/lib/money` failed with "Cannot find module" while the app
-and tsc both resolved the path fine. Bun's test runner does not auto-read tsconfig
-paths; it needs explicit config in `bunfig.toml` or relative imports in test files.
-We chose relative imports in `*.test.ts` for simplicity.
-Affects: every test file in this repo.
+Mutation testing failed with 'npm not found' in a container that only had Bun.
+Stryker's plugin loader and commandRunner resolve through npm/npx regardless of
+the test runner, so stryker.conf.json keeps `packageManager: "npm"` and CI images
+need node+npm installed even though tests execute via `bun test`.
+Affects: every repo using the mutation gate.
 ```
 
 ### Gotcha (personal-relevant)
@@ -279,14 +279,26 @@ Affects: every shell session on this network; add to `~/.zshenv`.
 
 When a new lesson contradicts an older one, do not edit the older one. Add a new `[decision]` entry that references and overrides.
 
-```markdown
-## [decision] 2026-05-15 | SUPERSEDES 2026-04-23 gotcha on bun test tsconfig paths
+The older entry:
 
-Bun 1.3 now reads tsconfig paths via `bunfig.toml` with `[test] paths = true`.
-Older relative-import workaround is no longer needed; new test files should use
-the `@/` prefix like the rest of the codebase.
-Supersedes: "bun test ignores tsconfig paths by default" (2026-04-23).
-Affects: test files created after 2026-05-15.
+```markdown
+## [gotcha] 2026-04-23 | bun install rewrites bun.lock on drift — CI needs --frozen-lockfile
+
+A CI run silently updated bun.lock because plain `bun install` reconciles the lockfile
+when package.json drifted. CI must run `bun install --frozen-lockfile` so drift fails
+the build instead of mutating the lockfile.
+Affects: every CI pipeline in Bun repos.
+```
+
+The superseding entry, appended later:
+
+```markdown
+## [decision] 2026-05-15 | SUPERSEDES 2026-04-23 gotcha on bun install lockfile drift
+
+The `--frozen-lockfile` flag moved from per-pipeline steps into the shared CI install
+script, so individual pipelines no longer set it by hand.
+Supersedes: "bun install rewrites bun.lock on drift — CI needs --frozen-lockfile" (2026-04-23).
+Affects: CI pipelines created after 2026-05-15.
 ```
 
 Both entries stay in the file. A reader can trace the history.
@@ -328,7 +340,7 @@ After a 2-hour session on a pricing feature, Claude proposes:
 Candidates for lessons files:
 
 1. [mistake]  lessons.local.md | wrapped Money in a class, user corrected to branded type
-2. [gotcha]   LESSONS.md       | bun test ignores tsconfig paths; use relative imports in *.test.ts
+2. [gotcha]   LESSONS.md       | Stryker resolves through npm/npx; keep packageManager "npm" even with bun test
 3. [decision] LESSONS.md       | discount tiers live in a dispatch record, not a switch
 
 OK to append all three? (reply: all / none / numbers)

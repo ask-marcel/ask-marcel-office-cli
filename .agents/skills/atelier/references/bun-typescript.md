@@ -16,6 +16,8 @@ Identifiable by `"module": "src/main.ts"` in `package.json` and the Clean Archit
 
 Never call `node`, `tsc`, `ts-node`, `vite`, `npm`, `pnpm`, or `yarn`.
 
+**Server archetype.** The default shape is a CLI/batch job that runs and `process.exit`s, but `src/main.ts` may instead call `Bun.serve` to serve HTTP. The inbound server is then an `infra/` adapter (the mirror of an outbound one), `main.ts` stays the single entry with its one top-level catch, and the Dockerfile gains `EXPOSE <port>`. See `references/architecture.md` § Inbound HTTP (server archetype).
+
 ## `package.json`
 
 Minimal skeleton:
@@ -27,8 +29,8 @@ Minimal skeleton:
   "type": "module",
   "scripts": {
     "start": "bun run src/main.ts",
-    "lint": "eslint --cache",
-    "lint:strict": "LINT_STRICT=1 eslint",
+    "lint": "eslint --cache --max-warnings=0",
+    "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "coverage": "bun run scripts/check-coverage.ts",
     "mutate": "stryker run",
@@ -209,7 +211,7 @@ export default [
 
 Notes on the config:
 
-- **One config file, two modes.** The inner-loop `bun run lint` runs only the fast non-type-aware rules (~2 s cached / ~7 s cold). `bun run lint:strict` sets `LINT_STRICT=1` and the conditional block adds `parserOptions.projectService: true` plus the type-aware `@typescript-eslint` rules (~25 s on a full repo). Pre-commit gate 4 runs the strict version. There is no separate `eslint.strict.config.js` — keeping one config eliminates drift.
+- **One config file, two modes.** Both scripts carry `--max-warnings=0`, so warnings fail either run (the zero-warning rule, hard rule 15) — the modes differ only in depth. The inner-loop `bun run lint` runs the fast non-type-aware rules (~2 s cached / ~7 s cold); `bun run lint:strict` sets `LINT_STRICT=1` and the conditional block adds `parserOptions.projectService: true` plus the type-aware `@typescript-eslint` rules (~25 s on a full repo). Pre-commit gate 5 runs the strict version. There is no separate `eslint.strict.config.js` — keeping one config eliminates drift.
 - **`sonarjsPlugin.configs.recommended`** catches SonarLint findings at lint time so they no longer escape the IDE. See `references/workflow.md` for the common ones (S4325, S6594, S4123, S6551, S6671). Three rules are turned off as always-on noise: `sonarjs/no-unused-vars` (duplicate), `sonarjs/no-empty-test-file` (false-positive on `describe` blocks), `sonarjs/cognitive-complexity` (we already cap function size).
 - **`no-console` is `error`**. Always use the logger port (see below), never `console.*`.
 - **`security/detect-object-injection`, `detect-unsafe-regex`, and `detect-non-literal-fs-filename`** are disabled at the project level because they only false-positive on this codebase's idioms (branded-type `Record<K, V>` lookups, bounded regexes, `chmodSync(mkdtempSync(...))` in tests). Comments in the config explain why each is off. Never inline-ignore them per-line.
@@ -298,16 +300,17 @@ For throwaway scripts, one-off CLIs, or prototypes with a single integration, a 
 
 ## Testing
 
-No tests today. If you add them:
+Tests are mandatory — TDD is hard rule 11, and the whole eight-gate pipeline (tests, coverage tiers, mutation) assumes they exist:
 
 - Filename convention: `*.test.ts` next to the source.
 - Runner: `bun test`.
+- See `references/tdd.md` and `references/testing.md` for the loop and the fakes-not-mocks discipline.
 
 ## Secrets & config hygiene
 
-No credentials in source. Load every env var through the `envVar` branded-type factory, centralised in a `config/env.ts` per feature. `.env*` is git-ignored. For Firebase Admin, add `*-service-account*.json` to `.gitignore` and load the path via env var, never commit the JSON.
+No credentials in source. Load every env var through the `envVar` branded-type factory — or its coerced siblings `envNumber` / `envEnum` — centralised in a `config/env.ts` per feature, including the logger's level (`createWinstonLogger(config.logLevel)`), so nothing reads `process.env` directly. `.env*` is git-ignored. For Firebase Admin, add `*-service-account*.json` to `.gitignore` and load the path via env var, never commit the JSON.
 
-See `references/security.md` for the full pattern: `envVar` factory, redacted Winston logger, never-sprinkle-`process.env` rule, and the list of what must never be committed.
+See `references/security.md` for the full pattern: the `envVar` / `envNumber` / `envEnum` factories (and the Zod-schema scale-up for large config), the redacted Winston logger, the never-sprinkle-`process.env` rule, and the list of what must never be committed.
 
 ## Logger (port + adapter + fake, not a module singleton)
 
@@ -338,9 +341,9 @@ const redactFormat = format((info) => {
   return info;
 });
 
-export const createWinstonLogger = (): Logger => {
+export const createWinstonLogger = (level: string): Logger => {
   const winston = createLogger({
-    level: process.env.LOG_LEVEL ?? 'info',
+    level,
     format: format.combine(redactFormat(), format.json()),
     transports: [new transports.Console()],
   });
@@ -371,7 +374,7 @@ export const createLoggerFake = (): LoggerFake => {
 };
 ```
 
-Every use-case declares `readonly logger: Logger` in its `Deps` and calls `deps.logger.info(...)`. Composition wires `createWinstonLogger()` in `src/composition/build-deps.ts`. Tests inject `createLoggerFake()` and assert on the `calls` array — logs become assertable without a mocking library.
+Every use-case declares `readonly logger: Logger` in its `Deps` and calls `deps.logger.info(...)`. Composition wires `createWinstonLogger(config.logLevel)` in `src/composition/build-deps.ts` (the level comes from the typed-env config, never `process.env` directly). Tests inject `createLoggerFake()` and assert on the `calls` array — logs become assertable without a mocking library.
 
 Why this and not a module-level singleton: a singleton makes the logger impossible to swap in tests without monkey-patching, and impossible to redact/reformat per-environment without mutating global state. A port is one extra type declaration and pays off the first time you want to assert that a warning fired, or run a test suite in silent mode.
 
@@ -411,13 +414,65 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
     - `cp <skill-path>/assets/mutate-changed.sh scripts/mutate-changed.sh`
     - `chmod +x scripts/*.sh`
     - Add to `.gitignore`: `.stryker-tmp/` and `reports/` (Stryker scratch + output dirs).
-14. Install the pre-commit hook (eight gates):
+14. Install the git hooks (eight-gate pre-commit + commit-msg):
     - `cp <skill-path>/assets/check-commit-size.sh scripts/check-commit-size.sh`
     - `cp <skill-path>/assets/check-package-json.sh scripts/check-package-json.sh`
     - `chmod +x scripts/check-commit-size.sh scripts/check-package-json.sh`
-    - `mkdir -p .githooks && cp <skill-path>/assets/pre-commit .githooks/pre-commit && chmod +x .githooks/pre-commit`
-    - `git config core.hooksPath .githooks`
+    - `mkdir -p .githooks`
+    - `cp <skill-path>/assets/pre-commit .githooks/pre-commit`
+    - `cp <skill-path>/assets/commit-msg .githooks/commit-msg` (Conventional Commits validator, hard rule 23 — dependency-free, no `package.json` change)
+    - `chmod +x .githooks/pre-commit .githooks/commit-msg`
+    - `git config core.hooksPath .githooks` (picks up both hooks)
     - Optional: `brew install gitleaks` (macOS) or grab a binary from `github.com/gitleaks/gitleaks/releases`. The hook degrades gracefully if missing.
-    - See `references/workflow.md` for the eight-gate breakdown and the no-bypass rule.
-15. Verify: `bun run lint`, `bun run typecheck`, `bun run coverage`, and `bun run mutate` all clean on a minimal `src/main.ts`. Run `bash scripts/check-package-json.sh` once to confirm no `"latest"` slipped in.
-16. Commit with Conventional Commits; from here, follow the Clean Architecture rules for every new feature.
+    - See `references/workflow.md` for the eight-gate breakdown, the commit-message format, and the no-bypass rule.
+15. Verify: `bun run lint`, `bun run typecheck`, `bun run coverage`, and `bun run mutate` all clean on a minimal `src/main.ts`. Run `bash scripts/check-package-json.sh` once to confirm no `"latest"` slipped in, and confirm the `commit-msg` hook rejects a junk message (`echo 'nope' | …` or just try a bad commit).
+16. Commit with Conventional Commits (`type(scope): subject`) — once the user confirms (rule 25); the `commit-msg` hook enforces the format. From here, follow the Clean Architecture rules for every new feature.
+
+## Containerization (optional)
+
+The atelier takes no position on deployment — `greenfield` scopes Docker out of repo-birth, and the canonical archetypes (CLIs, batch jobs, Firebase Admin jobs) ship as a `bun run`, not an image. This section exists only so that *if* you containerize, the image conforms instead of drifting. It is documentation, not a gate.
+
+A minimal, production-ready multi-stage build:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM oven/bun:1 AS base
+WORKDIR /usr/src/app
+
+# Production deps only, in a layer cached on the lockfile.
+FROM base AS install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# Final image: prod deps + source, run as the non-root `bun` user.
+FROM base AS release
+COPY --from=install /usr/src/app/node_modules node_modules
+COPY package.json ./
+COPY src/ src/
+USER bun
+ENTRYPOINT ["bun", "run", "src/main.ts"]
+```
+
+Four things keep it conforming — and they are exactly where a copied-from-a-blog Dockerfile drifts:
+
+- **Entry is `src/main.ts`**, never `src/index.ts` — the atelier's named entry (rule 5, `"module": "src/main.ts"`).
+- **Copy `bun.lock`, not `bun.lockb`** — Bun's lockfile is text now; the binary `bun.lockb` is legacy.
+- **No `EXPOSE`** for the CLI/batch archetype — it runs and `process.exit`s; there is no port to bind. Add `EXPOSE <port>` only for an actual server whose `src/main.ts` calls `Bun.serve`.
+- **No `bun run lint` or tests inside the build.** Quality is already owned by the eight pre-commit gates and CI; linting in the image duplicates the gate and couples building with checking. If you want a build-time backstop anyway, run `bun run lint:strict` (the full type-aware gate) rather than bare `bun run lint` (which runs only the fast non-type-aware rules — both already fail on warnings).
+
+Add a `.dockerignore` so the build context stays small and the image never ships local cruft:
+
+```
+node_modules
+.git
+coverage
+.stryker-tmp
+reports
+```
+
+Build and run a CLI image (argv in, process exits — no port mapping):
+
+```bash
+docker build -t my-app .
+docker run --rm my-app <args>
+```

@@ -1,6 +1,6 @@
 ---
 name: atelier
-description: Senior-engineer coding standard for Bun/TypeScript and Next.js repos. Enforces strict TDD (Red-Green-Refactor, primary-port SUT, hand-written fakes for secondary ports only — never `mock` from `bun:test`), Clean Architecture (`src/{domain,use-cases,infra,presenter,composition,test-helpers}`), `Result<T, E>` at every IO boundary, branded value objects at trust boundaries, SOLID via typed arrow functions, and a Bun-only toolchain (no `class`, no `function` declaration, no `interface`, no `console.*`, no `npm`/`pnpm`/`yarn`/`vite`). Backed by an eight-gate pre-commit hook, per-tier coverage thresholds, and Stryker mutation testing. Use for ANY code task in a Bun or Next.js repo — writing, editing, scaffolding, testing, refactoring, dependency changes, React components, scripts, linting, architecture, error handling, code review, debugging, security review. Consult even when the user does not mention conventions; rules are non-negotiable and violations must be rewritten.
+description: Senior-engineer coding standard for Bun/TypeScript and Next.js repos. Enforces strict TDD (Red-Green-Refactor, primary-port SUT, hand-written fakes — never `mock` from `bun:test`), Clean Architecture (`src/{domain,use-cases,infra,presenter,composition}`), `Result<T, E>` at IO boundaries, branded types at trust boundaries, a Bun-only toolchain (no `class`, no `function` declaration, no `interface`, no `console.*`, no npm/pnpm/yarn/vite), and Atomic Design — a logic-free design system (`src/components/{atoms,molecules,organisms}`) of stateless props-only components, styling sealed inside (no Tailwind in app code). Backed by an eight-gate pre-commit hook, coverage tiers, and Stryker mutation. Use for ANY code task in Bun or Next.js repos — writing, editing, scaffolding, testing, refactoring, React components, design-system work, linting, architecture, error handling, code review, debugging, security. Consult even when conventions are not mentioned; rules are non-negotiable and violations must be rewritten.
 ---
 
 # Atelier
@@ -23,9 +23,14 @@ Do not assume. Do not hide confusion. Surface tradeoffs.
 
 Before implementing:
 - State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them. Do not pick silently.
+- If multiple interpretations exist, present them — with the rough effort and tradeoff of each so the choice is informed. Do not pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what is confusing. Ask.
+
+When clarification is warranted (use judgment — trivial tasks do not need an interview), ask *well*:
+- **Answer your own questions first.** If the codebase can settle a question, explore it instead of asking — never ask what you could find out yourself.
+- **One question at a time, each led with your recommended answer** — so a clarification is a quick yes-or-correct, not homework handed back to the user.
+- **For a non-trivial plan or design, walk the decision tree one branch at a time**, resolving dependencies between decisions in order, rather than dumping every open question at once.
 
 ### 2. Simplicity first
 
@@ -38,6 +43,19 @@ Minimum code that solves the problem. Nothing speculative.
 - If you write 200 lines and it could be 50, rewrite it.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+**The lazy ladder — stop at the first rung that solves it.** Before writing code, walk these in order and stop as soon as one applies; the cheapest code is the code you never wrote:
+
+1. **Does it need to exist?** YAGNI — if nothing requires it, skip it.
+2. **Standard library / language feature?** Use it before hand-rolling.
+3. **Native runtime capability?** Reach for `Bun.file`/`Bun.write` (rule 20), `crypto.subtle`, `fetch`, `URL`, Web APIs before adding a dependency.
+4. **A dependency already in `package.json`?** Use it before `bun add`-ing another (rule 19).
+5. **One clear line?** Then one line.
+6. **Only then** write the minimum that works.
+
+Tiebreaker: when two stdlib options are equally sized, pick the edge-case-correct, more efficient one. Delete before adding; prefer boring over clever.
+
+**Simplicity is not negligence.** The ladder trims speculation, never safety. Never minimized: trust-boundary validation (branded value objects), `Result` error handling at IO boundaries, security (source-to-sink), accessibility in UI, and anything the user explicitly asked for. "No error handling for impossible scenarios" means skip the *impossible* cases — not the real failure modes that branded types and `Result` exist to capture. See `references/complexity.md` (The lazy ladder).
 
 ### 3. Surgical changes
 
@@ -94,6 +112,8 @@ The bar is "would a new contributor cloning this repo today get the same picture
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, fewer "wait, the README says X but the code does Y" follow-ups, and clarifying questions come before implementation rather than after mistakes.
 
+See `references/behavioural-examples.md` for before/after worked examples of each guideline in this repo's idiom — over-abstraction vs one function, drive-by vs surgical edit, vague vs verifiable plan.
+
 ## Lessons (memory across sessions)
 
 The repo may contain two append-only journals: `.claude/LESSONS.md` (committed, team-shared) and `.claude/lessons.local.md` (gitignored, personal). Both follow the same strict format.
@@ -110,7 +130,7 @@ See `references/lessons.md` for the entry format, extraction heuristics, routing
 1. **No `class` keyword.** Anywhere. Value objects, entities, services, strategies, decorators, observers, factories: all expressed as modules of arrow functions and typed records. See the translation catalogue below and in `references/design-patterns.md`.
 2. **No `function` declarations.** Always `export const fn = (...) => {...}`. Enforced by `func-style: ['error', 'expression']`.
 3. **No `interface`.** Always `type Foo = {...}`. Enforced by `@typescript-eslint/consistent-type-definitions: ['error', 'type']`.
-4. **No `console.*`.** Use the injected `Logger` port (`src/use-cases/ports/logger.ts`); the production adapter is Winston-backed (`src/infra/logger.ts`). Enforced by the `no-console` ESLint rule.
+4. **No `console.*`.** Use the injected `Logger` port (`src/use-cases/ports/logger.ts`); the production adapter is Winston-backed (`src/infra/logger.ts`). Enforced by the `no-console` ESLint rule in both variant configs. *Next.js exception:* the React boundary and static export make constructor injection impractical across client components, so that variant sanctions exactly one module singleton, `src/lib/utils/logger.ts` (see `references/nextjs-monorepo.md`). Everywhere else a module-level logger stays banned.
 5. **Bun only.** Never `npm`, `pnpm`, `yarn`, `node`, or `vite` directly. Install with `bun install`. Run with `bun run` / `bunx`. Execute with `bun run src/main.ts`.
 6. **Explicit return types on every exported function.** Enforced by `@typescript-eslint/explicit-function-return-type`.
 7. **Type-only imports on their own line.** `import type { Foo } from './foo';`.
@@ -119,12 +139,12 @@ See `references/lessons.md` for the entry format, extraction heuristics, routing
 10. **No custom error classes.** Plain `Error` only. Narrow `unknown` before reading `.message`.
 11. **No production code without a failing test.** See the TDD section below.
 12. **Brand at trust boundaries; pass through inside one.** Wrap every domain primitive that crosses a **trust boundary** or feeds a **dangerous sink** in a branded type with a validating factory: tokens, secrets, URLs that reach `fetch`, paths that reach the filesystem, HTML that reaches the DOM, env-var values, money amounts, emails, phone numbers, ISO codes, IDs whose validity is enforced (e.g. UUID-shaped). The factory is the validation gate; once a value has type `Email`, downstream code trusts it. Inside a single trust boundary — e.g. a CLI where the user has already provided every argument through a validated Zod schema — IDs that are slotted directly into a URL template **may** stay as plain `string`; minting one branded type per Graph-API ID gives ceremony without security value when the only "source" is the user's own terminal. The test: would interpolating this value into a sink without a checkpoint create an exploitable category? If yes, brand. If no (the value already crossed a checkpoint upstream and is now traveling inside a single trust zone), a plain `string` is honest and lighter. See the Value Objects section below and `references/security.md`.
-13. **No `mock` from `bun:test` — the entire namespace.** `mock()`, `mock.module()`, `.toHaveBeenCalled*` — all banned. Enforced by `no-restricted-imports` in `eslint.config.js`. Reason: `mock.module` is **process-global, not file-scoped** — once set in any test file, every subsequent file the runner loads sees the substitution and unrelated tests break silently. `mock()` needs `mock.restore()` discipline that is easy to forget. Both are unnecessary when production code is designed for testability. Every infra adapter that wraps a third-party SDK **must** expose two constructors from day one: `createX(realDeps)` for production wiring, and `createXFromApi(api: XApi)` where `XApi` is a minimal type slice of **the SDK's real surface** — the actual methods the adapter calls, with the SDK's actual parameter shapes. **Anti-pattern: `XApi` shaped like the port itself.** If `XApi` is `{ acquireToken; close }` and the port is also `{ acquireToken; close }`, then `createXFromApi` is a one-line pass-through and `createX` is still untestable — you've moved the seam to the wrong place. The correct slice for a Playwright adapter is `{ launchPersistentContext(...) }` (the Playwright surface), not `{ acquireToken(...) }` (the port surface). The seam belongs on the SDK side, not the port side. Tests import `createXFromApi` and pass an in-memory object that satisfies the SDK slice. For `globalThis.fetch` adapters, use `installFetchMock` from `assets/fetch-mock.ts` — its swap is per-test via `afterEach().restore()`, not process-global. See `references/testing.md`, `references/testing-infra.md` (XApi-as-port-clone anti-pattern), and `references/workflow.md`.
+13. **No `mock` from `bun:test` — the entire namespace.** `mock()`, `mock.module()`, `.toHaveBeenCalled*` — all banned. Enforced by `no-restricted-imports` in the ESLint config. Reason: `mock.module` is **process-global, not file-scoped** — once set in any test file, every subsequent file the runner loads sees the substitution and unrelated tests break silently. `mock()` needs `mock.restore()` discipline that is easy to forget. Both are unnecessary when production code is designed for testability. Every infra adapter **must** expose a test seam from day one — one of the three patterns in `references/testing-infra.md`: custom-fetch DI, the two-constructor pair, or sync-builder export. For adapters wrapping a third-party SDK the default seam is the two-constructor pair: `createX(realDeps)` for production wiring, and `createXFromApi(api: XApi)` where `XApi` is a minimal type slice of **the SDK's real surface** — the actual methods the adapter calls, with the SDK's actual parameter shapes. **Anti-pattern: `XApi` shaped like the port itself.** If `XApi` is `{ acquireToken; close }` and the port is also `{ acquireToken; close }`, then `createXFromApi` is a one-line pass-through and `createX` is still untestable — you've moved the seam to the wrong place. The correct slice for a Playwright adapter is `{ launchPersistentContext(...) }` (the Playwright surface), not `{ acquireToken(...) }` (the port surface). The seam belongs on the SDK side, not the port side. Tests import `createXFromApi` and pass an in-memory object that satisfies the SDK slice. For `globalThis.fetch` adapters, use `installFetchMock` from `assets/fetch-mock.ts` — its swap is per-test via `afterEach().restore()`, not process-global. See `references/testing.md`, `references/testing-infra.md` (XApi-as-port-clone anti-pattern), and `references/workflow.md`.
 14. **Outside-in classicist TDD.** The System Under Test is the **primary port** (use case, command handler, application service), never an individual entity, value object, or domain service. Entities, value objects, and domain services are used **real** in tests. Only **secondary ports** (repository, email sender, clock, token decoder) get hand-written fakes. Every test name describes a complete business scenario in domain language. This keeps the domain free to refactor without breaking tests. Inspired by Ian Cooper's *TDD, Where Did It All Go Wrong?*. See `references/tdd.md`.
-15. **Zero lint warnings; no inline ignores, ever.** `bun run lint` fails on warnings, not only errors. Two acceptable ways to clear a finding: refactor the code so the rule stops firing, or change the rule's severity at the project level in `eslint.config.js` with a comment explaining why. Never `// eslint-disable*`, `// @ts-ignore`, `// @ts-expect-error`, `// snyk-ignore`, `// deepcode ignore`, `// sonar-ignore`, or any equivalent from another tool. See `references/workflow.md`.
+15. **Zero lint warnings; no inline ignores, ever.** `bun run lint` fails on warnings, not only errors. Two acceptable ways to clear a finding: refactor the code so the rule stops firing, or change the rule's severity at the project level in the ESLint config with a comment explaining why. Never `// eslint-disable*`, `// @ts-ignore`, `// @ts-expect-error`, `// snyk-ignore`, `// deepcode ignore`, `// sonar-ignore`, or any equivalent from another tool. See `references/workflow.md`.
 16. **`Result<T, E>` at IO boundaries.** Every port that crosses an IO boundary returns `Promise<Result<T, PortError>>` where `PortError` is a discriminated union. Every use-case returns `Promise<Result<Summary, StepError>>`. Thrown exceptions are reserved for programmer bugs; `main.ts` catches them and reports "crashed (unexpected)". See `references/result-type.md`.
-17. **`try/catch` is quarantined.** Allowed only in `src/infra/**` (adapters translate thrown library errors into `Result` errs), in pure-domain fallbacks for native-synchronous throwers (e.g. `JSON.parse`, `URL` constructor, `Buffer.from(b64).toString()`, `decodeURIComponent`, `BigInt(...)`, `new Date(invalid).toISOString()` — the list is illustrative, not exhaustive: any built-in that throws on bad input qualifies if the call sits in pure domain code and the catch returns a `Result`), and exactly once in `src/main.ts` for genuinely unexpected crashes. Zero `try/catch` inside `src/use-cases/**` — pattern-match on `Result.ok` instead.
-18. **No curried arrow chains.** Never `const f = (a) => (b) => { ... }`. Use a single arrow with all parameters and wrap at the call site: `const compareByPriority = (a: X, b: X, target: number) => { ... }` then `arr.sort((a, b) => compareByPriority(a, b, t))`. Curried chains cause Prettier/TS-formatter fights and obscure the signature.
+17. **`try/catch` is quarantined.** Allowed only in `src/infra/**` (adapters translate thrown library errors into `Result` errs), in pure-domain fallbacks for native-synchronous throwers (e.g. `JSON.parse`, `URL` constructor, `Buffer.from(b64).toString()`, `decodeURIComponent`, `BigInt(...)`, `new Date(invalid).toISOString()` — the list is illustrative, not exhaustive: any built-in that throws on bad input qualifies if the call sits in pure domain code and the catch returns a `Result`), and exactly once in `src/main.ts` for genuinely unexpected crashes. Zero `try/catch` inside `src/use-cases/**` — pattern-match on `Result.ok` instead. `*.test.ts` files and `src/test-helpers/**` sit outside the quarantine — test code may catch (e.g. the `captureRejection` helper), mirroring rule 20's test carve-out.
+18. **No curried arrow chains.** Never `const f = (a) => (b) => { ... }`. Use a single arrow with all parameters and wrap at the call site: `const compareByPriority = (a: X, b: X, target: number) => { ... }` then `arr.sort((a, b) => compareByPriority(a, b, t))`. Curried chains cause Prettier/TS-formatter fights and obscure the signature. *Exemption — DI factories:* `const createX = (deps: Deps): PortType => async (input) => { ... }` is sanctioned. The outer call runs once at composition, and the inner arrow IS the port function the type names — that is closure over dependencies, not currying on a call path.
 19. **No `"latest"` or `"*"` in `package.json`.** Every entry under `dependencies`, `devDependencies`, and `peerDependencies` declares a concrete version (`^X.Y.Z`, `~X.Y.Z`, `X.Y.Z`, or a real range). Add new packages with `bun add <pkg>` (runtime) or `bun add -d <pkg>` (dev) — Bun resolves the actual latest version at install time and writes it as `^X.Y.Z`. Never hand-edit `package.json` to insert `"latest"` or `"*"`. Reason: `"latest"` is non-deterministic — `bun install` on different days produces different `node_modules/` trees; the lockfile only partially mitigates it, and the literal string semantically signals "always upgrade", which is a silent-break footgun. To intentionally bump every dep to the current latest, run `bun update` (which rewrites `^X.Y.Z` ranges to the latest matching version) and commit the lockfile change. Enforced by `scripts/check-package-json.sh` in pre-commit gate 2.
 20. **Bun file API in production; `node:fs` only in tests and at directory boundaries; `node:path` anywhere.** All **file** IO in `src/**` production code goes through the Bun file API:
 
@@ -143,11 +163,21 @@ See `references/lessons.md` for the entry format, extraction heuristics, routing
 
     Reason: keeping file IO on `Bun.file` is faster, has zero `import` ceremony, fits the `try/catch`-quarantine-in-`infra/**` pattern cleanly, and lets the project disable `security/detect-non-literal-fs-filename` at the lint level without losing real coverage (the rule does not watch `Bun.file`). See `references/result-type.md`, `references/testing-infra.md` (filesystem patterns), `references/workflow.md` (lint-rule rationale).
 
+21. **The design system is independent and logic-free.** In React/Next.js repos, everything under `src/components/{atoms,molecules,organisms}` is a stateless `const` arrow component: props in, JSX out. No hooks of any kind (`useState`, `useEffect`, `useContext`, …), no data fetching, no translation lookups, no `'use client'`, no imports from `src/lib/**`, `src/config/**`, `app/**`, or framework modules (`next/link`, `next/image`) — the only imports are `react` and lower design-system layers, strictly upward (atoms → molecules → organisms). Interactivity: native HTML first (`<details>`, CSS states), then state hoisted to props (`isOpen`/`onToggle`); the state itself lives in `src/lib/hooks/` and is wired by page shells in `src/page/`. Links and images are injected as `ComponentType<...>` props built in `src/lib/layout/wrappers.tsx`. The test: every component renders in Storybook with hardcoded props alone. See `references/atomic-design.md`.
+
+22. **Styling is sealed inside the design system — the app never sees Tailwind.** The mirror image of rule 21. Utility classes exist only under `src/components/**`; design tokens live in `app/globals.css` (Tailwind v4 CSS-first config). `app/**` routes, `src/page/**` shells, `src/lib/**`, and `src/config/**` never contain a class string: page shells stack organisms in a bare `<main>`, and each organism owns its own section spacing. Molecules and organisms expose typed variant props (`variant`, `size`, `tone`), never free-form `className`/`style`; only leaf atoms (icons and similar primitives) accept `className`, and only from design-system parents. If something needs styling, it *is* a design-system component. Two tests: a rebrand touches only `src/components/**` + `globals.css`; swapping the styling engine leaves the app byte-identical. See `references/atomic-design.md`.
+
+23. **Conventional Commits, enforced by a hook — not by goodwill.** Every commit message is `type(optional-scope)!: subject` with a type from the standard set (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`), an optional lowercase scope, an optional `!` for breaking changes, a non-empty subject with no trailing period, and a header ≤100 chars. This is the project changelog and the `git bisect` surface; a soft convention drifts, so a `commit-msg` hook validates it on every commit and rejects the rest. Enforcement is wired per variant: the Bun-script variant installs the dependency-free `assets/commit-msg` validator into `.githooks/` (alongside the eight-gate `pre-commit`, both picked up by `core.hooksPath`); the Next.js monorepo enforces the identical grammar through `@commitlint/config-conventional` as a `simple-git-hooks` `commit-msg` step. The `commit-msg` hook is distinct from the eight pre-commit gates — it fires on the message, not the staged diff. See `references/workflow.md` (Commit message format).
+
+24. **Never touch a test without explicit user confirmation.** Test files (`*.test.ts`; the project convention is `*.test.ts`, but `*.spec.ts` is covered too if a repo uses it) are confirmation-gated. Do not create, edit, rename, move, delete, skip (`.skip`, `.only`, `xfail`), or weaken (loosen an assertion, change an expected value, comment out a case) **any** test without first showing the user the exact test or diff and getting an explicit yes. Tests are the contract and the safety net; silently editing a failing test to make it pass, or deleting an inconvenient one, is the most dangerous move an agent makes — it disables the very check that catches regressions. This holds even under TDD (rule 11): the loop stays test-first, but the Red step becomes *propose the failing test → get confirmation → then write it*. When a test fails, the default is to fix the production code; changing the test is a last resort that needs the user's sign-off and a one-line reason. If asked to "just make the tests pass", never weaken them silently — surface the conflict and ask. The same applies to a change in `src/test-helpers/**` that would alter what existing tests assert. (Behavioural gate, like rule 11 — not lint-enforced; the discipline is the enforcement.)
+
+25. **Never commit or push on your own initiative — confirm with the user first.** Producing and staging the change is the agent's job; deciding to commit it is the user's. Even when the tree is green, even when a commit is the obvious next step, even mid-flow: stop, show what would be committed (the staged-diff summary and a proposed Conventional-Commits message), and wait for an explicit yes before running `git commit` — same for `git push`. Do not infer "commit" from a general "do it" / "go ahead" on the task; the commit needs its own confirmation. An explicit "commit and push X" *is* that confirmation; silence is not. This complements rule 23 (the message *format*) and rule 24 (tests) — rule 25 governs *when* a commit happens: only on the user's say-so. (Behavioural gate, like rules 11 and 24 — the discipline is the enforcement.)
+
 ## The TDD process (non-negotiable - every feature)
 
-Red-Green-Refactor is the only loop:
+Red-Green-Refactor is the only loop — with the test boundary confirmation-gated (rule 24):
 
-1. **RED.** Write a failing test. Concrete example, domain language. Tests go in `*.test.ts` next to source. Runner: `bun test`.
+1. **RED.** Propose a failing test — concrete example, domain language — and get the user's confirmation before writing it to `*.test.ts` next to source. Once confirmed, write it and watch it fail. Runner: `bun test`.
 2. **GREEN.** Write the simplest arrow-function code that makes it pass. "Fake it" (hardcoded return) is a valid first step.
 3. **REFACTOR.** Remove duplication (Rule of Three, wait for the third occurrence), improve names, extract functions, promote primitives to branded types.
 
@@ -158,6 +188,8 @@ Red-Green-Refactor is the only loop:
 
 **What is the unit?** A unit is a **behaviour**, not a function. The test targets the primary port (use case, command handler, application service). Inside the port, every domain collaborator runs for real. The only test doubles are hand-written fakes for secondary ports (repository, email sender, clock, token decoder). This is Outside-in classicist TDD (Ian Cooper). See `references/tdd.md` for the full treatment.
 
+**Test the code you own; trust your dependencies.** Never write a test whose real assertion is that a third-party library, the runtime, or the framework behaves as documented — pin your own behaviour, not someone else's contract. This is why adapters test their *translation* of an SDK (not the SDK), SDK-bridge lines are coverage-exempt, domain pieces are exercised through the port rather than tested in isolation, and prop-pure design-system components carry no unit tests at all. See `references/testing.md` (Test the code you own).
+
 **Test naming.** Every test describes a complete business scenario in domain language. Not the name of a function.
 
 - Bad: `'getDiscount returns 20 when tier is premium'`
@@ -165,7 +197,9 @@ Red-Green-Refactor is the only loop:
 
 **Test structure.** Arrange-Act-Assert. When stuck, write backwards: Assert first, then Act, then Arrange.
 
-When the user asks for a feature without mentioning tests, write the test first anyway and state briefly that you are doing so. If they ask you to skip tests, do not comply silently. Ask why, and offer to proceed with TDD or at minimum add the characterisation tests that pin current behaviour.
+When the user asks for a feature without mentioning tests, still go test-first — but propose the test and get confirmation before writing it (rule 24), stating briefly that you are doing so. If they ask you to skip tests, do not comply silently. Ask why, and offer to proceed with TDD or at minimum add the characterisation tests that pin current behaviour. Modifying or deleting an existing test is never silent — show the change and wait for an explicit yes.
+
+**Next.js variant scope.** The loop applies to logic — `src/lib/**` and `src/config/**` (path helpers, i18n, SEO builders, config factories, hook internals extracted as pure functions). Design-system components contain nothing unit-testable by design (rule 21 makes them prop→JSX maps); they are verified by the design-system lint block and review, not by tests. See the variant matrix below and `references/nextjs-monorepo.md` (Testing).
 
 See `references/tdd.md` and `references/testing.md`.
 
@@ -258,6 +292,19 @@ See `references/complexity.md`, `references/code-smells.md`.
 
 See `references/architecture.md`.
 
+## UI architecture: Atomic Design (React/Next.js repos)
+
+The UI is two worlds with a hard wall between them (hard rules 21–22):
+
+- **The design system** — `src/components/{atoms,molecules,organisms}`. Stateless, props-only, logic-free presentational components. Imports point strictly upward (atoms → molecules → organisms) and never leave the design system; the only external import is `react`. No hooks, no fetching, no i18n, no `next/*`.
+- **The application** — `src/page/` page shells own all state (hooks from `src/lib/hooks/`), resolve translations and config (`src/config/`, `data/translations/`), build framework wrappers (`src/lib/layout/wrappers.tsx` is the only place importing `next/link`/`next/image`), and hand everything to the design system as props: display strings, `isOpen` + `onToggle` pairs, injected `ComponentType` link/image components.
+
+The wall is two-way. No application knowledge enters the design system — and no styling knowledge leaves it. Tailwind utilities appear only under `src/components/**` (tokens in `app/globals.css`); routes, page shells, lib, and config never carry a class string, and component APIs expose typed variants instead of `className`. The app does not know Tailwind exists.
+
+Interactivity climbs a ladder: native HTML (`<details>`/`<summary>`, CSS `group-open:`) → hoisted state via props → a hook in `src/lib/hooks/` consumed by the page shell. Never a hook inside a component.
+
+Read `references/atomic-design.md` before touching `src/components/**`, `src/page/**`, or `src/lib/{hooks,layout}/**` — it has the layer table, component anatomy, the injection pattern, the data-flow wiring, and the "where does it go?" decision table.
+
 ## Security
 
 Security is a data-flow property: an untrusted **source** must cross a validating **checkpoint** before reaching a sensitive **sink**. The checkpoint is always a branded type with a validating factory. The pattern is the same as for domain primitives (Email, Money) — just extended to security-sensitive ones (`SafeUrl`, `SanitizedHtml`, `EnvVar`, `SafePath`).
@@ -281,7 +328,7 @@ If all four are true, the design is good enough. Stop polishing.
 
 ## Project type (pick the right variant reference)
 
-**Next.js monorepo** (read `references/nextjs-monorepo.md`) if:
+**Next.js monorepo** (read `references/nextjs-monorepo.md`; for any work on components, pages, or UI sections also read `references/atomic-design.md`) if:
 - `packages/*` with Bun workspaces at the root, or
 - `next.config.ts` in a package, or
 - `app/(en)/`, `app/(fr)/` route groups, or
@@ -294,22 +341,40 @@ If all four are true, the design is good enough. Stop polishing.
 
 If the repo is brand-new, ask which variant the user wants before scaffolding.
 
+### What applies where
+
+The hard rules are universal unless this table says otherwise. Gates and tooling differ by variant:
+
+| Concern | Bun script repo | Next.js monorepo |
+|:---|:---|:---|
+| TDD + `bun test` | Everything (rule 11, full loop) | `src/lib/**` + `src/config/**` logic; design-system components are prop-pure (rule 21) — lint + review, not unit tests |
+| Coverage tiers (`check-coverage.ts`) | Yes — 100/100/80 | No |
+| Stryker mutation | Yes — gates `mutate:staged`/`mutate:changed` | No |
+| Pre-commit | Eight-gate `.githooks/pre-commit` | `simple-git-hooks`: test + lint + commitlint — never install both hook mechanisms |
+| Commit message (rule 23) | `commit-msg` hook: shipped `assets/commit-msg` validator (zero deps) | `commit-msg` hook: `@commitlint/config-conventional` via `simple-git-hooks` — same grammar |
+| Logger | `Logger` port + `src/infra` adapter (rule 4) | Sanctioned singleton `src/lib/utils/logger.ts` (rule 4 exception) |
+| `Result<T, E>` (rule 16) | Every IO port | `src/lib/**` runtime IO; build-time data loaders may throw — a loud failed build is the desired outcome |
+| Mock ban (rule 13) | `no-restricted-imports` in ESLint config | Same rule, added with the test setup |
+| Rules 21–22 (design system, styling seal) | n/a (no UI) | Mandatory, lint-enforced (design-system ESLint block) |
+
 ## Reference files
 
 Toolchain:
-- `references/nextjs-monorepo.md` | Next.js 16 + Atomic Design + Tailwind v4 + i18n route groups + static export.
-- `references/bun-typescript.md` | Bun-script repo bootstrap: tsconfig, ESLint flat config (SonarJS + type-aware rules + `no-restricted-imports`), Logger port + Winston adapter, secrets discipline, full bootstrap checklist with asset copy steps.
+- `references/nextjs-monorepo.md` | Next.js 16 + Tailwind v4 + i18n route groups + static export.
+- `references/atomic-design.md` | the logic-free design system: atoms/molecules/organisms layer rules, stateless props-only components, interactivity ladder (native HTML → hoisted state → `src/lib/hooks`), injected link/image wrappers, page-shell wiring, "where does it go?" table.
+- `references/bun-typescript.md` | Bun-script repo bootstrap: tsconfig, ESLint flat config (SonarJS + type-aware rules + `no-restricted-imports`), Logger port + Winston adapter, secrets discipline, full bootstrap checklist with asset copy steps, optional containerization Dockerfile.
 
 Engineering:
 - `references/tdd.md` | Red-Green-Refactor, Three Laws, triangulation, transformation priority, writing tests backwards, why we use fakes not mocks.
-- `references/testing.md` | Outside-in classicist school, primary-port SUT, fakes (with error-injection knob), the absolute no-`mock`-from-`bun:test` rule, test builders, contract tests, common mistakes.
+- `references/testing.md` | Outside-in classicist school, primary-port SUT, the test-the-code-you-own principle (trust your dependencies), fakes (with error-injection knob), the absolute no-`mock`-from-`bun:test` rule, test builders, contract tests, common mistakes.
 - `references/testing-infra.md` | three patterns for infra-adapter tests (custom-fetch DI / two-constructor / sync-builder export), production-wiring smoke test, `installFetchMock`, global-swap pattern, FS chmod tricks, ordering gotchas.
 - `references/solid-principles.md` | SRP, OCP, LSP, ISP, DIP expressed as typed records and function contracts.
 - `references/clean-code.md` | naming priorities, object calisthenics translated to a class-free world, comments, formatting, storytelling.
 - `references/object-design.md` | RDD, stereotypes, tell-don't-ask, value objects vs entities, aggregates, polymorphism via dispatch.
 - `references/code-smells.md` | detection catalogue and the refactorings that clean each smell.
-- `references/complexity.md` | essential vs accidental complexity, YAGNI, DRY + Rule of Three, KISS, four elements.
-- `references/architecture.md` | vertical slices, dependency rule, hexagonal and clean architecture, walking skeleton.
+- `references/complexity.md` | essential vs accidental complexity, YAGNI, the lazy ladder (stop at the first rung), KISS, DRY + Rule of Three, four elements.
+- `references/behavioural-examples.md` | before/after worked examples (in this repo's idiom) for the four Behavioural Guidelines: think-before-coding, simplicity, surgical changes, goal-driven execution; anti-pattern table.
+- `references/architecture.md` | vertical slices, dependency rule, hexagonal and clean architecture, walking skeleton, inbound HTTP server archetype.
 - `references/design-patterns.md` | full GoF catalogue rewritten as modules of arrow functions.
 - `references/class-to-module.md` | translation table for OO patterns (value object, interface, service, strategy, factory, decorator, observer, command, entity) in this class-free style.
 
@@ -328,21 +393,22 @@ Process:
 0. Read `.claude/LESSONS.md` and `.claude/lessons.local.md` if they exist. Apply any relevant past lessons silently.
 1. Identify the variant. Read the matching variant reference.
 2. Identify the feature. If non-trivial, skim `references/architecture.md`.
-3. Write a failing test in `*.test.ts` with a concrete example name.
+3. Propose a failing test in `*.test.ts` with a concrete example name; get the user's confirmation before writing it, and never modify or delete an existing test without explicit sign-off (rule 24).
 4. Write the simplest arrow-function code to make it green.
 5. Refactor. Apply object calisthenics. Promote primitives to branded types. Extract on Rule of Three.
 6. Never emit `class`, `function` declaration, `interface`, `console.*`, or `npm/pnpm/yarn/node/vite`. Refuse and rewrite.
 7. Any new dependency uses `bun add` / `bun add -d`.
 8. Any logging goes through `deps.logger` (the `Logger` port). Never `console.*`, never a module-level singleton.
-9. Any commit message uses Conventional Commits.
-10. If legacy code in the repo uses a forbidden pattern, match the local style in that file only. Flag the drift once and offer to refactor.
-11. At session wrap-up, scan for `[mistake]`, `[decision]`, `[gotcha]` entries worth capturing. Propose a candidate list and append on approval. See `references/lessons.md`.
+9. Any commit message follows Conventional Commits — `type(scope)!: subject`, validated by the `commit-msg` hook (hard rule 23). Write it that way the first time; do not lean on `--no-verify`.
+10. Work trunk-based: commit to `main` in small green increments (≤10 files / ≤300 lines per gate 1), not onto long-lived feature branches. Every commit keeps `main` releasable — that is what the pre-commit gates guarantee. Hide unfinished work behind a flag, not a branch. This is the default and overrides any "branch first" habit. See `references/workflow.md` (Trunk-based development).
+11. If legacy code in the repo uses a forbidden pattern, match the local style in that file only. Flag the drift once and offer to refactor.
+12. At session wrap-up, scan for `[mistake]`, `[decision]`, `[gotcha]` entries worth capturing. Propose a candidate list and append on approval. See `references/lessons.md`.
 
 ## Pre-code checklist
 
 1. Do I understand the requirement? Write acceptance criteria.
 2. What is the first failing test? (domain-language name, concrete example)
-3. What is the simplest solution?
+3. What is the simplest solution? Walk the lazy ladder (Behavioural Guideline #2) — skip it / stdlib / native runtime / existing dep / one line / minimal custom, in that order.
 4. Am I solving a real need or a hypothetical one?
 
 ## During-code checklist
@@ -351,17 +417,17 @@ Process:
 2. Does this module have one reason to change?
 3. Am I depending on function-type contracts, not concretions?
 4. Is there duplication I should extract? (Rule of Three, not before)
-5. Did I write the test first?
+5. Did I write the test first — proposed and confirmed before writing, never silently changed (rule 24)?
 
 ## Post-code checklist
 
-Inner-loop checks (run after every code change):
+Inner-loop checks 1–4 run after every code change; check 5 runs before staging (Bun variant — see the variant matrix for what applies in a Next.js repo):
 
 1. `bun test` — passes.
 2. `bun run lint` — 0 errors AND 0 warnings. No inline ignores added.
 3. `bun run typecheck` — `tsc --noEmit`, clean.
 4. `bun run coverage` — 100% on `src/domain/**` and `src/use-cases/**`, 80% on `composition` + `infra` + `presenter`.
-5. `bun run mutate:changed` — staged-and-changed domain/use-case files score ≥90% mutation. Pre-commit will run `mutate:staged` automatically; running `mutate:changed` during iteration catches surviving mutants before they reach the gate.
+5. Before staging (not after every edit — it costs 1–3 min per file): `bun run mutate:changed` — domain/use-case files score ≥90% mutation. The pre-commit gate runs `mutate:staged` regardless; running `mutate:changed` earlier catches surviving mutants sooner.
 
 Then review:
 
@@ -391,9 +457,11 @@ The pre-commit hook runs **eight gates** in order: commit size → package.json 
 - Passing raw strings or numbers for domain concepts instead of branded types.
 - Untrusted input reaching a sensitive sink (SQL, shell, filesystem, HTTP, HTML, redirect) without a branded-type checkpoint between them.
 - A secret (token, password, API key, PII) interpolated into a log line, or placed in a `NEXT_PUBLIC_*` env var.
+- Creating, editing, deleting, renaming, or skipping a test file — or weakening an assertion, changing an expected value, or commenting out a case — without first showing the user and getting an explicit yes (rule 24). Weakening a failing test to go green instead of fixing the code is the worst of these; the default for a red test is to fix production code.
+- Running `git commit` or `git push` without the user's explicit confirmation (rule 25). Staging and proposing the commit is the agent's role; pulling the trigger is the user's. "Do it" on a task is not commit approval — show the proposed commit and ask.
 - Importing anything from the `mock` namespace of `bun:test` — `mock()`, `mock.module()` — or asserting on `.toHaveBeenCalled*`. Write a fake, or expose a `createXFromApi(api)` factory the test can feed an in-memory object. Enforced by `no-restricted-imports`.
-- An infra adapter exported as a single `createX(realDeps)` with no matching `createXFromApi(api: XApi)` factory. Without the seam, someone will reach for `mock.module` on the next test. Expose the testable constructor from day one, even before the first test exists.
-- Adding a new `src/infra/*.ts` or `src/composition/*.ts` file without a matching side-effect import in `scripts/coverage-preload.ts`. Untested infra files are invisible to `bun test --coverage` unless something imports them; the preload makes them appear at 0% so the gate can fail loudly.
+- An infra adapter exported with no test seam at all — no custom-fetch DI, no `createXFromApi(api: XApi)` factory, no sync-builder export (`references/testing-infra.md`). Without a seam, someone will reach for `mock.module` on the next test. Expose one from day one, even before the first test exists.
+- Adding a new `src/infra/*.ts`, `src/composition/*.ts`, or `src/presenter/*.ts` file without a matching side-effect import in `scripts/coverage-preload.ts`. Untested infra files are invisible to `bun test --coverage` unless something imports them; the preload makes them appear at 0% so the gate can fail loudly.
 - `coverageThreshold` set in `bunfig.toml` while a per-tier script owns enforcement. Bun exits non-zero on the global threshold before the script can print per-file violations — looks like "coverage failed silently". Remove the global threshold; let the script own it.
 - An inline suppression of any tool: `// eslint-disable*`, `// @ts-ignore`, `// @ts-expect-error`, `// snyk-ignore`, `// sonar-ignore`, `// deepcode ignore`, `// istanbul ignore`. Refactor, or change rule severity at the project level.
 - `try/catch` anywhere outside `src/infra/**`, `src/main.ts`, or a pure-domain native-API fallback (`JSON.parse`, `URL`). Use-cases must pattern-match on `Result.ok`.
@@ -406,11 +474,18 @@ The pre-commit hook runs **eight gates** in order: commit size → package.json 
 - Domain-specific data (brand lists, flow slugs, tier rates, tenant names) hardcoded as string-literal unions or records in framework code. Drive from env or config files; keep the framework generic.
 - A per-file exclusion in `stryker.conf.json` for "the tests are awkward". Skip lists rot. The only structural exclusions are `**/*.test.ts` and `**/ports/**`. If a file produces equivalent or flaky mutants, tighten the test or refactor the production code — never add it to a skip list.
 - A commit exceeding 10 files OR 300 lines (insertions + deletions) without a clear big-bang justification (initial scaffold, mass-rename, generated files). Split into smaller coherent slices. The pre-commit gate enforces this; do not normalise `--no-verify`.
+- A commit message that is not Conventional Commits — no `type:` prefix, an unlisted type (`wip:`, `update:`), a capitalised type, a trailing period, or a >100-char header. The `commit-msg` hook rejects these (hard rule 23); write `type(scope): subject` the first time rather than reaching for `--no-verify`. A repo with the eight-gate `pre-commit` installed but no `commit-msg` hook is half-protected — wire both.
 - A composition root or wiring file declared "untestable" and skipped. The two ergonomic switches make any composition file 100%-testable: parameterise every state-source (path, env var, clock) and inject every output sink (logger, sender). See `references/architecture.md` (Composition root testability).
 - A `"latest"` or `"*"` version string anywhere in `package.json`. Use `bun add <pkg>` so the version pins to `^X.Y.Z` at install time. To bump deliberately, run `bun update` and commit the lockfile change in the same commit. Enforced by `scripts/check-package-json.sh` (pre-commit gate 2).
 - Closing a session (or declaring a task done) with non-README files modified but the README un-audited. The README is part of the change set — re-read it, update what drifted, or state in one sentence that nothing user-visible changed. See Behavioural Guideline #5.
 - A `node:fs` import (`readFile`, `writeFile`, `readFileSync`, `fs/promises`, etc.) in any file under `src/**` that is not a `*.test.ts`, under `src/test-helpers/**`, or a single isolated directory-boundary helper in `src/infra/**` documented with a one-line comment. Production file IO uses `Bun.file` / `Bun.write`. Hard rule 20.
 - An assignment to `process.env.X = ...` anywhere outside `*.test.ts` (and even there, only inside `beforeAll`/`afterAll` with a saved-and-restored original). `process.env` is shared mutable state — pass values as parameters instead. See the Security section.
+- A hook call (`useState`, `useEffect`, any `use*`) inside `src/components/**`. State is hoisted: native HTML first, then `isOpen`/`onToggle` props wired by the page shell from a hook in `src/lib/hooks/`. Hard rule 21.
+- An import of `src/lib/**`, `src/config/**`, `next/link`, or `next/image` anywhere under `src/components/**`. Links and images arrive as injected `ComponentType` props built in `src/lib/layout/wrappers.tsx`.
+- A design-system component that resolves translations, reads `process.env`, fetches data, or carries `'use client'`. Display strings and data arrive as props; the client boundary belongs to the page shell.
+- A downward import in the design system: an atom importing a molecule, or a molecule importing an organism. Imports point strictly upward.
+- A Tailwind utility string in `app/**` (anywhere but `globals.css`), `src/page/**`, `src/lib/**`, or `src/config/**`. Styling is sealed in the design system; the app never sees Tailwind. Hard rule 22.
+- A molecule or organism exposing free-form `className`/`style` in its public props, or a page shell passing one in. Visual variation is a typed variant prop — add the variant to the component.
 
 ## Remember
 
@@ -419,3 +494,5 @@ Code exists to build products for users and customers. Testable, flexible, maint
 Design happens during REFACTORING, not during coding. Let patterns emerge from tests and Rule of Three, never from speculation.
 
 "A little bit of duplication is 10x better than the wrong abstraction."
+
+"Solve today's problem simply, not tomorrow's prematurely." Most over-engineering is not wrong, only mistimed — abstraction added before its need is real.

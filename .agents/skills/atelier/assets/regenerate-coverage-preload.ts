@@ -28,9 +28,9 @@
  *     # exits non-zero if the on-disk file is out of sync with the glob;
  *     # use this in CI or pre-commit so a missing import blocks the merge.
  *
- * Wire it into pre-commit (gate 0, before the coverage gate):
+ * Wire it into pre-commit as an unnumbered pre-flight (the gates stay 1..8):
  *
- *   echo "[0/9] coverage-preload sync" >&2
+ *   echo "[pre-flight] coverage-preload sync" >&2
  *   bun run scripts/regenerate-coverage-preload.ts --check
  *
  * Tune SCAN_DIRS below if your project's Clean Architecture layout differs.
@@ -63,7 +63,8 @@ const EXCLUDE = (relPath: string): boolean =>
 const parseArgs = (argv: ReadonlyArray<string>): Args => {
   const check = argv.includes('--check');
   const outIdx = argv.indexOf('--out');
-  const out = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : 'scripts/coverage-preload.ts';
+  const candidate = outIdx >= 0 ? argv[outIdx + 1] : undefined;
+  const out = candidate ?? 'scripts/coverage-preload.ts';
   return { check, out };
 };
 

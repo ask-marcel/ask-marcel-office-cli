@@ -2,6 +2,8 @@
 
 Reusable solutions to common design problems. A shared vocabulary for discussing design. This file translates the classic GoF patterns into modules of arrow functions and typed records.
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## Warning first
 
 Do not force patterns. Let them emerge from refactoring. Patterns solve problems you have, not problems you might have.
@@ -20,21 +22,17 @@ Use a pattern when:
 
 **Purpose.** Ensure only one instance exists.
 
-**When to use.** Global configuration, connection pools, logging. Often overused. Dependency injection is usually better.
+**When to use.** Side-effect-free constants and frozen configuration records. Often overused. Dependency injection is usually better.
 
 ```ts
 // Just export a module-level const. That is your singleton.
-// src/lib/utils/logger.ts
-import { createLogger, format, transports } from 'winston';
-
-export const logger = createLogger({
-  level: 'info',
-  format: format.json(),
-  transports: [new transports.Console()],
-});
+// src/domain/retry-policy.ts
+export const retryPolicy = Object.freeze({ maxAttempts: 3, backoffMs: 200 });
 ```
 
 No ceremony needed. ESM modules are singletons by default.
+
+Stateful or IO-performing singletons (loggers, clients, pools) are NOT expressed this way — they are factories in `src/infra/**` injected at composition (hard rule 4).
 
 ### Factory
 
@@ -307,8 +305,9 @@ export const createEmitter = <T>(): Emitter<T> => {
 type OrderEvent = { kind: 'placed'; orderId: OrderId };
 const orderEvents = createEmitter<OrderEvent>();
 
+const placed: OrderId[] = [];
 const unsubscribe = orderEvents.subscribe((event) => {
-  if (event.kind === 'placed') logger.info('order placed', { orderId: event.orderId });
+  if (event.kind === 'placed') placed.push(event.orderId);
 });
 
 orderEvents.emit({ kind: 'placed', orderId: orderId('ord-1') });
@@ -363,10 +362,20 @@ export type Command = {
   undo: () => void;
 };
 
-export const addItemCommand = (cart: Cart, item: Item): Command => ({
-  execute: () => addToCart(cart, item),
-  undo: () => removeFromCart(cart, item),
-});
+// addToCart/removeFromCart are immutable (they return new carts), so the
+// command closes over a mutable holder; execute/undo swap the current cart.
+export const addItemCommand = (cart: Cart, item: Item): Command & { getCart: () => Cart } => {
+  let current = cart;
+  return {
+    execute: () => {
+      current = addToCart(current, item);
+    },
+    undo: () => {
+      current = removeFromCart(current, item);
+    },
+    getCart: () => current,
+  };
+};
 
 export type CommandHistory = {
   execute: (command: Command) => void;

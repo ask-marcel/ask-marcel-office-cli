@@ -74,24 +74,28 @@ Infrastructure -> Application -> Domain
 
 ```ts
 // Domain defines the contract (inner)
+export type RepoError = { type: 'io'; message: string };
+
 export type UserRepo = {
-  save: (user: User) => Promise<void>;
-  findById: (id: UserId) => Promise<User | null>;
+  save: (user: User) => Promise<Result<void, RepoError>>;
+  findById: (id: UserId) => Promise<Result<User | null, RepoError>>;
 };
 
 // Infrastructure implements it (outer)
 export const createPostgresUserRepo = (db: Database): UserRepo => ({
   save: async (user) => {
-    /* SQL here */
+    /* SQL here, wrapped in ok()/err() */
   },
   findById: async (id) => {
-    /* SQL here */
+    /* SQL here, wrapped in ok()/err() */
   },
 });
 
 // Domain use-case depends on the contract, never on the postgres implementation
-export const createGetUser = (repo: UserRepo) => async (id: UserId): Promise<User | null> => repo.findById(id);
+export const createGetUser = (repo: UserRepo) => async (id: UserId): Promise<Result<User | null, RepoError>> => repo.findById(id);
 ```
+
+IO ports always return `Promise<Result<T, PortError>>`, never bare `Promise<T>` — see `references/result-type.md`.
 
 ### 4. Contracts
 
@@ -120,11 +124,13 @@ Options in our style:
 - Decorator functions (from `references/design-patterns.md`).
 
 ```ts
-// Higher-order function wraps a handler with logging
+// Higher-order function wraps a handler with logging.
+// The logger is a parameter, not a module-level singleton (hard rule 4).
 export type Handler<Req, Res> = (request: Req) => Promise<Res>;
 
 export const withLogging = <Req extends { path: string }, Res extends { status: number }>(
-  handler: Handler<Req, Res>
+  handler: Handler<Req, Res>,
+  logger: Logger
 ): Handler<Req, Res> =>
   async (request) => {
     logger.info('request', { path: request.path });
@@ -189,35 +195,22 @@ Similar to hexagonal, with explicit layers:
 
 ## Feature-driven structure (frontend)
 
-Aligns with the Next.js variant:
+In the Next.js variant there is no `features/` folder. A vertical slice is expressed as one organism per page section plus a page shell per route, with the slice's logic in `src/lib/<feature>/` (e.g. `src/lib/guides/`). Components never live outside the design system (`src/components/{atoms,molecules,organisms}` — hard rules 21-22), and state lives in `src/lib/hooks/`, wired by the page shells.
 
 ```
 src/
   components/
-    atoms/      | (Atomic Design: no internal composition)
-    molecules/  | (import atoms only)
-    organisms/  | (import atoms + molecules)
-  page/         | page shells
-  features/
-    auth/
-      components/
-      hooks/
-      services/
-      types/
-      index.ts  | public API
-    checkout/
-      components/
-      hooks/
-      services/
-      types/
-      index.ts
-  lib/          | truly shared
-    hooks/
+    atoms/      | no internal composition
+    molecules/  | import atoms only
+    organisms/  | import atoms + molecules; one per page section
+  page/         | page shells; one per route, wire organisms to lib state
+  lib/
+    guides/     | feature logic for the "guides" slice
+    hooks/      | state, consumed by page shells
     i18n/
-    utils/
 ```
 
-See `references/nextjs-monorepo.md` for the full layout and rules.
+See `references/nextjs-monorepo.md` for the full layout and rules, and `references/atomic-design.md` for the component layer rules.
 
 ---
 
@@ -253,6 +246,9 @@ src/
 │   ├── telegram-http.ts
 │   ├── rss-fetcher-http.ts
 │   ├── prompt-loader-fs.ts
+│   ├── http/                   # inbound Bun.serve adapter (server archetype)
+│   │   ├── server.ts           #   route table + the one request-level try/catch
+│   │   └── to-response.ts      #   pure Result → Response mapper
 │   └── logger.ts
 ├── presenter/                  # CLI argv parsing, usage text, output formatting
 │   └── cli.ts
@@ -275,7 +271,7 @@ src/
 |:---|:---|
 | `domain/` | nothing inside `src/` |
 | `use-cases/` | `domain/` + its own `ports/` (types only) |
-| `infra/` | `domain/` + the ports it implements + third-party SDKs |
+| `infra/` | `domain/` + the ports it implements (+ the use-case `Result`/error types an inbound adapter maps) + third-party SDKs |
 | `presenter/` | `domain/` only |
 | `composition/` | everything (this is the only place where concrete `infra/` meets use-case deps) |
 | `test-helpers/` | `domain/` + ports (no production code depends on test-helpers) |
@@ -295,6 +291,61 @@ Invariants the layout protects:
 3. Implement the real adapter under `src/infra/<service>-<protocol>.ts` (e.g. `sheets-google.ts`, `tmdb-http.ts`). The adapter is the only place `try/catch` wraps the SDK call.
 4. Wire it into `PipelineDeps` and `src/composition/build-deps.ts`.
 5. Write use-case tests that inject the fake and pattern-match on `Result.ok`.
+
+### Inbound HTTP (server archetype)
+
+The canonical archetype is a CLI/batch job that runs and `process.exit`s. When the entry instead serves HTTP, **the server is an `infra/` adapter — the inbound mirror of an outbound one — not a new layer and not a `presenter/` file.** An outbound adapter (`telegram-http.ts`) turns a thrown SDK error *into* a `Result`; the inbound adapter turns a use-case `Result` *into* a `Response`. It reuses infra's existing `try/catch` quarantine slot and 80% coverage tier, and **adds no new layer** — it lives under `infra/`, covered by that row's inbound-adapter clause.
+
+Why not `presenter/`: the `Result → Response` mapper must read `Summary` and `StepError`, which live in `use-cases/ports/`. The `presenter → domain/ only` rule forbids that import, so a "presenter mapper" silently breaks the dependency table. The `infra/` row explicitly covers the use-case `Result`/error types an inbound adapter maps — so the mapper belongs there.
+
+```ts
+// src/infra/http/to-response.ts — pure, total: a use-case Result → an HTTP Response.
+import type { Result } from '../../domain/result.ts';
+import type { Summary, StepError } from '../../use-cases/ports/step-error.ts';
+
+export const toResponse = (result: Result<Summary, StepError>): Response => {
+  if (result.ok) return Response.json(result.value, { status: 200 });
+  const { step, cause, message } = result.error;
+  // The use-case flatten already stringified the port `kind` into `cause: string`, so there is no
+  // typed discriminant to switch on here — a use-case failure is a 500 by default. Precise client
+  // errors (400) are decided upstream at the branded request checkpoint, before this runs.
+  return Response.json({ step, error: cause, message }, { status: 500 });
+};
+```
+
+```ts
+// src/infra/http/server.ts — inbound adapter; the one request-level try/catch lives here.
+import type { Result } from '../../domain/result.ts';
+import type { OrderInput } from '../../domain/order-input.ts';
+import type { Summary, StepError } from '../../use-cases/ports/step-error.ts';
+import { parseOrderBody } from '../../domain/order-input.ts'; // branded checkpoint (rule 12)
+import { formatError } from '../../domain/utilities/format-error.ts';
+import { toResponse } from './to-response.ts';
+
+type HttpDeps = { readonly placeOrder: (input: OrderInput) => Promise<Result<Summary, StepError>> };
+
+export const createHttpServer = (deps: HttpDeps): { readonly fetch: (req: Request) => Promise<Response> } => ({
+  fetch: async (req) => {
+    try {
+      const parsed = parseOrderBody(await req.text());
+      if (!parsed.ok) return Response.json({ error: parsed.error.message }, { status: 400 });
+      return toResponse(await deps.placeOrder(parsed.value));
+    } catch (e) {
+      return Response.json({ error: formatError(e) }, { status: 500 });
+    }
+  },
+});
+```
+
+`src/main.ts` stays the single thin entry with its one top-level catch: env → `buildPipelineDeps(env)` → `createHttpServer(deps)` → `Bun.serve({ port: env.port, fetch: server.fetch })`. Do not add a second `main-web.ts`; if the app is server-shaped, `main.ts` *is* the serving entry, and the Dockerfile gains `EXPOSE <port>` (`references/bun-typescript.md` § Containerization).
+
+Three rules this archetype leans on:
+
+1. **The body is an untrusted source — brand it (rule 12).** `parseOrderBody` is the validating checkpoint; precise `400`s are decided here, where the type is still narrow.
+2. **A use-case error defaults to `500`.** The flatten destroys the port `kind` (see `references/result-type.md`), so never switch on `StepError.cause` to fabricate `401`/`404`/`429` — that non-exhaustive lookup rots silently. Honoring typed statuses is a real upgrade: carry a status number through the flatten where TS still enforces totality over the `kind` union — adopt it when a requirement lands, not speculatively.
+3. **Register each new `src/infra/http/*.ts` in `scripts/coverage-preload.ts` in the same commit** — or the 80% gate passes trivially on uncovered files.
+
+No router until the third route (Rule of Three) — a `switch (new URL(req.url).pathname)` covers one or two endpoints. No framework; that choice stays out of scope.
 
 ### Framework vs configuration
 
