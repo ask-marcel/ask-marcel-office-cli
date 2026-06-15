@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { mapWacError, wrapExcelExecute } from './excel-error.ts';
 
 describe('mapWacError', () => {
@@ -27,19 +28,7 @@ describe('mapWacError', () => {
 });
 
 describe('wrapExcelExecute', () => {
-  const stubGraph: GraphClient = {
-    get: async () => ok({}),
-    post: async () => ok({}),
-    getBinary: async () => ok({}),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
-    getBinaryElevated: async () => ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  };
+  const stubGraph: GraphClient = fakeGraphClient();
 
   it('forwards the inner ok value unchanged', async () => {
     const wrapped = wrapExcelExecute(async () => ok({ value: [{ name: 'Sheet1' }] }));

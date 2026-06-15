@@ -2,26 +2,18 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './search-sharepoint-sites-by-name.ts';
 
 // `/sites?search=` and the per-site archive probe both go through graph.get, so route by path.
 const PROBE = '?$select=id,webUrl,siteCollection';
-const graphWith = (search: Result<unknown, GraphError>, onProbe: (id: string) => Result<unknown, GraphError>): GraphClient => ({
-  get: async (path) => {
-    if (path.includes(PROBE)) return onProbe(/\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '');
-    return search;
-  },
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-});
+const graphWith = (search: Result<unknown, GraphError>, onProbe: (id: string) => Result<unknown, GraphError>): GraphClient =>
+  fakeGraphClient({
+    get: async (path) => {
+      if (path.includes(PROBE)) return onProbe(/\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '');
+      return search;
+    },
+  });
 
 const searchPage = ok({
   '@odata.context': 'ctx',

@@ -1,27 +1,19 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 
 // A graph fake whose /search/query POST returns `totalFor(queryString)` as the
 // driveItem hit total, recording every queryString it was asked.
-const searchGraph = (totalFor: (queryString: string) => number | undefined, queries: Array<string>): GraphClient => ({
-  get: async () => ok({}),
-  post: async (_path, body) => {
-    const qs = (body as { requests?: ReadonlyArray<{ query?: { queryString?: string } }> }).requests?.[0]?.query?.queryString ?? '';
-    queries.push(qs);
-    return ok({ value: [{ hitsContainers: [{ total: totalFor(qs) }] }] });
-  },
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-});
+const searchGraph = (totalFor: (queryString: string) => number | undefined, queries: Array<string>): GraphClient =>
+  fakeGraphClient({
+    post: async (_path, body) => {
+      const qs = (body as { requests?: ReadonlyArray<{ query?: { queryString?: string } }> }).requests?.[0]?.query?.queryString ?? '';
+      queries.push(qs);
+      return ok({ value: [{ hitsContainers: [{ total: totalFor(qs) }] }] });
+    },
+  });
 
 const webUrlOf = (e: unknown): string | undefined => (e as { webUrl?: string }).webUrl;
 

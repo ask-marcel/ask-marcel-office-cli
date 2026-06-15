@@ -1,22 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute, meta, schema } from './microsoft-search-query.ts';
 
-const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => ({
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  ...overrides,
-});
+const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => fakeGraphClient(overrides);
 
 type CapturedRequest = {
   readonly entityTypes: ReadonlyArray<string>;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { buildGbkNameZip, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './convert-mail-attachment-zip.ts';
 
@@ -11,22 +12,10 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClient =>
-  ({
-    get: async (url: string) => get(url),
-    post: async () => ok({}),
-    getBinary: async () => ok({}),
-    getElevated: async () => ok({}),
-    teamsChat: async () => ok({}),
-    teamsChatIc3: async () => ok({}),
-    getBinaryElevated: async () => ok({}),
-    fetchUrl: async () => ok({}),
-    put: async () => ok({}),
-    delete: async () => ok({}),
-    getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  }) as GraphClient;
+const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClient => fakeGraphClient({ get: async (url: string) => get(url) }) as GraphClient;
 
-const zipFileAttachment = (bytes: Uint8Array): GraphClient => graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
+const zipFileAttachment = (bytes: Uint8Array): GraphClient =>
+  graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
 
 const params = { messageId: 'm1', attachmentId: 'a1' };
 type ZipResult = { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
