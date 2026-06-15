@@ -45,8 +45,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return raw === 'json' ? 'json' : 'text';
   };
   const renderOut = (data: unknown): void => render(data, logger, getFormat());
-  const fail = (message: string, code?: string, source?: ErrorSource): void => {
-    renderError(message, getFormat(), code, source);
+  const fail = (message: string, code?: string, source?: ErrorSource, retryAfterSeconds?: number): void => {
+    renderError(message, getFormat(), code, source, retryAfterSeconds);
     deps.onCommandError?.();
   };
 
@@ -522,7 +522,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
           for (const [canonical, alias] of Object.entries(aliasUsedFor)) {
             message = message.replaceAll(`--${canonical}`, `--${alias}`);
           }
-          fail(message, result.error.code, sourceFromGraphError(result.error));
+          const retryAfterSeconds = result.error.type === 'api_error' ? result.error.retryAfterSeconds : undefined;
+          fail(message, result.error.code, sourceFromGraphError(result.error), retryAfterSeconds);
           return;
         }
         const outputDir = program.opts<{ outputDir?: string }>().outputDir;

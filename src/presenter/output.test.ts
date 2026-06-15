@@ -119,6 +119,30 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.source).toBe('graph');
   });
 
+  it('surfaces the Retry-After interval in the JSON envelope so a throttled CLI consumer can honor Graph backoff', async () => {
+    const out = await captureStream('stdout', () => renderError('TooManyRequests: Too many requests', 'json', 'TooManyRequests', 'graph', 120));
+    const parsed = JSON.parse(out.trim()) as { ok: false; error: string; errorCode: string; retryAfterSeconds?: number };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.retryAfterSeconds).toBe(120);
+  });
+
+  it('surfaces Retry-After as a `retryAfter: Ns` line in text output', async () => {
+    const out = await captureStream('stdout', () => renderError('TooManyRequests: slow down', 'text', 'TooManyRequests', 'graph', 30));
+    expect(out).toContain('retryAfter: 30s');
+  });
+
+  it('omits retryAfterSeconds from the envelope when no interval was supplied (most errors carry none)', async () => {
+    const out = await captureStream('stdout', () => renderError('itemNotFound: not found', 'json', 'itemNotFound', 'graph'));
+    const parsed = JSON.parse(out.trim()) as { ok: false; retryAfterSeconds?: number };
+    expect(parsed.retryAfterSeconds).toBeUndefined();
+  });
+
+  it('keeps a Retry-After of 0 in the envelope (0 is an immediate-retry hint, not absence)', async () => {
+    const out = await captureStream('stdout', () => renderError('TooManyRequests: slow down', 'json', 'TooManyRequests', 'graph', 0));
+    const parsed = JSON.parse(out.trim()) as { retryAfterSeconds?: number };
+    expect(parsed.retryAfterSeconds).toBe(0);
+  });
+
   it('hint-table source wins over the explicit 4th-arg when both are available (curated rule beats discriminator-derived fallback)', async () => {
     // Caller asserts `source: 'graph'` but the rule table classifies
     // `cli_reject_search_with_filter` as `cli` — the hint's source wins.

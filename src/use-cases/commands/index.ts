@@ -90,6 +90,7 @@ import * as createMailDraft from './create-mail-draft.ts';
 import * as updateMailDraft from './update-mail-draft.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as convertLocalFile from './convert-local-file.ts';
+import * as extractLocalFileImages from './extract-local-file-images.ts';
 import * as convertMailAttachmentZip from './convert-mail-attachment-zip.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
@@ -238,6 +239,7 @@ const commands: Record<string, Command> = {
   'update-mail-draft': updateMailDraft,
   'convert-drive-item-zip': convertDriveItemZip,
   'convert-local-file': convertLocalFile,
+  'extract-local-file-images': extractLocalFileImages,
   'convert-mail-attachment-zip': convertMailAttachmentZip,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,

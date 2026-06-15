@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# atelier pre-commit hook — 8 gates
+#
+# Order matters: cheap fast-fail gates first, expensive gates last so a slow
+# mutation run is only paid when everything else is clean.
+#
+#   1. commit size       — ≤10 files AND ≤300 lines (insertions + deletions)
+#   2. package.json      — no "latest" / "*" version strings
+#   3. secret scan       — gitleaks protect --staged (degrades gracefully)
+#   4. tests             — bun test
+#   5. strict lint       — bun run lint:strict (0 errors AND 0 warnings)
+#   6. typecheck         — bun run typecheck
+#   7. coverage          — bun run coverage (per-tier gates)
+#   8. mutation testing  — bun run mutate:staged (≥90% on staged domain/use-case files)
+#
+# Install once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# Bypass with `git commit --no-verify` is reserved for genuine big-bang
+# changes (initial scaffolds, mass-renames, generated-file updates). Justify
+# every bypass in the commit body. Do not normalise bypassing.
+
+set -euo pipefail
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "pre-commit: 'bun' is not on PATH. Install Bun from https://bun.sh" >&2
+  exit 1
+fi
+
+echo "pre-commit: running 8 gates..."
+
+echo "[1/8] commit size"
+bash scripts/check-commit-size.sh
+
+echo "[2/8] package.json (no latest / *)"
+bash scripts/check-package-json.sh
+
+echo "[3/8] gitleaks protect --staged"
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --verbose --no-banner
+else
+  echo "  warning: 'gitleaks' not on PATH — skipping secret scan." >&2
+  echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
+fi
+
+echo "[4/8] bun test"
+bun test
+
+echo "[5/8] bun run lint:strict"
+bun run lint:strict
+
+echo "[6/8] bun run typecheck"
+bun run typecheck
+
+echo "[7/8] bun run coverage"
+bun run coverage
+
+echo "[8/8] bun run mutate:staged"
+bun run mutate:staged
+
+echo "pre-commit: all gates passed"
