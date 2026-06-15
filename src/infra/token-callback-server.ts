@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
@@ -25,13 +25,7 @@ type TokenCallbackError =
   | { type: 'invalid_payload'; message: string }
   | { type: 'server_closed'; message: string };
 
-const ALLOWED_ORIGINS = [
-  'https://teams.microsoft.com',
-  'https://teams.live.com',
-  'http://127.0.0.1',
-  'http://localhost',
-  'chrome-extension://',
-];
+const ALLOWED_ORIGINS = ['https://teams.microsoft.com', 'https://teams.live.com', 'http://127.0.0.1', 'http://localhost', 'chrome-extension://'];
 
 const createTokenCallbackServer = (logger: Logger, timeoutMs: number = 5 * 60 * 1000): TokenCallbackServer => {
   let server: Server | null = null;
@@ -53,83 +47,97 @@ const createTokenCallbackServer = (logger: Logger, timeoutMs: number = 5 * 60 * 
     }
   };
 
+  // Extracted out of the createServer callback so the request-body listeners
+  // (`req.on('data'|'end')`) sit at a sane nesting depth rather than five
+  // closures deep inside start()'s Promise executor (sonarjs/no-nested-functions).
+  const handleRequest = (req: IncomingMessage, res: ServerResponse): void => {
+    // CORS headers for browser extension
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/token') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 1e6) {
+          req.destroy();
+          res.writeHead(413);
+          res.end('Payload too large');
+        }
+      });
+
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body) as TokenCallbackPayload;
+
+          if (!payload.access_token || typeof payload.access_token !== 'string') {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'missing access_token' }));
+            return;
+          }
+
+          // Validate origin if present
+          const origin = req.headers['origin'];
+          if (origin && !ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed))) {
+            logger.info('token_callback.rejected_origin', { origin });
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'origin not allowed' }));
+            return;
+          }
+
+          logger.info('token_callback.received', { hasAccessToken: true, hasRefreshToken: !!payload.refresh_token });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok' }));
+
+          // Resolve the promise and stop the server
+          if (resolveCallback) {
+            resolveCallback(ok(payload));
+            resolveCallback = null;
+          }
+          void stop();
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          logger.info('token_callback.parse_error', { message });
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid json' }));
+        }
+      });
+      return;
+    }
+
+    // Health check endpoint
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'waiting' }));
+      return;
+    }
+
+    res.writeHead(404);
+    res.end('Not found');
+  };
+
+  const onTimeout = (): void => {
+    logger.info('token_callback.timeout', { timeoutMs });
+    if (resolveCallback) {
+      resolveCallback(err({ type: 'timeout', message: `token callback timed out after ${timeoutMs}ms` }));
+      resolveCallback = null;
+    }
+    void stop();
+  };
+
   const start = (): Promise<Result<TokenCallbackPayload, TokenCallbackError>> => {
     return new Promise((resolve) => {
       resolveCallback = resolve;
 
-      server = createServer((req, res) => {
-        // CORS headers for browser extension
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-        if (req.method === 'OPTIONS') {
-          res.writeHead(204);
-          res.end();
-          return;
-        }
-
-        if (req.method === 'POST' && req.url === '/token') {
-          let body = '';
-          req.on('data', (chunk) => {
-            body += chunk;
-            if (body.length > 1e6) {
-              req.destroy();
-              res.writeHead(413);
-              res.end('Payload too large');
-            }
-          });
-
-          req.on('end', () => {
-            try {
-              const payload = JSON.parse(body) as TokenCallbackPayload;
-
-              if (!payload.access_token || typeof payload.access_token !== 'string') {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'missing access_token' }));
-                return;
-              }
-
-              // Validate origin if present
-              const origin = req.headers['origin'];
-              if (origin && !ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed))) {
-                logger.info('token_callback.rejected_origin', { origin });
-                res.writeHead(403, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'origin not allowed' }));
-                return;
-              }
-
-              logger.info('token_callback.received', { hasAccessToken: true, hasRefreshToken: !!payload.refresh_token });
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ status: 'ok' }));
-
-              // Resolve the promise and stop the server
-              if (resolveCallback) {
-                resolveCallback(ok(payload));
-                resolveCallback = null;
-              }
-              void stop();
-            } catch (e) {
-              const message = e instanceof Error ? e.message : String(e);
-              logger.info('token_callback.parse_error', { message });
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'invalid json' }));
-            }
-          });
-          return;
-        }
-
-        // Health check endpoint
-        if (req.method === 'GET' && req.url === '/health') {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'waiting' }));
-          return;
-        }
-
-        res.writeHead(404);
-        res.end('Not found');
-      });
+      server = createServer(handleRequest);
 
       // Bind to port 0 — OS assigns a random available port
       server.listen(0, '127.0.0.1', () => {
@@ -143,14 +151,7 @@ const createTokenCallbackServer = (logger: Logger, timeoutMs: number = 5 * 60 * 
         logger.info('token_callback.listening', { port, timeoutMs });
 
         // Set timeout
-        timeoutHandle = setTimeout(() => {
-          logger.info('token_callback.timeout', { timeoutMs });
-          if (resolveCallback) {
-            resolveCallback(err({ type: 'timeout', message: `token callback timed out after ${timeoutMs}ms` }));
-            resolveCallback = null;
-          }
-          void stop();
-        }, timeoutMs);
+        timeoutHandle = setTimeout(onTimeout, timeoutMs);
       });
 
       server.on('error', (e) => {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
+import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
