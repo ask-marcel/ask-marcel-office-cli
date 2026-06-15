@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "atelier": {
+      "source": "vdelacou/atelier",
+      "sourceType": "github",
+      "skillPath": "skills/atelier/SKILL.md",
+      "computedHash": "aef874a8f533f9337e84ca2e0926bad68ec9d351e42030474441026b9b056786"
+    }
+  }
+}
