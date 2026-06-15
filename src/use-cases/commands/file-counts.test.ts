@@ -7,6 +7,7 @@ import { addEstimatedFileCounts } from './file-counts.ts';
 // driveItem hit total, recording every queryString it was asked.
 const searchGraph = (totalFor: (queryString: string) => number | undefined, queries: Array<string>): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async (_path, body) => {
     const qs = (body as { requests?: ReadonlyArray<{ query?: { queryString?: string } }> }).requests?.[0]?.query?.queryString ?? '';
     queries.push(qs);

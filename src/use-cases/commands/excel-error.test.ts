@@ -29,6 +29,7 @@ describe('mapWacError', () => {
 describe('wrapExcelExecute', () => {
   const stubGraph: GraphClient = {
     get: async () => ok({}),
+    patch: async () => ok({}),
     post: async () => ok({}),
     getBinary: async () => ok({}),
     getElevated: async () => ok({}),

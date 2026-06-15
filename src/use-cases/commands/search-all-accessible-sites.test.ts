@@ -8,6 +8,7 @@ import { execute, meta } from './search-all-accessible-sites.ts';
 // so tests can stage one response per page.
 const graphWith = (onPost: (from: number) => Result<unknown, GraphError>, driveItemTotal?: number): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async (_path, body) => {
     const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
     // The command issues one extra driveItem-count query for `fileEstimate`; route it separately so site-paging tests stay isolated.
@@ -123,6 +124,7 @@ describe('search-all-accessible-sites', () => {
     const queries: Array<string> = [];
     const graph: GraphClient = {
       ...graphWith(() => page([], false, 0)),
+      patch: async () => ok({}),
       post: async (_path, body) => {
         const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; query: { queryString: string } }> }).requests[0];
         if (req?.entityTypes?.[0] === 'site') queries.push(queryStringOf(body)); // ignore the driveItem fileEstimate query
@@ -199,6 +201,7 @@ describe('search-all-accessible-sites', () => {
     const TOTAL = 275;
     const graph: GraphClient = {
       ...graphWith(() => page([], false, 0)),
+      patch: async () => ok({}),
       post: async (_p, body) => {
         const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number }> }).requests[0];
         if (req?.entityTypes?.[0] === 'driveItem') return ok({ value: [] });
@@ -220,6 +223,7 @@ describe('search-all-accessible-sites', () => {
   it('adds estimatedFileCount to each kept site when --count-files true (one path-scoped search each)', async () => {
     const graph: GraphClient = {
       ...graphWith(() => page([], false, 0)),
+      patch: async () => ok({}),
       post: async (_p, body) => {
         const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number; query?: { queryString?: string } }> }).requests[0];
         if (req?.entityTypes?.[0] === 'driveItem') {

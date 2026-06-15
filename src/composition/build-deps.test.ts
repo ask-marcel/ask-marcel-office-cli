@@ -22,6 +22,15 @@ describe('buildDeps composition root', () => {
     expect(typeof deps.auth.getAccessToken).toBe('function');
   });
 
+  it('exposes a makeLoginAuth factory that builds a login AuthManager for either browser flow', () => {
+    const fs = createFileSystemFake();
+    const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs });
+    const extensionAuth = deps.makeLoginAuth({ useExtension: true });
+    const playwrightAuth = deps.makeLoginAuth({ useExtension: false });
+    expect(typeof extensionAuth.getAccessToken).toBe('function');
+    expect(typeof playwrightAuth.getAccessToken).toBe('function');
+  });
+
   it('uses default config values when no config is provided', () => {
     const previousLevel = process.env.ASKMARCEL_LOG_LEVEL;
     process.env.ASKMARCEL_LOG_LEVEL = 'error';

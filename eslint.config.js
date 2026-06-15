@@ -127,6 +127,10 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
+    // `browser-extension/**` is a separate Chrome-extension deliverable (vanilla
+    // browser-runtime JS using `chrome`/`window` globals), not the Bun/TS CLI
+    // source this atelier config governs — linting it here only yields spurious
+    // `no-undef` on browser globals. It carries its own concerns.
+    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**', 'browser-extension/**'],
   },
 ];

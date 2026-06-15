@@ -12,6 +12,7 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
       if (!Object.hasOwn(responses, path)) throw new Error(`unexpected get(${path})`);
       return responses[path];
     },
+    patch: async () => ok({}),
     post: async () => ok({}),
     getBinary: async () => ok({}),
     getElevated: async () => ok({}),

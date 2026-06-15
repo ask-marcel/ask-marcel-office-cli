@@ -17,6 +17,7 @@ const toBase64 = (bytes: Uint8Array): string => {
 const versionGraph = (handlers: { get?: (url: string) => Result<unknown, GraphError>; elevated?: (url: string) => Result<unknown, GraphError> }): GraphClient =>
   ({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
+    patch: async () => ok({}),
     post: async () => ok({}),
     getBinary: async () => ({ ok: false, error: { type: 'api_error', status: 403, message: 'non-elevated token rejected on historical version' } }),
     getElevated: async () => ok({}),

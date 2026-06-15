@@ -6,6 +6,7 @@ import { searchIndexTotal } from './search-index-total.ts';
 
 const graphWith = (onPost: (body: unknown) => Result<unknown, GraphError>): GraphClient => ({
   get: async () => ok({}),
+  patch: async () => ok({}),
   post: async (_path, body) => onPost(body),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
@@ -35,6 +36,7 @@ describe('searchIndexTotal', () => {
     let body: unknown;
     const graph: GraphClient = {
       ...graphWith(() => container(0)),
+      patch: async () => ok({}),
       post: async (p, b) => {
         path = p;
         body = b;

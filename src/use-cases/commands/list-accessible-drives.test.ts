@@ -8,6 +8,7 @@ type Route = (path: string) => Result<unknown, GraphError>;
 
 const routeGraph = (routes: Route): GraphClient => ({
   get: async (path) => routes(path),
+  patch: async () => ok({}),
   post: async () => ok({}),
   getBinary: async () => ok({}),
   getElevated: async () => ok({}),
@@ -112,6 +113,7 @@ describe('list-accessible-drives', () => {
     };
     const graph: GraphClient = {
       ...routeGraph(routes),
+      patch: async () => ok({}),
       post: async (_p, body) => {
         const qs = (body as { requests?: ReadonlyArray<{ query?: { queryString?: string } }> }).requests?.[0]?.query?.queryString ?? '';
         const total = qs.includes('path:"https://x/personal/me/Documents"') ? 137 : 0;

@@ -12,6 +12,7 @@ const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 
         calls.push({ via: 'basic', path });
         return ok({});
       },
+      patch: async () => ok({}),
       post: async () => ok({}),
       getBinary: async () => ok({}),
       getElevated: async (path: string) => {

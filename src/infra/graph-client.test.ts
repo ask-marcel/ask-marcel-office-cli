@@ -309,6 +309,20 @@ describe('graph client', () => {
     expect(capturedSignal).toBeInstanceOf(AbortSignal);
   });
 
+  it('issues an authenticated PATCH carrying the JSON body (used by update-mail-draft)', async () => {
+    let captured: { method?: string; body?: unknown } = {};
+    const captureFetch: FetchFn = async (_url, init) => {
+      captured = { method: init?.method, body: init?.body };
+      return Response.json({ id: 'm1', isDraft: true });
+    };
+    const client = createGraphClient(fakeAuth(), captureFetch);
+    const result = await client.patch('/me/messages/m1', { subject: 'Updated' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ id: 'm1', isDraft: true });
+    expect(captured.method).toBe('PATCH');
+    expect(captured.body).toBe(JSON.stringify({ subject: 'Updated' }));
+  });
+
   it('fetchUrl follows a CDN URL and returns the parsed JSON when content-type advertises JSON', async () => {
     const fetchFn: FetchFn = async (url) => {
       expect(url).toBe('https://contoso.sharepoint.com/sites/x/file.json');
