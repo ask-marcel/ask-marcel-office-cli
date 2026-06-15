@@ -7,6 +7,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
+import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
 
@@ -60,33 +61,26 @@ const failedAuth = (): AuthManager => ({
   getLastElevatedOutcome: () => null,
 });
 
-const okGraph = (value: unknown): GraphClient => ({
-  get: async () => ({ ok: true, value }),
-  post: async () => ({ ok: true, value }),
-  getBinary: async () => ({ ok: true, value }),
-  getElevated: async () => ({ ok: true, value: {} }),
-  teamsChat: async () => ({ ok: true, value: {} }),
-  teamsChatIc3: async () => ({ ok: true, value: {} }),
-  getBinaryElevated: async () => ({ ok: true, value: {} }),
-  fetchUrl: async () => ({ ok: true, value }),
-  put: async () => ({ ok: true, value }),
-  delete: async () => ({ ok: true, value }),
-  getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-});
+const okGraph = (value: unknown): GraphClient =>
+  fakeGraphClient({
+    get: async () => ({ ok: true, value }),
+    post: async () => ({ ok: true, value }),
+    getBinary: async () => ({ ok: true, value }),
+    fetchUrl: async () => ({ ok: true, value }),
+    put: async () => ({ ok: true, value }),
+    delete: async () => ({ ok: true, value }),
+  });
 
-const errGraph = (error: GraphError): GraphClient => ({
-  get: async () => ({ ok: false, error }),
-  post: async () => ({ ok: false, error }),
-  getBinary: async () => ({ ok: false, error }),
-  getElevated: async () => ({ ok: true, value: {} }),
-  teamsChat: async () => ({ ok: true, value: {} }),
-  teamsChatIc3: async () => ({ ok: true, value: {} }),
-  getBinaryElevated: async () => ({ ok: true, value: {} }),
-  fetchUrl: async () => ({ ok: false, error }),
-  put: async () => ({ ok: false, error }),
-  delete: async () => ({ ok: false, error }),
-  getCachedTokenInfo: async () => ({ ok: false, error }),
-});
+const errGraph = (error: GraphError): GraphClient =>
+  fakeGraphClient({
+    get: async () => ({ ok: false, error }),
+    post: async () => ({ ok: false, error }),
+    getBinary: async () => ({ ok: false, error }),
+    fetchUrl: async () => ({ ok: false, error }),
+    put: async () => ({ ok: false, error }),
+    delete: async () => ({ ok: false, error }),
+    getCachedTokenInfo: async () => ({ ok: false, error }),
+  });
 
 describe('buildCli command surface', () => {
   it('renders an authenticated envelope when login succeeds (under --output json)', async () => {
@@ -247,22 +241,12 @@ describe('buildCli command surface', () => {
 
   it('accepts both the canonical and the alias spelling of a command flag (e.g. --task-list-id alongside --todo-task-list-id)', async () => {
     let capturedPath = '';
-    const captureGraph: GraphClient = {
+    const captureGraph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
         capturedPath = path;
         return { ok: true, value: { value: [] } };
       },
-      post: async () => ({ ok: true, value: {} }),
-      getBinary: async () => ({ ok: true, value: {} }),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ({ ok: true, value: {} }),
-      teamsChatIc3: async () => ({ ok: true, value: {} }),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ({ ok: true, value: {} }),
-      put: async () => ({ ok: true, value: {} }),
-      delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-    };
+    });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-todo-tasks', '--task-list-id', 'AAMkABC']));
@@ -271,22 +255,12 @@ describe('buildCli command surface', () => {
 
   it('convert-local-file reads the file through the CLI-wired filesystem and never touches Graph', async () => {
     let graphCalled = false;
-    const tripwireGraph: GraphClient = {
+    const tripwireGraph: GraphClient = fakeGraphClient({
       get: async () => {
         graphCalled = true;
         return { ok: true, value: {} };
       },
-      post: async () => ({ ok: true, value: {} }),
-      getBinary: async () => ({ ok: true, value: {} }),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ({ ok: true, value: {} }),
-      teamsChatIc3: async () => ({ ok: true, value: {} }),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ({ ok: true, value: {} }),
-      put: async () => ({ ok: true, value: {} }),
-      delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-    };
+    });
     const fs = createFileSystemFake();
     fs.seed('/work/data.csv', 'name,age\nAlice,30');
     const cli = buildCli({ auth: okAuth(), graph: tripwireGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
@@ -299,22 +273,12 @@ describe('buildCli command surface', () => {
 
   it('accepts --id as an alias for --message-id on sole-message-id commands (P3)', async () => {
     let capturedPath = '';
-    const captureGraph: GraphClient = {
+    const captureGraph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
         capturedPath = path;
         return { ok: true, value: { id: 'AAMkAGI2', subject: 'hi' } };
       },
-      post: async () => ({ ok: true, value: {} }),
-      getBinary: async () => ({ ok: true, value: {} }),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ({ ok: true, value: {} }),
-      teamsChatIc3: async () => ({ ok: true, value: {} }),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ({ ok: true, value: {} }),
-      put: async () => ({ ok: true, value: {} }),
-      delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-    };
+    });
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-mail-message', '--id', 'AAMkAGI2']));
     // --id maps to messageId → the message path (a default $select is appended by the command).
@@ -322,19 +286,9 @@ describe('buildCli command surface', () => {
   });
 
   it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
-    const captureGraph: GraphClient = {
+    const captureGraph: GraphClient = fakeGraphClient({
       get: async () => ({ ok: true, value: { value: [] } }),
-      post: async () => ({ ok: true, value: {} }),
-      getBinary: async () => ({ ok: true, value: {} }),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ({ ok: true, value: {} }),
-      teamsChatIc3: async () => ({ ok: true, value: {} }),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ({ ok: true, value: {} }),
-      put: async () => ({ ok: true, value: {} }),
-      delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-    };
+    });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
@@ -523,22 +477,12 @@ describe('buildCli command surface', () => {
 
   it('still accepts the canonical flag name when the user does not use the alias', async () => {
     let capturedPath = '';
-    const captureGraph: GraphClient = {
+    const captureGraph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
         capturedPath = path;
         return { ok: true, value: { value: [] } };
       },
-      post: async () => ({ ok: true, value: {} }),
-      getBinary: async () => ({ ok: true, value: {} }),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ({ ok: true, value: {} }),
-      teamsChatIc3: async () => ({ ok: true, value: {} }),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ({ ok: true, value: {} }),
-      put: async () => ({ ok: true, value: {} }),
-      delete: async () => ({ ok: true, value: {} }),
-      getCachedTokenInfo: async () => ({ ok: true, value: { scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined } }),
-    };
+    });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-todo-tasks', '--todo-task-list-id', 'AAMkXYZ']));

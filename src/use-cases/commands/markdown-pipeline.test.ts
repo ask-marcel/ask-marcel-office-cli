@@ -1,22 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  ...overrides,
-});
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
 
 describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + image embedding + turndown', () => {
   it('converts inline HTML returned by getBinary directly', async () => {

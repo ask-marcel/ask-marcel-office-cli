@@ -104,7 +104,12 @@ const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
 const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
-    return err({ type: 'api_error', status: 400, message: 'referenceAttachment missing sourceUrl — Graph returned incomplete link metadata (the linked file may have been deleted or the share revoked). Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.' });
+    return err({
+      type: 'api_error',
+      status: 400,
+      message:
+        'referenceAttachment missing sourceUrl — Graph returned incomplete link metadata (the linked file may have been deleted or the share revoked). Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.',
+    });
   }
   const resolved = await graph.get(`/shares/${buildShareToken(sourceUrl)}/driveItem`);
   if (!resolved.ok) return resolved;
@@ -113,7 +118,12 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   const itemId = item.id;
   const name = item.name ?? '';
   if (typeof driveId !== 'string' || typeof itemId !== 'string') {
-    return err({ type: 'api_error', status: 500, message: 'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.' });
+    return err({
+      type: 'api_error',
+      status: 500,
+      message:
+        'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.',
+    });
   }
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard

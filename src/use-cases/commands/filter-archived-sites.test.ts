@@ -2,26 +2,18 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
 
 // A graph fake whose GET is routed by the probed site id, recording every probed path.
-const graphProbing = (byId: (id: string) => Result<unknown, GraphError>, probed: Array<string>): GraphClient => ({
-  get: async (path) => {
-    probed.push(path);
-    const id = /\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '';
-    return byId(id);
-  },
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-});
+const graphProbing = (byId: (id: string) => Result<unknown, GraphError>, probed: Array<string>): GraphClient =>
+  fakeGraphClient({
+    get: async (path) => {
+      probed.push(path);
+      const id = /\/sites\/([^?]+)\?/.exec(path)?.[1] ?? '';
+      return byId(id);
+    },
+  });
 
 const active = ok({ id: 's', webUrl: 'https://contoso.sharepoint.com/sites/Team' });
 const withStatus = (archiveStatus: string): Result<unknown, GraphError> => ok({ siteCollection: { archivalDetails: { archiveStatus } } });

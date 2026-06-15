@@ -2,21 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError, TokenInfo } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './scopes-check.ts';
 
-const fakeGraphWithTokenInfo = (tokenResult: Result<TokenInfo, GraphError>): GraphClient => ({
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => tokenResult,
-});
+const fakeGraphWithTokenInfo = (tokenResult: Result<TokenInfo, GraphError>): GraphClient => fakeGraphClient({ getCachedTokenInfo: async () => tokenResult });
 
 describe('scopes-check', () => {
   it('forwards the cached token info ({ scopes, audience, expiresAt, expiresInSeconds }) when getCachedTokenInfo succeeds', async () => {

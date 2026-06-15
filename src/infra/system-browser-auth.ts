@@ -139,7 +139,7 @@ const authenticateViaSystemBrowser = async (deps: SystemBrowserAuthDeps): Promis
   // 2. Open system browser with the port in URL
   const teamsUrl = `${TEAMS_URL}?ask_marcel_port=${actualPort}`;
   logger.info('system_browser.opening', { url: teamsUrl });
-  
+
   // Show progress to user
   process.stderr.write('Opening browser for authentication...\n');
   process.stderr.write('Please ensure the Ask Marcel Companion extension is installed in your browser.\n');
@@ -165,7 +165,8 @@ const authenticateViaSystemBrowser = async (deps: SystemBrowserAuthDeps): Promis
     // Extension timeout or server error
     logger.info('system_browser.failed', { reason: result.error.type });
     if (result.error.type === 'timeout') {
-      const message = 'Browser extension did not respond within timeout. ' +
+      const message =
+        'Browser extension did not respond within timeout. ' +
         'Make sure the Ask Marcel Companion extension is installed and enabled in your browser. ' +
         'See browser-extension/README.md for installation instructions. ' +
         'Alternatively, use --use-playwright flag for Playwright-based authentication.';

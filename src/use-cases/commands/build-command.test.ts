@@ -2,21 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildElevatedPickODataListCommand, buildListCommand } from './build-command.ts';
 
-const fakeGraph: GraphClient = {
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ({ ok: true, value: {} }),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ({ ok: true, value: {} }),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-};
+const fakeGraph: GraphClient = fakeGraphClient();
 
 describe('buildCommand', () => {
   it('returns err({ type: "validation_error" }) with the zod message when schema validation fails', async () => {
@@ -31,22 +20,12 @@ describe('buildCommand', () => {
 
   it('calls graph.get with the constructed path on valid params', async () => {
     let captured = '';
-    const graph: GraphClient = {
+    const graph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
         captured = path;
         return ok({});
       },
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
-      getElevated: async () => ({ ok: true, value: {} }),
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildCommand((p) => `/items/${p.id}`, z.object({ id: z.string() }));
     const result = await cmd.execute(graph, { id: '42' });
     expect(result).toEqual(ok({}));
@@ -67,22 +46,12 @@ describe('buildElevatedCommand', () => {
 
   it('calls graph.getElevated with the constructed path on valid params', async () => {
     let captured = '';
-    const graph: GraphClient = {
-      get: async () => ok({}),
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
+    const graph: GraphClient = fakeGraphClient({
       getElevated: async (path: string) => {
         captured = path;
         return ok({});
       },
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ({ ok: true, value: {} }),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildElevatedCommand((p) => `/chats/${p.id}`, z.object({ id: z.string() }));
     const result = await cmd.execute(graph, { id: '19:abc' });
     expect(result).toEqual(ok({}));
@@ -93,22 +62,12 @@ describe('buildElevatedCommand', () => {
 describe('buildListCommand', () => {
   it('appends $top to the constructed path when --top is supplied', async () => {
     let captured = '';
-    const graph: GraphClient = {
+    const graph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
         captured = path;
         return ok({});
       },
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
-      getElevated: async () => ok({}),
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ok({}),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildListCommand(() => '/me/messages', z.object({}));
     await cmd.execute(graph, { top: '5' });
     expect(captured).toBe('/me/messages?$top=5');
@@ -116,22 +75,12 @@ describe('buildListCommand', () => {
 
   it('rejects a non-numeric --top via Zod before reaching graph', async () => {
     let called = false;
-    const graph: GraphClient = {
+    const graph: GraphClient = fakeGraphClient({
       get: async () => {
         called = true;
         return ok({});
       },
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
-      getElevated: async () => ok({}),
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ok({}),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildListCommand(() => '/me/messages', z.object({}));
     const result = await cmd.execute(graph, { top: 'lots' });
     expect(called).toBe(false);
@@ -156,22 +105,12 @@ describe('buildListCommand', () => {
 describe('buildElevatedListCommand', () => {
   it('routes to graph.getElevated and applies OData passthrough', async () => {
     let captured = '';
-    const graph: GraphClient = {
-      get: async () => ok({}),
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
+    const graph: GraphClient = fakeGraphClient({
       getElevated: async (path: string) => {
         captured = path;
         return ok({});
       },
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ok({}),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildElevatedListCommand(() => '/me/chats', z.object({}));
     await cmd.execute(graph, { top: '3', filter: "topic eq 'project'" });
     expect(captured).toBe("/me/chats?$top=3&$filter=topic%20eq%20'project'");
@@ -181,22 +120,12 @@ describe('buildElevatedListCommand', () => {
 describe('buildElevatedPickODataListCommand', () => {
   it('routes to graph.getElevated and applies ONLY the picked OData keys (dropped keys never reach the URL even if supplied)', async () => {
     let captured = '';
-    const graph: GraphClient = {
-      get: async () => ok({}),
-      post: async () => ok({}),
-      getBinary: async () => ok({}),
+    const graph: GraphClient = fakeGraphClient({
       getElevated: async (path: string) => {
         captured = path;
         return ok({});
       },
-      teamsChat: async () => ok({}),
-      teamsChatIc3: async () => ok({}),
-      getBinaryElevated: async () => ok({}),
-      fetchUrl: async () => ok({}),
-      put: async () => ok({}),
-      delete: async () => ok({}),
-      getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-    };
+    });
     const cmd = buildElevatedPickODataListCommand(() => '/me/chats', z.object({}), ['top', 'select']);
     await cmd.execute(graph, { top: '3', orderby: 'lastUpdatedDateTime desc', select: 'id,topic', expand: 'members' });
     expect(captured).toBe('/me/chats?$top=3&$select=id%2Ctopic');

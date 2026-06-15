@@ -1,22 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { fetchRawBytes, inlineBinary } from './fetch-raw-bytes.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => ({
-  get: async () => ok({}),
-  post: async () => ok({}),
-  getBinary: async () => ok({}),
-  getElevated: async () => ok({}),
-  teamsChat: async () => ok({}),
-  teamsChatIc3: async () => ok({}),
-  getBinaryElevated: async () => ok({}),
-  fetchUrl: async () => ok({}),
-  put: async () => ok({}),
-  delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
-  ...overrides,
-});
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
 
 const PDF_HEADER = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
 const PDF_HEADER_B64 = 'JVBERi0=';
