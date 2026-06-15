@@ -2,6 +2,8 @@
 
 SOLID helps structure software to be flexible, maintainable, and testable. These principles reduce coupling and increase cohesion. In a codebase with no classes or interfaces, each principle still applies. We express it through function-type aliases and modules of arrow functions.
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## S | Single Responsibility Principle
 
 > "A module should have one, and only one, reason to change."

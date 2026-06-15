@@ -4,6 +4,8 @@
 
 The SUT of every unit test is a **primary port** — a use case, command handler, or application service at the hexagonal boundary. Inside the port, the full domain runs real: entities, value objects, domain services, aggregate roots. The only test doubles are **fakes** for secondary ports (repository, email sender, clock, token decoder, payment gateway, any adapter to the outside world).
 
+> **Note on examples.** Some example port signatures in this file are elided to `Promise<T>` for brevity where error handling is not the lesson. Real IO ports return `Promise<Result<T, PortError>>` and use-cases return `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 Benefits:
 
 - Refactoring the domain never breaks tests.
@@ -11,6 +13,19 @@ Benefits:
 - The design pressure lands on the right boundary: when a test is hard to write, the port's contract is wrong, not the entity.
 
 See `references/tdd.md` for the full treatment and Ian Cooper's context.
+
+## Test the code you own; trust your dependencies
+
+The first question before writing any test is *whose behaviour am I pinning?* Test only the code this repo owns. Never write a test whose real assertion is that a third-party library, the runtime, or the framework behaves as documented — that test pins someone else's contract, breaks when they release, and proves nothing about your code. Trust your dependencies; if one is genuinely suspect, the answer is to pin its version (hard rule 19) or replace it, not to grow a test suite around it.
+
+This single principle is why several other rules look the way they do:
+
+- **Adapters test the translation, not the SDK.** An infra adapter's job is to turn a library's contract into `Result<T, PortError>`. The test feeds a slice of the SDK's real surface (the two-constructor pattern, hard rule 13) and asserts that *your* mapping of success and error is correct — not that the SDK itself works. You are testing the seam, not the library behind it. See the infra-adapter section below and `references/testing-infra.md`.
+- **SDK-bridge lines are coverage-exempt.** A line whose only job is to construct or call into a third-party SDK has no behaviour of yours to cover, so it is exempt from the line-coverage gate rather than wrapped in a contortion test. See `references/workflow.md` (SDK-bridge lines).
+- **Domain pieces are used, not tested.** Entities, value objects, and domain services run real inside a primary-port test (the classicist rule above). You own them, but you pin their behaviour *through the port*, not in isolation — so they stay free to refactor.
+- **Prop-pure components are not unit-tested.** A design-system component is a deterministic prop→JSX map with no logic of its own (hard rule 21); there is nothing to own a test. It is covered by the design-system lint block and review, never by React Testing Library ceremony that re-proves React renders props.
+
+The same instinct underlies the mock ban (hard rule 13): you write fakes for the secondary-port contracts *you define*, and for code you do not own you inject a thin slice of its real surface — you never reach into a dependency to puppet it.
 
 ## The testing pyramid
 
@@ -182,10 +197,10 @@ Three shapes are permitted: **dummy**, **stub**, **fake**. Hand-written spies (a
 
 ### Dummy
 
-A record passed but never used.
+A record passed but never used. Satisfy the port with real no-ops — never `{} as Logger`, which is the non-narrowing `as` cast the skill bans.
 
 ```ts
-const dummyLogger = {} as Logger;
+const dummyLogger: Logger = { info: () => {}, warn: () => {}, error: () => {} };
 const service = createUserService(realRepo, dummyLogger);
 ```
 
@@ -225,40 +240,14 @@ When the code under test returns `Result<T, E>`, the fake needs an optional `err
 ```ts
 export const createSheetsFake = (config?: {
   tabs?: Partial<Record<string, ReadonlyArray<SheetRow>>>;
-  errors?: {
-    readRows?: SheetsError;
-    appendOrUpdate?: SheetsError;
-    deleteRow?: SheetsError;
-  };
+  errors?: { readRows?: SheetsError; appendOrUpdate?: SheetsError; deleteRow?: SheetsError };
 }): Sheets => {
-  const store = new Map<string, SheetRow[]>();
-  for (const [tab, rows] of Object.entries(config?.tabs ?? {})) store.set(tab, [...(rows ?? [])]);
-
-  return {
-    readRows: async (tab) => {
-      if (config?.errors?.readRows) return err(config.errors.readRows);
-      return ok(store.get(tab) ?? []);
-    },
-    appendOrUpdate: async (tab, row) => {
-      if (config?.errors?.appendOrUpdate) return err(config.errors.appendOrUpdate);
-      const rows = store.get(tab) ?? [];
-      store.set(tab, [...rows.filter((r) => r.id !== row.id), row]);
-      return ok(undefined);
-    },
-  };
+  // each operation checks its errors entry first: if set, return err(config.errors.<op>);
+  // otherwise act on an in-memory store seeded from config.tabs.
 };
 ```
 
-Used in a test:
-
-```ts
-const sheets = createSheetsFake({
-  tabs: { POST: [row] },
-  errors: { appendOrUpdate: { kind: 'write-failed', message: 'quota' } },
-});
-```
-
-Cast the error-map value to the port's discriminated-union shape with `as const` on the `kind` so TypeScript narrows to the right variant. See `references/result-type.md`.
+Full implementation: `references/result-type.md` (fakes with error injection).
 
 ### Batch use-cases: `ok(summary)` with an `errored` count
 
@@ -302,17 +291,7 @@ expect(spy.sentEmails).toContain(email('user@example.com'));
 
 ### No `mock` from `bun:test` (absolute, enforced by lint)
 
-The entire `mock` namespace of `bun:test` is banned — `mock()`, `mock.module()`, `.toHaveBeenCalledWith`, `.toHaveBeenCalledTimes`. Enforced by `no-restricted-imports` in `eslint.config.js`:
-
-```js
-'no-restricted-imports': ['error', {
-  paths: [{
-    name: 'bun:test',
-    importNames: ['mock'],
-    message: 'Use fakes (in-memory implementations), hand-written spies, or the createXFromApi(api) two-constructor pattern for infra adapters. See references/testing.md.',
-  }],
-}],
-```
+The entire `mock` namespace of `bun:test` is banned — `mock()`, `mock.module()`, `.toHaveBeenCalledWith`, `.toHaveBeenCalledTimes`. The canonical `no-restricted-imports` block that enforces this lives in `references/bun-typescript.md` (ESLint config section); it bans the entire `mock` namespace from `bun:test`.
 
 ```ts
 // BANNED
@@ -366,7 +345,7 @@ describe('placeOrder', () => {
 
     const [saved] = await orders.findByCustomer(customer);
     expect(saved.total).toEqual(money(80, 'EUR'));
-    expect(emails.sentTo).toContain(email('c-1@example.com'));
+    expect(emails.sentEmails).toContain(email('c-1@example.com'));
   });
 });
 ```
@@ -438,13 +417,13 @@ it('round-trips through the factory', () => {
   files: ['src/**/!(*.test).ts'],
   rules: {
     'no-restricted-imports': ['error', {
-      patterns: [{ group: ['*'], importNames: ['/Unsafe$/'], message: '*Unsafe helpers are test-only' }],
+      patterns: [{ group: ['**'], importNamePattern: 'Unsafe$', message: '*Unsafe helpers are test-only' }],
     }],
   },
 }
 ```
 
-(ESLint's `importNames` doesn't accept regex directly; in practice the rule is enforced by review or by a small custom rule. The convention is the load-bearing part.)
+(The pattern IS lint-enforceable: ESLint ≥ 8.55 supports `importNamePattern` — a regex over imported names — inside `patterns`, so no custom rule is needed.)
 
 ### Secondary-port integration tests
 
@@ -461,7 +440,7 @@ describe('postgresOrderRepo', () => {
   it('saves an order and finds it by customer', async () => {
     const order = buildOrder({ customer: customerId('c-1'), total: money(80, 'EUR') });
     await repo.save(order);
-    const [found] = await repo.findByCustomer(customer('c-1'));
+    const [found] = await repo.findByCustomer(customerId('c-1'));
     expect(found).toEqual(order);
   });
 });

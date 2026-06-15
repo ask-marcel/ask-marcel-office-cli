@@ -1,5 +1,7 @@
 # Object-Oriented Design (class-free edition)
 
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+
 ## Responsibility-Driven Design
 
 Modules are defined by their responsibilities, not their data.

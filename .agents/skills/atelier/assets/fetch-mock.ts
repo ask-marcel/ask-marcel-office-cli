@@ -23,7 +23,7 @@
  * or use url.endsWith(...) for exact path-suffix matching. A broad
  * url.includes(...) will match more URLs than you expect.
  *
- * See skills/atelier/references/testing.md (Testing infra adapters, pattern 1).
+ * See skills/atelier/references/testing-infra.md (§ 1. HTTP via globalThis.fetch → installFetchMock).
  */
 
 // FetchInput / FetchInit are derived from the global `fetch` signature so the

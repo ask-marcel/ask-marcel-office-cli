@@ -21,23 +21,28 @@ if [ ! -f package.json ]; then
   exit 0
 fi
 
-# Match a value position equal to the bare strings "latest" or "*".
-# Catches:  "any-pkg": "latest",   "x": "*"
-# Permits:  "x": "^1.2.3" / "1.2.3" / "~1.2.3" / ">=1.0.0" etc.
-violations=$(grep -nE '"\*"|"latest"' package.json || true)
+# Match a VALUE position (after the colon) equal to the bare strings
+# "latest", "*", or a bare dist-tag ("beta", "alpha", "next", "canary",
+# "rc") — all non-deterministic in exactly the way rule 19 bans.
+# Anchoring on the colon keeps package NAMES out of scope (the dependency
+# "next" is fine; the version "next" is not).
+# Catches:  "any-pkg": "latest",   "x": "*",   "plugin": "beta"
+# Permits:  "x": "^1.2.3" / "~1.2.3" / ">=1.0.0" / "^4.0.0-beta.0",  "next": "16.1.1"
+violations=$(grep -nE ':[[:space:]]*"(\*|latest|beta|alpha|next|canary|rc)"' package.json || true)
 
 if [ -z "$violations" ]; then
   exit 0
 fi
 
 cat <<EOF >&2
-  ╳ package.json contains forbidden version "latest" or "*":
+  ╳ package.json contains a forbidden version string ("latest", "*", or a bare dist-tag):
 
 $(echo "$violations" | sed 's/^/      /')
 
   Atelier rule 19: every dependency declares a concrete version or range.
   Fix:
-    - Replace each "latest" / "*" with the actual installed version.
+    - Replace each "latest" / "*" / bare dist-tag with the actual installed
+      version (a pre-release pin like "^4.0.0-beta.0" is fine; bare "beta" is not).
     - For new packages, use \`bun add <pkg>\` (or \`bun add -d <pkg>\`)
       instead of hand-editing — Bun pins to ^X.Y.Z automatically.
     - To bump everything to current latest, run \`bun update\` and commit
