@@ -210,4 +210,29 @@ describe('command meta — invariants on every registered command', () => {
       });
     });
   }
+
+  it('references no PHANTOM command names in any prose (summary / option descriptions / responseShape / example / bodyTemplate)', () => {
+    // Phantom-name guard (QA-2026-06-16): a prose hint pointing at a command that
+    // does not exist (e.g. the plugin once taught `get-event` for `get-calendar-event`)
+    // ships silently — meta.test previously validated only per-command FLAGS. Validate
+    // every command-shaped reference against the registry + lifecycle names + aliases.
+    const valid = new Set<string>(['docs', 'help-json', 'login', 'logout', 'update']);
+    for (const [name, cmd] of populated) {
+      valid.add(name);
+      for (const alias of cmd.meta.commandAliases ?? []) valid.add(alias);
+    }
+    const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
+    const phantom: string[] = [];
+    for (const [name, cmd] of populated) {
+      const prose = [cmd.meta.summary, cmd.meta.example, cmd.meta.responseShape ?? '', cmd.meta.bodyTemplate ?? '', ...cmd.meta.options.map((o) => o.description)].join('\n');
+      // (a) explicit `ask-marcel <name>` invocations — unambiguous
+      for (const m of prose.matchAll(/ask-marcel\s+([a-z][a-z0-9-]+)/g)) if (!valid.has(m[1] ?? '')) phantom.push(`${name}: ask-marcel ${m[1]}`);
+      // (b) backticked command-shaped tokens (verb-prefixed kebab) — `feeds \`get-calendar-event\``
+      for (const m of prose.matchAll(/`([a-z][a-z0-9-]+)`/g)) {
+        const tok = m[1] ?? '';
+        if (verbKebab.test(tok) && !valid.has(tok)) phantom.push(`${name}: \`${tok}\``);
+      }
+    }
+    expect(phantom).toEqual([]);
+  });
 });
