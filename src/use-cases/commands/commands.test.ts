@@ -27,7 +27,7 @@ import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as listAccessibleDrives from './list-accessible-drives.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
-import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
+import * as downloadDriveItemContent from './download-drive-item-content.ts';
 import * as getCalendarEvent from './get-calendar-event.ts';
 import * as getCalendarView from './get-calendar-view.ts';
 import * as getCurrentUser from './get-current-user.ts';
@@ -200,7 +200,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
-  'download-onedrive-file-content': downloadOnedriveFileContent,
+  'download-drive-item-content': downloadDriveItemContent,
   'get-drive-item': getDriveItem,
   'list-drive-item-permissions': listDriveItemPermissions,
   'list-drive-item-versions': listDriveItemVersions,
@@ -679,9 +679,9 @@ describe('commands', () => {
     if (result.ok) expect(result.value).toEqual({ value: [{ id: 'v1' }] });
   });
 
-  it('download-onedrive-file-content returns binary bytes as faithful inline base64 (content-sniffed — not coerced to text)', async () => {
+  it('download-drive-item-content returns binary bytes as faithful inline base64 (content-sniffed — not coerced to text)', async () => {
     const binaryB64 = btoa(String.fromCharCode(0xff, 0xfe, 0xfd, 0x80, 0x81)); // invalid UTF-8 → sniffs binary
-    const result = await callCommand('download-onedrive-file-content', { driveId: 'd1', itemId: 'i1' }, { contentType: 'application/octet-stream', size: 5, base64: binaryB64 });
+    const result = await callCommand('download-drive-item-content', { driveId: 'd1', itemId: 'i1' }, { contentType: 'application/octet-stream', size: 5, base64: binaryB64 });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { contentType: string; base64: string };
@@ -690,11 +690,11 @@ describe('commands', () => {
     }
   });
 
-  it('download-onedrive-file-content returns valid-UTF-8 bytes as text (content-sniffed, regardless of extension)', async () => {
+  it('download-drive-item-content returns valid-UTF-8 bytes as text (content-sniffed, regardless of extension)', async () => {
     const utf8 = new TextEncoder().encode('hi 文'); // multi-byte: proves the sniffer decodes real UTF-8, not just ASCII
     const textB64 = btoa(String.fromCharCode(...utf8));
     const result = await callCommand(
-      'download-onedrive-file-content',
+      'download-drive-item-content',
       { driveId: 'd1', itemId: 'i1' },
       { contentType: 'application/octet-stream', size: utf8.byteLength, base64: textB64 }
     );
@@ -706,12 +706,12 @@ describe('commands', () => {
     }
   });
 
-  it('download-onedrive-file-content rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint instead of empty error (audit round-6 §1.1)', async () => {
+  it('download-drive-item-content rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint instead of empty error (audit round-6 §1.1)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'Reports', folder: { childCount: 12 } }) },
     ]);
-    const cmd = cmdMap['download-onedrive-file-content'];
-    if (!cmd) throw new Error('download-onedrive-file-content not registered');
+    const cmd = cmdMap['download-drive-item-content'];
+    if (!cmd) throw new Error('download-drive-item-content not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iFolder' });
     expect(result.ok).toBe(false);
@@ -1194,7 +1194,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-onedrive-file-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — audit v1.0.0 §bug-3)', async () => {
+  it('download-drive-item-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — audit v1.0.0 §bug-3)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 5 }) },
       {
@@ -1203,8 +1203,8 @@ describe('commands', () => {
         response: () => new Response(new TextEncoder().encode('# hi'), { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
       },
     ]);
-    const cmd = cmdMap['download-onedrive-file-content'];
-    if (!cmd) throw new Error('download-onedrive-file-content not registered');
+    const cmd = cmdMap['download-drive-item-content'];
+    if (!cmd) throw new Error('download-drive-item-content not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const result = await cmd.execute(graph, { driveId: 'd1', itemId: 'iText' });
     expect(result.ok).toBe(true);
@@ -1267,7 +1267,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-as-pdf short-circuits plain-text source extensions to `{contentType: "text/plain", size, text}` for envelope parity with download-onedrive-file-content (audit round-7 B5)', async () => {
+  it('download-drive-item-as-pdf short-circuits plain-text source extensions to `{contentType: "text/plain", size, text}` for envelope parity with download-drive-item-content (audit round-7 B5)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 4 }) },
       {
@@ -1384,7 +1384,7 @@ describe('commands', () => {
     expect(v.media[0]?.contentType).toBe('image/png');
   });
 
-  it('extract-drive-item-images rejects an unsupported source with a 415 that names the extension and points at download-onedrive-file-content', async () => {
+  it('extract-drive-item-images rejects an unsupported source with a 415 that names the extension and points at download-drive-item-content', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt/content', method: 'GET', response: () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }) },
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iTxt', method: 'GET', response: Response.json({ name: 'notes.txt' }) },
@@ -1399,7 +1399,7 @@ describe('commands', () => {
     if (result.error.type !== 'api_error') return;
     expect(result.error.status).toBe(415);
     expect(result.error.message).toContain('txt is not a supported document — image extraction supports pdf and docx / xlsx / pptx');
-    expect(result.error.message).toContain('download-onedrive-file-content');
+    expect(result.error.message).toContain('download-drive-item-content');
   });
 
   it('extract-drive-item-images returns a validation_error when itemId is missing', async () => {
@@ -4864,7 +4864,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-drives', params: {} },
   { name: 'get-drive-root-item', params: { driveId: 'd1' } },
   { name: 'list-folder-files', params: { driveId: 'd1', itemId: 'i1' } },
-  { name: 'download-onedrive-file-content', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' } },
+  { name: 'download-drive-item-content', params: { driveId: 'd1', itemId: 'i1' }, responseBody: { contentType: 'application/octet-stream', size: 5, base64: 'JVBERi0=' } },
   { name: 'get-drive-item', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' } },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' } },
@@ -5056,7 +5056,7 @@ describe('command schema rejection', () => {
     { name: 'get-specific-calendar-event', params: { calendarId: 'c1' } },
     { name: 'list-team-channels', params: {} },
     { name: 'get-team-channel', params: { teamId: 'tm1' } },
-    { name: 'download-onedrive-file-content', params: { driveId: 'd1' } },
+    { name: 'download-drive-item-content', params: { driveId: 'd1' } },
     { name: 'download-drive-item-version', params: { driveId: 'd1', itemId: 'i1' } },
     { name: 'download-drive-item-as-pdf', params: { driveId: 'd1' } },
     { name: 'download-drive-item-as-markdown', params: { driveId: 'd1' } },
@@ -5126,7 +5126,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-drives', params: {}, expectedPath: '/me/drives' },
   { name: 'get-drive-root-item', params: { driveId: 'd1' }, expectedPath: '/drives/d1/root' },
   { name: 'list-folder-files', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/children' },
-  { name: 'download-onedrive-file-content', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
+  { name: 'download-drive-item-content', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'get-drive-item', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1' },
   { name: 'list-drive-item-permissions', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/permissions' },
   { name: 'list-drive-item-versions', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/versions' },

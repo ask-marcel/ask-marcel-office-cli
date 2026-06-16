@@ -42,7 +42,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     });
   }
 
-  // Audit round-7 B5: parity with `download-onedrive-file-content`. Decode
+  // Audit round-7 B5: parity with `download-drive-item-content`. Decode
   // plain-text source bytes as UTF-8 and return `{contentType: "text/plain",
   // size, text}` instead of base64 — sibling commands now share the same
   // envelope shape for the same input.

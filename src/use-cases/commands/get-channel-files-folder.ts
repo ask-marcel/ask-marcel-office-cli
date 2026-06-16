@@ -8,7 +8,7 @@ const { execute, schema } = buildSelectableCommand((p) => `/teams/${p.teamId}/ch
 
 const meta: CommandMeta = {
   summary:
-    "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
+    "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-drive-item-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
   category: 'teams',
   graphMethod: 'GET',
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/filesFolder',

@@ -4,6 +4,7 @@ export type CommandManifestEntry = {
   readonly name: string;
   readonly summary: string;
   readonly category: CommandCategory;
+  readonly commandAliases?: CommandMeta['commandAliases'];
   readonly graphMethod: CommandMeta['graphMethod'];
   readonly graphPathTemplate: string;
   readonly graphDocsUrl: string;

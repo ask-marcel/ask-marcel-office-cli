@@ -9,7 +9,7 @@ import { extractImagesFromBytes } from './image-extraction.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 
-const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-onedrive-file-content` and process locally.';
+const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-drive-item-content` and process locally.';
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
@@ -35,7 +35,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Extract the embedded images from a OneDrive / SharePoint document. For docx / xlsx / pptx (and their macro-enabled / template variants) it reads the OOXML media parts directly (png/jpg/gif/bmp/tiff/webp/svg) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. For a pdf it walks every page via unpdf and re-encodes each painted image as PNG (note: page-oriented — it captures images as painted on each page, but NOT layer-hidden/unpainted XObjects or the full uncropped original behind a clipped image). Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded in the response. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. For any other format the command returns a 415 pointing at `download-onedrive-file-content`.',
+    'Extract the embedded images from a OneDrive / SharePoint document. For docx / xlsx / pptx (and their macro-enabled / template variants) it reads the OOXML media parts directly (png/jpg/gif/bmp/tiff/webp/svg) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. For a pdf it walks every page via unpdf and re-encodes each painted image as PNG (note: page-oriented — it captures images as painted on each page, but NOT layer-hidden/unpainted XObjects or the full uncropped original behind a clipped image). Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded in the response. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. For any other format the command returns a 415 pointing at `download-drive-item-content`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',

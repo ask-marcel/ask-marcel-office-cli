@@ -13,7 +13,7 @@ const { execute } = buildCommand(() => '/me/drive/sharedWithMe', schema);
 
 const meta: CommandMeta = {
   summary:
-    'List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/select/filter/etc. are all silently ignored), so the CLI does not advertise them. The full collection (~500 items in a typical tenant) is always returned; slice client-side or pair with the global output-path flag to land the raw JSON on disk.',
+    'List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-drive-item-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/select/filter/etc. are all silently ignored), so the CLI does not advertise them. The full collection (~500 items in a typical tenant) is always returned; slice client-side or pair with the global output-path flag to land the raw JSON on disk.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/me/drive/sharedWithMe',

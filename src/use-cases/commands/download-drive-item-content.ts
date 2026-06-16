@@ -47,6 +47,7 @@ const meta: CommandMeta = {
   summary:
     'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: "text/plain", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.',
   category: 'drive',
+  commandAliases: ['download-onedrive-file-content'],
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-get-content',
@@ -65,7 +66,7 @@ const meta: CommandMeta = {
       description: 'driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.',
     },
   ],
-  example: "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "text/plain", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.',
   producesBytes: true,

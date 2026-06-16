@@ -4,7 +4,7 @@ import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as listAccessibleDrives from './list-accessible-drives.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
-import * as downloadOnedriveFileContent from './download-onedrive-file-content.ts';
+import * as downloadDriveItemContent from './download-drive-item-content.ts';
 import * as getCalendarEvent from './get-calendar-event.ts';
 import * as getCalendarView from './get-calendar-view.ts';
 import * as getCurrentUser from './get-current-user.ts';
@@ -180,7 +180,7 @@ const commands: Record<string, Command> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
-  'download-onedrive-file-content': downloadOnedriveFileContent,
+  'download-drive-item-content': downloadDriveItemContent,
   'get-drive-item': getDriveItem,
   'list-drive-item-permissions': listDriveItemPermissions,
   'list-drive-item-versions': listDriveItemVersions,

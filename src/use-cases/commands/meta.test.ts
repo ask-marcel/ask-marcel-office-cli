@@ -78,6 +78,13 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
+      it('keeps any commandAliases kebab-case and non-colliding with a canonical command name', () => {
+        for (const alias of cmd.meta.commandAliases ?? []) {
+          expect(alias).toMatch(/^[a-z][a-z0-9-]*$/);
+          expect(Object.keys(commands).includes(alias)).toBe(false);
+        }
+      });
+
       it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/message-token analogues — are excluded)', () => {
         const runtimeFlagNames = new Set([
           'top',

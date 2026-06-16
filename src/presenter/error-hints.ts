@@ -95,7 +95,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_drive_share_link_on_teams_resolver',
-    hint: 'Re-run with `ask-marcel resolve-drive-share-link --url <same-url>` — the URL is a OneDrive / SharePoint share link (`*.sharepoint.com` or `1drv.ms`), not a Teams message link. The returned `graphPath` (`/shares/{token}/driveItem`) feeds `get-drive-item`, `download-onedrive-file-content`, or the conversion siblings.',
+    hint: 'Re-run with `ask-marcel resolve-drive-share-link --url <same-url>` — the URL is a OneDrive / SharePoint share link (`*.sharepoint.com` or `1drv.ms`), not a Teams message link. The returned `graphPath` (`/shares/{token}/driveItem`) feeds `get-drive-item`, `download-drive-item-content`, or the conversion siblings.',
   },
   {
     source: 'cli',

@@ -10,7 +10,7 @@ import { buildShareToken } from './sharepoint-link-extractor.ts';
 // token that Graph's [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)
 // endpoint accepts. Pure encoding — no HTTP — the actual `/shares/{token}/driveItem`
 // fetch is left to a follow-up call (the LLM may want different downstream
-// commands depending on the resolved driveItem: `download-onedrive-file-content`,
+// commands depending on the resolved driveItem: `download-drive-item-content`,
 // `convert-mail-attachment-to-markdown`, etc.).
 //
 // Accepted host shapes:
@@ -96,7 +96,7 @@ const execute: Command['execute'] = async (_graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-onedrive-file-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
+    "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-drive-item-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '{url}',

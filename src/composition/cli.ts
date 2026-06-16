@@ -466,6 +466,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     program.commandsGroup(`${CATEGORY_LABELS[category]}:`);
     for (const [name, cmd] of entries) {
       const commandDef = program.command(name).description(cmd.meta.summary);
+      // Back-compat: deprecated former names stay invokable as commander aliases.
+      for (const aliasName of cmd.meta.commandAliases ?? []) commandDef.alias(aliasName);
       // Audit round-7 B6: every single-value flag rejects repeated occurrences.
       // Commander.js by default last-wins on `--filter A --filter B` — surprising
       // for an LLM consumer that constructed two filters expecting both to apply.

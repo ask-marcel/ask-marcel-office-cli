@@ -32,7 +32,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-drive-special-folder': ['Files.Read'],
   'list-folder-files': ['Files.Read'],
   'get-drive-item': ['Files.Read'],
-  'download-onedrive-file-content': ['Files.Read'],
+  'download-drive-item-content': ['Files.Read'],
   'list-drive-item-permissions': ['Files.Read'],
   'list-drive-item-versions': ['Files.Read'],
   'list-drive-item-thumbnails': ['Files.Read'],

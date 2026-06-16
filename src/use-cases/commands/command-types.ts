@@ -23,7 +23,7 @@ type CommandOptionAlias = {
  * on commands whose path is folder-scoped (e.g. `list-folder-files`,
  * `get-drive-delta` — the item ID MUST point at a folder). Commands like
  * `get-drive-item`, `list-drive-item-versions`, and
- * `download-onedrive-file-content` accept BOTH files and folders, so they
+ * `download-drive-item-content` accept BOTH files and folders, so they
  * keep `--item-id` as the only name to avoid misleading the LLM into
  * thinking the value must be a folder.
  */
@@ -97,6 +97,14 @@ type PaginationStrategy =
 type CommandMeta = {
   readonly summary: string;
   readonly category: CommandCategory;
+  /**
+   * Deprecated former command names kept working as commander-level aliases for
+   * back-compat after a rename (e.g. `download-onedrive-file-content` →
+   * `download-drive-item-content`). The canonical registry key is what `--help`
+   * and the manifest list first; each alias here is also accepted on the CLI and
+   * surfaced in the manifest so an LLM that learned the old name still resolves.
+   */
+  readonly commandAliases?: ReadonlyArray<string>;
   readonly graphMethod: CommandHttpMethod;
   readonly graphPathTemplate: string;
   readonly graphDocsUrl: string;

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-16T08:24:00.940Z",
+  "generatedAt": "2026-06-16T09:53:53.973Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -461,8 +461,36 @@
       "producesBytes": true
     },
     {
+      "name": "download-drive-item-content",
+      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: \"text/plain\", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.",
+      "category": "drive",
+      "commandAliases": [
+        "download-onedrive-file-content"
+      ],
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`."
+        }
+      ],
+      "example": "ask-marcel download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
+      "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.",
+      "producesBytes": true
+    },
+    {
       "name": "download-drive-item-version",
-      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-onedrive-file-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Audit v1.0.0 §D4 caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch).",
+      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Audit v1.0.0 §D4 caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch).",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content",
@@ -519,33 +547,8 @@
       "producesBytes": true
     },
     {
-      "name": "download-onedrive-file-content",
-      "summary": "Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: \"text/plain\", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.",
-      "category": "drive",
-      "graphMethod": "GET",
-      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
-      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
-      "options": [
-        {
-          "name": "drive-id",
-          "key": "driveId",
-          "required": true,
-          "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
-        },
-        {
-          "name": "item-id",
-          "key": "itemId",
-          "required": true,
-          "description": "driveItem ID of the file to download. Returned by `ask-marcel list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`."
-        }
-      ],
-      "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.",
-      "producesBytes": true
-    },
-    {
       "name": "extract-drive-item-images",
-      "summary": "Extract the embedded images from a OneDrive / SharePoint document. For docx / xlsx / pptx (and their macro-enabled / template variants) it reads the OOXML media parts directly (png/jpg/gif/bmp/tiff/webp/svg) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. For a pdf it walks every page via unpdf and re-encodes each painted image as PNG (note: page-oriented — it captures images as painted on each page, but NOT layer-hidden/unpainted XObjects or the full uncropped original behind a clipped image). Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded in the response. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. For any other format the command returns a 415 pointing at `download-onedrive-file-content`.",
+      "summary": "Extract the embedded images from a OneDrive / SharePoint document. For docx / xlsx / pptx (and their macro-enabled / template variants) it reads the OOXML media parts directly (png/jpg/gif/bmp/tiff/webp/svg) — including original full-resolution / un-cropped originals and images on hidden slides the rendered view never shows. For a pdf it walks every page via unpdf and re-encodes each painted image as PNG (note: page-oriented — it captures images as painted on each page, but NOT layer-hidden/unpainted XObjects or the full uncropped original behind a clipped image). Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded in the response. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. For any other format the command returns a 415 pointing at `download-drive-item-content`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
@@ -729,7 +732,7 @@
     },
     {
       "name": "get-channel-files-folder",
-      "summary": "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
+      "summary": "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-drive-item-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/filesFolder",
@@ -1133,7 +1136,7 @@
     },
     {
       "name": "get-drive-special-folder",
-      "summary": "Resolve a OneDrive well-known folder via `--folder-name` (one of `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-onedrive-file-content`.",
+      "summary": "Resolve a OneDrive well-known folder via `--folder-name` (one of `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-drive-item-content`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/special/{folder-name}",
@@ -5851,7 +5854,7 @@
     },
     {
       "name": "list-shared-with-me",
-      "summary": "List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/select/filter/etc. are all silently ignored), so the CLI does not advertise them. The full collection (~500 items in a typical tenant) is always returned; slice client-side or pair with the global output-path flag to land the raw JSON on disk.",
+      "summary": "List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-drive-item-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/select/filter/etc. are all silently ignored), so the CLI does not advertise them. The full collection (~500 items in a typical tenant) is always returned; slice client-side or pair with the global output-path flag to land the raw JSON on disk.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drive/sharedWithMe",
@@ -7174,7 +7177,7 @@
     },
     {
       "name": "resolve-drive-share-link",
-      "summary": "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-onedrive-file-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
+      "summary": "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-drive-item-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",

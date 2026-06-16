@@ -24,7 +24,7 @@ const DRIVE_HINTS: ConversionHints = {
   legacyPpt:
     'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown here — there is no pure-JS parser for the format. Convert it to PDF first with `download-drive-item-as-pdf` (Graph renders legacy .ppt), then read the PDF with a vision-capable model.',
   image: (ext) =>
-    `${ext} is an image and cannot be converted to markdown. Fetch the bytes with \`download-onedrive-file-content\` and feed them to a vision-capable model, or pull images embedded in a document with \`extract-drive-item-images\`.`,
+    `${ext} is an image and cannot be converted to markdown. Fetch the bytes with \`download-drive-item-content\` and feed them to a vision-capable model, or pull images embedded in a document with \`extract-drive-item-images\`.`,
   generic: (ext) => `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`,
 };
 
