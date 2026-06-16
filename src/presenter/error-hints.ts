@@ -120,6 +120,11 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   },
   {
     source: 'cli',
+    matchCode: (c) => c === 'commander.excessArguments',
+    hint: 'Unexpected bare-word argument(s). This command takes only `--flags`, never positional words — a token like `item--id` or `id` is read as a stray positional. The usual cause is a mistyped flag: `item--id` should be `--item-id`, and every flag needs its leading `--`. Run `ask-marcel <command> --help` for the exact flag spellings.',
+  },
+  {
+    source: 'cli',
     matchCode: (c) => c === 'commander.missingMandatoryOptionValue' || c === 'commander.optionMissingArgument',
     hint: 'A required CLI flag is missing or was passed without its value. Run `ask-marcel <command> --help` for the full required-params list with their value shapes.',
   },

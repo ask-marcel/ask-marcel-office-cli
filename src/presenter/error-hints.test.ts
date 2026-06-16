@@ -307,6 +307,14 @@ describe('findErrorHint — Commander.js parser errors (Audit Alex-session §2 f
     expect(result?.hint).toContain('help-json --terse --category');
   });
 
+  it('maps `commander.excessArguments` (a bare-word flag typo like `item--id`) to a hint explaining flags need `--`', () => {
+    const result = findErrorHint("too many arguments for 'get-mail-message'. Expected 0 arguments but got 2.", 'commander.excessArguments');
+    expect(result?.source).toBe('cli');
+    expect(result?.hint).toContain('item--id');
+    expect(result?.hint).toContain('--item-id');
+    expect(result?.hint).toContain('ask-marcel <command> --help');
+  });
+
   it('maps `commander.missingMandatoryOptionValue` to a "required flag missing — re-read --help" hint', () => {
     const result = findErrorHint("required option '--message-id <value>' not specified", 'commander.missingMandatoryOptionValue');
     expect(result?.source).toBe('cli');
