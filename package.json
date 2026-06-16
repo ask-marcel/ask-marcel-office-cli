@@ -64,7 +64,7 @@
     "mutate": "stryker run",
     "mutate:changed": "bash scripts/mutate-changed.sh",
     "mutate:staged": "bash scripts/mutate-staged.sh",
-    "build:js": "bun build src/main.ts --target=node --outfile=dist/cli.js --format=esm --external playwright --external update-notifier && bun build src/index.ts --target=node --outfile=dist/index.js --format=esm --external playwright --external update-notifier",
+    "build:js": "bun build src/main.ts --target=node --outfile=dist/cli.js --format=esm --external playwright --external update-notifier --external xlsx --external mammoth --external jszip --external unpdf --external turndown --external turndown-plugin-gfm --external word-extractor --external @kenjiuno/msgreader --external fast-xml-parser --external winston && bun build src/index.ts --target=node --outfile=dist/index.js --format=esm --external playwright --external update-notifier --external xlsx --external mammoth --external jszip --external unpdf --external turndown --external turndown-plugin-gfm --external word-extractor --external @kenjiuno/msgreader --external fast-xml-parser --external winston",
     "build:types": "bun --bun x tsc -p tsconfig.build.json",
     "docs:gen": "bun run scripts/gen-docs.ts",
     "build": "rm -rf dist && bun run docs:gen && bun run build:js && bun run build:types && bun run scripts/fix-dts-extensions.ts && bun run scripts/add-shebang.ts && cp docs/commands.json dist/commands.json",
