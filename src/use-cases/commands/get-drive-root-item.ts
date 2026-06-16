@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/root`, baseSchema);
@@ -18,8 +19,7 @@ const meta: CommandMeta = {
       key: 'driveId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     ...selectExpandOptions,
   ],

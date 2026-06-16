@@ -3,6 +3,7 @@ import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1) });
 const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/pivotTables`, baseSchema);
@@ -21,7 +22,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description: 'OneDrive / SharePoint drive ID.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     {
       name: 'item-id',

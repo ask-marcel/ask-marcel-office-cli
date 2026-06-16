@@ -6,6 +6,7 @@ import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -48,8 +49,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .zip file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     {

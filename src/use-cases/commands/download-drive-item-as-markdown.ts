@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -44,8 +45,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`.' },
     {

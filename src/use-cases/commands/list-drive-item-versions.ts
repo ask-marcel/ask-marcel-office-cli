@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/versions`, baseSchema);
@@ -18,9 +19,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, ' +
-        'or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     ...noSkipOptions,

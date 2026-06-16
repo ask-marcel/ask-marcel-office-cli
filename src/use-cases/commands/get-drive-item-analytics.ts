@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/analytics`, schema);
@@ -17,7 +18,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description: 'OneDrive / SharePoint drive ID.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     {
       name: 'item-id',

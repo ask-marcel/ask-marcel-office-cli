@@ -9,6 +9,7 @@ import { formatZodError } from './format-zod-error.ts';
 import { extractExternalRels } from './ooxml-metadata.ts';
 import { extractSharepointUrls, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import type { ResolvedLink } from './sharepoint-link-extractor.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 /**
  * The document-side sibling of `extract-sharepoint-links-in-mail`: pulls a
@@ -83,8 +84,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     {
       name: 'item-id',

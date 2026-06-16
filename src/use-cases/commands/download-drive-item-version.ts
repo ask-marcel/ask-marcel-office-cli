@@ -8,6 +8,7 @@ import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 import { normalizeVersionId } from './version-id.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // v1.4.0 surface-consolidation: the three historical-version downloads
 // (`-content`, `-as-pdf`, `-as-markdown`) shared the exact same schema +
@@ -82,8 +83,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     {

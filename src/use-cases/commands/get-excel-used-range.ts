@@ -3,6 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { mapWacError } from './excel-error.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // Audit Alex-session §3 follow-up: the Graph `usedRange()` endpoint returns
 // four parallel 2D arrays — `values`, `text`, `numberFormat`, `formulas`.
@@ -91,7 +92,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description: 'OneDrive / SharePoint drive ID.',
+      description: DRIVE_ID_DESCRIPTION,
     },
     {
       name: 'item-id',

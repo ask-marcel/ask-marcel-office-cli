@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 /**
  * Renders an Excel chart to a PNG via Graph's chart `Image()` function. Unlike
@@ -47,7 +48,7 @@ const meta: CommandMeta = {
   graphPathTemplate: "/drives/{drive-id}/items/{item-id}/workbook/worksheets/{worksheet-id}/charts/{chart-id}/Image(width=0,height=0,fittingMode='Fit')",
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chart-image',
   options: [
-    { name: 'drive-id', key: 'driveId', required: true, description: 'OneDrive / SharePoint drive ID.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: DRIVE_ID_DESCRIPTION },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     {
       name: 'worksheet-id',
