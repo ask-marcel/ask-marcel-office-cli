@@ -3,6 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { CommandCategory, Command, CommandMeta } from './command-types.ts';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
 import { CATEGORY_LABELS, renderCommandMarkdown } from './docs-render.ts';
+import { firstSentence } from './first-sentence.ts';
 import { lookupScopes } from './graph-scopes.ts';
 
 export type DocsError = { type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
@@ -136,7 +137,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'help-json',
     summary:
-      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~12 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}`. Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.',
+      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~6 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}` (summary compacted to its first sentence). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders the in-process command manifest',
@@ -168,7 +169,10 @@ export const buildTerseManifest = (registry: Readonly<Record<string, Command>>, 
   generatedAt: now().toISOString(),
   commands: buildEntries(registry).map((e) => ({
     name: e.name,
-    summary: e.summary,
+    // Terse is the per-category discovery view — keep it token-cheap by
+    // projecting each multi-sentence summary to its first sentence (the full
+    // summary stays in the unflagged manifest). Keeps drive/mail under budget.
+    summary: firstSentence(e.summary),
     category: e.category,
     ...(e.stability ? { stability: e.stability } : {}),
   })),

@@ -6,6 +6,7 @@ import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
+import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
@@ -152,21 +153,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // was dropped (it was a one-trick toggle on this top-level listing only;
   // `help-json --terse` covers the same need with a structured payload).
 
-  // Compact a subcommand's description to its first sentence (everything up
-  // to the first period followed by a space, or the first newline). Returns
-  // the full text untouched when no sensible cut-point exists, so we never
-  // produce a less-readable result than the original. The cut keeps the
-  // trailing period for natural reading.
-  const compactSummary = (full: string): string => {
-    const newlineIdx = full.indexOf('\n');
-    const periodIdx = full.search(/\. /);
-    const candidates = [newlineIdx, periodIdx].filter((i) => i > 0);
-    if (candidates.length === 0) return full;
-    const cut = Math.min(...candidates);
-    // Keep the period itself when cutting on `. ` so the line ends naturally;
-    // strip a stray period for the newline case.
-    return full.charAt(cut) === '.' ? full.slice(0, cut + 1) : full.slice(0, cut);
-  };
+  // Compact a subcommand's description to its first sentence — shared with the
+  // `help-json --terse` projection via `firstSentence` so both stay consistent.
 
   // QA fix: derive the advertised endpoint counts from the registry so the
   // top-level description can never drift from the manifest again. The
@@ -200,7 +188,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // `ask-marcel <cmd> --help` is untouched — Commander only consults
     // `subcommandDescription` when formatting parent's child list.
     .configureHelp({
-      subcommandDescription: (cmd) => compactSummary(cmd.description()),
+      subcommandDescription: (cmd) => firstSentence(cmd.description()),
     })
     .option(
       '--output-path <path>',
@@ -295,7 +283,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~425 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~80 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~6 KB for one category, vs ~425 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~30 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',
