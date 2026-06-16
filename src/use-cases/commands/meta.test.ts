@@ -30,6 +30,16 @@ describe('command meta — invariants on every registered command', () => {
     }
   });
 
+  it('flags EXACTLY the Teams-substrate (chatsvcagg/ic3) chat-content commands with needsSubstrateToken so an agent can warm up auth before calling them (paired with needsElevatedToken on the m365 commands)', () => {
+    const expected = new Set(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-history', 'list-teams-chat-messages', 'list-teams-chats-with-messages']);
+    const flagged = new Set(
+      Object.entries(commands)
+        .filter(([, c]) => c.meta.needsSubstrateToken === true)
+        .map(([name]) => name)
+    );
+    expect(flagged).toEqual(expected);
+  });
+
   it('marks EXACTLY the two mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
     const mutating = Object.entries(commands)
       .filter(([, cmd]) => cmd.meta.mutates === true)
@@ -193,7 +203,7 @@ describe('command meta — invariants on every registered command', () => {
             for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);
           }
         }
-        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
+        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.needsSubstrateToken, cmd.meta.pagination]) {
           if (flag !== undefined) expect(flag).toBe(true);
         }
       });

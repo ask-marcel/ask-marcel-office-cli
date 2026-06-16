@@ -32,6 +32,7 @@ const meta: CommandMeta = {
   summary:
     "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling).",
   category: 'chats',
+  needsSubstrateToken: true,
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/csa/{region}/api/v1/chats/{chat-id}/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-list',

@@ -133,6 +133,14 @@ type CommandMeta = {
    */
   readonly needsElevatedToken?: true;
   /**
+   * `true` if the command needs a Teams substrate token (chatsvcagg or ic3,
+   * captured at login from `teams.microsoft.com`) — the Teams chat-content
+   * commands. Like `needsElevatedToken`, an LLM should check this before
+   * invoking and warm up an interactive `login`; a headless or stale session
+   * times out on these (the non-interactive silent-SSO limitation, QA-011).
+   */
+  readonly needsSubstrateToken?: true;
+  /**
    * `true` if the command returns inlined bytes (`{contentType, size, base64}`
    * or `{contentType, size, text}`) and is therefore a valid target for the
    * global `--output-path` flag. Used by the CLI composition to derive the

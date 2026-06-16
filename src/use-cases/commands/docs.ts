@@ -61,6 +61,7 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     ...(paginationStrategy ? { paginationStrategy } : {}),
     ...(scopesRequired && scopesRequired.length > 0 ? { scopesRequired } : {}),
     ...(cmd.meta.needsElevatedToken ? { needsElevatedToken: cmd.meta.needsElevatedToken } : {}),
+    ...(cmd.meta.needsSubstrateToken ? { needsSubstrateToken: cmd.meta.needsSubstrateToken } : {}),
     ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
     ...(cmd.meta.producesMedia ? { producesMedia: cmd.meta.producesMedia } : {}),
     ...(cmd.meta.mutates ? { mutates: cmd.meta.mutates } : {}),

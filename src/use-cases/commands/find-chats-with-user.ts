@@ -171,6 +171,7 @@ const meta: CommandMeta = {
   summary:
     'Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `JANE` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.',
   category: 'chats',
+  needsSubstrateToken: true,
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/csa/{region}/api/v3/teams/users/me/chats',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chat-list',

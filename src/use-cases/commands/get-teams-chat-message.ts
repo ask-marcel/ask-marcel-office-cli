@@ -19,6 +19,7 @@ const meta: CommandMeta = {
   summary:
     'Return a single Microsoft Teams chat message by its id via the chat substrate. Uses the chatsvcagg-audience bearer captured at login (same identity as the basic Teams token, different audience). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. Source the chat-id + message-id via `list-teams-chats-with-messages` or `list-teams-chat-messages`.',
   category: 'chats',
+  needsSubstrateToken: true,
   graphMethod: 'GET',
   graphPathTemplate: 'https://teams.microsoft.com/api/csa/{region}/api/v1/chats/{chat-id}/messages/{message-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-get',

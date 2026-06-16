@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.5.0",
-  "generatedAt": "2026-06-16T15:03:37.465Z",
+  "generatedAt": "2026-06-16T15:56:19.445Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -544,7 +544,8 @@
       ],
       "example": "ask-marcel download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
       "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions.",
-      "producesBytes": true
+      "producesBytes": true,
+      "needsElevatedToken": true
     },
     {
       "name": "extract-drive-item-images",
@@ -692,6 +693,7 @@
       ],
       "example": "ask-marcel find-chats-with-user --name 'Alex Kim'",
       "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, hasMore, nextContinuationToken? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
+      "needsSubstrateToken": true,
       "stability": "experimental"
     },
     {
@@ -800,7 +802,8 @@
         }
       ],
       "example": "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
-      "responseShape": "single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array."
+      "responseShape": "single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.",
+      "needsElevatedToken": true
     },
     {
       "name": "get-current-user",
@@ -2272,6 +2275,7 @@
       ],
       "example": "ask-marcel get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
       "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**",
+      "needsSubstrateToken": true,
       "stability": "experimental"
     },
     {
@@ -2983,7 +2987,8 @@
       ],
       "example": "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
       "responseShape": "collection of Microsoft Graph `conversationMember` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "needsElevatedToken": true
     },
     {
       "name": "list-chats",
@@ -3020,7 +3025,8 @@
       ],
       "example": "ask-marcel list-chats",
       "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).",
-      "pagination": true
+      "pagination": true,
+      "needsElevatedToken": true
     },
     {
       "name": "list-conversation-messages",
@@ -6728,6 +6734,7 @@
       ],
       "example": "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
       "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
+      "needsSubstrateToken": true,
       "stability": "experimental"
     },
     {
@@ -6753,6 +6760,7 @@
       ],
       "example": "ask-marcel list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
       "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
+      "needsSubstrateToken": true,
       "stability": "experimental"
     },
     {
@@ -6778,6 +6786,7 @@
       ],
       "example": "ask-marcel list-teams-chats-with-messages --page-size 100",
       "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member's `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
+      "needsSubstrateToken": true,
       "stability": "experimental"
     },
     {

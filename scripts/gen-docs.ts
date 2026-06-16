@@ -44,6 +44,8 @@ const buildManifest = (generatedAt: string): CommandManifest => {
       ...(m.producesBytes ? { producesBytes: m.producesBytes } : {}),
       ...(m.producesMedia ? { producesMedia: m.producesMedia } : {}),
       ...(m.mutates ? { mutates: m.mutates } : {}),
+      ...(m.needsElevatedToken ? { needsElevatedToken: m.needsElevatedToken } : {}),
+      ...(m.needsSubstrateToken ? { needsSubstrateToken: m.needsSubstrateToken } : {}),
       ...(m.stability ? { stability: m.stability } : {}),
     });
   }
