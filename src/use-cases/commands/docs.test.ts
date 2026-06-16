@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { Command } from './command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from './docs.ts';
+import { commands } from './index.ts';
 
 const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   schema: { _: 'fake' } as never,
@@ -133,6 +134,19 @@ describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () =>
     // Terse should be at least 50% smaller — the heavy responseShape /
     // bodyTemplate fields drop out entirely on every entry.
     expect(terse.length).toBeLessThan(full.length / 2);
+  });
+
+  it('keeps the real help-json sizes within their documented budget — a tripwire so the "~440 KB full / ~31 KB terse / ~6 KB per category" hints (README/USAGE/cli/error-hints) cannot silently go stale as commands are added', () => {
+    const stamp = (): Date => new Date(0);
+    const full = JSON.stringify(buildManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp)).length;
+    const terseAll = JSON.stringify(buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp)).length;
+    const terseDrive = JSON.stringify(filterManifestByCategory(buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp), 'drive')).length;
+    // If a band trips, update BOTH the documented "~N KB" hints and these bounds in the same change.
+    expect(full).toBeGreaterThan(350_000); // floor: catch a broken/empty projection
+    expect(full).toBeLessThan(520_000); // ceiling: docs say ~440 KB
+    expect(terseAll).toBeGreaterThan(22_000);
+    expect(terseAll).toBeLessThan(40_000); // docs say ~31 KB
+    expect(terseDrive).toBeLessThan(8_500); // docs say ~6 KB/category (drive is the largest)
   });
 });
 
