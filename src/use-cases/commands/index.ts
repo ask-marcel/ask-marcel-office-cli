@@ -80,6 +80,7 @@ import * as searchOnenotePages from './search-onenote-pages.ts';
 import * as searchAllAccessibleSites from './search-all-accessible-sites.ts';
 import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
+import * as readMailAttachment from './read-mail-attachment.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
@@ -243,6 +244,7 @@ const commands: Record<string, Command> = {
   'convert-mail-attachment-zip': convertMailAttachmentZip,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
+  'read-mail-attachment': readMailAttachment,
   'list-calendar-event-attachments': listCalendarEventAttachments,
   'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
   'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,

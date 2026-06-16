@@ -110,6 +110,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'convert-mail-attachment-to-pdf': ['Mail.Read', 'Files.Read'],
   'convert-mail-attachment-to-markdown': ['Mail.Read'],
   'convert-mail-attachment-zip': ['Mail.Read'],
+  'read-mail-attachment': ['Mail.Read'],
   'list-calendar-event-attachments': ['Calendars.Read'],
   'convert-calendar-event-attachment-to-markdown': ['Calendars.Read'],
   'convert-calendar-event-attachment-to-pdf': ['Calendars.Read', 'Files.Read'],

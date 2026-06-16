@@ -100,11 +100,10 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // branching on the polymorphic `@odata.type`. Path-agnostic so both the mail
 // (`/me/messages/{id}/attachments/{id}`) and calendar-event
 // (`/me/events/{id}/attachments/{id}`) commands share one implementation.
-const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
-  const fetched = await graph.get(attachmentPath);
-  if (!fetched.ok) return fetched;
-  const a = fetched.value as Record<string, unknown>;
-
+// Route an ALREADY-FETCHED attachment object to markdown by its polymorphic
+// `@odata.type`. Split out from the path-based fetch so `read-mail-attachment`
+// can peek the type for zip-routing without a second Graph round-trip.
+const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>, includeMetadata: boolean): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
   const odataType = a['@odata.type'];
   if (typeof odataType !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'attachment response missing @odata.type discriminator' });
@@ -120,6 +119,12 @@ const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: s
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
+};
+
+const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
+  const fetched = await graph.get(attachmentPath);
+  if (!fetched.ok) return fetched;
+  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, includeMetadata);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -154,4 +159,4 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { convertAttachmentToMarkdown, execute, meta, schema };
+export { convertAttachmentToMarkdown, convertFetchedAttachment, execute, meta, schema };
