@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-15T09:31:17.017Z",
+  "generatedAt": "2026-06-15T14:14:21.762Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -38,7 +38,8 @@
         }
       ],
       "example": "ask-marcel convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
+      "producesBytes": true
     },
     {
       "name": "convert-calendar-event-attachment-to-pdf",
@@ -62,7 +63,8 @@
         }
       ],
       "example": "ask-marcel convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`."
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.",
+      "producesBytes": true
     },
     {
       "name": "convert-drive-item-zip",
@@ -149,7 +151,8 @@
         }
       ],
       "example": "ask-marcel convert-local-file --path ./report.docx",
-      "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk."
+      "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -186,7 +189,8 @@
         }
       ],
       "example": "ask-marcel convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-to-pdf",
@@ -210,7 +214,8 @@
         }
       ],
       "example": "ask-marcel convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs."
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-zip",
@@ -290,7 +295,8 @@
         }
       ],
       "example": "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it)."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).",
+      "producesBytes": true
     },
     {
       "name": "create-mail-draft",
@@ -369,7 +375,8 @@
       ],
       "example": "ask-marcel create-mail-draft --subject \"Q3 Report\" --body-content \"Please review the attached report.\" --to-recipients \"alice@example.com,bob@example.com\" --importance High",
       "responseShape": "The created Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. The `id` field is the draft message ID — use it with `update-mail-draft` to modify before sending.",
-      "bodyTemplate": "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }"
+      "bodyTemplate": "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
+      "mutates": true
     },
     {
       "name": "download-drive-item-as-markdown",
@@ -425,7 +432,8 @@
         }
       ],
       "example": "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: \"text/plain\", size, text }` for plain-text passthrough sources (txt/md/html/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally."
+      "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: \"text/plain\", size, text }` for plain-text passthrough sources (txt/md/html/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.",
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-as-pdf",
@@ -449,7 +457,8 @@
         }
       ],
       "example": "ask-marcel download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs."
+      "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-version",
@@ -506,7 +515,8 @@
         }
       ],
       "example": "ask-marcel download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
-      "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions."
+      "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions.",
+      "producesBytes": true
     },
     {
       "name": "download-onedrive-file-content",
@@ -530,7 +540,8 @@
         }
       ],
       "example": "ask-marcel download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files."
+      "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.",
+      "producesBytes": true
     },
     {
       "name": "extract-drive-item-images",
@@ -554,7 +565,8 @@
         }
       ],
       "example": "ask-marcel extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
-      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter)."
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter).",
+      "producesMedia": true
     },
     {
       "name": "extract-local-file-images",
@@ -572,7 +584,8 @@
         }
       ],
       "example": "ask-marcel extract-local-file-images --path /tmp/deck.pdf --output-dir ./deck-images",
-      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter). A missing file returns api_error 404 with the path."
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter). A missing file returns api_error 404 with the path.",
+      "producesMedia": true
     },
     {
       "name": "extract-mail-attachment-images",
@@ -596,7 +609,8 @@
         }
       ],
       "example": "ask-marcel extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
-      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter)."
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).",
+      "producesMedia": true
     },
     {
       "name": "extract-sharepoint-links-in-documents",
@@ -1169,7 +1183,8 @@
         }
       ],
       "example": "ask-marcel get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
-      "responseShape": "`{ contentType: \"image/png\", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`)."
+      "responseShape": "`{ contentType: \"image/png\", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`).",
+      "producesBytes": true
     },
     {
       "name": "get-excel-range",
@@ -1352,7 +1367,8 @@
         }
       ],
       "example": "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged."
+      "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.",
+      "producesBytes": true
     },
     {
       "name": "get-mail-message",
@@ -1412,7 +1428,8 @@
         }
       ],
       "example": "ask-marcel get-mail-message-mime --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"text/plain\", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments."
+      "responseShape": "`{ contentType: \"text/plain\", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.",
+      "producesBytes": true
     },
     {
       "name": "get-mail-rule",
@@ -1512,7 +1529,8 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/profilephoto-get",
       "options": [],
       "example": "ask-marcel get-my-profile-photo",
-      "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`."
+      "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`.",
+      "producesBytes": true
     },
     {
       "name": "get-onenote-page-as-markdown",
@@ -1562,7 +1580,8 @@
         }
       ],
       "example": "ask-marcel get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body."
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body.",
+      "producesBytes": true
     },
     {
       "name": "get-onenote-page-content",
@@ -1586,7 +1605,8 @@
         }
       ],
       "example": "ask-marcel get-onenote-page-content --onenote-page-id '1-abc...'",
-      "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope"
+      "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope",
+      "producesBytes": true
     },
     {
       "name": "get-organization",
@@ -1997,7 +2017,8 @@
         }
       ],
       "example": "ask-marcel get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
-      "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk."
+      "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk.",
+      "producesBytes": true
     },
     {
       "name": "get-site-analytics",
@@ -7158,7 +7179,13 @@
           "name": "message-id",
           "key": "messageId",
           "required": true,
-          "description": "Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts.",
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts. Accepts `--id` as an alias.",
           "argumentHint": {
             "kind": "idOrName"
           }
@@ -7223,7 +7250,8 @@
       ],
       "example": "ask-marcel update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
       "responseShape": "The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.",
-      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent"
+      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent",
+      "mutates": true
     }
   ]
 }

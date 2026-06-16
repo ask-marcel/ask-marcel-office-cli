@@ -46,8 +46,19 @@ const openZipEntries = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<Z
       .filter((e): e is { name: string; file: JSZip.JSZipObject } => e.file !== null && !e.file.dir);
     const contents = await Promise.all(entries.map((e) => e.file.async('uint8array')));
     return ok(entries.map((e, i) => ({ path: e.name, bytes: contents[i] ?? new Uint8Array() })));
-  } catch (e) {
-    return err({ type: 'api_error', status: 400, message: `zip parse failed: ${e instanceof Error ? e.message : String(e)}` });
+  } catch {
+    // A non-zip / corrupted input makes JSZip throw a message that leaks an
+    // internal docs URL ("Can't find end of central directory : is this a zip
+    // file ? If it is, see https://stuk.github.io/jszip/..."). Return the clean,
+    // actionable envelope shape every other command uses instead of surfacing
+    // the library's raw error (2026-06-15 QA P3 — the one un-wrapped error in
+    // the live sweep).
+    return err({
+      type: 'api_error',
+      status: 400,
+      message:
+        'not a valid zip archive — these bytes are not a readable ZIP container. If the source is a single document rather than an archive, convert it directly (e.g. convert-mail-attachment-to-markdown, download-drive-item-as-markdown, or convert-local-file).',
+    });
   }
 };
 

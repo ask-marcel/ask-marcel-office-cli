@@ -50,6 +50,23 @@ describe('buildManifest', () => {
     expect(fooEntry?.responseShape).toBe('single thing');
   });
 
+  it('serializes producesBytes / producesMedia / mutates when set, and omits them otherwise (F-01 — help-json must mirror the meta, not silently drop byte/media/write flags)', () => {
+    const registry: Readonly<Record<string, Command>> = {
+      'aaa-plain': fakeCmd(),
+      'aaa-bytes': fakeCmd({ producesBytes: true }),
+      'aaa-media': fakeCmd({ producesMedia: true }),
+      'aaa-write': fakeCmd({ graphMethod: 'PATCH', mutates: true }),
+    };
+    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const byName = (n: string): (typeof manifest.commands)[number] | undefined => manifest.commands.find((c) => c.name === n);
+    expect(byName('aaa-plain')).not.toHaveProperty('producesBytes');
+    expect(byName('aaa-plain')).not.toHaveProperty('producesMedia');
+    expect(byName('aaa-plain')).not.toHaveProperty('mutates');
+    expect(byName('aaa-bytes')?.producesBytes).toBe(true);
+    expect(byName('aaa-media')?.producesMedia).toBe(true);
+    expect(byName('aaa-write')?.mutates).toBe(true);
+  });
+
   it('uses the real `new Date()` when no clock injector is given', () => {
     const before = Date.now();
     const manifest = buildManifest({ foo: fakeCmd() }, 'fake-pkg', '0.0.1');

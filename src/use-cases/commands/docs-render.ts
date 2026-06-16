@@ -17,6 +17,8 @@ export type CommandManifestEntry = {
   readonly scopesRequired?: CommandMeta['scopesRequired'];
   readonly needsElevatedToken?: CommandMeta['needsElevatedToken'];
   readonly producesBytes?: CommandMeta['producesBytes'];
+  readonly producesMedia?: CommandMeta['producesMedia'];
+  readonly mutates?: CommandMeta['mutates'];
   readonly stability?: CommandMeta['stability'];
 };
 

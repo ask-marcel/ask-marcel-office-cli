@@ -107,6 +107,7 @@ const meta: CommandMeta = {
     'ask-marcel create-mail-draft --subject "Q3 Report" --body-content "Please review the attached report." --to-recipients "alice@example.com,bob@example.com" --importance High',
   bodyTemplate:
     "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
+  mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     'The created Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. The `id` field is the draft message ID — use it with `update-mail-draft` to modify before sending.',

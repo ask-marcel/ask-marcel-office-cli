@@ -40,6 +40,9 @@ const buildManifest = (generatedAt: string): CommandManifest => {
       ...(m.responseShape ? { responseShape: m.responseShape } : {}),
       ...(m.bodyTemplate ? { bodyTemplate: m.bodyTemplate } : {}),
       ...(m.pagination ? { pagination: m.pagination } : {}),
+      ...(m.producesBytes ? { producesBytes: m.producesBytes } : {}),
+      ...(m.producesMedia ? { producesMedia: m.producesMedia } : {}),
+      ...(m.mutates ? { mutates: m.mutates } : {}),
       ...(m.stability ? { stability: m.stability } : {}),
     });
   }

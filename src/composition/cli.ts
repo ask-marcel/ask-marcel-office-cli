@@ -173,11 +173,22 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
   // POST) when search-all-accessible-sites was added without updating it.
   const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET').length;
-  const postCommandNames = Object.entries(cmdRegistry)
-    .filter(([, c]) => c.meta.graphMethod === 'POST')
+  // 2026-06-15 (F-03): the only write commands are the two mail-draft ones
+  // (create=POST, update=PATCH); everything else is a read or a search. Derive
+  // BOTH lists from the manifest's `mutates` flag so the read-only narrative can
+  // never drift from the registry. The previous code took every POST command and
+  // labelled it "— searches, not mutations", which silently mislabelled
+  // create-mail-draft as a search the moment it shipped (and omitted the PATCH
+  // update-mail-draft entirely).
+  const mutatingCommandNames = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.mutates === true)
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
-  const surfaceDescription = `Microsoft Graph CLI. READ-ONLY: this CLI cannot send mail, modify or create calendar items, write files, or perform any mutating action — there is no send-mail / create-event / upload-file command. ${getEndpointCount} GET endpoints + ${postCommandNames.length} POST (${postCommandNames.join(', ')} — searches, not mutations). Safe default for LLM autonomy.`;
+  const searchPostNames = Object.entries(cmdRegistry)
+    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.mutates !== true)
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are the ${mutatingCommandNames.length} mail-draft commands (${mutatingCommandNames.join(', ')}), which can only create or update an UNSENT draft; the CLI cannot send mail, create or modify calendar items, or write files (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
 
   program
     .name('ask-marcel')
@@ -284,7 +295,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~370 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~62 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~12 KB for one category, vs ~425 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` (~80 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',
@@ -368,12 +379,12 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel login',
-      '               ask-marcel login --use-playwright  (fallback to Playwright if extension fails)',
+      'Example:       ask-marcel login   (default: opens a Playwright-driven Edge/Chrome window)',
+      '               ask-marcel login --use-extension   (use the Ask Marcel Companion browser extension instead)',
       'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
       'Browser ext:   Install "Ask Marcel Companion" for faster login (no Playwright needed).',
       '               See browser-extension/README.md for installation instructions.',
-      'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context, only with --use-playwright).',
+      'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context — the default browser path; not used with --use-extension).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
       '               this CLI cannot request additional scopes. To inspect the granted set,',
       '               run `ask-marcel scopes-check`.',
@@ -516,6 +527,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         // `convert-local-file` is the one command whose input is the local
         // filesystem, not Graph — route it to executeLocal with the
         // composition-selected FileSystem (the same instance --output-path uses).
+        const isLocalCommand = cmd.executeLocal !== undefined;
         const result = cmd.executeLocal !== undefined ? await cmd.executeLocal(fs, normalized) : await cmd.execute(graph, normalized);
         if (!result.ok) {
           let message = result.error.message;
@@ -523,7 +535,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
             message = message.replaceAll(`--${canonical}`, `--${alias}`);
           }
           const retryAfterSeconds = result.error.type === 'api_error' ? result.error.retryAfterSeconds : undefined;
-          fail(message, result.error.code, sourceFromGraphError(result.error), retryAfterSeconds);
+          // 2026-06-15 (F-02): a local-filesystem command (convert-local-file,
+          // extract-local-file-images) never touches Graph, so its runtime
+          // failures must not be stamped `source: graph` (misleading — an LLM
+          // might treat a missing local file as a transient Graph error and
+          // retry). Validation errors still flow through the normal classifier.
+          const source = isLocalCommand && result.error.type !== 'validation_error' ? 'cli' : sourceFromGraphError(result.error);
+          fail(message, result.error.code, source, retryAfterSeconds);
           return;
         }
         const outputDir = program.opts<{ outputDir?: string }>().outputDir;

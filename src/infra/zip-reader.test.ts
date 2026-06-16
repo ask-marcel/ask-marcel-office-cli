@@ -41,11 +41,16 @@ describe('openZipEntries', () => {
     expect(new TextDecoder().decode(result.value[0]?.bytes)).toContain('Vendor red-team capability deck');
   });
 
-  it('returns an api_error for bytes that are not a parseable zip', async () => {
+  it('returns a clean, actionable api_error for non-zip bytes — no leaked jszip URL, names a next-step command (QA 2026-06-15 P3)', async () => {
     const result = await openZipEntries(Uint8Array.from([1, 2, 3, 4, 5]));
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('api_error');
-    expect(result.error.type === 'api_error' ? result.error.message : '').toContain('zip parse failed');
+    const message = result.error.type === 'api_error' ? result.error.message : '';
+    expect(message).toContain('not a valid zip archive');
+    // the internal library URL never leaks, and a sibling command is named.
+    expect(message).not.toContain('http');
+    expect(message).not.toContain('jszip');
+    expect(message).toContain('convert-mail-attachment-to-markdown');
   });
 });

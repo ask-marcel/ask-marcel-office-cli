@@ -57,7 +57,8 @@ const meta: CommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: true,
-      description: 'Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts.',
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts. Accepts `--id` as an alias.',
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -108,6 +109,7 @@ const meta: CommandMeta = {
   example: 'ask-marcel update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
   bodyTemplate:
     "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent",
+  mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
     'The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.',

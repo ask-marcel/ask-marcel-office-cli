@@ -4246,7 +4246,7 @@ describe('convert-drive-item-zip', () => {
     expect(result?.ok).toBe(false);
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
-      expect(result.error.message).toContain('zip parse failed');
+      expect(result.error.message).toContain('not a valid zip archive');
     }
   });
 
@@ -4258,7 +4258,7 @@ describe('convert-drive-item-zip', () => {
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
       // the fetch error is returned as-is — NOT swallowed and re-surfaced as a zip-parse failure
-      expect(result.error.message).not.toContain('zip parse failed');
+      expect(result.error.message).not.toContain('not a valid zip archive');
     }
   });
 
@@ -4662,7 +4662,7 @@ describe('onenote-resource-embedder', () => {
     const graph = createGraphClient(fakeAuth(), async (url) => {
       if (url !== RES) return new Response('no', { status: 404 });
       calls += 1;
-      return new Response(new Uint8Array([1, 2, 3]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } });
     });
     const out = await embedOnenoteResources(graph, `<img src="${RES}"> mid <img src="${RES}">`);
     expect(calls).toBe(1);
@@ -4754,7 +4754,7 @@ describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   const pageHtml = `<html><body><p>Notes.</p><img src="${RES}"></body></html>`;
   const onenoteFetch = (): FetchFn => async (url) => {
     if (url.endsWith('/onenote/pages/p1/content')) return new Response(pageHtml, { status: 200, headers: { 'content-type': 'text/html' } });
-    if (url === RES) return new Response(new Uint8Array([1, 2, 3]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'image/png' } });
+    if (url === RES) return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } });
     if (url.includes('/onenote/pages/p1?')) {
       return Response.json({
         title: 'My Page',

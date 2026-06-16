@@ -30,6 +30,14 @@ describe('command meta — invariants on every registered command', () => {
     }
   });
 
+  it('marks EXACTLY the two mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
+    const mutating = Object.entries(commands)
+      .filter(([, cmd]) => cmd.meta.mutates === true)
+      .map(([name]) => name)
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(mutating).toEqual(['create-mail-draft', 'update-mail-draft']);
+  });
+
   for (const [name, cmd] of populated) {
     describe(`meta for \`${name}\``, () => {
       it('has a non-empty summary', () => {
@@ -161,7 +169,7 @@ describe('command meta — invariants on every registered command', () => {
             for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);
           }
         }
-        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
+        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
           if (flag !== undefined) expect(flag).toBe(true);
         }
       });

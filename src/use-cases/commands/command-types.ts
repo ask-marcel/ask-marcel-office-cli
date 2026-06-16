@@ -140,6 +140,17 @@ type CommandMeta = {
    */
   readonly producesMedia?: true;
   /**
+   * `true` if the command performs a write (mutation) against Microsoft Graph
+   * rather than a read/search. Today only the two mail-draft commands
+   * (`create-mail-draft` = POST, `update-mail-draft` = PATCH) — both produce an
+   * UNSENT draft and cannot send. The CLI composition derives its read-only
+   * top-level `--help` narrative from this flag (mutating commands vs search
+   * POSTs) instead of hardcoding command names, and the manifest/`help-json`
+   * surface it so an LLM can tell at a glance which commands change state.
+   * Audit 2026-06-15 (F-03).
+   */
+  readonly mutates?: true;
+  /**
    * Stability tier of the command. Omitted from manifest entries when the
    * command is `'stable'` (the implicit default), surfaced only on
    * `'experimental'` commands so an LLM can prefer stable siblings when they

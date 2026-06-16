@@ -90,14 +90,26 @@ describe('buildCli command surface', () => {
     expect(out).toContain('"status":"authenticated"');
   });
 
-  it('top-level description advertises endpoint counts derived from the command registry, never a hardcoded literal', () => {
+  it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET').length;
-    const postCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'POST').length;
+    const mutating = Object.entries(commands)
+      .filter(([, c]) => c.meta.mutates === true)
+      .map(([n]) => n);
+    const searchPosts = Object.entries(commands)
+      .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.mutates !== true)
+      .map(([n]) => n);
     const description = cli.description();
     expect(description).toContain(`${getCount} GET endpoints`);
-    expect(description).toContain(`${postCount} POST`);
+    // every search POST is listed in the "search POST" clause
+    for (const name of searchPosts) expect(description).toContain(name);
+    // every write command is named as a mutation, and there IS at least one
+    expect(mutating.length).toBeGreaterThan(0);
+    for (const name of mutating) expect(description).toContain(name);
+    // the old bug: every POST was labelled "searches, not mutations", which
+    // mislabelled create-mail-draft. That phrasing must be gone.
+    expect(description).not.toContain('searches, not mutations');
   });
 
   it('renders an authenticated status as plain "status: authenticated" by default (text format)', async () => {
@@ -286,6 +298,15 @@ describe('buildCli command surface', () => {
     expect(graphCalled).toBe(false);
   });
 
+  it('stamps a failed local-only command with source `cli`, not `graph` — it never touched Graph (F-02)', async () => {
+    const fs = createFileSystemFake(); // nothing seeded → readBytes returns a not-found error
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'convert-local-file', '--path', '/work/missing.csv']));
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; source?: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.source).toBe('cli');
+  });
+
   it('accepts --id as an alias for --message-id on sole-message-id commands (P3)', async () => {
     let capturedPath = '';
     const captureGraph: GraphClient = fakeGraphClient({
@@ -298,6 +319,19 @@ describe('buildCli command surface', () => {
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-mail-message', '--id', 'AAMkAGI2']));
     // --id maps to messageId → the message path (a default $select is appended by the command).
     expect(capturedPath.startsWith('/me/messages/AAMkAGI2')).toBe(true);
+  });
+
+  it('accepts --id as an alias for --message-id on update-mail-draft, matching its read siblings (F-05)', async () => {
+    let capturedPath = '';
+    const captureGraph: GraphClient = fakeGraphClient({
+      patch: async (path: string) => {
+        capturedPath = path;
+        return { ok: true, value: { id: 'AAMkAGI2', subject: 'Updated' } };
+      },
+    });
+    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update-mail-draft', '--id', 'AAMkAGI2', '--subject', 'Updated']));
+    expect(capturedPath).toBe('/me/messages/AAMkAGI2');
   });
 
   it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {

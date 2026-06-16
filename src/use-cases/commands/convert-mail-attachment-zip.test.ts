@@ -12,7 +12,7 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClient => fakeGraphClient({ get: async (url: string) => get(url) }) as GraphClient;
+const graphWith = (get: (url: string) => Result<unknown, GraphError>): GraphClient => fakeGraphClient({ get: async (url: string) => get(url) });
 
 const zipFileAttachment = (bytes: Uint8Array): GraphClient =>
   graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
@@ -86,11 +86,11 @@ describe('convert-mail-attachment-zip', () => {
     expect(result.error.type === 'api_error' ? result.error.message : '').toContain('no contentBytes');
   });
 
-  it('propagates the zip parse error when the attachment bytes are not a zip', async () => {
+  it('propagates a clean (non-leaking) zip parse error when the attachment bytes are not a zip', async () => {
     const result = await execute(zipFileAttachment(Uint8Array.from([1, 2, 3, 4, 5])), params);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.type === 'api_error' ? result.error.message : '').toContain('zip parse failed');
+    expect(result.error.type === 'api_error' ? result.error.message : '').toContain('not a valid zip archive');
   });
 
   it('propagates a graph fetch error unchanged', async () => {
