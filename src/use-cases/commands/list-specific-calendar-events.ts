@@ -24,6 +24,7 @@ const meta: CommandMeta = {
       name: 'calendar-id',
       key: 'calendarId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description:
         'Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `ask-marcel list-calendars` to discover non-default calendar IDs.',
     },

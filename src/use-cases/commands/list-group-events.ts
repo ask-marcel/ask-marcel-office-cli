@@ -18,6 +18,7 @@ const meta: CommandMeta = {
       name: 'group-id',
       key: 'groupId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Azure AD group object ID for a unified (Microsoft 365) group. Use `list-groups` to find one.',
     },
     ...odataQueryOptions,

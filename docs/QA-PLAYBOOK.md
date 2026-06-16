@@ -105,7 +105,7 @@ For **every command**, exercise each row of this table (live against the tenant 
 | `--output-path` | passthrough-vs-`.pdf` extension mismatch | `passthrough_extension_mismatch` guard fires |
 | `--output-dir` | every `producesMedia` command | files land with flattened collision-free names; `base64` → `savedTo` |
 | `--output json` / default text | error AND success paths under both | JSON envelopes parse; text mode renders |
-| `--id` aliases | every sole-message-id command | works; commands with two ids reject `--id` |
+| `--id` aliases | every command with a SINGLE required id-option (2026-06-16: broadened from mail-only to all sole-id commands) | works; commands with two required ids carry no `--id` (would be ambiguous) — guarded by a meta-invariant |
 
 ## D. Conversion deep-dive (fixtures + live)
 

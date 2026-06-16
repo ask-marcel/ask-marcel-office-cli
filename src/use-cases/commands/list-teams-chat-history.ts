@@ -143,6 +143,7 @@ const meta: CommandMeta = {
       name: 'chat-id',
       key: 'chatId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`.',
     },
     {

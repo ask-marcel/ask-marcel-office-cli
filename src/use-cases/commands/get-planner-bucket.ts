@@ -17,7 +17,10 @@ const meta: CommandMeta = {
       key: 'plannerBucketId',
       required: true,
       description: 'Planner bucket ID. Returned by `ask-marcel list-plan-buckets`.',
-      aliases: [{ name: 'bucket-id', key: 'bucketId' }],
+      aliases: [
+        { name: 'id', key: 'id' },
+        { name: 'bucket-id', key: 'bucketId' },
+      ],
     },
   ],
   example: "ask-marcel get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",

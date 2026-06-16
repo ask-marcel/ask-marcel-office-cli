@@ -17,6 +17,7 @@ const meta: CommandMeta = {
       name: 'site-id',
       key: 'siteId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'SharePoint site ID.',
     },
   ],

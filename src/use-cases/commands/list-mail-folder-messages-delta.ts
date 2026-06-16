@@ -18,6 +18,7 @@ const meta: CommandMeta = {
       name: 'mail-folder-id',
       key: 'mailFolderId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Mail folder ID or well-known name (`inbox`, `archive`, `sentitems`, `deleteditems`, `junkemail`, `drafts`). Returned by `list-mail-folders`.',
     },
     ...odataQueryOptions,

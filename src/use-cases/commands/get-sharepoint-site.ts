@@ -17,6 +17,7 @@ const meta: CommandMeta = {
       name: 'site-id',
       key: 'siteId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description:
         'SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site.',
     },

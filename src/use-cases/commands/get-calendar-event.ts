@@ -18,6 +18,7 @@ const meta: CommandMeta = {
       name: 'event-id',
       key: 'eventId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Microsoft Graph event ID. Returned by `ask-marcel list-calendar-events` in the `id` field of each event.',
     },
     ...selectExpandOptions,

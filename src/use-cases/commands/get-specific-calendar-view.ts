@@ -35,6 +35,7 @@ const meta: CommandMeta = {
       name: 'calendar-id',
       key: 'calendarId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`.',
     },
     { name: 'start-date-time', key: 'startDateTime', required: true, aliases: [{ name: 'start', key: 'start' }], description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },

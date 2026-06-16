@@ -33,6 +33,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'To Do task list ID. Returned by `ask-marcel list-todo-task-lists`.',
       aliases: [
+        { name: 'id', key: 'id' },
         { name: 'task-list-id', key: 'taskListId' },
         { name: 'todo-list-id', key: 'todoListId' },
       ],

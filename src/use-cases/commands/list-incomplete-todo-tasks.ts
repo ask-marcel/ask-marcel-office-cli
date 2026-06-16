@@ -48,6 +48,7 @@ const meta: CommandMeta = {
       description:
         'todoTaskList ID. Returned by `ask-marcel list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
       aliases: [
+        { name: 'id', key: 'id' },
         { name: 'task-list-id', key: 'taskListId' },
         { name: 'todo-list-id', key: 'todoListId' },
       ],

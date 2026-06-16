@@ -51,6 +51,7 @@ const meta: CommandMeta = {
       name: 'chat-id',
       key: 'chatId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description:
         'Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. ' +
         'Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). ' +

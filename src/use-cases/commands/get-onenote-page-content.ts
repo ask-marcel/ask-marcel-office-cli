@@ -26,7 +26,10 @@ const meta: CommandMeta = {
       key: 'onenotePageId',
       required: true,
       description: 'OneNote page ID. Returned by `ask-marcel list-onenote-section-pages`.',
-      aliases: [{ name: 'page-id', key: 'pageId' }],
+      aliases: [
+        { name: 'id', key: 'id' },
+        { name: 'page-id', key: 'pageId' },
+      ],
     },
   ],
   example: "ask-marcel get-onenote-page-content --onenote-page-id '1-abc...'",

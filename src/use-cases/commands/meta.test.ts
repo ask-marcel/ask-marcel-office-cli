@@ -68,6 +68,16 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
+      it('exposes the --id alias on a SOLE required id-option (uniform sole-id convention, QA-2026-06-16)', () => {
+        // When a command has exactly one required `*-id` option, `--id` is unambiguous and
+        // every such command must accept it (matches the mail-message family). Commands with
+        // two required ids deliberately do NOT (—id would be ambiguous).
+        const requiredIdOpts = cmd.meta.options.filter((o) => o.required && /-id$/.test(o.name));
+        if (requiredIdOpts.length === 1) {
+          expect(requiredIdOpts[0]?.aliases?.some((a) => a.name === 'id' && a.key === 'id')).toBe(true);
+        }
+      });
+
       it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/message-token analogues — are excluded)', () => {
         const runtimeFlagNames = new Set([
           'top',

@@ -12,7 +12,16 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/sites/{site-id}/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
-  options: [{ name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.' }, ...noSkipOptions],
+  options: [
+    {
+      name: 'site-id',
+      key: 'siteId',
+      required: true,
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.',
+    },
+    ...noSkipOptions,
+  ],
   example: "ask-marcel list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,

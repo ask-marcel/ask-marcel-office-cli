@@ -13,7 +13,16 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/onenote/notebooks/{notebook-id}/sections',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/notebook-list-sections',
-  options: [{ name: 'notebook-id', key: 'notebookId', required: true, description: 'OneNote notebook ID. Returned by `ask-marcel list-onenote-notebooks`.' }, ...odataQueryOptions],
+  options: [
+    {
+      name: 'notebook-id',
+      key: 'notebookId',
+      required: true,
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'OneNote notebook ID. Returned by `ask-marcel list-onenote-notebooks`.',
+    },
+    ...odataQueryOptions,
+  ],
   example: "ask-marcel list-onenote-notebook-sections --notebook-id '1-12abc...'",
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
   pagination: true,

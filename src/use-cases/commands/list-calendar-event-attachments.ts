@@ -27,7 +27,13 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/events/{event-id}/attachments',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/event-list-attachments',
   options: [
-    { name: 'event-id', key: 'eventId', required: true, description: 'Outlook calendar event ID. Returned by `ask-marcel list-calendar-events` or `get-calendar-event`.' },
+    {
+      name: 'event-id',
+      key: 'eventId',
+      required: true,
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'Outlook calendar event ID. Returned by `ask-marcel list-calendar-events` or `get-calendar-event`.',
+    },
     ...odataQueryOptions,
   ],
   example: "ask-marcel list-calendar-event-attachments --event-id 'AAMkAGI2...'",

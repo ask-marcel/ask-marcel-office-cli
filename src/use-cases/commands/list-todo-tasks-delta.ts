@@ -19,6 +19,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Microsoft To Do task list ID. Returned by `list-todo-task-lists`.',
       aliases: [
+        { name: 'id', key: 'id' },
         { name: 'task-list-id', key: 'taskListId' },
         { name: 'todo-list-id', key: 'todoListId' },
       ],

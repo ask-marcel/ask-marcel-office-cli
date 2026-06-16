@@ -18,6 +18,7 @@ const meta: CommandMeta = {
       name: 'user-id',
       key: 'userId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner).',
     },
     ...odataQueryOptions,

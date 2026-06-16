@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-16T07:22:58.781Z",
+  "generatedAt": "2026-06-16T08:24:00.940Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -703,6 +703,12 @@
           "name": "event-id",
           "key": "eventId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Graph event ID. Returned by `ask-marcel list-calendar-events` in the `id` field of each event."
         },
         {
@@ -769,6 +775,12 @@
           "name": "chat-id",
           "key": "chatId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Returned by `list-chats`."
         },
         {
@@ -1095,6 +1107,12 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Graph drive ID. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {
@@ -1315,6 +1333,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID. Use `list-groups` to find one."
         },
         {
@@ -1452,6 +1476,10 @@
           "description": "Message rule ID. Returned by `list-mail-rules`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "rule-id",
               "key": "ruleId"
             }
@@ -1547,6 +1575,10 @@
           "description": "OneNote page ID. Returned by `ask-marcel list-onenote-section-pages`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "page-id",
               "key": "pageId"
             }
@@ -1598,6 +1630,10 @@
           "description": "OneNote page ID. Returned by `ask-marcel list-onenote-section-pages`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "page-id",
               "key": "pageId"
             }
@@ -1647,6 +1683,10 @@
           "description": "Planner bucket ID. Returned by `ask-marcel list-plan-buckets`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "bucket-id",
               "key": "bucketId"
             }
@@ -1670,6 +1710,10 @@
           "required": true,
           "description": "Planner plan ID. Returned in the `planId` field of any task from `ask-marcel list-planner-tasks`.",
           "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            },
             {
               "name": "plan-id",
               "key": "planId"
@@ -1695,6 +1739,10 @@
           "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. Accepts `--task-id` as a shorter alias (each task command targets exactly one of Planner or To Do, so within this command's flag set there is no ambiguity).",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "task-id",
               "key": "taskId"
             }
@@ -1718,6 +1766,10 @@
           "required": true,
           "description": "Planner task ID. Returned by `ask-marcel list-planner-tasks` or `list-plan-tasks`. Accepts `--task-id` as a shorter alias (each task command targets exactly one of Planner or To Do, so within this command's flag set there is no ambiguity).",
           "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            },
             {
               "name": "task-id",
               "key": "taskId"
@@ -1821,6 +1873,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site."
         },
         {
@@ -2032,6 +2090,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID."
         }
       ],
@@ -2086,6 +2150,12 @@
           "name": "team-id",
           "key": "teamId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`."
         },
         {
@@ -2152,6 +2222,12 @@
           "name": "team-id",
           "key": "teamId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams team ID. Returned by `list-joined-teams`."
         },
         {
@@ -2259,6 +2335,12 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD user ID or UPN — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory)."
         },
         {
@@ -2368,6 +2450,12 @@
           "name": "event-id",
           "key": "eventId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Outlook calendar event ID. Returned by `ask-marcel list-calendar-events` or `get-calendar-event`."
         },
         {
@@ -2436,6 +2524,12 @@
           "name": "event-id",
           "key": "eventId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`."
         },
         {
@@ -2583,6 +2677,12 @@
           "name": "calendar-group-id",
           "key": "calendarGroupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Calendar group ID. Returned by `list-calendar-groups`."
         },
         {
@@ -2851,6 +2951,12 @@
           "name": "chat-id",
           "key": "chatId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`."
         },
         {
@@ -2925,6 +3031,12 @@
           "name": "conversation-id",
           "key": "conversationId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`)."
         },
         {
@@ -3744,6 +3856,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID for a unified (Microsoft 365) group."
         },
         {
@@ -3823,6 +3941,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID for a unified (Microsoft 365) group."
         },
         {
@@ -3878,6 +4002,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID for a unified (Microsoft 365) group. Use `list-groups` to find one."
         },
         {
@@ -3933,6 +4063,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID. Use `list-groups` to find one."
         },
         {
@@ -3988,6 +4124,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID. Use `list-groups` to find one."
         },
         {
@@ -4043,6 +4185,12 @@
           "name": "group-id",
           "key": "groupId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD group object ID for a unified (Microsoft 365) group."
         },
         {
@@ -4193,6 +4341,10 @@
           "description": "todoTaskList ID. Returned by `ask-marcel list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "task-list-id",
               "key": "taskListId"
             },
@@ -4328,6 +4480,12 @@
           "name": "mail-folder-id",
           "key": "mailFolderId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "mailFolder ID. Returned by `ask-marcel list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`."
         },
         {
@@ -4383,6 +4541,12 @@
           "name": "mail-folder-id",
           "key": "mailFolderId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "mailFolder ID. Returned by `ask-marcel list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`."
         },
         {
@@ -4438,6 +4602,12 @@
           "name": "mail-folder-id",
           "key": "mailFolderId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Mail folder ID or well-known name (`inbox`, `archive`, `sentitems`, `deleteditems`, `junkemail`, `drafts`). Returned by `list-mail-folders`."
         },
         {
@@ -4768,6 +4938,12 @@
           "name": "notebook-id",
           "key": "notebookId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "OneNote notebook ID. Returned by `ask-marcel list-onenote-notebooks`."
         },
         {
@@ -4875,6 +5051,10 @@
           "description": "OneNote section ID. Returned by `ask-marcel list-onenote-notebook-sections` or `list-all-onenote-sections`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "section-id",
               "key": "sectionId"
             }
@@ -4947,6 +5127,10 @@
           "description": "Planner plan ID. Returned in the `planId` field of any task from `ask-marcel list-planner-tasks`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "plan-id",
               "key": "planId"
             }
@@ -4977,6 +5161,10 @@
           "required": true,
           "description": "Planner plan ID. Returned in the `planId` field of any task from `ask-marcel list-planner-tasks`.",
           "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            },
             {
               "name": "plan-id",
               "key": "planId"
@@ -5356,6 +5544,12 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD user ID or UPN whose calendar to read. Requires `Calendars.Read.Shared` access (granted by the calendar owner)."
         },
         {
@@ -5411,6 +5605,12 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD user ID or UPN of the calendar owner."
         },
         {
@@ -5600,6 +5800,12 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner)."
         },
         {
@@ -5769,6 +5975,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
@@ -5876,6 +6088,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`."
         },
         {
@@ -5986,6 +6204,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID."
         },
         {
@@ -6108,6 +6332,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID."
         },
         {
@@ -6157,6 +6387,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID. Returned by `search-sharepoint-sites-by-name`."
         },
         {
@@ -6187,6 +6423,12 @@
           "name": "site-id",
           "key": "siteId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "SharePoint site ID."
         },
         {
@@ -6236,6 +6478,12 @@
           "name": "calendar-id",
           "key": "calendarId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `ask-marcel list-calendars` to discover non-default calendar IDs."
         },
         {
@@ -6291,6 +6539,12 @@
           "name": "calendar-id",
           "key": "calendarId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Returned by `ask-marcel list-calendars`."
         },
         {
@@ -6369,6 +6623,12 @@
           "name": "team-id",
           "key": "teamId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`."
         },
         {
@@ -6399,6 +6659,12 @@
           "name": "team-id",
           "key": "teamId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Teams team ID."
         }
       ],
@@ -6418,6 +6684,12 @@
           "name": "chat-id",
           "key": "chatId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`."
         },
         {
@@ -6467,6 +6739,12 @@
           "name": "chat-id",
           "key": "chatId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`."
         }
       ],
@@ -6628,6 +6906,10 @@
           "description": "To Do task list ID. Returned by `ask-marcel list-todo-task-lists`.",
           "aliases": [
             {
+              "name": "id",
+              "key": "id"
+            },
+            {
               "name": "task-list-id",
               "key": "taskListId"
             },
@@ -6692,6 +6974,10 @@
           "required": true,
           "description": "Microsoft To Do task list ID. Returned by `list-todo-task-lists`.",
           "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            },
             {
               "name": "task-list-id",
               "key": "taskListId"
@@ -6768,6 +7054,12 @@
           "name": "user-id",
           "key": "userId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Azure AD user ID or userPrincipalName (UPN) — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory)."
         },
         {
@@ -7086,6 +7378,12 @@
           "name": "drive-id",
           "key": "driveId",
           "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
           "description": "Microsoft Graph drive ID to search inside. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
         },
         {

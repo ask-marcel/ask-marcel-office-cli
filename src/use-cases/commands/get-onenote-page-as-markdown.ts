@@ -51,7 +51,10 @@ const meta: CommandMeta = {
       key: 'onenotePageId',
       required: true,
       description: 'OneNote page ID. Returned by `ask-marcel list-onenote-section-pages`.',
-      aliases: [{ name: 'page-id', key: 'pageId' }],
+      aliases: [
+        { name: 'id', key: 'id' },
+        { name: 'page-id', key: 'pageId' },
+      ],
     },
     {
       name: 'inline-images',

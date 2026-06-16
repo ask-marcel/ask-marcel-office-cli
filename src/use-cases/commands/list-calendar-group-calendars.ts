@@ -17,6 +17,7 @@ const meta: CommandMeta = {
       name: 'calendar-group-id',
       key: 'calendarGroupId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Calendar group ID. Returned by `list-calendar-groups`.',
     },
     ...odataQueryOptions,

@@ -21,6 +21,7 @@ const meta: CommandMeta = {
       name: 'user-id',
       key: 'userId',
       required: true,
+      aliases: [{ name: 'id', key: 'id' }],
       description: 'Azure AD user ID or UPN of the calendar owner.',
     },
     { name: 'start-date-time', key: 'startDateTime', required: true, aliases: [{ name: 'start', key: 'start' }], description: `Start of the window. ${RELATIVE_DATE_DESCRIPTION}` },
