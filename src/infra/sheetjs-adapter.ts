@@ -1,12 +1,15 @@
-import * as XLSX from 'xlsx';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { GraphError } from './graph-client.ts';
 
 type SheetCsv = { readonly name: string; readonly csv: string };
 
-const readSheetsAsCsv = (bytes: Uint8Array): Result<ReadonlyArray<SheetCsv>, GraphError> => {
+const readSheetsAsCsv = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<SheetCsv>, GraphError>> => {
   try {
+    // Lazy-load SheetJS (~181 ms init — the single heaviest dep) so non-Excel
+    // commands don't pay for it at startup; loads on the first .xlsx/.xls/.csv
+    // conversion only (QA-012 cold-start).
+    const XLSX = await import('xlsx');
     const workbook = XLSX.read(bytes, { type: 'array' });
     const sheets = workbook.SheetNames.map((name) => {
       const sheet = workbook.Sheets[name];

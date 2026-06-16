@@ -94,7 +94,7 @@ const csvToMarkdownSection = (name: string, csv: string, maxCells: number = DEFA
 };
 
 const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
-  const sheets = readSheetsAsCsv(bytes);
+  const sheets = await readSheetsAsCsv(bytes);
   if (!sheets.ok) return sheets;
   const maxCells = opts.maxCells ?? DEFAULT_MAX_CELLS;
   const sections = sheets.value.map(({ name, csv }) => csvToMarkdownSection(name, csv, maxCells));

@@ -3,8 +3,8 @@ import { buildMalformedXlsx, buildSampleXlsx, buildXlsxWithBlankRow } from '../t
 import { readSheetsAsCsv } from './sheetjs-adapter.ts';
 
 describe('readSheetsAsCsv', () => {
-  it('returns one entry per worksheet, each with the sheet name and CSV-rendered cells', () => {
-    const result = readSheetsAsCsv(buildSampleXlsx());
+  it('returns one entry per worksheet, each with the sheet name and CSV-rendered cells', async () => {
+    const result = await readSheetsAsCsv(buildSampleXlsx());
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toHaveLength(2);
@@ -17,15 +17,15 @@ describe('readSheetsAsCsv', () => {
     }
   });
 
-  it('drops fully-blank rows so an inflated/padded used range does not bloat the CSV (no `,`-only filler lines)', () => {
-    const result = readSheetsAsCsv(buildXlsxWithBlankRow());
+  it('drops fully-blank rows so an inflated/padded used range does not bloat the CSV (no `,`-only filler lines)', async () => {
+    const result = await readSheetsAsCsv(buildXlsxWithBlankRow());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value[0]?.csv).toBe('Name,Age\nAlice,30');
   });
 
-  it('returns err({ type: api_error }) when the bytes are not a valid xlsx archive', () => {
-    const result = readSheetsAsCsv(buildMalformedXlsx());
+  it('returns err({ type: api_error }) when the bytes are not a valid xlsx archive', async () => {
+    const result = await readSheetsAsCsv(buildMalformedXlsx());
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.status).toBe(500);
