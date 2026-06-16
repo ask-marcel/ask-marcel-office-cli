@@ -87,6 +87,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // Audit v1.0.0 §B4: *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
     if (error.type === 'passthrough_extension_mismatch')
       return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
+    // Large-payload guard: refuse to dump a multi-MB base64 blob to stdout (context bomb). Point at --output-path.
+    if (error.type === 'inline_too_large')
+      return `--output-path: ${commandName} returned a ~${(error.base64Length * 0.75e-6).toFixed(1)} MB inline payload — too large to print to stdout (it would flood the context). Re-run with \`--output-path <file>\` to write the bytes to disk; the envelope then carries \`savedTo\` instead of \`base64\`.`;
     // Audit v1.0.0 §B10: humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
     const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
     if (enoent !== null) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;

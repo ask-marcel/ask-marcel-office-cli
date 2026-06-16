@@ -18,6 +18,16 @@ describe('persistIfRequested', () => {
     expect(fs.has('/work/test-output/should-not-write.pdf')).toBe(false);
   });
 
+  it('refuses to inline a multi-MB base64 payload when no --output-path is set — points the caller at --output-path instead of flooding stdout', async () => {
+    const fs = createFileSystemFake();
+    const big = 'A'.repeat(1_200_000); // >1 MB of base64 — a context bomb if dumped to stdout
+    const data = { contentType: 'application/pdf', size: 900_000, base64: big };
+    const result = await persistIfRequested(fs, undefined, data);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('inline_too_large');
+  });
+
   it('rejects an empty `--output-path ""` explicitly so a shell-quoting mistake (`--output-path "$VAR"` with VAR unset) is caught instead of silently being a no-op', async () => {
     const fs = createFileSystemFake();
     const data = { contentType: 'application/pdf', base64: 'JVBERi0=' };

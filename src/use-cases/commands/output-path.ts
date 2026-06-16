@@ -30,7 +30,8 @@ export type OutputPathError =
   | { readonly type: 'write_failed'; readonly message: string }
   | { readonly type: 'empty_path' }
   | { readonly type: 'is_directory' }
-  | { readonly type: 'passthrough_extension_mismatch'; readonly contentType: string; readonly requestedExtension: string };
+  | { readonly type: 'passthrough_extension_mismatch'; readonly contentType: string; readonly requestedExtension: string }
+  | { readonly type: 'inline_too_large'; readonly base64Length: number };
 
 export type OutputDirError = { readonly type: 'no_media' } | { readonly type: 'empty_path' } | { readonly type: 'write_failed'; readonly message: string };
 
@@ -47,8 +48,20 @@ const looksLikeDirectoryPath = (path: string): boolean => path.endsWith('/') || 
 const isPdfExtension = (path: string): boolean => path.toLowerCase().endsWith('.pdf');
 const isPdfContentType = (ct: string): boolean => ct.toLowerCase().startsWith('application/pdf');
 
+// Above this many base64 chars (~750 KB of binary), inlining the payload to
+// stdout would flood the LLM's context — the multi-MB context-bomb class the
+// audits flagged. Without --output-path, refuse and point the caller at it
+// rather than dumping the blob. Small payloads (icons, a profile photo, a tiny
+// attachment) still inline. Only the single-base64 byte envelopes are guarded;
+// the image-extraction `media` arrays go through persistMediaIfRequested.
+const INLINE_BASE64_LIMIT = 1_000_000;
+
 export const persistIfRequested = async (fs: FileSystem, outputPath: string | undefined, data: unknown): Promise<Result<unknown, OutputPathError>> => {
-  if (outputPath === undefined) return ok(data);
+  if (outputPath === undefined) {
+    const inline = isPlainRecord(data) ? data['base64'] : undefined;
+    if (typeof inline === 'string' && inline.length > INLINE_BASE64_LIMIT) return err({ type: 'inline_too_large', base64Length: inline.length });
+    return ok(data);
+  }
   // Audit v1.0.0 §bug-5: `--output-path ""` was silently treated as
   // "no flag", which masked shell-quoting mistakes (`--output-path "$VAR"`
   // where VAR is empty). Reject with a clear error instead.
