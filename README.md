@@ -25,7 +25,7 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 
 ### Read-only by design
 
-**This is the most important property.** 171 GET endpoints + 2 POST (searches) + 1 POST (create draft) + 1 PATCH (update draft). No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 172 GET endpoints + 2 POST (searches) + 1 POST (create draft) + 1 PATCH (update draft) = 176 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -112,7 +112,7 @@ npm i -g ask-marcel-office-cli
 # authenticate (cached → refresh → browser fallback)
 ask-marcel login
 
-# everything else is read-only and discoverable from --help
+# the rest is read-only (the only writes are mail drafts) and discoverable from --help
 ask-marcel list-drives
 ask-marcel search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
 ask-marcel convert-mail-to-markdown --message-id "AAMkAD..."
@@ -192,7 +192,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Agent skill (progressive disclosure)
 
-A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 165 commands into context at once.
+A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 176 commands into context at once.
 
 **Structure**
 
@@ -200,7 +200,7 @@ A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives
 .agents/skills/ask-marcel-office/
 ├── SKILL.md                          # core workflow + category index
 └── references/                       # per-domain command details, loaded on demand
-    ├── marcel-mail.md        (29 commands)
+    ├── marcel-mail.md        (31 commands)
     ├── marcel-drive.md       (30 commands)
     ├── marcel-calendar.md    (23 commands)
     ├── marcel-sharepoint.md  (18 commands)
@@ -210,7 +210,7 @@ A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives
     ├── marcel-notes.md       (11 commands)
     ├── marcel-chats.md        (9 commands)
     ├── marcel-teams.md        (7 commands)
-    └── marcel-meta.md         (5 commands)
+    └── marcel-meta.md         (6 commands)
 ```
 
 **How it works**

@@ -47,7 +47,7 @@ Run it with the `/qa-audit` skill, or hand this document to a fresh session and 
 | A4 | Coverage | `bun run coverage`; check the **real exit code**, not a piped grep's | exit 0, "all files meet their tier gate". If a file shows >99% with no line numbers, switch bunfig to lcov and grep `DA:N,0` |
 | A5 | Mutation | `rm -f reports/stryker-incremental.json && ./node_modules/.bin/stryker run stryker.conf.json` (node shebang — NOT `bun --bun x`, which breaks @babel/generator; delete the incremental file or it serves stale verdicts) | ≥90 overall; investigate any file <90 |
 | A6 | Build (both tsconfigs) | `bun run build` | bundle + declaration emit clean. The dev typecheck does NOT run the build's declaration emit — dual-tsconfig CJS-interop errors only appear here |
-| A7 | **Bundle execution smoke** | Run `dist/cli.js` under **both** `bun` and `node` on every vendored fixture: `convert-local-file --path` × {`src/test-helpers/assets/sample.msg`, `assets/legacy-sample.doc`, a temp `.csv`, a temp `.zip`, a missing path} | Correct output under both runtimes. **`bun test` runs from source and can NEVER catch bundler-interop breakage** — the `.msg` "Object is not a constructor" bug shipped green through every gate and only this check finds its class |
+| A7 | **Bundle execution smoke** | Run `dist/cli.js` under **both** `bun` and `node` on every vendored fixture: `convert-local-file --path` × {`src/test-helpers/assets/sample.msg`, `src/test-helpers/assets/legacy-sample.doc`, a temp `.csv`, a temp `.zip`, a missing path}. ALSO run `extract-local-file-images --path` on an image-bearing docx (the `producesMedia` family uses JSZip+unpdf — a separate bundler-interop surface; 2026-06-15 there is no vendored image fixture, so synthesize one or **vendor an image-bearing `.docx`** and add this row permanently). | Correct output under both runtimes. **`bun test` runs from source and can NEVER catch bundler-interop breakage** — the `.msg` "Object is not a constructor" bug shipped green through every gate and only this check finds its class |
 | A8 | Deploy parity | `cmp "$(npm root -g)/ask-marcel-office-cli/dist/cli.js" dist/cli.js`; `ask-marcel --version` vs `package.json` | byte-identical, versions match |
 | A9 | Dependency hygiene | `grep -E '"(latest|\*)"' package.json` (must be empty); `bun outdated` (note majors, don't bump) | no `latest`/`*`; outdated list recorded in report |
 
@@ -96,7 +96,7 @@ For **every command**, exercise each row of this table (live against the tenant 
 | OData flags where declared (`--select/--filter/--top/--orderby/--expand`) | honored or documented-as-ignored (mailboxSettings class); `--top` >1000 rejected client-side |
 | Pagination (every `pagination: true` command) | `nextLink` hoisted to envelope top level; `next-page --url` round-trips |
 
-**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check):
+**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check). _As of 2026-06-15 (F-01 fix) `docs/commands.json` AND `help-json` both carry `producesBytes`/`producesMedia`/`mutates`, so derive the leak-scan worklist straight from the manifest: `jq '[.commands[]|select(.producesBytes or .producesMedia)|.name]' docs/commands.json`._:
 
 | Flag | Check | Pass criteria |
 |---|---|---|
@@ -146,12 +146,12 @@ Microsoft moves things. Each run, re-verify the full endpoint surface AND the kn
 
 | Probe | Why fragile | Last status |
 |---|---|---|
-| `list-teams-chat*` / `get-teams-chat-message` (chatsvcagg→csa substrate) | Microsoft-internal API, moved 2026-05 (`/api/csa/<region>/api/v{1,3}`) | working 2026-06 |
-| 3 `download-drive-item-version*` commands (ODSP allow-list, elevated token) | needs M365ChatClient-identity token from login's second capture | working 2026-06 |
-| `?format=pdf` input list (38 extensions) | CDN-side list drifts; pdf→pdf rejected | working 2026-06-10 (docx→pdf live) |
-| `?format=html` input set (loop/fluid/wbtx/whiteboard only) | Office docs always `Sandbox_InputFormatNotSupported` | confirmed 2026-05 |
-| OneNote reads on >5K-item doc libraries | Graph blocks ALL OneNote reads (tenant-side) | **UNBLOCKED 2026-06-10** — notebooks/sections/pages/page-content all 200 live |
-| Elevated + Teams-substrate token capture in NON-interactive sessions | silent SSO (IdP-federated) times out without a user at the browser → list-chats/get-chat/list-chat-members/list-teams-chat\*/find-chats-with-user/download-drive-item-version BLOCKED | observed 2026-06-10; plan audits with an interactive warm-up or accept the blocked subset |
+| `list-teams-chat*` / `get-teams-chat-message` (chatsvcagg→csa substrate) | Microsoft-internal API, moved 2026-05 (`/api/csa/<region>/api/v{1,3}`) | **working 2026-06-15** — csa substrate token HEALTHY non-interactively (list-teams-chat-messages/-history/get-teams-chat-message/list-teams-chats-with-messages/find-chats-with-user/resolve-teams-link all ok) |
+| 3 `download-drive-item-version*` commands (ODSP allow-list, elevated token) | needs M365ChatClient-identity token from login's second capture | working 2026-06; BLOCKED 2026-06-15 (elevated-token silent-SSO timeout, QA-011) |
+| `?format=pdf` input list (38 extensions) | CDN-side list drifts | working 2026-06-15 (docx→pdf live). **pdf→pdf now returns PASSTHROUGH (raw bytes + `passthrough:true` + note), NOT a reject** — the old "pdf→pdf rejected" expectation is retired |
+| `?format=html` input set (loop/fluid/wbtx/whiteboard only) | Office docs always `Sandbox_InputFormatNotSupported` | confirmed 2026-05; `.whiteboard` live-verified ok 2026-06-15 |
+| OneNote reads on >5K-item doc libraries | Graph blocks ALL OneNote reads (tenant-side) | **UNBLOCKED 2026-06-15** — notebooks/sections/pages/page-content all 200 live |
+| Elevated token capture in NON-interactive sessions (distinct from substrate) | silent SSO (IdP-federated) times out without a user at the browser → the *elevated m365.cloud.microsoft* path blocks list-chats/get-chat/list-chat-members/download-drive-item-version. (The *substrate* csa token is NOT affected — see row 1.) Error guidance correctly suggests `logout && login`. | observed 2026-06-15 (QA-011); plan audits with an interactive warm-up or accept the 4-cmd blocked subset |
 | `/me/followedSites`, `/sites/delta` | always 403 on delegated; commands use `/sites?search=` | avoided by design |
 | Archived sites | 423 `resourceLocked` on GET /sites/{id}; site-search probes & excludes | working 2026-06 |
 | Elevated-token capture (visible Edge, IdP-federated SSO) | headless refused; federated IdP needs the 5-min deadline | working 2026-05 |
@@ -194,18 +194,30 @@ Precedent: the 3 `download-drive-item-version-*` commands consolidated into one 
 | `pageCount` on PDF attachment metadata (agents chunk reads at 20 pages) | F | plugin audit 2026-06 | open |
 | Polymorphic `read-mail-attachment` (auto-route by content-type) | F | plugin audit 2026-06 | open |
 | Rename `download-onedrive-file-content` → `download-drive-item-content` + alias | F/P3 | naming audit 2026-06 | open |
-| meta.test: validate backticked command references against registry (phantom-name class) | F | QA 2026-06 | open |
+| meta.test: validate backticked command references against registry (phantom-name class — would have caught F-04) | F | QA 2026-06 | open (F-04 fixed manually 2026-06-15; general guard still wanted) |
 | Friendlier commander error for bare-word flag typos (`item--id`) | I | session 2026-06 | open |
 | Recycle-bin listing (metadata-only — no content API on delegated) | — | probe 2026-06 | dropped (Graph can't) |
-| Fix `login` hang after silent token refresh (browser teardown; stderr "waiting on user" line) | **P1** | plugin doc 2026-06-08, confirmed open QA 2026-06-10 | open |
-| chmod 0600 on token-cache.json at write (docs already claim it) | P3 | QA 2026-06-10 (QA-001) | open |
-| One shared `--drive-id` description constant (11 commands lack the SharePoint pointer) | P3 | QA 2026-06-10 (QA-003) | open |
-| Password-protected PDF: honest dedicated message | P3 | QA 2026-06-10 (QA-006) | open |
-| Container-neutral hints for attachments nested in .msg/zip | I | QA 2026-06-10 (QA-007) | open |
-| One-time cleanup + prevention for orphaned `ask-marcel-temp` (un-dotted) root folder | P3 | QA 2026-06-10 (QA-008) | open |
-| Align OData `--top` support within command families (list-site-columns vs list-site-content-types; microsoft-search-query page-size) | P3 | QA 2026-06-10 (QA-013) | open |
-| Cold-start reduction (~1.2 s node: lazier imports / precompiled registry) | I | QA 2026-06-10 (QA-012) | open |
-| SSO-timeout errors should suggest `ask-marcel login` explicitly | I | QA 2026-06-10 (QA-011) | open |
+| Cold-start reduction (lazier imports / precompiled registry) | I | QA-012 | open (~0.84 s node / ~0.6 s bun 2026-06-15 — improved from ~1.2 s, not eliminated) |
+| One shared `--drive-id` description constant | P3 | QA-003 | open (SharePoint pointer DONE 2026-06-10; 5 wording variants remain — minor) |
+| `login` hang after silent token refresh | **P1** | QA-010 | **SHIPPED 2026-06-10 (cd6e74e)**; interactive race repro still opportunistic |
+| chmod 0600 on token-cache.json at write | P3 | QA-001 | **DONE 2026-06-10 (72a6c70)** — verified 0600 live 2026-06-15 |
+| Password-protected PDF honest message | P3 | QA-006 | **DONE 2026-06-10 (74fc486)** — verified live 2026-06-15 |
+| Container-neutral hints for .msg/zip-nested attachments | I | QA-007 | **DONE 2026-06-10 (fe1cfd9)** |
+| Orphaned `ask-marcel-temp` cleanup | P3 | QA-008 | **DONE 2026-06-10 (fe1cfd9)** |
+| OData `--top` family alignment | P3 | QA-013 | CLOSED no-change (deliberate, documented) |
+| SSO-timeout errors suggest `login` | I | QA-011 | CLOSED no-change — guidance present, re-confirmed live 2026-06-15 |
+| Byte/media + `mutates` metadata serialized in commands.json AND help-json | P3 | QA 2026-06-15 (F-01) | **DONE 2026-06-15** |
+| Read-only `--help` narrative derives writes-vs-searches from `mutates` (no mislabel) | P3 | QA 2026-06-15 (F-03) | **DONE 2026-06-15** |
+| login help phantom `--use-playwright` removed | P3 | QA 2026-06-15 (F-04) | **DONE 2026-06-15** |
+| `update-mail-draft --id` alias (family consistency) | P3 | QA 2026-06-15 (F-05) | **DONE 2026-06-15** |
+| Local-only command errors stamp `source: cli` not `graph` | I | QA 2026-06-15 (F-02) | **DONE 2026-06-15** |
+| Wrap raw JSZip error (no leaked docs URL) on non-zip input | P3 | QA 2026-06-15 (F-08) | **DONE 2026-06-15** |
+| Stale doc numbers (README counts, help-json size hints) | I | QA 2026-06-15 (F-06) | **DONE 2026-06-15** |
+| Vendor an image-bearing `.docx` fixture + add `extract-local-file-images` to A7 bundle smoke (producesMedia/JSZip+unpdf interop is un-smoked) | I | QA 2026-06-15 | open |
+| Surface "use `--output-path` for large payloads" per byte command (get-mail-message-mime/get-mail-attachment default to inline base64) | I/F | QA 2026-06-15 | open (mitigated by F-01 producesBytes flag) |
+| Pre-existing mutation debt in `docs.ts` (54%) / `docs-render.ts` (70%) — rendering files below the per-file 90 in isolation | I | QA 2026-06-15 | open (tolerated by full-aggregate gate; not a regression) |
+| `--start`/`--end` aliases on calendar-view family (agents + plugin reach for them) | F | QA 2026-06-15 | open |
+| Downstream plugin doc sweep — stale `>/dev/null`/GBK-unzip workarounds + phantom flags (`--link`,`--start`,`get-event`,`--filter`,`--user-email`) across 13 files | — | QA 2026-06-15 | open (separate `ask-marcel-plugin` repo) |
 
 ## H. Report template
 
@@ -229,3 +241,4 @@ Then — separately, after the report — propose the fix plan and **wait for ap
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-06-08 | 1.4.0 | plugin session (pre-playbook) | 1 | 1 | 1 | 0 | 2 | 2 | DEGRADED | plugin audit doc |
 | 2026-06-10 | 1.4.0 / 444c4fc | Claude (first full playbook run) | 1 (carried: login-hang) | 0 | 5 | 0 | 6 | 6 | HEALTHY | .claude/qa-reports/2026-06-10.md — 173/173 cmds ALL live-verified (blocked subset closed after maintainer re-login); offline matrix 128×4 pass; leak scan clean; OneNote unblocked. Same-day fix wave shipped: QA-010 P1 + 001/002/003/005/006/007/008/009 fixed, 011/013 closed-as-correct (cd6e74e..fd7332b, scoped mutation 96.3%); full A5 aborted (pre-fix sandbox) — rerun next audit |
+| 2026-06-15 | 1.4.0 / 53a4af3 | Claude (second full playbook run) | 0 (carried QA-010 shipped) | 0 | 6 | 0 | 2 | 4 | HEALTHY | .claude/qa-reports/2026-06-15.md — 176 cmds (was 173: +mail-draft writes, +image extraction, +Retry-After). Offline matrix 176×4 = 606 cases, 0 fail; byte+media leak guards clean; B6 error sweep clean. Live: 174 cmds, 158 ok / 6 boundary-err / 4 BLOCKED (QA-011 elevated-token) / 6 skip — **ZERO drift, ZERO P1 leaks** (4.78 MB→103 B stdout). Same-run fix wave (working tree, not yet committed): F-01 byte/media/mutates serialization, F-03 read-only narrative, F-04 login phantom flag, F-05 update-mail-draft --id, F-06 stale numbers, F-02 local err source, F-08 jszip-leak wrap. Gates: 3775/0 tests, lint/typecheck clean, coverage 100% all tiers, deploy byte-identical; added-line mutation 100%. A5 full run ~13 h (infeasible) — scoped-on-changed used. Improvements vs playbook: pdf→pdf now passthrough; Teams substrate healthy non-interactively |
