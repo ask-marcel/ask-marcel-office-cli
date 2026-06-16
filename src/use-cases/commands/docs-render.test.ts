@@ -201,4 +201,40 @@ describe('renderCommandMarkdown', () => {
     const md = renderCommandMarkdown(listDrives);
     expect(md).not.toContain('**Stability:**');
   });
+
+  it('renders a Request body section (fenced json) when the entry has a bodyTemplate', () => {
+    const withBody: CommandManifestEntry = { ...calendarEvent, bodyTemplate: '{ "subject": "<text>" }' };
+    const md = renderCommandMarkdown(withBody);
+    expect(md).toContain('## Request body');
+    expect(md).toContain('```json');
+    expect(md).toContain('{ "subject": "<text>" }');
+  });
+
+  it('omits the Request body section when the entry has no bodyTemplate', () => {
+    expect(renderCommandMarkdown(listDrives)).not.toContain('## Request body');
+  });
+
+  it('omits the Scopes line for an EMPTY scopesRequired array (not just undefined) — guards the `.length > 0` check', () => {
+    const md = renderCommandMarkdown({ ...calendarEvent, scopesRequired: [] });
+    expect(md).not.toContain('**Scopes required:**');
+  });
+
+  it('omits the Positional arguments section for an EMPTY positionalArguments array — guards the `.length > 0` check', () => {
+    const md = renderCommandMarkdown({ ...listDrives, positionalArguments: [] });
+    expect(md).not.toContain('## Positional arguments');
+  });
+
+  it('renders no alias suffix for an EMPTY aliases array (not just undefined) — guards the `aliases.length === 0` check', () => {
+    const md = renderCommandMarkdown({ ...calendarEvent, options: [{ name: 'event-id', key: 'eventId', required: true, description: 'The Graph event ID.', aliases: [] }] });
+    expect(md).toContain('| `--event-id` | The Graph event ID. |');
+    expect(md).not.toContain('aliases:');
+  });
+
+  it('renders the back-compat commandAliases on the command name line when present', () => {
+    const renamed: CommandManifestEntry = { ...listDrives, commandAliases: ['list-onedrive-drives'] };
+    const md = renderCommandMarkdown(renamed);
+    // canonical heading first; alias surfaced so an LLM that learned the old name still finds it
+    expect(md).toContain('# `list-drives`');
+    expect(md).toContain('list-onedrive-drives');
+  });
 });

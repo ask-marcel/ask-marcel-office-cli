@@ -67,6 +67,16 @@ describe('buildManifest', () => {
     expect(byName('aaa-write')?.mutates).toBe(true);
   });
 
+  it('serializes commandAliases (back-compat names) when set, and omits the key otherwise', () => {
+    const registry: Readonly<Record<string, Command>> = {
+      'aaa-renamed': fakeCmd({ commandAliases: ['aaa-old-name'] }),
+      'aaa-plain': fakeCmd(),
+    };
+    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    expect(manifest.commands.find((c) => c.name === 'aaa-renamed')?.commandAliases).toEqual(['aaa-old-name']);
+    expect(manifest.commands.find((c) => c.name === 'aaa-plain')).not.toHaveProperty('commandAliases');
+  });
+
   it('uses the real `new Date()` when no clock injector is given', () => {
     const before = Date.now();
     const manifest = buildManifest({ foo: fakeCmd() }, 'fake-pkg', '0.0.1');
@@ -85,6 +95,15 @@ describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () =>
     const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
     const foo = manifest.commands.find((c) => c.name === 'list-foo');
     expect(foo).toEqual({ name: 'list-foo', summary: 'lists foos', category: 'drive' });
+  });
+
+  it('compacts each terse summary to its first sentence (keeps the per-category discovery view token-cheap)', () => {
+    const registry: Readonly<Record<string, Command>> = {
+      'list-foo': fakeCmd({ summary: 'Lists the foos. A second sentence with extra detail that terse should drop.' }),
+    };
+    const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1');
+    const foo = manifest.commands.find((c) => c.name === 'list-foo');
+    expect(foo?.summary).toBe('Lists the foos.');
   });
 
   it('still includes lifecycle entries with their canonical summaries so a discovery-mode consumer sees login/logout/update/docs/help-json', () => {

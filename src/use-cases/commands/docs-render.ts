@@ -124,6 +124,10 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
     `- **Graph endpoint:** \`${entry.graphMethod} ${entry.graphPathTemplate}\``,
     `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
   ];
+  if (entry.commandAliases && entry.commandAliases.length > 0) {
+    const aliasNames = entry.commandAliases.map((a) => `\`${a}\``).join(', ');
+    lines.push(`- **Also invokable as (deprecated alias):** ${aliasNames}`);
+  }
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
