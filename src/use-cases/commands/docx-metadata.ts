@@ -7,7 +7,6 @@ import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalR
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { extractCommentAnchors } from './docx-comment-anchors.ts';
 import { attrOf, collectText, findAll, findAllTexts, parseXml } from './ooxml-xml-walker.ts';
-import type { XmlObject } from './ooxml-xml-walker.ts';
 
 /**
  * Pulls the side-channel content out of a .docx zip — every text-bearing
@@ -53,7 +52,7 @@ type DocxMetadata = {
 const extractPeople = (root: unknown): ReadonlyArray<Person> => {
   const persons = findAll(root, 'w15:person');
   return persons.map((p) => {
-    const presence = findAll(p, 'w15:presenceInfo')[0] ?? ({} as XmlObject);
+    const presence = findAll(p, 'w15:presenceInfo')[0] ?? {};
     return {
       author: attrOf(p, 'w15:author'),
       providerId: attrOf(presence, 'w15:providerId'),
@@ -86,7 +85,7 @@ const extractHidden = (root: unknown): ReadonlyArray<string> => {
   for (const r of runs) {
     const rPr = r['w:rPr'];
     if (!rPr || typeof rPr !== 'object') continue;
-    if (!Object.hasOwn(rPr as Record<string, unknown>, 'w:vanish')) continue;
+    if (!Object.hasOwn(rPr, 'w:vanish')) continue;
     const text = collectText(r, 'w:t');
     if (text !== '') out.push(text);
   }

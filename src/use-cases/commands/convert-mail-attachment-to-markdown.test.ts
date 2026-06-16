@@ -26,7 +26,7 @@ const graphWith = (handlers: { get?: (url: string) => Result<unknown, GraphError
   fakeGraphClient({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
     getBinary: async (url: string) => handlers.getBinary?.(url) ?? ok({}),
-  }) as GraphClient;
+  });
 
 // A graph that returns one fileAttachment for the attachments fetch.
 const fileAttachment = (name: string, bytes: Uint8Array): GraphClient =>

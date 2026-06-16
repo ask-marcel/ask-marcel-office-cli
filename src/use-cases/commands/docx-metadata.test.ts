@@ -115,7 +115,7 @@ describe('extractDocxMetadata', () => {
     expect(m.bookmarks).toEqual([{ id: '10', name: 'BM_named' }]);
 
     // Fields — instrText trimmed, whitespace-only instrText + empty w:fldSimple filtered, header field discovered
-    expect(m.fields.map((f) => f.instruction).toSorted()).toEqual(['DOCVARIABLE FS', 'MERGEFIELD Spaced', 'PAGE']);
+    expect(m.fields.map((f) => f.instruction).toSorted((a, b) => a.localeCompare(b))).toEqual(['DOCVARIABLE FS', 'MERGEFIELD Spaced', 'PAGE']);
     expect(m.fields.every((f) => f.instruction !== '')).toBe(true);
     expect(m.fields).toContainEqual({ source: 'word/document.xml', instruction: 'MERGEFIELD Spaced' });
     expect(m.fields).toContainEqual({ source: 'word/header1.xml', instruction: 'PAGE' });

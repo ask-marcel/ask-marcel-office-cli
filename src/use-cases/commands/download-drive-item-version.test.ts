@@ -20,7 +20,7 @@ const versionGraph = (handlers: { get?: (url: string) => Result<unknown, GraphEr
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
     getBinary: async () => ({ ok: false, error: { type: 'api_error', status: 403, message: 'non-elevated token rejected on historical version' } }),
     getBinaryElevated: async (url: string) => handlers.elevated?.(url) ?? ok({}),
-  }) as GraphClient;
+  });
 
 const params = { driveId: 'd1', itemId: 'i1', versionId: '2.0' };
 const val = (r: Result<unknown, GraphError>): Record<string, unknown> => (r.ok ? (r.value as Record<string, unknown>) : {});

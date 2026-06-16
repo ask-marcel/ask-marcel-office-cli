@@ -234,7 +234,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
-    expect(v.value.map((d) => d.id).sort()).toEqual(['dg1', 'dg3']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['dg1', 'dg3']);
     // g1 is only a joined team (not a member group), so dg1 carries the joinedTeam source alone.
     expect(v.value.find((d) => d.id === 'dg1')?.sources).toEqual(['joinedTeam']);
     // g3 is only a member group.
@@ -334,7 +334,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string }>; partialErrors: ReadonlyArray<{ source: string }> };
-    expect(v.partialErrors.map((p) => p.source).sort()).toEqual(['/me/drive/sharedWithMe', '/me/drives', '/me/memberOf']);
+    expect(v.partialErrors.map((p) => p.source).sort((a, b) => a.localeCompare(b))).toEqual(['/me/drive/sharedWithMe', '/me/drives', '/me/memberOf']);
     expect(v.value.map((d) => d.id)).toEqual(['dg1']);
   });
 
@@ -469,7 +469,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
-    expect(v.value.map((d) => d.id).sort()).toEqual(['mem-drive', 'priv-drive', 'shar-drive', 'team-default']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['mem-drive', 'priv-drive', 'shar-drive', 'team-default']);
     expect(v.value.find((d) => d.id === 'priv-drive')?.sources).toEqual(['channel']);
     expect(v.value.find((d) => d.id === 'shar-drive')?.sources).toEqual(['channel']);
   });
@@ -563,7 +563,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
-    expect(v.value.map((d) => d.id).sort()).toEqual(['b!tre1', 'fol1', 'rec1']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['b!tre1', 'fol1', 'rec1']);
     for (const id of ['rec1', 'fol1', 'b!tre1']) expect(v.value.find((d) => d.id === id)?.sources).toEqual(['activity']);
   });
 
@@ -639,7 +639,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string; sources: ReadonlyArray<string> }> };
-    expect(v.value.map((d) => d.id).sort()).toEqual(['d-default', 'd-wiki']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['d-default', 'd-wiki']);
     expect(v.value.find((d) => d.id === 'd-default')?.sources).toEqual(['joinedTeam']); // known default NOT re-tagged
     expect(v.value.find((d) => d.id === 'd-wiki')?.sources).toEqual(['siteLibrary']); // secondary library, newly found
   });
@@ -670,7 +670,7 @@ describe('list-accessible-drives', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { value: ReadonlyArray<{ id: string }>; partialErrors?: ReadonlyArray<{ source: string }> };
-    expect(v.value.map((d) => d.id).sort()).toEqual(['lib1', 'od', 's1', 's2', 's3', 's4']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['lib1', 'od', 's1', 's2', 's3', 's4']);
     expect(v.partialErrors?.map((p) => p.source)).toEqual(['/sites/c.sharepoint.com:/sites/Site500:/drives']);
   });
 
@@ -696,7 +696,7 @@ describe('list-accessible-drives', () => {
     if (!result.ok) return;
     const v = result.value as { truncated?: boolean; value: ReadonlyArray<{ id: string }> };
     expect(v.truncated).toBe(true); // 3 distinct sites > cap of 2
-    expect(v.value.map((d) => d.id).sort()).toEqual(['a', 'b', 'cc']);
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['a', 'b', 'cc']);
   });
 
   it('attaches a best-effort index-wide fileEstimate (driveItem count) from /search/query', async () => {

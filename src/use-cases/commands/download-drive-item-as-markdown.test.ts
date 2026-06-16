@@ -16,7 +16,7 @@ const graphWith = (handlers: { get?: (url: string) => Result<unknown, GraphError
   fakeGraphClient({
     get: async (url: string) => handlers.get?.(url) ?? ok({}),
     getBinary: async () => handlers.getBinary?.() ?? ok({}),
-  }) as GraphClient;
+  });
 
 const asText = (r: Result<unknown, GraphError>): string => (r.ok ? ((r.value as { text?: string }).text ?? '') : '');
 const params = { driveId: 'd1', itemId: 'i1' };

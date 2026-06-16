@@ -45,7 +45,7 @@ describe('extractComments — slide anchoring', () => {
     const comments = extractComments(zipR.value, extractCommentAuthors(zipR.value));
     const bytext = (t: string): string | undefined => comments.find((c) => c.text === t)?.slide;
     // only the three real ppt/comments/*.xml parts are picked up — the stray <p:cm> inside slide1 is NOT
-    expect(comments.map((c) => c.text).toSorted()).toEqual(['anchored', 'decoy', 'tenth']);
+    expect(comments.map((c) => c.text).toSorted((a, b) => a.localeCompare(b))).toEqual(['anchored', 'decoy', 'tenth']);
     expect(bytext('anchored')).toBe('slide1.xml'); // comments-typed rel anchors
     expect(bytext('decoy')).toBeUndefined(); // a slideLayout rel and a notesSlide's comments rel both must NOT anchor
     expect(bytext('tenth')).toBe('slide10.xml'); // slide\d+ matches a two-digit slide number

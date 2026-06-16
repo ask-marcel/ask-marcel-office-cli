@@ -1593,14 +1593,14 @@ describe('stderrProgress (the production onProgress sink)', () => {
     const originalOut = process.stdout.write;
     let errCaptured = '';
     let outCaptured = '';
-    process.stderr.write = ((chunk: string | Uint8Array) => {
+    process.stderr.write = (chunk: string | Uint8Array) => {
       errCaptured += String(chunk);
       return true;
-    }) as typeof process.stderr.write;
-    process.stdout.write = ((chunk: string | Uint8Array) => {
+    };
+    process.stdout.write = (chunk: string | Uint8Array) => {
       outCaptured += String(chunk);
       return true;
-    }) as typeof process.stdout.write;
+    };
     try {
       stderrProgress('Signed in — capturing companion tokens…');
     } finally {

@@ -26,7 +26,7 @@ describe('encodePng', () => {
     expect([...sig]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(chunks.map((c) => c.type)).toEqual(['IHDR', 'IDAT', 'IEND']);
 
-    const ihdr = chunks[0]!.data;
+    const ihdr = chunks[0].data;
     const dv = new DataView(ihdr.buffer, ihdr.byteOffset, ihdr.byteLength);
     expect(dv.getUint32(0)).toBe(2); // width
     expect(dv.getUint32(4)).toBe(2); // height
@@ -34,7 +34,7 @@ describe('encodePng', () => {
     expect(ihdr[9]).toBe(2); // color type = RGB
 
     // IDAT inflates back to filter-0 scanlines: [0, row0(6 bytes), 0, row1(6 bytes)]
-    const scanlines = new Uint8Array(inflateSync(Buffer.from(chunks[1]!.data)));
+    const scanlines = new Uint8Array(inflateSync(Buffer.from(chunks[1].data)));
     expect([...scanlines]).toEqual([0, 255, 0, 0, 0, 255, 0, 0, 0, 0, 255, 255, 255, 255]);
 
     // IEND is the canonical empty chunk including its CRC — pins chunk framing + crc32
@@ -42,7 +42,7 @@ describe('encodePng', () => {
   });
 
   it('maps channel counts to PNG color types (1=grayscale, 4=RGBA) and falls back to RGBA', () => {
-    const colorTypeOf = (channels: number, data: Uint8Array): number => parse(encodePng({ width: 1, height: 1, channels, data })).chunks[0]!.data[9]!;
+    const colorTypeOf = (channels: number, data: Uint8Array): number => parse(encodePng({ width: 1, height: 1, channels, data })).chunks[0].data[9];
     expect(colorTypeOf(1, Uint8Array.from([128]))).toBe(0); // grayscale
     expect(colorTypeOf(4, Uint8Array.from([1, 2, 3, 4]))).toBe(6); // RGBA
     expect(colorTypeOf(2, Uint8Array.from([1, 2]))).toBe(6); // unknown → RGBA fallback

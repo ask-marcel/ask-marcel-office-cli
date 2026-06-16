@@ -8,7 +8,7 @@ describe('extractPdfImages', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.length).toBe(1);
-    const part = result.value[0]!;
+    const part = result.value[0];
     expect(part.path).toMatch(/^pdf\/page1\/.+\.png$/);
     expect([...part.bytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]); // PNG signature
     // IHDR width/height (bytes 16..24) prove the fixture's 2x2 image's real dimensions were carried through.

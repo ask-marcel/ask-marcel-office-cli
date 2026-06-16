@@ -549,7 +549,7 @@ const buildPdf = (content: Buffer, resources: string, obj5?: Buffer): Uint8Array
   const off: Record<number, number> = {};
   for (const id of ids) {
     off[id] = pdf.length;
-    pdf = Buffer.concat([pdf, enc(`${id} 0 obj\n`), objs[id]!, enc('\nendobj\n')]);
+    pdf = Buffer.concat([pdf, enc(`${id} 0 obj\n`), objs[id], enc('\nendobj\n')]);
   }
   const xrefAt = pdf.length;
   const size = ids.length + 1;

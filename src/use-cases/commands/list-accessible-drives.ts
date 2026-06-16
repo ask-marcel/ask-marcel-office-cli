@@ -338,7 +338,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
       name: d.name,
       driveType: d.driveType,
       webUrl: d.webUrl,
-      sources: [...d.sources].sort(),
+      sources: [...d.sources].sort((a, b) => a.localeCompare(b)),
       ...(d.groupId !== null ? { groupId: d.groupId } : {}),
       ...(d.size !== null ? { size: d.size } : {}),
     }))

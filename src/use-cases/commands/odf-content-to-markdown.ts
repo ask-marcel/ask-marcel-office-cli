@@ -143,7 +143,7 @@ const cellText = (cell: Node, tag: string): string =>
 
 const trimTrailingEmpty = <T>(items: ReadonlyArray<T>, isEmpty: (item: T) => boolean): ReadonlyArray<T> => {
   let end = items.length;
-  while (end > 0 && isEmpty(items[end - 1] as T)) end -= 1;
+  while (end > 0 && isEmpty(items[end - 1])) end -= 1;
   return items.slice(0, end);
 };
 
