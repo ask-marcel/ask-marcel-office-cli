@@ -18,6 +18,7 @@ export type BuildDepsConfig = {
   readonly home?: string;
   readonly fs?: FileSystem;
   readonly processRunner?: ProcessRunner;
+  readonly createAuth?: typeof createAuthManager;
 };
 
 /**
@@ -44,9 +45,14 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const fs = config.fs ?? defaultFileSystem();
   const processRunner = config.processRunner ?? defaultProcessRunner();
   const logger = createWinstonLogger({ logLevel });
-  const auth = createAuthManager({ cachePath, logger, fs });
+  const makeAuth = config.createAuth ?? createAuthManager;
+  // E-01: command-path auth must never trigger the system-browser/extension capture
+  // on re-auth (it opened a Chrome popup per command — a storm in batch/agent use).
+  // Mirror the default `login`: headed Edge via Playwright, which captures all four
+  // tokens in one window so a single re-auth ends the cascade. The extension stays
+  // reachable via `login --use-extension`.
+  const auth = makeAuth({ cachePath, logger, fs, skipSystemBrowser: true, usePlaywrightFallback: true });
   const graph = createGraphClient(auth);
-  const makeLoginAuth: LoginAuthFactory = ({ useExtension }) =>
-    createAuthManager({ cachePath, logger, fs, skipSystemBrowser: !useExtension, usePlaywrightFallback: !useExtension });
+  const makeLoginAuth: LoginAuthFactory = ({ useExtension }) => makeAuth({ cachePath, logger, fs, skipSystemBrowser: !useExtension, usePlaywrightFallback: !useExtension });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };

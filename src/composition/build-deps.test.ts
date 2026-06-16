@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
+import { createAuthManager } from '../infra/auth.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildDeps } from './build-deps.ts';
 
@@ -21,6 +22,18 @@ describe('buildDeps composition root', () => {
     const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs });
     expect(typeof deps.makeLoginAuth({ useExtension: false }).getAccessToken).toBe('function');
     expect(typeof deps.makeLoginAuth({ useExtension: true }).getAccessToken).toBe('function');
+  });
+
+  it('builds the command-path auth manager with the system-browser/extension capture disabled so re-auth uses headed Edge, never a per-command Chrome popup', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, createAuth: recordingCreateAuth });
+    expect(calls[0]?.skipSystemBrowser).toBe(true);
+    expect(calls[0]?.usePlaywrightFallback).toBe(true);
   });
 
   it('falls back to a home-derived cache path when none is provided', () => {
