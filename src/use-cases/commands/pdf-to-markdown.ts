@@ -3,7 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { extractPdfText } from '../../infra/pdf-text-extractor.ts';
 
-type PdfTextEnvelope = { readonly contentType: 'text/plain'; readonly size: number; readonly text: string };
+type PdfTextEnvelope = { readonly contentType: 'text/plain'; readonly size: number; readonly text: string; readonly pageCount: number };
 
 /**
  * Convert a PDF to a plain-text envelope by extracting its text layer (via unpdf).
@@ -17,9 +17,9 @@ type PdfTextEnvelope = { readonly contentType: 'text/plain'; readonly size: numb
 const pdfToMarkdown = async (bytes: Uint8Array, noTextHint: string): Promise<Result<PdfTextEnvelope, GraphError>> => {
   const extracted = await extractPdfText(bytes);
   if (!extracted.ok) return extracted;
-  const text = extracted.value.trim();
+  const text = extracted.value.text.trim();
   if (text === '') return err({ type: 'api_error', status: 415, message: noTextHint });
-  return ok({ contentType: 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
+  return ok({ contentType: 'text/plain', size: new TextEncoder().encode(text).byteLength, text, pageCount: extracted.value.pageCount });
 };
 
 export { pdfToMarkdown };

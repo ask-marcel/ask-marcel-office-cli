@@ -7,14 +7,16 @@ describe('extractPdfText', () => {
     const result = await extractPdfText(buildPdfWithText());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value).toContain('Hello from the'); // fixture's no-/Widths font drops the final glyph in pdfjs
+    expect(result.value.text).toContain('Hello from the'); // fixture's no-/Widths font drops the final glyph in pdfjs
+    expect(result.value.pageCount).toBeGreaterThan(0);
   });
 
   it('returns an empty string for a PDF that paints no text (e.g. a scanned/image-only page)', async () => {
     const result = await extractPdfText(buildPdfNoImages());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.trim()).toBe('');
+    expect(result.value.text.trim()).toBe('');
+    expect(result.value.pageCount).toBeGreaterThan(0);
   });
 
   it('returns an api_error for bytes that are not a parseable PDF', async () => {

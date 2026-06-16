@@ -42,15 +42,20 @@ const pdfErrorMessage = (e: unknown): string => {
   return `pdf text extraction failed: ${detail}`;
 };
 
-const extractPdfText = async (bytes: Uint8Array): Promise<Result<string, GraphError>> => {
+type PdfText = { readonly text: string; readonly pageCount: number };
+
+const extractPdfText = async (bytes: Uint8Array): Promise<Result<PdfText, GraphError>> => {
   try {
     const { extractText, getDocumentProxy } = await import('unpdf');
     const doc = await getDocumentProxy(bytes, { verbosity: 0 });
     const { text } = await extractText(doc, { mergePages: true });
-    return ok(text);
+    // `numPages` is free here (the doc is already parsed) and lets an LLM caller
+    // chunk its reads (it batches ~20 pages at a time) without a second pass.
+    return ok({ text, pageCount: doc.numPages });
   } catch (e) {
     return err({ type: 'api_error', status: 415, message: pdfErrorMessage(e) });
   }
 };
 
 export { extractPdfText, pdfErrorMessage };
+export type { PdfText };
