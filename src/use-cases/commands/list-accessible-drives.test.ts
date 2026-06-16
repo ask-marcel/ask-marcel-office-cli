@@ -723,6 +723,32 @@ describe('list-accessible-drives', () => {
     expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['a', 'b', 'cc']);
   });
 
+  it('does not flag truncated when the site-library count equals --max-groups exactly', async () => {
+    // Boundary mirror of the group/shared-drive exact-cap tests: 2 distinct sites == cap of 2
+    // must NOT be truncated (guards `sites.size > maxGroups` against a `>=` regression).
+    const routes: Route = (path) => {
+      if (path === '/me/drives')
+        return ok({
+          value: [
+            { id: 'a', name: 'A', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteA/Shared%20Documents' },
+            { id: 'b', name: 'B', driveType: 'documentLibrary', webUrl: 'https://c.sharepoint.com/sites/SiteB/Shared%20Documents' },
+          ],
+        });
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteA:/drives') return ok({ value: [] });
+      if (path === '/sites/c.sharepoint.com:/sites/SiteB:/drives') return ok({ value: [] });
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), { maxGroups: '2' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as { truncated?: boolean; value: ReadonlyArray<{ id: string }> };
+    expect(v.truncated).toBeUndefined(); // exactly 2 sites == cap of 2 → not truncated
+    expect(v.value.map((d) => d.id).sort((a, b) => a.localeCompare(b))).toEqual(['a', 'b']);
+  });
+
   it('attaches a best-effort index-wide fileEstimate (driveItem count) from /search/query', async () => {
     const graph: GraphClient = { ...routeGraph(fullRoutes), post: async () => ok({ value: [{ hitsContainers: [{ total: 139461 }] }] }) };
     const result = await execute(graph, {});
