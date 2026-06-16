@@ -18,8 +18,8 @@ bun add -g ask-marcel-office-cli
 ask-marcel login
 
 # the rest is discoverable
-ask-marcel --help                                # ~31 KB, one-sentence summaries
-ask-marcel help-json --terse --category mail     # ~16 KB JSON for one category
+ask-marcel --help                                # ~34 KB, one-sentence summaries
+ask-marcel help-json --terse --category mail     # ~6 KB JSON for one category
 ask-marcel docs list-mail-messages               # full per-command Markdown
 ```
 
