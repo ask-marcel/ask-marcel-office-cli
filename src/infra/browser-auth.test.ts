@@ -1043,9 +1043,15 @@ describe('browser auth — chatsvcagg capture (Teams substrate audience)', () =>
       appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
     });
 
-  const chatsvcaggRequest = (): RequestLike => ({
+  // Accept an explicit token so a test can seed the captured Bearer and assert
+  // against the SAME value. `chatsvcaggJwt()` stamps `exp` from `Date.now()`, so
+  // evaluating it once for the request and again for the expectation could straddle
+  // a 1-second boundary and desync `exp` (G16-01). The default keeps callers that
+  // never compare the token (region-only tests) unchanged, and computes the JWT
+  // once per request rather than lazily on every `headers()` read.
+  const chatsvcaggRequest = (token: string = chatsvcaggJwt()): RequestLike => ({
     url: () => 'https://chatsvcagg.teams.microsoft.com/api/v2/users/me/chats',
-    headers: () => ({ authorization: `Bearer ${chatsvcaggJwt()}` }),
+    headers: () => ({ authorization: `Bearer ${token}` }),
   });
 
   it('captures a chatsvcagg-audience Bearer in the same single-session run as Teams + elevated (no third browser)', async () => {
@@ -1061,31 +1067,33 @@ describe('browser auth — chatsvcagg capture (Teams substrate audience)', () =>
     // Both the Teams token (response listener) and the chatsvcagg bearer
     // (request listener) are emitted by the SAME page run — the second
     // goto navigates to m365.cloud.microsoft for the elevated leg.
+    const chatsvcaggToken = chatsvcaggJwt();
     const { api, getLaunchCount } = makeFakeApi({
       pageOpts: {
         responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
-        requestsPerGoto: [[chatsvcaggRequest()], [elevatedRequest]],
+        requestsPerGoto: [[chatsvcaggRequest(chatsvcaggToken)], [elevatedRequest]],
         urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
       },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig());
     const result = await browser.acquireBothTokens(['scope'], 'https://teams.microsoft.com');
     expect(result.chatsvcagg.ok).toBe(true);
-    if (result.chatsvcagg.ok) expect(result.chatsvcagg.token as unknown as string).toBe(chatsvcaggJwt());
+    if (result.chatsvcagg.ok) expect(result.chatsvcagg.token as unknown as string).toBe(chatsvcaggToken);
     expect(getLaunchCount()).toBe(1);
   });
 
   it('captures a chatsvcagg bearer via the standalone re-capture path when no Teams response is ever seen but the request listener fires', async () => {
+    const chatsvcaggToken = chatsvcaggJwt();
     const { api } = makeFakeApi({
       pageOpts: {
-        requestsPerGoto: [[chatsvcaggRequest()]],
+        requestsPerGoto: [[chatsvcaggRequest(chatsvcaggToken)]],
         urlsAfterGoto: ['https://teams.microsoft.com/v2/'],
       },
     });
     const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 }));
     const result = await browser.acquireChatsvcaggToken();
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.token as unknown as string).toBe(chatsvcaggJwt());
+    if (result.ok) expect(result.token as unknown as string).toBe(chatsvcaggToken);
   });
 
   it('returns { ok: false, reason: "sso_timeout" } from standalone re-capture when no chatsvcagg request fires within the deadline', async () => {
