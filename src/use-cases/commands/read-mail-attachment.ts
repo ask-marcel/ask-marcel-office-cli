@@ -23,6 +23,39 @@ const isZipAttachment = (a: Record<string, unknown>): boolean => {
   return name.endsWith('.zip') || contentType === 'application/zip' || contentType === 'application/x-zip-compressed';
 };
 
+// Content-types whose bytes are a convertible Office/text document. Senders and
+// Outlook mislabel attachments (a real spreadsheet saved as `report.jpg`), so when
+// the filename extension would misroute but the content-type is one of these, the
+// polymorphic reader routes by the content-type instead. Generic types
+// (octet-stream) are absent, so a correctly-named file with a vague content-type
+// still routes by its name (matching the zip-by-extension behaviour above).
+const CONTENT_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+  'application/vnd.oasis.opendocument.text': 'odt',
+  'application/vnd.oasis.opendocument.presentation': 'odp',
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.ms-excel': 'xls',
+  'text/csv': 'csv',
+};
+
+// Rename a fileAttachment to the extension its content-type implies when the
+// filename's own extension disagrees, so the shared dispatch picks the right
+// converter. Non-file attachments and already-correct names pass through unchanged.
+const nameByContentType = (a: Record<string, unknown>): Record<string, unknown> => {
+  if (a['@odata.type'] !== '#microsoft.graph.fileAttachment') return a;
+  const contentType = typeof a['contentType'] === 'string' ? a['contentType'].toLowerCase() : '';
+  const ext = Object.hasOwn(CONTENT_TYPE_EXTENSIONS, contentType) ? CONTENT_TYPE_EXTENSIONS[contentType] : undefined;
+  if (ext === undefined) return a;
+  const name = typeof a['name'] === 'string' ? a['name'] : '';
+  const dot = name.lastIndexOf('.');
+  if ((dot === -1 ? '' : name.slice(dot + 1).toLowerCase()) === ext) return a;
+  return { ...a, name: `${dot === -1 ? name || 'attachment' : name.slice(0, dot)}.${ext}` };
+};
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -44,12 +77,12 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     }
     return convertZipArchive(base64ToBytes(contentBytes), includeMetadata);
   }
-  return convertFetchedAttachment(graph, a, includeMetadata);
+  return convertFetchedAttachment(graph, nameByContentType(a), includeMetadata);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Read an Outlook mail attachment whatever it is — one command that auto-routes by file type so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.',
+    'Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
