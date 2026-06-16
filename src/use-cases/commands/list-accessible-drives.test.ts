@@ -219,6 +219,30 @@ describe('list-accessible-drives', () => {
     expect(v.value.map((d) => d.id)).toEqual(['dg1', 'dg2']);
   });
 
+  it('caps pagination at MAX_PAGES (25) — stops following @odata.nextLink past the bound, never looping forever', async () => {
+    // /me/drives returns an UNBOUNDED nextLink chain (every page links to the next, never
+    // a terminal page). Only the MAX_PAGES guard stops the walk; without it this would loop
+    // forever. Proves the bound holds: exactly 25 pages are fetched, then the walk stops.
+    const routes: Route = (path) => {
+      if (path === '/me/joinedTeams') return ok({ value: [] });
+      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
+      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
+      if (path === '/me/drives' || /^\/me\/drives\?page=\d+$/.test(path)) {
+        const n = Number(path.match(/page=(\d+)/)?.[1] ?? '0');
+        return ok({
+          value: [{ id: `d${n}`, name: `D${n}`, driveType: 'business', webUrl: `w${n}` }],
+          '@odata.nextLink': `https://graph.microsoft.com/v1.0/me/drives?page=${n + 1}`,
+        });
+      }
+      return emptyActivity(path);
+    };
+    const result = await execute(routeGraph(routes), {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // pages 0..24 fetched → 25 drives; page 25 onward is never requested.
+    expect((result.value as { value: ReadonlyArray<unknown> }).value).toHaveLength(25);
+  });
+
   it('skips malformed team/group entries — null, non-object, non-string id, and non-Unified groups', async () => {
     const routes: Route = (path) => {
       if (path === '/me/drives') return ok({ value: [] });
