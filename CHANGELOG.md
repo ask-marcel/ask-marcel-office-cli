@@ -2,6 +2,45 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 1.5.0
+
+Agent-ergonomics, a faster cold-start, and one new command. All additive — no
+breaking changes (the one rename keeps its old name as an alias).
+
+### Added
+
+- **`read-mail-attachment`** — a polymorphic "read any attachment" command that
+  auto-routes by content-type: a `.zip` is unpacked and every entry converted
+  (the `{ count, files }` envelope), everything else (docx/xlsx/pptx/odf/csv/pdf/
+  `.msg`/legacy/text, reference + embedded items) runs through the markdown
+  dispatch. Images / scanned PDFs / legacy `.ppt` return the actionable
+  vision-model hint. Use the explicit `convert-mail-attachment-*` siblings only
+  to force a specific output format. (Surface: 176 → 177 commands.)
+- **`pageCount`** on the born-digital PDF text envelope (every PDF→markdown entry
+  point) so an LLM can chunk its reads without a second parse.
+- **`--id`** is now accepted by *every* command with a single required `*-id`
+  flag (was mail-message-only) — e.g. `get-calendar-event --id`, `get-team --id`.
+- **`--start` / `--end`** aliases for `--start-date-time` / `--end-date-time`
+  across the calendar-view family.
+
+### Changed
+
+- **`download-onedrive-file-content` → `download-drive-item-content`** (it works
+  on any driveItem, not just OneDrive). The old name keeps working as a
+  back-compat alias.
+- **Friendlier error for a mistyped flag**: a bare word like `item--id` (instead
+  of `--item-id`) now explains flags need their leading `--`, rather than
+  commander's opaque "too many arguments".
+
+### Performance
+
+- **Cold-start**: the heavy conversion deps are `--external` to the npm bundle
+  (`dist/cli.js` 7.4 MB → 1.2 MB; `node --version` ~1.0 s → 0.58 s). The compiled
+  standalone binaries (`build:bin`) stay self-contained.
+- **`help-json --terse`** summaries are compacted to their first sentence, so a
+  per-category discovery fetch drops well under budget (drive 17.9 KB → 6.5 KB,
+  mail 16.8 KB → 5.2 KB; full terse 83 KB → 31 KB).
+
 ## 1.0.0
 
 The first stable release. Two breaking changes consolidate the public output
