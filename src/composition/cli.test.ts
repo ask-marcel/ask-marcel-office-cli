@@ -334,6 +334,27 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/messages/AAMkAGI2');
   });
 
+  it('accepts --start/--end as aliases for --start-date-time/--end-date-time on the calendar-view family (QA-2026-06-16)', async () => {
+    const pathFor = async (args: ReadonlyArray<string>): Promise<string> => {
+      let captured = '';
+      const graph: GraphClient = fakeGraphClient({
+        get: async (path: string) => {
+          captured = path;
+          return { ok: true, value: { value: [] } };
+        },
+      });
+      const cli = buildCli({ auth: okAuth(), graph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-calendar-view', ...args]));
+      return captured;
+    };
+    // The short --start/--end forms agents reach for must produce the identical Graph
+    // call as the canonical --start-date-time/--end-date-time (alias → canonical key).
+    const aliased = await pathFor(['--start', '2026-04-01T00:00:00Z', '--end', '2026-05-01T00:00:00Z']);
+    const canonical = await pathFor(['--start-date-time', '2026-04-01T00:00:00Z', '--end-date-time', '2026-05-01T00:00:00Z']);
+    expect(aliased).toBe(canonical);
+    expect(aliased).toContain('/me/calendarView?startDateTime=');
+  });
+
   it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
     const captureGraph: GraphClient = fakeGraphClient({
       get: async () => ({ ok: true, value: { value: [] } }),

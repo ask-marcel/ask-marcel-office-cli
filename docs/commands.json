@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "1.4.0",
-  "generatedAt": "2026-06-15T14:14:21.762Z",
+  "generatedAt": "2026-06-16T07:22:58.781Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2442,12 +2442,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
@@ -2675,12 +2687,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
@@ -2735,12 +2759,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Lower bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "Upper bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
@@ -3714,12 +3750,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Start of the window (recurrences are expanded across it). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
@@ -5369,12 +5417,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Start of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
@@ -6237,12 +6297,24 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "start",
+              "key": "start"
+            }
+          ],
           "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
+          "aliases": [
+            {
+              "name": "end",
+              "key": "end"
+            }
+          ],
           "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {

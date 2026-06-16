@@ -63,8 +63,8 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['primary', 'default'] },
     },
     { name: 'event-id', key: 'eventId', required: true, description: 'Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
-    { name: 'start-date-time', key: 'startDateTime', required: true, description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
-    { name: 'end-date-time', key: 'endDateTime', required: true, description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
+    { name: 'start-date-time', key: 'startDateTime', required: true, aliases: [{ name: 'start', key: 'start' }], description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
+    { name: 'end-date-time', key: 'endDateTime', required: true, aliases: [{ name: 'end', key: 'end' }], description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
   example:

@@ -61,6 +61,13 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
+      it('exposes the short --start/--end aliases on any date-window option (calendar-view family, QA-2026-06-16)', () => {
+        for (const opt of cmd.meta.options) {
+          if (opt.name === 'start-date-time') expect(opt.aliases?.some((a) => a.name === 'start' && a.key === 'start')).toBe(true);
+          if (opt.name === 'end-date-time') expect(opt.aliases?.some((a) => a.name === 'end' && a.key === 'end')).toBe(true);
+        }
+      });
+
       it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/message-token analogues — are excluded)', () => {
         const runtimeFlagNames = new Set([
           'top',

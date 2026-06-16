@@ -217,7 +217,7 @@ Precedent: the 3 `download-drive-item-version-*` commands consolidated into one 
 | Vendor an image-bearing `.docx` fixture + add `extract-local-file-images` to A7 bundle smoke (producesMedia/JSZip+unpdf interop is un-smoked) | I | QA 2026-06-15 | open — JSZip media path smoked via synth docx 2026-06-16; **unpdf PDF-image path LIVE-confirmed 2026-06-16** (mail-attachment re-probe → 101 imgs) but still NOT in the offline bundle gate |
 | Surface "use `--output-path` for large payloads" per byte command (get-mail-message-mime/get-mail-attachment default to inline base64) | I/F | QA 2026-06-15 | open (mitigated by F-01 producesBytes flag) |
 | Pre-existing mutation debt — `docs.ts` (54%) / `docs-render.ts` (70%) and now `list-accessible-drives.ts` (89.58%, 52 survivors in the discovery fan-out, surfaced 2026-06-16 by full-file scoping) | I | QA 2026-06-15 / -06-16 | open (overall scoped run 91.81% ≥90; per-file <90 in isolation; not a regression) |
-| `--start`/`--end` aliases on calendar-view family (agents + plugin reach for them) | F | QA 2026-06-15 | open |
+| `--start`/`--end` aliases on calendar-view family (agents + plugin reach for them) | F | QA 2026-06-15 | **DONE 2026-06-16 (working tree)** — all 6 date-window commands (list-calendar-view/-delta/-event-instances, list-{specific,group,shared}-calendar-view) gain `--start`/`--end` → canonical key; live-verified (`--start/--end` → ok); meta-invariant + behavioral tests added |
 | Downstream plugin doc sweep — stale `>/dev/null`/GBK-unzip workarounds + phantom flags (`--link`,`--start`,`get-event`,`--filter`,`--user-email`) across 13 files | — | QA 2026-06-15 | open (separate `ask-marcel-plugin` repo) |
 
 ## H. Report template
