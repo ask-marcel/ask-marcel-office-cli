@@ -57,8 +57,8 @@
   ],
   "scripts": {
     "start": "bun run src/main.ts",
-    "lint": "eslint --cache",
-    "lint:strict": "LINT_STRICT=1 eslint",
+    "lint": "eslint --cache --max-warnings=0",
+    "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "bun --bun x tsc --noEmit",
     "coverage": "bun run scripts/check-coverage.ts",
     "mutate": "stryker run",
