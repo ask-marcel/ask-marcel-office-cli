@@ -430,7 +430,7 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
 
 ## Containerization (optional)
 
-The atelier takes no position on deployment — `greenfield` scopes Docker out of repo-birth, and the canonical archetypes (CLIs, batch jobs, Firebase Admin jobs) ship as a `bun run`, not an image. This section exists only so that *if* you containerize, the image conforms instead of drifting. It is documentation, not a gate.
+The atelier takes no position on deployment — `atelier-greenfield` scopes Docker out of repo-birth, and the canonical archetypes (CLIs, batch jobs, Firebase Admin jobs) ship as a `bun run`, not an image. This section exists only so that *if* you containerize, the image conforms instead of drifting. It is documentation, not a gate.
 
 A minimal, production-ready multi-stage build:
 
