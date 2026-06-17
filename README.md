@@ -97,7 +97,7 @@ A typical conversion command returns multi-MB PDF bytes. Sending 5 MB of base64 
 
 Two flag patterns avoid the round-trip:
 
-- **`--output-path /path/to/file.pdf`** — the CLI decodes the bytes, writes them to disk, and replaces `base64: "..."` in the envelope with `savedTo: "/path/to/file.pdf"`. The LLM sees a 3-line confirmation instead of a 7-million-character payload. Works on every command that returns binary or text content; rejected with a clear error on plain-JSON commands so a misapplied flag is never silent.
+- **`--output-path /path/to/file.pdf`** — the CLI decodes the bytes, writes them to disk, and replaces `base64: "..."` in the envelope with `savedTo: "/path/to/file.pdf"`. The LLM sees a 3-line confirmation instead of a 7-million-character payload. Works on every command that returns binary or text content; rejected with a clear error on plain-JSON commands so a misapplied flag is never silent. A binary payload over ~1 MB is **refused** without this flag (an `inline_too_large` error pointing you here), so a multi-MB base64 string can never flood the context by accident.
 - **No flag, text mode** — binary commands print a one-line summary (`binary: application/pdf, 4837291 bytes — use --output-path to save`) instead of spilling base64 to stdout. The LLM sees a hint without ever pulling the bytes.
 
 ### Relative dates on calendar windows

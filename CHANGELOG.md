@@ -4,8 +4,10 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## 1.5.0
 
-Agent-ergonomics, a faster cold-start, and one new command. All additive — no
-breaking changes (the one rename keeps its old name as an alias).
+Agent-ergonomics, a faster cold-start, a new command, and an LLM-safety pass.
+Mostly additive; the one rename keeps its old name as an alias. **One behaviour
+change to note**: byte commands now refuse to inline a payload over ~1 MB without
+`--output-path` (see _Changed_).
 
 ### Added
 
@@ -22,6 +24,10 @@ breaking changes (the one rename keeps its old name as an alias).
   flag (was mail-message-only) — e.g. `get-calendar-event --id`, `get-team --id`.
 - **`--start` / `--end`** aliases for `--start-date-time` / `--end-date-time`
   across the calendar-view family.
+- **Token-tier flags in the manifest** — `needsElevatedToken` (now serialized to
+  `commands.json` too, not only `help-json`) and a new `needsSubstrateToken` mark
+  the Teams elevated / chat-substrate commands, so an agent can warm up an
+  interactive login before calling them instead of dead-ending on a timeout.
 
 ### Changed
 
@@ -31,6 +37,26 @@ breaking changes (the one rename keeps its old name as an alias).
 - **Friendlier error for a mistyped flag**: a bare word like `item--id` (instead
   of `--item-id`) now explains flags need their leading `--`, rather than
   commander's opaque "too many arguments".
+- **Byte commands refuse to inline a multi-MB payload** without `--output-path`:
+  `get-mail-attachment`, `get-mail-message-mime`, the `download-*` family, etc.
+  now return an actionable `inline_too_large` error above ~1 MB instead of
+  flooding an LLM's context with a base64 blob. Small payloads still inline.
+- **`read-mail-attachment` prefers content-type when the filename misleads** — a
+  real spreadsheet saved as `report.jpg` now converts as a table instead of
+  returning an image hint. The explicit `convert-*` siblings stay
+  extension-deterministic by design.
+- **Unified `--drive-id` guidance** — the 11 terse drive-item commands now point
+  at `list-drives` / `list-sharepoint-site-drives` like the rest.
+
+### Fixed
+
+- **Auth no longer pops a browser per command on re-auth.** A command whose token
+  needed refreshing used to launch the Chrome extension-capture window — once per
+  process, with no cross-process throttle, so a batch/agent run stacked up
+  windows. Command re-auth now uses a headed Edge sign-in (one login re-caches all
+  tokens); the extension capture is reserved for explicit `login --use-extension`.
+- **Stale doc numbers** — the `help-json` size hints (terse-category ~16 → ~6 KB
+  after the trim) and the README command list now match reality.
 
 ### Performance
 
