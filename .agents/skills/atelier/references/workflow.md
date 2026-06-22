@@ -487,6 +487,44 @@ If a check is wrong for the codebase, fix it at the project level — raise or l
 
 If the repo already uses Husky, drop the body of `assets/pre-commit` (from `set -euo pipefail` onwards) into `.husky/pre-commit`. The shebang and the `git config core.hooksPath` step are unnecessary; Husky handles them.
 
+## Dependency CVE scanning (CI)
+
+Gate 2 pins every dependency to a concrete version for supply-chain safety, but a pinned `^1.2.3` can still *be* a known-vulnerable version — pinning stops silent upgrades, it does not scan. The only dependency scanner the toolchain ships (the Snyk IDE extension, see `references/bun-typescript.md`) runs IDE-side, so CI and the pre-commit hook never see its findings — the same drift problem that motivated mirroring SonarLint into ESLint (see *SonarLint findings caught at lint time* above). The fix is a deterministic CVE scan in CI.
+
+**Tool: `bun audit`.** Bun-native, no new dependency, reads the resolved tree from `bun.lock`, and exits non-zero when it lists a vulnerability. `--audit-level=high` filters to high/critical; an unfixable advisory is allow-listed with `--ignore <id>` **at the workflow level, with a reason** — never inline, the same rule as a project-level ESLint severity change.
+
+**It is a CI job, not a ninth gate.** CVE feeds change daily, independent of your diff. Blocking a 10-file commit because a new advisory dropped overnight in an *untouched* dependency fails in the wrong place. So the scan runs in CI on two triggers, each doing a different job:
+
+- **A scheduled daily run** is the real watchdog — it is the only thing that catches a newly-disclosed CVE in a dependency *nobody touched*. A red scheduled run is the signal; wire it to an issue or chat alert if you want (out of scope here).
+- **A pull-request run scoped to `package.json` / `bun.lock`** blocks vulnerabilities a PR *deliberately introduces*, while never red-flagging PRs that don't change dependencies.
+
+`.github/workflows/audit.yml`:
+
+```yaml
+name: audit
+on:
+  schedule:
+    - cron: '0 6 * * *'        # daily watchdog: new CVEs in untouched deps
+  pull_request:
+    paths:                      # PR run fires only when deps actually change
+      - package.json
+      - bun.lock
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile   # also fails on lockfile drift — a supply-chain check in itself
+      - run: bun audit --audit-level=high
+      # An advisory with no upstream fix is allow-listed here, project-level, with a reason:
+      # - run: bun audit --audit-level=high --ignore GHSA-xxxx-xxxx-xxxx  # no patched release as of YYYY-MM-DD; tracking <link>
+```
+
+`--audit-level=high` fails the job only on high/critical advisories; moderate and low are reported but do not block — run `bun audit` locally to see the full list. The scan covers **all** dependencies, not `--prod` only: dev and build tooling are part of the supply-chain attack surface CI exists to watch.
+
+This is the one piece of CI the standard prescribes today. The broader CI pipeline atelier assumes elsewhere ("quality is owned by the eight gates **and CI**") is deliberately left to the adopter.
+
 ## README consistency
 
 The README is the contract with anyone who clones the repo. If it lies, the change is broken even if the tests are green. Audit it twice: once before declaring a task done, and once more before ending the session.
@@ -573,6 +611,7 @@ After the change, restart the TS server in VS Code (Cmd/Ctrl + Shift + P → "Ty
 - **Coverage gates per-tier:** 100% on `domain` + `use-cases`, 80% on `composition` + `infra` + `presenter`, skip `test-helpers` and `main.ts` only. `build-deps.ts` is now in scope (testable via optional config DI).
 - **SonarLint parity at lint time** via `eslint-plugin-sonarjs` + type-aware `@typescript-eslint` rules.
 - **Pre-commit hook runs eight gates**, in cost-ascending order: commit size → package.json (no `"latest"` / `"*"`) → gitleaks → tests → lint:strict → typecheck → coverage → mutate:staged.
+- **Dependency CVE scanning lives in CI, not the gate** (`bun audit --audit-level=high`): a daily scheduled watchdog for new CVEs in untouched deps, plus a PR run scoped to `package.json` / `bun.lock` for deliberately-introduced ones.
 - **Mutation testing on staged files** (Stryker, ≥90% break threshold) makes "tests don't actually pin behaviour" findable in CI.
 - **Commits stay small:** ≤10 files AND ≤300 lines per commit. The hook enforces it.
 - **Periodic audits**: once per release, drop the `test-helpers` skip and run coverage; anything below 100% is dead code or untested defensive code.
