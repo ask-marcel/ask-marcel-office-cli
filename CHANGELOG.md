@@ -2,6 +2,19 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 1.5.1
+
+### Fixed
+
+- **No browser window opens per command once a secondary token lapses** (completes
+  the 1.5.0 auth fix). The elevated / Teams-chat (chatsvcagg / ic3) token recaptures
+  each launched a _visible_ browser that "opens and closes within seconds" to
+  silently re-capture — per command, per process, with no cross-process throttle —
+  so after the short-lived elevated token (~59 min) expired, every elevated or
+  Teams-chat command popped a window. The command-path auth now **fails fast** with
+  an actionable "run `ask-marcel login`" instead; browser capture is reserved for
+  the explicit `login` command, which re-captures all four tokens in one session.
+
 ## 1.5.0
 
 Agent-ergonomics, a faster cold-start, a new command, and an LLM-safety pass.
@@ -50,15 +63,11 @@ change to note**: byte commands now refuse to inline a payload over ~1 MB withou
 
 ### Fixed
 
-- **Auth no longer pops a browser per command.** Two paths used to: the primary
-  refresh-fallback launched the Chrome extension-capture window, and the
-  secondary-token (elevated / Teams-chat) recaptures each opened a visible window
-  that "opens and closes within seconds" — both per command, per process, with no
-  cross-process throttle, so a batch/agent run stacked up windows. Now the primary
-  path only opens a headed Edge sign-in when its refresh genuinely fails, and the
-  secondary-token getters **fail fast** with an actionable "run `ask-marcel login`"
-  instead of opening a window per command. Browser capture is reserved for the
-  explicit `login` command (extension via `--use-extension`).
+- **Auth no longer pops a browser per command on re-auth.** The primary-token
+  refresh-fallback used to launch the Chrome extension-capture window — once per
+  process, with no cross-process throttle, so a batch/agent run stacked up windows.
+  Command re-auth now uses a headed Edge sign-in only when the silent refresh
+  genuinely fails; the extension capture is reserved for explicit `login --use-extension`.
 - **Stale doc numbers** — the `help-json` size hints (terse-category ~16 → ~6 KB
   after the trim) and the README command list now match reality.
 
