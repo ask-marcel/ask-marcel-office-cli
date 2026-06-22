@@ -170,6 +170,21 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
+  it('fails fast with a "run login" error instead of opening a browser per command when secondary-token recapture is disabled (the command path) — for all three secondary tokens', async () => {
+    const fs = createFileSystemFake();
+    const logger = createLoggerFake();
+    // A browser whose every secondary capture WOULD succeed if called — so an
+    // err here proves the browser path was skipped, not that capture failed.
+    const tok = futureElevated();
+    const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, logger, fs, fakeSystemBrowserAuth, true, false, false);
+    for (const getToken of [auth.getElevatedAccessToken, auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
+      const result = await getToken();
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.type === 'auth_failed' ? result.error.message : '').toContain('login');
+    }
+  });
+
   it('returns cached token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     const header = btoa(JSON.stringify({ alg: 'RS256' }));

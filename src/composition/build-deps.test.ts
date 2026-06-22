@@ -34,6 +34,7 @@ describe('buildDeps composition root', () => {
     buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, createAuth: recordingCreateAuth });
     expect(calls[0]?.skipSystemBrowser).toBe(true);
     expect(calls[0]?.usePlaywrightFallback).toBe(true);
+    expect(calls[0]?.recaptureSecondaryViaBrowser).toBe(false); // secondary getters fail-fast, no per-command browser
   });
 
   it('falls back to a home-derived cache path when none is provided', () => {

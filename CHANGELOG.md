@@ -50,11 +50,15 @@ change to note**: byte commands now refuse to inline a payload over ~1 MB withou
 
 ### Fixed
 
-- **Auth no longer pops a browser per command on re-auth.** A command whose token
-  needed refreshing used to launch the Chrome extension-capture window — once per
-  process, with no cross-process throttle, so a batch/agent run stacked up
-  windows. Command re-auth now uses a headed Edge sign-in (one login re-caches all
-  tokens); the extension capture is reserved for explicit `login --use-extension`.
+- **Auth no longer pops a browser per command.** Two paths used to: the primary
+  refresh-fallback launched the Chrome extension-capture window, and the
+  secondary-token (elevated / Teams-chat) recaptures each opened a visible window
+  that "opens and closes within seconds" — both per command, per process, with no
+  cross-process throttle, so a batch/agent run stacked up windows. Now the primary
+  path only opens a headed Edge sign-in when its refresh genuinely fails, and the
+  secondary-token getters **fail fast** with an actionable "run `ask-marcel login`"
+  instead of opening a window per command. Browser capture is reserved for the
+  explicit `login` command (extension via `--use-extension`).
 - **Stale doc numbers** — the `help-json` size hints (terse-category ~16 → ~6 KB
   after the trim) and the README command list now match reality.
 

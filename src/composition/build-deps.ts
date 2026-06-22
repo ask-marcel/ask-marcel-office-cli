@@ -46,12 +46,14 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const processRunner = config.processRunner ?? defaultProcessRunner();
   const logger = createWinstonLogger({ logLevel });
   const makeAuth = config.createAuth ?? createAuthManager;
-  // E-01: command-path auth must never trigger the system-browser/extension capture
-  // on re-auth (it opened a Chrome popup per command — a storm in batch/agent use).
-  // Mirror the default `login`: headed Edge via Playwright, which captures all four
-  // tokens in one window so a single re-auth ends the cascade. The extension stays
-  // reachable via `login --use-extension`.
-  const auth = makeAuth({ cachePath, logger, fs, skipSystemBrowser: true, usePlaywrightFallback: true });
+  // E-01 + friction-plan #3: the command-path auth must never pop a browser per
+  // command. `skipSystemBrowser` keeps primary re-auth off the Chrome+extension
+  // capture; `recaptureSecondaryViaBrowser: false` makes the elevated/chatsvcagg/ic3
+  // getters FAIL-FAST ("run `ask-marcel login`") instead of opening a visible window
+  // per command when a secondary token lapses (~hourly for the elevated token).
+  // Both browser captures are reserved for the explicit `login` command (extension
+  // via `--use-extension`).
+  const auth = makeAuth({ cachePath, logger, fs, skipSystemBrowser: true, usePlaywrightFallback: true, recaptureSecondaryViaBrowser: false });
   const graph = createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = ({ useExtension }) => makeAuth({ cachePath, logger, fs, skipSystemBrowser: !useExtension, usePlaywrightFallback: !useExtension });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };

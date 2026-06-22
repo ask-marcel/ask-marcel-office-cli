@@ -144,6 +144,15 @@ type SystemBrowserAuthFn = () => Promise<
   >
 >;
 
+// Fail-fast (no browser) message for the secondary-token getters when browser
+// recapture is disabled (the command path). These tokens have no refresh token,
+// so the only renewal is a browser capture — which must happen at an interactive
+// `login`, not by popping a window per command (friction-plan #3, the completion
+// of E-01: the secondary recaptures open a visible window that "opens and closes
+// within seconds" per command, and the CLI runs one process per command).
+const failFastSecondaryMessage = (token: string, commands: string): string =>
+  `${token} token is expired or was not captured at login. Run \`ask-marcel login\` to (re)capture it — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
   cachePath: string,
@@ -152,7 +161,8 @@ const createAuthManagerFromApi = (
   fs: FileSystem,
   systemBrowserAuthFn?: SystemBrowserAuthFn,
   usePlaywrightFallback: boolean = true,
-  skipSystemBrowser: boolean = false
+  skipSystemBrowser: boolean = false,
+  recaptureSecondaryViaBrowser: boolean = true
 ): AuthManager => {
   const systemBrowserAuth = systemBrowserAuthFn ?? defaultSystemBrowserAuth(logger, skipSystemBrowser);
   const readCache = async (): Promise<CachedToken | null> => {
@@ -445,8 +455,10 @@ const createAuthManagerFromApi = (
       logger.info('auth.elevated.cache_hit');
       return ok(validated.value);
     }
-    // Elevated absent, expired, or malformed; need to re-capture. The
-    // persistent profile cookies do the silent SSO, no UI prompt.
+    // Elevated absent, expired, or malformed; need to re-capture.
+    if (!recaptureSecondaryViaBrowser)
+      return err({ type: 'auth_failed', message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, list-chat-members, download-drive-item-version') });
+    // The persistent profile cookies do the silent SSO, no UI prompt.
     return recaptureElevatedShared();
   };
 
@@ -507,6 +519,11 @@ const createAuthManagerFromApi = (
       logger.info('auth.chatsvcagg.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
+    if (!recaptureSecondaryViaBrowser)
+      return err({
+        type: 'auth_failed',
+        message: failFastSecondaryMessage('chatsvcagg (Teams chat)', 'list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user'),
+      });
     return recaptureChatsvcaggShared();
   };
 
@@ -578,6 +595,7 @@ const createAuthManagerFromApi = (
       logger.info('auth.ic3.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
+    if (!recaptureSecondaryViaBrowser) return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history') });
     return recaptureIc3Shared();
   };
 
@@ -661,6 +679,7 @@ const createAuthManager = (deps: {
   systemBrowserAuth?: SystemBrowserAuthFn;
   usePlaywrightFallback?: boolean;
   skipSystemBrowser?: boolean;
+  recaptureSecondaryViaBrowser?: boolean;
 }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
@@ -670,7 +689,17 @@ const createAuthManager = (deps: {
     freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
     onProgress: stderrProgress,
   });
-  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs, deps.systemBrowserAuth, deps.usePlaywrightFallback, deps.skipSystemBrowser);
+  return createAuthManagerFromApi(
+    browserAuth,
+    deps.cachePath,
+    browserProfileDir,
+    deps.logger,
+    fs,
+    deps.systemBrowserAuth,
+    deps.usePlaywrightFallback,
+    deps.skipSystemBrowser,
+    deps.recaptureSecondaryViaBrowser
+  );
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };
