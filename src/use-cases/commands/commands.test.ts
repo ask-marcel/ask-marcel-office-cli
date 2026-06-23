@@ -5526,6 +5526,36 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     return fn as FakeFetch & { urls: string[] };
   };
 
+  // Branches on host: the substrate chat-list walk (teams.microsoft.com) vs the
+  // elevated per-chat member hydration (graph.microsoft.com/.../chats/{id}/members).
+  // Lets a test drive the cross-tenant path end to end — the summary roster left
+  // the counterpart bare, and `/chats/{id}/members` resolves their name/email.
+  type GraphMemberFix = { displayName?: string; email?: string; userId?: string };
+  type MembersFix = Record<string, { ok: boolean; members?: Array<GraphMemberFix> }>;
+  const hydratingFetch = (pages: ReadonlyArray<PageFix>, membersByChat: MembersFix): FakeFetch & { urls: string[] } => {
+    let calls = 0;
+    let lastUrl: string | null = null;
+    const urls: string[] = [];
+    const fn = async (url: string): Promise<Response> => {
+      lastUrl = url;
+      urls.push(url);
+      const members = /graph\.microsoft\.com.*\/chats\/([^?]+?)\/members/.exec(url);
+      if (members) {
+        const entry = membersByChat[decodeURIComponent(members[1] ?? '')];
+        if (entry === undefined || !entry.ok)
+          return new Response(JSON.stringify({ error: { code: 'Forbidden' } }), { status: 403, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ value: entry.members ?? [] }), { headers: { 'content-type': 'application/json' } });
+      }
+      const page = pages[Math.min(calls, pages.length - 1)] ?? { chats: [] };
+      calls += 1;
+      return new Response(JSON.stringify(page), { headers: { 'content-type': 'application/json' } });
+    };
+    Object.defineProperty(fn, 'lastUrl', { get: () => lastUrl });
+    Object.defineProperty(fn, 'lastBody', { get: () => null });
+    Object.defineProperty(fn, 'urls', { get: () => urls });
+    return fn as FakeFetch & { urls: string[] };
+  };
+
   it('returns chats whose members match the query on displayName (case-insensitive)', async () => {
     const fetchFn = sequencedFetch([
       {
@@ -5778,6 +5808,168 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { name: '' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.type).toBe('validation_error');
+  });
+
+  // ── Cross-tenant hydration (the Chen Robin repro): an externally-homed
+  //    counterpart returns in the summary roster as a bare `{mri}` — no name,
+  //    no email — so a name search can't match it. `/chats/{id}/members`
+  //    (elevated) resolves the member; the matcher re-runs on the hydrated
+  //    roster. The bug was a silent `matchCount:0` on a real, active chat.
+  const robinChenChatId = '19:aaaaaaaa-1111-2222-3333-444444444444_bbbbbbbb-1111-2222-3333-444444444444@unq.gbl.spaces';
+  const robinChenMri = '8:orgid:aaaaaaaa-1111-2222-3333-444444444444';
+
+  it('discovers a cross-tenant 1:1 by name when the summary roster left the counterpart bare — hydrates via /chats/{id}/members (Chen Robin repro)', async () => {
+    const fetchFn = hydratingFetch([{ chats: [{ id: robinChenChatId, chatType: 'oneOnOne', members: [{ mri: robinChenMri }] }] }], {
+      [robinChenChatId]: {
+        ok: true,
+        members: [
+          { displayName: 'Robin Chen', email: 'robin.chen@contoso.com', userId: 'aaaaaaaa-1111-2222-3333-444444444444' },
+          { displayName: 'Me', userId: 'bbbbbbbb-1111-2222-3333-444444444444' },
+        ],
+      },
+    });
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Robin Chen' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as {
+        matchCount: number;
+        chatsHydrated: number;
+        unresolvedMemberCount: number;
+        hint?: string;
+        matches: Array<{ chatId: string; matchedMembers: Array<{ mri?: string; displayName?: string; email?: string }> }>;
+      };
+      expect(v.matchCount).toBe(1);
+      expect(v.matches[0]?.chatId).toBe(robinChenChatId);
+      expect(v.matches[0]?.matchedMembers[0]?.displayName).toBe('Robin Chen');
+      expect(v.matches[0]?.matchedMembers[0]?.email).toBe('robin.chen@contoso.com');
+      // Reconstructs the substrate MRI from the resolved object-id so the caller
+      // can feed it straight back to get-chat / list-chat-members.
+      expect(v.matches[0]?.matchedMembers[0]?.mri).toBe(robinChenMri);
+      expect(v.chatsHydrated).toBe(1);
+      expect(v.unresolvedMemberCount).toBe(0);
+      expect(v.hint).toBeUndefined();
+    }
+  });
+
+  it('surfaces a counterpart who is RESOLVED in a meeting but BARE in the 1:1 — hydrates the direct chat even though the cheap pass already matched (the live dual-identity gap)', async () => {
+    // The live failure: the cheap pass found Yu in a small meeting (resolved as
+    // a Guest, a DIFFERENT object-id), so a "hydrate only when empty" gate never
+    // probed the 1:1 where her HOME identity is bare. Both chats must come back.
+    const meetingId = '19:meeting_ProjectGroup@thread.v2';
+    const fetchFn = hydratingFetch(
+      [
+        {
+          chats: [
+            {
+              id: meetingId,
+              chatType: 'meeting',
+              members: [{ mri: '8:orgid:dddddddd-1111-2222-3333-444444444444', displayName: 'Robin Chen', email: 'Robin.chen@contoso.com', userSubType: 'Guest' }],
+            },
+            { id: robinChenChatId, chatType: 'oneOnOne', members: [{ mri: robinChenMri }] },
+          ],
+        },
+      ],
+      { [robinChenChatId]: { ok: true, members: [{ displayName: 'Robin Chen', email: 'robin.chen@contoso.com', userId: 'aaaaaaaa-1111-2222-3333-444444444444' }] } }
+    );
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Robin Chen' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number; matches: Array<{ chatId: string }> };
+      expect(v.matchCount).toBe(2);
+      const ids = v.matches.map((m) => m.chatId);
+      expect(ids).toContain(meetingId); // resolved in the cheap pass
+      expect(ids).toContain(robinChenChatId); // resolved by hydrating the bare 1:1
+      expect(v.chatsHydrated).toBe(1); // only the bare 1:1 — the meeting carried a resolved member
+    }
+  });
+
+  it('turns a confident empty into an honest one — when hydration cannot resolve a bare member it returns a hint + unresolvedMemberCount, not a bare matchCount:0', async () => {
+    const fetchFn = hydratingFetch(
+      [{ chats: [{ id: robinChenChatId, chatType: 'oneOnOne', members: [{ mri: robinChenMri }] }] }],
+      { [robinChenChatId]: { ok: false } } // /chats/{id}/members → 403
+    );
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Robin Chen' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number; unresolvedMemberCount: number; hint?: string };
+      expect(v.matchCount).toBe(0);
+      expect(v.chatsHydrated).toBe(1);
+      expect(v.unresolvedMemberCount).toBe(1);
+      expect(typeof v.hint).toBe('string');
+      expect(v.hint).toContain('object-id');
+    }
+  });
+
+  it('hydration that resolves the roster but still does not match yields a clean empty (no hint, unresolvedMemberCount 0) — the person genuinely is not in the chat', async () => {
+    const fetchFn = hydratingFetch([{ chats: [{ id: robinChenChatId, chatType: 'oneOnOne', members: [{ mri: robinChenMri }] }] }], {
+      [robinChenChatId]: { ok: true, members: [{ displayName: 'Robin Chen', email: 'robin.chen@contoso.com', userId: 'aaaaaaaa-1111-2222-3333-444444444444' }] },
+    });
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Nonexistent Person' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number; unresolvedMemberCount: number; hint?: string };
+      expect(v.matchCount).toBe(0);
+      expect(v.chatsHydrated).toBe(1);
+      expect(v.unresolvedMemberCount).toBe(0);
+      expect(v.hint).toBeUndefined();
+    }
+  });
+
+  it('does NOT hydrate bare members in group/meeting chats (cost control) — it counts them in unresolvedMemberCount and, on an empty result, emits the hint', async () => {
+    const fetchFn = hydratingFetch(
+      [{ chats: [{ id: '19:meeting_big@thread.v2', chatType: 'meeting', members: [{ mri: '8:orgid:aaaaaaaa-1111-2222-3333-444444444444' }, { displayName: 'Me' }] }] }],
+      {} // no /chats/{id}/members ever called — assert that below
+    );
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Robin Chen' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number; unresolvedMemberCount: number; hint?: string };
+      expect(v.matchCount).toBe(0);
+      expect(v.chatsHydrated).toBe(0); // the meeting is not a direct chat → not probed
+      expect(v.unresolvedMemberCount).toBe(1); // the one bare member is surfaced
+      expect(typeof v.hint).toBe('string');
+    }
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls.some((u) => u.includes('/members'))).toBe(false);
+  });
+
+  it('never hydrates a 1:1 whose member is already name-resolved — a non-matching but resolvable member is not bare, so no per-chat call and unresolvedMemberCount stays 0 (cost-control contract)', async () => {
+    // Guards the bareness predicate: an unmatched chat whose members all carry a
+    // name/email must NOT be treated as a hydration candidate. Otherwise every
+    // search would issue a members lookup for every unrelated 1:1.
+    const fetchFn = hydratingFetch(
+      [{ chats: [{ id: '19:alice_me@unq.gbl.spaces', chatType: 'chat', members: [{ mri: '8:orgid:alice', displayName: 'Alice Wonder', email: 'alice@corp.com' }] }] }],
+      {}
+    );
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { name: 'Robin Chen' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number; unresolvedMemberCount: number; hint?: string };
+      expect(v.matchCount).toBe(0);
+      expect(v.chatsHydrated).toBe(0);
+      expect(v.unresolvedMemberCount).toBe(0);
+      expect(v.hint).toBeUndefined();
+    }
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls.some((u) => u.includes('/members'))).toBe(false);
   });
 });
 

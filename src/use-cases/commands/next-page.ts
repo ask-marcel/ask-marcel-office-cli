@@ -5,12 +5,18 @@ import { formatZodError } from './format-zod-error.ts';
 
 const PREFIX = 'https://graph.microsoft.com/v1.0';
 
-// Audit round-8: chat-scoped cursor URLs must be re-signed with the
-// M365ChatClient elevated token to match `list-chats` / `get-chat` /
-// `list-chat-members` which re-elevated in this round. Without this
-// routing the page-2 fetch would 403 with `Missing scope: Chat.ReadBasic`.
-const ELEVATED_PATH_PREFIXES: ReadonlyArray<string> = ['/me/chats', '/chats/'];
-const requiresElevated = (path: string): boolean => ELEVATED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+// Chat-scoped cursor URLs are re-signed to match the token their originating
+// command uses, so pagination never switches identity mid-walk. Chat METADATA
+// (`/me/chats` → list-chats, `/chats/{id}` → get-chat) needs the elevated
+// M365ChatClient identity (`Chat.ReadBasic`). But `/chats/{id}/members`
+// (list-chat-members) reads on the BASIC token via `ChatMember.Read` — see that
+// command — so its page-2 cursor must NOT be elevated, else it would 401 once
+// the login-only elevated token goes stale even though page 1 succeeded.
+const requiresElevated = (path: string): boolean => {
+  if (path.startsWith('/me/chats')) return true;
+  if (path.startsWith('/chats/')) return !path.includes('/members');
+  return false;
+};
 
 const schema = z.object({
   url: z

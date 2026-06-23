@@ -1,22 +1,27 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import { buildElevatedPickODataListCommand } from './build-command.ts';
+import { buildPickODataListCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
-// Audit round-8 §1.5: this command was on the basic Teams token throughout
-// rounds 6 and 7 (audit had labelled `list-chat-members` "always worked
-// without elevation"). Round-8 testing showed the same `Missing scope
-// permissions` 403 as the chat-metadata siblings — Graph requires
-// `ChatMember.Read` which the basic token doesn't grant. Switch to the
-// elevated M365ChatClient identity for parity with `list-chats` /
-// `get-chat`.
+// Token: BASIC. `/chats/{id}/members` needs `ChatMember.Read`. Round-8 testing
+// found the basic Teams token lacked it (403 `Missing scope permissions`) and
+// moved this onto the elevated M365ChatClient identity. As of 2026-06 the basic
+// Teams web-client token DOES carry `ChatMember.Read` (`scopes-check` confirms;
+// 200s verified live on 1:1 `@unq.gbl.spaces` and meeting `@thread.v2` chats —
+// the scope is per-chat-membership, not per-subtype, so group chats ride along),
+// so it is back on the basic token via `buildPickODataListCommand`. Basic is preferable: the elevated
+// token is login-only and cannot refresh on the command path (see
+// `decision_auth_extension_window_login_only`), so depending on it made this
+// fail with "Elevated token expired, run login" whenever it was stale.
+// NOTE: chat METADATA (`/me/chats`, `/chats/{id}`) still needs `Chat.ReadBasic`,
+// which only the elevated token grants — `list-chats` / `get-chat` stay elevated.
 //
 // Audit v1.0.0 §B1: `/chats/{id}/members` rejects `$top`, `$orderby`, and
 // `$expand` with `BadRequest`. Advertise only the subset Graph honours.
 const baseSchema = z.object({ chatId: z.string().min(1) });
 const CHAT_MEMBERS_ODATA_KEYS = ['skip', 'select', 'filter'] as const;
-const inner = buildElevatedPickODataListCommand((p) => `/chats/${p.chatId}/members`, baseSchema, CHAT_MEMBERS_ODATA_KEYS);
+const inner = buildPickODataListCommand((p) => `/chats/${p.chatId}/members`, baseSchema, CHAT_MEMBERS_ODATA_KEYS);
 
 // Audit round-7 B3: Graph surfaces the unhelpful `1: NotFound` (the `1:` is
 // the Teams thread-id segment, echoed without context) for any missing
@@ -63,7 +68,6 @@ const meta: CommandMeta = {
   example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',
   pagination: true,
-  needsElevatedToken: true,
 };
 
 export { execute, meta, schema };

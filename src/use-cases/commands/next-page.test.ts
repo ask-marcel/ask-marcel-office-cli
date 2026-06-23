@@ -34,10 +34,16 @@ describe('next-page', () => {
     expect(calls).toEqual([{ via: 'elevated', path: '/me/chats?$skiptoken=XYZ' }]);
   });
 
-  it('routes /chats/{id}/members nextLinks to graph.getElevated (round-8: list-chat-members re-elevated)', async () => {
+  it('routes /chats/{id}/members nextLinks to graph.get (basic token — list-chat-members reads members via ChatMember.Read, no longer elevated)', async () => {
     const { graph, calls } = trackingGraph();
     await execute(graph, { url: 'https://graph.microsoft.com/v1.0/chats/19:abc/members?$skiptoken=Q' });
-    expect(calls).toEqual([{ via: 'elevated', path: '/chats/19:abc/members?$skiptoken=Q' }]);
+    expect(calls).toEqual([{ via: 'basic', path: '/chats/19:abc/members?$skiptoken=Q' }]);
+  });
+
+  it('routes /chats/{id} metadata nextLinks to graph.getElevated (get-chat still needs Chat.ReadBasic)', async () => {
+    const { graph, calls } = trackingGraph();
+    await execute(graph, { url: 'https://graph.microsoft.com/v1.0/chats/19:abc?$select=id&$skiptoken=Q' });
+    expect(calls).toEqual([{ via: 'elevated', path: '/chats/19:abc?$select=id&$skiptoken=Q' }]);
   });
 
   it('rejects a URL that does not start with the Graph v1.0 prefix without contacting the graph client', async () => {
