@@ -2,6 +2,24 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 1.5.2
+
+### Fixed
+
+- **`find-chats-with-user` now surfaces cross-tenant 1:1 chats.** An externally-homed
+  counterpart comes back from the Teams chat roster as a bare object-id — no name, no
+  email — so a name search could never match it, and a real, active 1:1 returned a
+  silent `matchCount: 0`. The command now hydrates every bare **direct (1:1)** chat via
+  `/chats/{id}/members` and re-runs the match, so a cross-tenant counterpart is found
+  even when they were already resolved in a meeting under a different identity. When
+  nothing matches but bare members remain, it returns a `hint` + `unresolvedMemberCount`
+  rather than a confidently-empty result.
+- **`list-chat-members` reads on the basic Teams token** (`ChatMember.Read`) instead of
+  the login-only elevated (M365ChatClient) token, so it no longer fails with "Elevated
+  token expired" on the command path. `next-page` routes `/chats/{id}/members` cursors on
+  the basic token to match. Chat _metadata_ (`list-chats` / `get-chat`) still requires
+  the elevated token.
+
 ## 1.5.1
 
 ### Fixed
