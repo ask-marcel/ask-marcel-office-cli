@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { execute } from './next-page.ts';
+import { execute, meta } from './next-page.ts';
 
 const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 'basic' | 'elevated'; readonly path: string }[] } => {
   const calls: { via: 'basic' | 'elevated'; path: string }[] = [];
@@ -46,10 +46,23 @@ describe('next-page', () => {
     expect(calls).toEqual([{ via: 'elevated', path: '/chats/19:abc?$select=id&$skiptoken=Q' }]);
   });
 
-  it('rejects a URL that does not start with the Graph v1.0 prefix without contacting the graph client', async () => {
+  it('rejects a URL that does not start with the Graph v1.0 prefix without contacting the graph client, naming the expected form', async () => {
     const { graph, calls } = trackingGraph();
     const result = await execute(graph, { url: 'https://example.com/something' });
     expect(calls).toHaveLength(0);
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('validation_error');
+    // Pin the refine message so the user is told what shape is expected, not a
+    // bare "Invalid input" (kills the empty-message / dropped-message-object mutants).
+    expect(result.error.message).toContain('Microsoft Graph v1.0 URL');
+  });
+
+  it('--url description documents the nextLink cursor source, the loop-until-absent pattern, and deltaLink', () => {
+    const urlOption = meta.options.find((o) => o.key === 'url');
+    expect(urlOption?.description).toContain('Full Graph v1.0 URL');
+    expect(urlOption?.description).toContain('Example:');
+    expect(urlOption?.description).toContain('Loop:');
+    expect(urlOption?.description).toContain('deltaLink');
   });
 });

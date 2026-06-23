@@ -1014,11 +1014,73 @@ describe('commands', () => {
     const graph = createGraphClient(fakeAuth(), fetchFn);
     const r = await cmd.execute(graph, { chatId: '19:bogus@thread.v2' });
     expect(r.ok).toBe(false);
-    if (!r.ok && r.error.type === 'api_error') {
-      expect(r.error.message).toContain('NotFound: Microsoft Teams chat not found');
-      expect(r.error.message).toContain('19:bogus@thread.v2');
-      expect(r.error.message).toContain('list-chats');
-    }
+    if (r.ok) return;
+    // Assert the discriminant + code directly (never guard on `r.error.type` —
+    // a guard lets a `type: ''` / `err({})` mutant skip the inner assertions).
+    expect(r.error.type).toBe('api_error');
+    expect(r.error.code).toBe('cli_rewrite_chat_not_found');
+    expect(r.error.message).toContain('NotFound: Microsoft Teams chat not found');
+    expect(r.error.message).toContain('19:bogus@thread.v2');
+    expect(r.error.message).toContain('list-chats');
+  });
+
+  it('list-chat-members does NOT rewrite a `1: NotFound` that is not anchored at the start of the message', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/chats/19:x@thread.v2/members',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { code: '11', message: 'NotFound' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-chat-members'];
+    if (!cmd) throw new Error('list-chat-members not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { chatId: '19:x@thread.v2' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.type).toBe('api_error');
+    // `11: NotFound` contains `1: NotFound` but not at the start — the anchored
+    // `/^1:.../` must NOT fire (pins the `^`), so the original error passes through.
+    expect(r.error.message).toContain('11: NotFound');
+    expect(r.error.code).not.toBe('cli_rewrite_chat_not_found');
+    expect(r.error.message).not.toContain('Microsoft Teams chat not found');
+  });
+
+  it('list-chat-members rewrites `1:NotFound` with no whitespace after the colon (the anchor tolerates zero spaces)', async () => {
+    const fetchFn = stagedFetch([
+      {
+        urlPrefix: 'https://graph.microsoft.com/v1.0/chats/19:y@thread.v2/members',
+        method: 'GET',
+        response: () =>
+          new Response(JSON.stringify({ error: { message: '1:NotFound' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+      },
+    ]);
+    const cmd = cmdMap['list-chat-members'];
+    if (!cmd) throw new Error('list-chat-members not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const r = await cmd.execute(graph, { chatId: '19:y@thread.v2' });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // `\s*` (zero-or-more) must match `1:NotFound` (no space) — pins it against
+    // a `\s` (exactly-one) mutant, which would refuse to rewrite the no-space form.
+    expect(r.error.type).toBe('api_error');
+    expect(r.error.code).toBe('cli_rewrite_chat_not_found');
+    expect(r.error.message).toContain('Microsoft Teams chat not found');
+  });
+
+  it('list-chat-members --chat-id description documents every chat-id source (id format, list-chats, Graph Explorer, joinUrl)', () => {
+    const opt = listChatMembers.meta.options.find((o) => o.key === 'chatId');
+    expect(opt?.description).toContain('Microsoft Teams chat ID');
+    expect(opt?.description).toContain('list-chats');
+    expect(opt?.description).toContain('Graph Explorer');
+    expect(opt?.description).toContain('joinUrl');
   });
 
   // Regression guard for the 2026-06 elevation drop: `/chats/{id}/members` is
