@@ -5591,10 +5591,11 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
   // Stateful fakeFetch — returns a different page per call, mimicking the
   // paginated /chats endpoint's continuationToken flow.
   type ChatFix = {
-    id: string;
+    id?: string; // Graph's Chat.id is optional — a chat with no id cannot be addressed downstream.
     title?: string | null;
     chatType?: string;
     members: Array<{ mri?: string; displayName?: string; email?: string; userSubType?: string; userPrincipalName?: string; givenName?: string; surname?: string }>;
+    lastMessage?: { composeTime?: string };
   };
   type PageFix = { chats: Array<ChatFix>; continuationToken?: string; hasMoreData?: boolean };
   const sequencedFetch = (pages: ReadonlyArray<PageFix>): FakeFetch => {
@@ -6058,6 +6059,151 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     }
     const urls = (fetchFn as unknown as { urls: string[] }).urls;
     expect(urls.some((u) => u.includes('/members'))).toBe(false);
+  });
+
+  // ── Shape & boundary hardening (QA 2026-06-23). The cases above pin matchCount
+  //    but not the projected SHAPE, the page-1 cursor, the member-count/title/
+  //    lastMessageAt projection, the undefined-id guard, or the validation
+  //    boundary — leaving killable logic mutants alive. Behavioural assertions,
+  //    not string pins.
+  it('projects only the identifying fields a matched member carries — absent fields are omitted, never emitted as undefined keys', async () => {
+    const fetchFn = sequencedFetch([{ chats: [{ id: '19:sparse@unq.gbl.spaces', chatType: 'chat', members: [{ mri: '8:orgid:x', displayName: 'Solo Name' }] }] }]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'solo' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const mm = (r.value as { matches: Array<{ matchedMembers: Array<Record<string, unknown>> }> }).matches[0]?.matchedMembers[0] ?? {};
+      expect(mm['mri']).toBe('8:orgid:x');
+      expect(mm['displayName']).toBe('Solo Name');
+      expect('email' in mm).toBe(false); // source had no email → key must be absent, not present-undefined
+      expect('userSubType' in mm).toBe(false);
+    }
+  });
+
+  it('projects the chat envelope faithfully — preserves the title, counts ALL members (not just the matches), and threads lastMessageAt when present', async () => {
+    const fetchFn = sequencedFetch([
+      {
+        chats: [
+          {
+            id: '19:env@unq.gbl.spaces',
+            title: 'Quarterly sync',
+            chatType: 'group',
+            members: [
+              { mri: '8:orgid:1', displayName: 'Target Person' },
+              { mri: '8:orgid:2', displayName: 'Bystander One' },
+              { mri: '8:orgid:3', displayName: 'Bystander Two' },
+            ],
+            lastMessage: { composeTime: '2026-06-20T09:30:00Z' },
+          },
+        ],
+      },
+    ]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'target' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const m = (r.value as { matches: Array<{ title: string | null; memberCount: number; lastMessageAt?: string; matchedMembers: unknown[] }> }).matches[0];
+      expect(m?.title).toBe('Quarterly sync'); // `?? null` must keep a real title
+      expect(m?.memberCount).toBe(3); // ALL members, not the single match
+      expect(m?.lastMessageAt).toBe('2026-06-20T09:30:00Z');
+      expect(m?.matchedMembers).toHaveLength(1);
+    }
+  });
+
+  it('defaults an absent title to null and omits lastMessageAt when the chat carries no lastMessage', async () => {
+    const fetchFn = sequencedFetch([{ chats: [{ id: '19:notitle@unq.gbl.spaces', title: null, chatType: 'chat', members: [{ mri: '8:orgid:1', displayName: 'Has Match' }] }] }]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'has match' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const m = (r.value as { matches: Array<Record<string, unknown>> }).matches[0] ?? {};
+      expect(m['title']).toBeNull();
+      expect('lastMessageAt' in m).toBe(false);
+    }
+  });
+
+  it('signs the first chat-list page WITHOUT a continuationToken and applies the membership-summary query params', async () => {
+    const fetchFn = sequencedFetch([{ chats: [{ id: '19:q@unq.gbl.spaces', chatType: 'chat', members: [{ mri: '1', displayName: 'Quincy' }] }] }]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'quincy' });
+    const urls = (fetchFn as unknown as { urls: string[] }).urls;
+    expect(urls[0]).not.toContain('continuationToken'); // page 1 has no cursor
+    expect(urls[0]).toContain('enableMembershipSummary=true'); // QUERY_BASE applied
+    expect(urls[0]).toContain('pageSize=100'); // default page size
+  });
+
+  it('skips a chat with no id (it cannot be addressed downstream) even when one of its members matches', async () => {
+    const fetchFn = sequencedFetch([{ chats: [{ chatType: 'chat', members: [{ mri: '8:orgid:1', displayName: 'Idless Match' }] }] }]);
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'idless' });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.value as { matchCount: number }).matchCount).toBe(0);
+  });
+
+  it('treats a whitespace-only displayName as bare and hydrates the 1:1 (trim() in the bareness predicate)', async () => {
+    const direct = '19:blank_me@unq.gbl.spaces';
+    const fetchFn = hydratingFetch([{ chats: [{ id: direct, chatType: 'chat', members: [{ mri: '8:orgid:blank', displayName: '   ' }] }] }], {
+      [direct]: { ok: true, members: [{ displayName: 'Real Person', email: 'real@corp.com', userId: 'blank' }] },
+    });
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'real person' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const v = r.value as { matchCount: number; chatsHydrated: number };
+      expect(v.matchCount).toBe(1); // only found because the blank member was treated as bare → hydrated
+      expect(v.chatsHydrated).toBe(1);
+    }
+  });
+
+  it('projects a hydrated member minimally — a resolved member with no email and no userId yields neither an email nor an mri key', async () => {
+    const direct = '19:nameonly_me@unq.gbl.spaces';
+    const fetchFn = hydratingFetch(
+      [{ chats: [{ id: direct, chatType: 'chat', members: [{ mri: '8:orgid:bare' }] }] }],
+      { [direct]: { ok: true, members: [{ displayName: 'Name Only' }] } } // no email, no userId to rebuild an mri from
+    );
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'name only' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const mm = (r.value as { matches: Array<{ matchedMembers: Array<Record<string, unknown>> }> }).matches[0]?.matchedMembers[0] ?? {};
+      expect(mm['displayName']).toBe('Name Only');
+      expect('email' in mm).toBe(false); // fromGraphMember omits email when absent
+      expect('mri' in mm).toBe(false); // and omits mri when there is no userId to rebuild it from
+    }
+  });
+
+  it('rejects a non-positive-integer --max-pages / --page-size at the validation boundary, but accepts a multi-digit value', async () => {
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const graph = createGraphClient(fakeAuth(), fakeFetch({ chats: [] }));
+    for (const bad of ['0', 'x1', '12x', '1a', '1.5', '-3']) {
+      const rMax = await cmd.execute(graph, { name: 'x', maxPages: bad });
+      expect(rMax.ok).toBe(false);
+      if (!rMax.ok) expect(rMax.error.type).toBe('validation_error');
+      const rPage = await cmd.execute(graph, { name: 'x', pageSize: bad });
+      expect(rPage.ok).toBe(false);
+    }
+    // multi-digit must pass — guards the regex from collapsing `\d*` to a single `\d`.
+    const ok = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({ chats: [] })), { name: 'x', maxPages: '100', pageSize: '250' });
+    expect(ok.ok).toBe(true);
+  });
+
+  it('propagates a substrate error from the chat-list walk rather than swallowing it into an empty result', async () => {
+    const fetchFn = Object.assign(async () => new Response(JSON.stringify({ error: { code: 'ServiceError' } }), { status: 500, headers: { 'content-type': 'application/json' } }), {
+      lastUrl: null,
+      lastBody: null,
+    }) as FakeFetch;
+    const cmd = cmdMap['find-chats-with-user'];
+    if (!cmd) throw new Error('command not found');
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { name: 'whoever' });
+    expect(r.ok).toBe(false);
   });
 });
 

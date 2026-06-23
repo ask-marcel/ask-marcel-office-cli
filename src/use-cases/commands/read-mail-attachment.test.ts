@@ -81,4 +81,39 @@ describe('read-mail-attachment (polymorphic, auto-routes by content-type)', () =
     if (result.ok) return;
     expect(result.error.type).toBe('validation_error');
   });
+
+  // ── Zip-detection branch hardening (QA 2026-06-23). Every zip test above
+  //    carries a `.zip` name, so the content-type-only branches of
+  //    isZipAttachment never decided anything on their own.
+  it('detects a zip by `application/zip` content-type even when the filename is not `.zip`', async () => {
+    const archive = await buildSampleZipArchive();
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'bundle.bin', contentType: 'application/zip', contentBytes: toBase64(archive) };
+    const result = await execute(graphReturning(att), params);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Array.isArray((result.value as { files?: unknown[] }).files)).toBe(true);
+  });
+
+  it('detects a zip by the legacy `application/x-zip-compressed` content-type when the filename is not `.zip`', async () => {
+    const archive = await buildSampleZipArchive();
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'bundle.bin', contentType: 'application/x-zip-compressed', contentBytes: toBase64(archive) };
+    const result = await execute(graphReturning(att), params);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Array.isArray((result.value as { files?: unknown[] }).files)).toBe(true);
+  });
+
+  it('does NOT treat a NON-fileAttachment whose name ends in `.zip` as a zip — only #microsoft.graph.fileAttachment bytes are unpacked', async () => {
+    // An itemAttachment (embedded message) called "forward.zip" must not be sent
+    // to the zip unpacker — it has no contentBytes blob to unzip. isZipAttachment
+    // gates on the @odata.type first; without that gate this would fail with the
+    // zip "no contentBytes" error instead of being rendered as an embedded item.
+    const att = { '@odata.type': '#microsoft.graph.itemAttachment', name: 'forward.zip', item: { '@odata.type': '#microsoft.graph.message', subject: 'Embedded' } };
+    const result = await execute(graphReturning(att), params);
+    if (result.ok) {
+      expect('count' in (result.value as Record<string, unknown>)).toBe(false); // not the zip {count, files} envelope
+    } else {
+      expect(result.error.type === 'api_error' ? result.error.message : '').not.toContain('no contentBytes');
+    }
+  });
 });
