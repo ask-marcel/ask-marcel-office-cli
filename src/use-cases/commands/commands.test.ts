@@ -20,6 +20,7 @@ import {
   buildSampleXlsx,
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
+import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -1018,6 +1019,31 @@ describe('commands', () => {
       expect(r.error.message).toContain('19:bogus@thread.v2');
       expect(r.error.message).toContain('list-chats');
     }
+  });
+
+  // Regression guard for the 2026-06 elevation drop: `/chats/{id}/members` is
+  // served by the BASIC Teams token (`ChatMember.Read`), NOT the login-only
+  // elevated M365 token. The path-fixture / error-rewrite tests are
+  // token-agnostic (real client + fake fetch matched on URL), so only this
+  // tracking fake catches a silent revert to `graph.getElevated` — which would
+  // resurrect the "Elevated token expired, run login" failure the switch fixed.
+  it('list-chat-members reads /chats/{id}/members via the basic token (graph.get), not the elevated M365 token', async () => {
+    const via: Array<'basic' | 'elevated'> = [];
+    const graph = fakeGraphClient({
+      get: async () => {
+        via.push('basic');
+        return ok({ value: [] });
+      },
+      getElevated: async () => {
+        via.push('elevated');
+        return ok({ value: [] });
+      },
+    });
+    const cmd = cmdMap['list-chat-members'];
+    if (!cmd) throw new Error('list-chat-members not registered');
+    const r = await cmd.execute(graph, { chatId: '19:abc@thread.v2' });
+    expect(r.ok).toBe(true);
+    expect(via).toEqual(['basic']);
   });
 
   it('get-team-channel rewrites the opaque `1: NotFound` error to a clear channel-id hint (audit v1.0.0 B2)', async () => {

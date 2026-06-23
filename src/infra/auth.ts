@@ -410,12 +410,12 @@ const createAuthManagerFromApi = (
   // actionable remediation rather than the old one-size-fits-all message.
   const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
-      return 'elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-chats, get-chat, list-chat-members, the historical-version download / convert commands.)';
+      return 'elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
     }
     if (reason === 'navigation_failed') {
-      return 'elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the elevated commands (list-chats / get-chat / list-chat-members / historical-version downloads) will be unavailable.';
+      return 'elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the elevated commands (list-chats / get-chat / historical-version downloads) will be unavailable.';
     }
-    return 'elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-chats, get-chat, list-chat-members, the historical-version download / convert commands.)';
+    return 'elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
   };
 
   const recaptureElevated = async (): Promise<Result<AccessToken, AuthError>> => {
@@ -457,7 +457,7 @@ const createAuthManagerFromApi = (
     }
     // Elevated absent, expired, or malformed; need to re-capture.
     if (!recaptureSecondaryViaBrowser)
-      return err({ type: 'auth_failed', message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, list-chat-members, download-drive-item-version') });
+      return err({ type: 'auth_failed', message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, download-drive-item-version') });
     // The persistent profile cookies do the silent SSO, no UI prompt.
     return recaptureElevatedShared();
   };
