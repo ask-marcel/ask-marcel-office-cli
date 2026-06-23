@@ -115,5 +115,8 @@ Thumbs.db
 # QA audit raw reports — may contain tenant data (file names, subjects, IDs); never commit
 .claude/qa-reports/
 
+# Personal append-only lessons journal (atelier) — individual workflow notes, not team-shared
+.claude/lessons.local.md
+
 # Bun build temp artifacts (left in cwd by `bun build --compile`)
 *.bun-build
