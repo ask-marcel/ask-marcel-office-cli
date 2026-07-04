@@ -1,4 +1,0 @@
-interface:
-  display_name: "Ask Marcel Office"
-  short_description: "Microsoft 365 read-only CLI"
-  default_prompt: "Use ask-marcel-office CLI to read my Microsoft 365 data"

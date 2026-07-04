@@ -181,34 +181,6 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
 
-
-## Agent skill (progressive disclosure)
-
-A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 179 commands into context at once.
-
-**Structure**
-
-```
-.agents/skills/ask-marcel-office/
-├── SKILL.md                          # core workflow + category index
-└── references/                       # per-domain command details, loaded on demand
-    ├── marcel-mail.md        (32 commands)
-    ├── marcel-drive.md       (30 commands)
-    ├── marcel-calendar.md    (23 commands)
-    ├── marcel-sharepoint.md  (18 commands)
-    ├── marcel-user.md        (15 commands)
-    ├── marcel-tasks.md       (15 commands)
-    ├── marcel-excel.md       (11 commands)
-    ├── marcel-notes.md       (11 commands)
-    ├── marcel-chats.md        (9 commands)
-    ├── marcel-teams.md        (7 commands)
-    └── marcel-meta.md         (6 commands)
-```
-
-**How it works**
-
-`SKILL.md` contains the authentication flow, the discovery loop (`help-json --terse --category` → `docs <cmd>` → execute), key patterns (OData passthrough, relative dates, document conversion, pagination), and a category index. The full command reference for each domain lives in `references/marcel-<category>.md` and is loaded only when the agent needs that domain — keeping the context window lean.
-
 ## Roadmap
 
 Read-only stays the default forever. There's no fixed feature backlog — coverage grows out of real LLM workflows as they come up.
