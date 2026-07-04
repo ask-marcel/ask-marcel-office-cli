@@ -1,7 +1,7 @@
 # Teams commands
 
 ## get-channel-files-folder
-Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-onedrive-file-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in u
+Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-drive-item-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in u
 Required: --team-id --channel-id
 Optional: --select --expand
 Example: ask-marcel-office get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'

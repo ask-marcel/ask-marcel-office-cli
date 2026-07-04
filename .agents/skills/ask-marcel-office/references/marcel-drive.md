@@ -27,10 +27,10 @@ Optional: --format --include-metadata
 Example: ask-marcel-office download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf
 Graph: GET /drives/{drive-id}/items/{item-id}/versions/{version-id}/content
 
-## download-onedrive-file-content
+## download-drive-item-content
 Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid
 Required: --drive-id --item-id
-Example: ask-marcel-office download-onedrive-file-content --drive-id 'b!1234' --item-id '01ABC'
+Example: ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'
 Graph: GET /drives/{drive-id}/items/{item-id}/content
 
 ## extract-drive-item-images
@@ -164,7 +164,7 @@ Example: ask-marcel-office list-shared-insights
 Graph: GET /me/insights/shared
 
 ## list-shared-with-me
-List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-onedrive-file-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/sel
+List driveItems shared with the signed-in user (typically by colleagues). Each entry includes the original drive + item ID under `remoteItem` so you can chain into `get-drive-item`, `download-drive-item-content`, etc. Note: Graph does NOT honor any OData query parameters on this endpoint (top/sel
 Example: ask-marcel-office list-shared-with-me
 Graph: GET /me/drive/sharedWithMe
 
