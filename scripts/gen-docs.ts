@@ -76,7 +76,13 @@ const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
     process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} not found — skipping rewrite\n`);
     return;
   }
-  const text = await file.text();
+  const rawText = await file.text();
+  // Keep the headline "All N commands across M categories" in sync with the
+  // registry so it can never drift from the actual surface (it has before).
+  // N = registry command count; M = distinct categories among them (the
+  // lifecycle commands live in their own hand-written table, not the registry).
+  const categoryCount = new Set(manifest.commands.map((c) => c.category)).size;
+  const text = rawText.replace(/All \d+ commands across \d+ categories/, `All ${manifest.commands.length} commands across ${categoryCount} categories`);
   const begin = text.indexOf(COMMANDS_DOC_BEGIN);
   const end = text.indexOf(COMMANDS_DOC_END);
   if (begin === -1 || end === -1 || end < begin) {
@@ -87,7 +93,7 @@ const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
   const after = text.slice(end);
   const generated = `\n\n${renderReadmeTables(manifest)}\n\n`;
   const next = `${before}${generated}${after}`;
-  if (next === text) {
+  if (next === rawText) {
     process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} already up-to-date\n`);
     return;
   }

@@ -1,6 +1,6 @@
 # Command reference
 
-All 179 commands across 12 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint.
+All 179 commands across 11 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint. The five lifecycle commands (`login`, `logout`, `update`, `docs`, `help-json`) are listed separately in the **Authentication & lifecycle** section below — `help-json` counts them in its manifest total (184), so a 179-vs-184 gap is those five, not a drift.
 
 The auto-generated tables below are rebuilt from the live command registry on every `bun run docs:gen` / `bun run build` — they cannot drift from the actual surface.
 
