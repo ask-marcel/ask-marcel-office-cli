@@ -8,7 +8,7 @@ import { embedInlineImages, type InlineAttachment } from './inline-image-embedde
 import { formatZodError } from './format-zod-error.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 
-// Audit v1.4.0 fresh-pass #6: `--inline-images false` opts out of the
+// `--inline-images false` opts out of the
 // per-image bytes-fetch + base64 embedding. An LLM that just wants the text
 // body of an email with several inline images was paying ~36 KB for a 6 KB
 // body. With `--inline-images false`, the body is rendered with the raw
@@ -21,21 +21,21 @@ const schema = z.object({
   keepQuoted: z.enum(['true', 'false']).optional(),
 });
 
-// Audit v1.0.0 — multi-MB attachments timeout fix. `?$expand=attachments`
+// multi-MB attachments timeout fix. `?$expand=attachments`
 // inlines every attachment's `contentBytes` (base64) into the message
 // envelope. For an email with a 4 MB PDF attachment the response balloons
 // past Graph's ~3 MB tolerance; Graph times out at 60s or truncates the
 // JSON mid-stream. We now stage the fetch:
-//   1. /me/messages/{id}                     (no $expand)         — body + hasAttachments
-//   2. /me/messages/{id}/attachments?$select (metadata only)      — only if hasAttachments
-//   3. /me/messages/{id}/attachments/{a-id}  (per inline image)   — only for small inline images
+// 1. /me/messages/{id} (no $expand) — body + hasAttachments
+// 2. /me/messages/{id}/attachments?$select (metadata only) — only if hasAttachments
+// 3. /me/messages/{id}/attachments/{a-id} (per inline image) — only for small inline images
 // File attachments are listed in the markdown by name + size + id (so the
 // caller can fetch them on demand via `convert-mail-attachment-to-pdf` or
 // `get-mail-attachment`); their bytes never traverse this command.
 
 const INLINE_IMAGE_SIZE_LIMIT_BYTES = 2_000_000;
 
-// Audit Alex-session §2 follow-up: `contentId` only exists on the
+// `contentId` only exists on the
 // `microsoft.graph.fileAttachment` subtype, NOT on the base
 // `microsoft.graph.attachment`. The `/me/messages/{id}/attachments`
 // endpoint returns polymorphic entries (fileAttachment | itemAttachment |
@@ -253,7 +253,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled);
   const text = [headers, bodyMd, fileList].filter((s) => s !== '').join('\n\n');
 
-  // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `text.length` is UTF-16 code units.
   const envelope: { contentType: string; size: number; text: string; note?: string } = {
     contentType: 'text/markdown',
     size: new TextEncoder().encode(text).byteLength,
@@ -268,7 +268,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default, inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). For LLM callers that only want the text body, pass `--inline-images false` to skip the per-image bytes fetch entirely — the body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list so you can decide whether to fetch them separately via `get-mail-attachment`. File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design (audit v1.0.0): one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
+    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default, inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). For LLM callers that only want the text body, pass `--inline-images false` to skip the per-image bytes fetch entirely — the body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list so you can decide whether to fetch them separately via `get-mail-attachment`. File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}',
@@ -297,7 +297,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel convert-mail-to-markdown --message-id 'AAMkAD...'",
+  example: "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).',
   producesBytes: true,

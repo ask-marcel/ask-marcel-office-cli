@@ -17,7 +17,7 @@ const meta: CommandMeta = {
       name: 'todo-task-list-id',
       key: 'todoTaskListId',
       required: true,
-      description: 'To Do task list ID. Returned by `ask-marcel list-todo-task-lists`.',
+      description: 'To Do task list ID. Returned by `ask-marcel-office list-todo-task-lists`.',
       aliases: [
         { name: 'task-list-id', key: 'taskListId' },
         { name: 'todo-list-id', key: 'todoListId' },
@@ -28,12 +28,12 @@ const meta: CommandMeta = {
       key: 'todoTaskId',
       required: true,
       description:
-        "To Do task ID. Returned by `ask-marcel list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
+        "To Do task ID. Returned by `ask-marcel-office list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
       aliases: [{ name: 'task-id', key: 'taskId' }],
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-todo-linked-resources --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
+  example: "ask-marcel-office list-todo-linked-resources --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
   responseShape: 'collection of Microsoft Graph `linkedResource` resources under `value[]`',
   pagination: true,
 };

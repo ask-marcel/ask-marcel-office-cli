@@ -78,7 +78,7 @@ const docxToMarkdown = async (bytes: Uint8Array, opts: DocxToMarkdownOptions = {
     if (!meta.ok) return meta;
     text = `${text}\n\n${formatDocxMetadata(meta.value)}`;
   }
-  // size = UTF-8 byte count (audit §2.1); `.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

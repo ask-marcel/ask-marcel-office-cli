@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/mailFolders/delta()',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/mailfolder-delta',
   options: [],
-  example: 'ask-marcel list-mail-folders-delta',
+  example: 'ask-marcel-office list-mail-folders-delta',
   responseShape:
     'collection of Microsoft Graph `mailFolder` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

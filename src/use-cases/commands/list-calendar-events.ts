@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/events',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-events',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-calendar-events',
+  example: 'ask-marcel-office list-calendar-events',
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
 };

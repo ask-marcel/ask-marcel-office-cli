@@ -66,7 +66,7 @@ describe('docxToMarkdown — with --include-metadata true', () => {
 
     // Core properties — creator, title, subject visible
     expect(text).toContain('### Core properties');
-    expect(text).toContain('**creator**: Vincent Delacourt');
+    expect(text).toContain('**creator**: Jordan Avery');
     expect(text).toContain('**title**: Q4 Report');
 
     // Custom properties — embedded as a markdown table
@@ -75,7 +75,7 @@ describe('docxToMarkdown — with --include-metadata true', () => {
 
     // Comments — author + body visible
     expect(text).toContain('### Comments');
-    expect(text).toContain('Vincent Delacourt');
+    expect(text).toContain('Jordan Avery');
     expect(text).toContain('Please double-check this figure.');
 
     // Tracked changes — insertion + deletion text both appear under their own sections

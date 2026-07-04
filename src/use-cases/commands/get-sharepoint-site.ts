@@ -19,11 +19,11 @@ const meta: CommandMeta = {
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
       description:
-        'SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site.',
+        'SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel-office search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site.',
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
+  example: "ask-marcel-office get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
   responseShape: 'single Microsoft Graph `site` resource',
 };
 

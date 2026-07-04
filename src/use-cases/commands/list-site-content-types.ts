@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel list-site-content-types --site-id 'contoso.sharepoint.com,...'",
+  example: "ask-marcel-office list-site-content-types --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `contentType` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

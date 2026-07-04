@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/places/microsoft.graph.room',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/place-list',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-rooms',
+  example: 'ask-marcel-office list-rooms',
   responseShape: 'collection of Microsoft Graph `room` resources under `value[]`',
   pagination: true,
 };

@@ -137,7 +137,7 @@ describe('Node filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 
-  it('recursively deletes a populated directory (login-fix round-1 Wave B — logout wipes the browser profile)', async () => {
+  it('recursively deletes a populated directory (— logout wipes the browser profile)', async () => {
     const { mkdirSync } = await import('node:fs');
     const profileDir = join(tmp, 'browser-profile');
     const subPath = join(profileDir, 'Default', 'Cookies');

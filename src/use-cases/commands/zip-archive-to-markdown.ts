@@ -13,7 +13,7 @@ import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
  * `bytesToMarkdown` dispatch the markdown commands use; an entry the dispatch
  * can't convert (image, binary, nested archive, scanned PDF) is LISTED with a
  * note instead of failing the whole archive. Notes use the container-neutral
- * NESTED_HINTS (QA-007): entries live INSIDE the zip, so caller-specific
+ * NESTED_HINTS: entries live INSIDE the zip, so caller-specific
  * sibling-command pointers (`extract-drive-item-images`, …) cannot reach them.
  */
 

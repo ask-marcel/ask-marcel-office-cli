@@ -1,11 +1,11 @@
 ---
 name: qa-audit
-description: Run the full-surface QA health check of the ask-marcel CLI by executing docs/QA-PLAYBOOK.md phase by phase — offline gates, bundle smoke tests, manifest-driven parameter matrix, conversion contract matrix, live read-only Graph drift probes, agent-ergonomics journeys, and gap/roadmap analysis. Use when the user asks to audit the CLI, run QA, check CLI health, find bugs/regressions across the command surface, or re-verify after a Microsoft Graph change. Produces a severity-ranked report and a proposed fix plan; never fixes code during the run.
+description: Run the full-surface QA health check of the ask-marcel-office CLI by executing docs/QA-PLAYBOOK.md phase by phase — offline gates, bundle smoke tests, manifest-driven parameter matrix, conversion contract matrix, live read-only Graph drift probes, agent-ergonomics journeys, and gap/roadmap analysis. Use when the user asks to audit the CLI, run QA, check CLI health, find bugs/regressions across the command surface, or re-verify after a Microsoft Graph change. Produces a severity-ranked report and a proposed fix plan; never fixes code during the run.
 ---
 
 # QA audit runner
 
-You are auditing the `ask-marcel` CLI. The authoritative procedure is **`docs/QA-PLAYBOOK.md`** — read it in full before doing anything, then execute phases A→H in order. This skill only adds the operating rules:
+You are auditing the `ask-marcel-office` CLI. The authoritative procedure is **`docs/QA-PLAYBOOK.md`** — read it in full before doing anything, then execute phases A→H in order. This skill only adds the operating rules:
 
 1. **Track phases as tasks.** One task per playbook phase (A–H); mark in_progress/completed as you go. Full surface every run — no sampling, no tiers.
 2. **Report, then plan.** You find and document; you do NOT fix during the run (not even trivial P1s — note them, finish the sweep). After delivering the report, propose a severity-ordered fix plan and WAIT for approval.

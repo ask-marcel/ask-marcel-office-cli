@@ -11,7 +11,7 @@ type MaybeId = { id?: string };
 
 const valueOrUndefined = <T>(r: Result<unknown, GraphError>): T | undefined => (r.ok ? (r.value as T) : undefined);
 
-// Audit round-7 Wave H: partial-result mode. The previous all-or-nothing
+// partial-result mode. The previous all-or-nothing
 // failure (any single Graph call failing aborts the whole command) made
 // cold-start unusable in tenants with quirky scopes — e.g. a user with
 // `/me/drive` available but no Planner license would never get past
@@ -32,7 +32,7 @@ const execute: Command['execute'] = async (graph, params) => {
     graph.get('/me/onenote/notebooks?$top=1&$select=id,displayName,isDefault'),
     graph.get('/me/joinedTeams?$top=1&$select=id,displayName'),
     graph.get('/me/drive/recent?$top=1&$select=id,name,lastModifiedDateTime'),
-    // Audit Alex-session §5.2: tenant timezone needed on first-contact so the
+    // tenant timezone needed on first-contact so the
     // LLM stops treating every datetime as UTC. `mailboxSettings.timeZone` is
     // the closest thing Graph exposes (Outlook setting; matches the tz the
     // user sees in Outlook/Teams). $select keeps the payload small.
@@ -82,14 +82,14 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "One-shot discovery for the IDs every other command needs, plus the user's job title and tenant timezone / locale / working-hours. Issues 9 Graph calls in parallel and returns what each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc. For Microsoft To Do lists call `list-todo-task-lists` on demand (intentionally dropped from this command's fan-out — the array of {id, displayName, wellknownListName} entries crowded the envelope with IDs an LLM rarely needs on first contact). Audit Alex-session §5.2: `tenantTimeZone` lets an LLM stop treating every datetime as UTC on first contact.",
+    "One-shot discovery for the IDs every other command needs, plus the user's job title and tenant timezone / locale / working-hours. Issues 9 Graph calls in parallel and returns what each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc. For Microsoft To Do lists call `list-todo-task-lists` on demand (intentionally dropped from this command's fan-out — the array of {id, displayName, wellknownListName} entries crowded the envelope with IDs an LLM rarely needs on first contact). `tenantTimeZone` lets an LLM stop treating every datetime as UTC on first contact.",
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate:
     '(meta) parallel: /me, /me/drive, /me/mailFolders/inbox, /me/calendar, /me/planner/plans, /me/onenote/notebooks, /me/joinedTeams, /me/drive/recent, /me/mailboxSettings',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get',
   options: [],
-  example: 'ask-marcel my-quick-context',
+  example: 'ask-marcel-office my-quick-context',
   responseShape:
     '`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user\'s role string from Azure AD (e.g. "Engineering Manager"). `tenantTimeZone` is the Outlook timezone string (e.g. "Romance Standard Time", "Pacific Standard Time"); `tenantLocale` is the IETF tag (e.g. "en-US"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command\'s fan-out to keep the envelope LLM-tractable.',
 };

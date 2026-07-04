@@ -24,7 +24,7 @@ const meta: CommandMeta = {
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-root-item`.' },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
+  example: "ask-marcel-office get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
   responseShape: 'single Microsoft Graph `driveItem` resource',
 };
 

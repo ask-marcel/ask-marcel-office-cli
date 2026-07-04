@@ -56,7 +56,7 @@ const meta: CommandMeta = {
       description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
     },
   ],
-  example: "ask-marcel extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
+  example: "ask-marcel-office extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
   responseShape:
     '`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence.',
 };

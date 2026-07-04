@@ -27,7 +27,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
+  example: "ask-marcel-office list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',
   pagination: true,
 };

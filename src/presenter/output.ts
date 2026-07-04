@@ -16,14 +16,14 @@ type SuccessEnvelope = {
    * Tells the LLM consumer how to shrink the next call — universal advice,
    * since the presenter doesn't know which command produced the data
    * (slim-default `--select`, lower `--top`, or `--output-path` for binary).
-   * Audit Alex-session §3 fix.
+   * fix.
    */
   readonly sizeHint?: string;
   /**
    * Surfaced when `data.value[]` carries N entries but each entry is empty
    * after stripping `@odata.etag` — the telltale shape of a `--select` with
    * unknown field names (Graph silently drops bogus fields). Distinct from
-   * `sizeHint` (which fires on byte count). Audit v1.4.0 #4 fix.
+   * `sizeHint` (which fires on byte count).
    */
   readonly selectHint?: string;
 };
@@ -37,19 +37,19 @@ const buildSizeHint = (bytes: number): string =>
   `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold). Universal remedy: \`--output-path <file>\` writes bytes to disk and keeps the envelope compact (works on every command). Per-item slimming via \`--select id,subject,...\` and item-count reduction via \`--top N\` work ONLY when the command's \`--help\` advertises those flags — endpoints like \`list-shared-with-me\`, \`microsoft-search-query\`, and the delta family silently ignore them.`;
 
 const SELECT_HINT =
-  "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel docs <command>`.";
+  "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel-office docs <command>`.";
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 // "Telltale bogus-select" detector. Two shapes both indicate the same trap
 // (user passed `--select` with field names Graph silently dropped):
 //
-//   Collection: `{ value: [{@odata.etag}, {@odata.etag}, ...] }`
-//     — N>0 entries, each empty after stripping `@odata.etag`.
+// Collection: `{ value: [{@odata.etag}, {@odata.etag}, ...] }`
+// — N>0 entries, each empty after stripping `@odata.etag`.
 //
-//   Single resource: `{ "@odata.context": "..." }`
-//     — top-level object with no keys other than `@odata.*` metadata.
-//     Example: `get-current-user --select aaaaaaaa,bbbbbbbb`.
+// Single resource: `{ "@odata.context": "..." }`
+// — top-level object with no keys other than `@odata.*` metadata.
+// Example: `get-current-user --select aaaaaaaa,bbbbbbbb`.
 //
 // Negatives: legitimately empty collection (`value: []`, N=0); single
 // resource carrying real fields alongside `@odata.context` (the normal
@@ -75,7 +75,7 @@ const looksLikeBogusSelectResponse = (data: unknown): boolean => {
 // Pagination / cursor tokens that the presenter lifts to the top of the
 // envelope so an LLM consumer can write `if (resp.nextLink) ...` instead of
 // reaching into `data["@odata.nextLink"]`. `@odata.deltaLink` is included
-// (audit v1.0.0 §4) so resumption tokens land in the same place — both
+// so resumption tokens land in the same place — both
 // nextLink and deltaLink are pagination cursors and should sit at the same
 // level. `@odata.count` is also lifted as a sibling.
 const HOIST_KEYS: ReadonlySet<string> = new Set(['@odata.nextLink', '@odata.deltaLink', '@odata.count']);
@@ -136,18 +136,18 @@ const render = (data: unknown, logger: Logger, format: OutputFormat): void => {
 };
 
 const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number): void => {
-  // Audit round-7 Wave G: `errorCode` is an additive field — old consumers
+  // `errorCode` is an additive field — old consumers
   // keying on `error: string` continue to work; new consumers can branch on
   // the structured code (`itemNotFound`, `InvalidIdMalformed`, `MissingScope`,
   // CLI-rewrite codes like `cli_rewrite_orderby_title`, etc.) without
   // substring-matching the human message.
   //
-  // Audit Alex-session §2: ALSO additive — `hint` and `source` come from
+  // ALSO additive — `hint` and `source` come from
   // the central table in `error-hints.ts`. Surfaced in both formats so an
   // LLM in text mode no longer has to guess what `ErrorInvalidIdMalformed`
   // means.
   //
-  // v1.4.0 fresh-pass #5 (round 2): asymmetry between hint-matched and
+  // asymmetry between hint-matched and
   // bare-Graph errors was a real problem — an LLM that branched on
   // `response.source` saw `{ok, error, errorCode}` for half its Graph
   // failures and `{ok, error, errorCode, hint, source}` for the other half.

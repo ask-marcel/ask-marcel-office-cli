@@ -30,7 +30,7 @@ const meta: CommandMeta = {
       ],
     },
   ],
-  example: "ask-marcel get-mail-rule --message-rule-id 'AQAAANC...'",
+  example: "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
   responseShape: 'single Microsoft Graph `messageRule` resource',
 };
 

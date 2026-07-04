@@ -29,7 +29,7 @@ describe('extractPdfText', () => {
   });
 });
 
-describe('pdfErrorMessage (QA-006 — encrypted PDFs)', () => {
+describe('pdfErrorMessage', () => {
   it('a pdfjs PasswordException becomes an honest "password-protected" message with a way forward', () => {
     const passwordError = Object.assign(new Error('No password given'), { name: 'PasswordException' });
     const message = pdfErrorMessage(passwordError);

@@ -29,7 +29,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
+  example: "ask-marcel-office get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
   responseShape: 'single Microsoft Graph `user` resource',
 };
 

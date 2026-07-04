@@ -3,7 +3,7 @@ import { buildElevatedPickODataListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
-// Audit round-8 §1.5: round-6 hypothesized that `/me/chats` would succeed
+// round-6 hypothesized that `/me/chats` would succeed
 // against the basic Teams web client token; the audit verified it does
 // NOT — Graph rejects with `Forbidden: Missing scope permissions ...
 // Chat.ReadBasic`. The M365ChatClient elevated identity DOES carry
@@ -11,11 +11,11 @@ import { pickODataOptions } from './odata-query.ts';
 // capture times out the command will surface that timeout (documented
 // pre-existing failure mode), not the misleading "Missing scope" 403.
 //
-// Audit v1.0.0 §B2/B3: `/me/chats` rejects `$orderby` with `BadRequest:
+// /B3: `/me/chats` rejects `$orderby` with `BadRequest:
 // QueryOptions to order by 'lastUpdatedDateTime' is not supported` and
 // hangs for 60s on `$expand=members`. Advertise only the subset Graph
 // actually honours.
-// Audit Alex-session §A: same slim default as `get-chat` — full `/me/chats`
+// same slim default as `get-chat` — full `/me/chats`
 // pages carry `viewpoint`, `webUrl`, `onlineMeetingInfo`, etc. on every entry.
 // Ship a slim default; user `--select` always wins.
 const DEFAULT_SELECT = 'id,topic,chatType,createdDateTime,lastUpdatedDateTime';
@@ -32,7 +32,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/chats',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chat-list',
   options: [...pickODataOptions(CHATS_ODATA_KEYS)],
-  example: 'ask-marcel list-chats',
+  example: 'ask-marcel-office list-chats',
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).',
   pagination: true,
   needsElevatedToken: true,

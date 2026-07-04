@@ -3,7 +3,7 @@ import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
-// Audit Alex-session §A: matches `get-mail-message`'s slim default — at 25
+// matches `get-mail-message`'s slim default — at 25
 // messages per page, the full Graph projection runs ~1 MB; the slim default
 // is ~30-60 KB. User `--select foo,bar` always wins.
 const DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview';
@@ -19,7 +19,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-messages',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-mail-messages',
+  example: 'ask-marcel-office list-mail-messages',
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
   pagination: true,

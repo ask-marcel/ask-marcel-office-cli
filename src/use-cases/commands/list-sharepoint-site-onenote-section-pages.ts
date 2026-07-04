@@ -31,7 +31,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-sharepoint-site-onenote-section-pages --site-id 'contoso.sharepoint.com,...' --onenote-section-id 's1'",
+  example: "ask-marcel-office list-sharepoint-site-onenote-section-pages --site-id 'contoso.sharepoint.com,...' --onenote-section-id 's1'",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]`',
   pagination: true,
 };

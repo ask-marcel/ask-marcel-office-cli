@@ -69,14 +69,14 @@ const meta: CommandMeta = {
       key: 'driveId',
       required: true,
       description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     {
       name: 'worksheet-id',
       key: 'worksheetId',
       required: true,
-      description: 'Worksheet ID or worksheet name. Returned by `ask-marcel list-excel-worksheets`.',
+      description: 'Worksheet ID or worksheet name. Returned by `ask-marcel-office list-excel-worksheets`.',
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -88,7 +88,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'a1Address' },
     },
   ],
-  example: "ask-marcel get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
+  example: "ask-marcel-office get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
   responseShape: 'single Microsoft Graph `workbookRange` resource (values, formulas, format)',
 };
 

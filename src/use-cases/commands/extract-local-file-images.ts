@@ -61,7 +61,7 @@ const meta: CommandMeta = {
         'Filesystem path of the pdf / docx / xlsx / pptx file to extract from (absolute, or relative to the current working directory). E.g. `/tmp/deck.pdf`, `./report.docx`.',
     },
   ],
-  example: 'ask-marcel extract-local-file-images --path /tmp/deck.pdf --output-dir ./deck-images',
+  example: 'ask-marcel-office extract-local-file-images --path /tmp/deck.pdf --output-dir ./deck-images',
   responseShape:
     '`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter). A missing file returns api_error 404 with the path.',
   producesMedia: true,

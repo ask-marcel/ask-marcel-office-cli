@@ -24,7 +24,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // short-circuit on (a) plain-text source extensions and (b) `pdf`
   // sources, returning the raw bytes via /content with no `?format`
   // query — the user wants a PDF, the source IS a PDF, no conversion
-  // needed. Audit v1.0.0 §bug-4: tag the short-circuit case with
+  // needed. -4: tag the short-circuit case with
   // `passthrough: true` + `note` so the caller can tell whether
   // conversion actually ran.
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
@@ -32,7 +32,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const item = meta.value as { name?: string; folder?: unknown };
   const name = item.name ?? '';
 
-  // Audit round-6 §1.1: a folder --item-id used to produce
+  // a folder --item-id used to produce
   // `{ok:false, error:""}` — surface a clear hint pointing at the right
   // command for enumeration.
   if (item.folder !== undefined && item.folder !== null) {
@@ -88,7 +88,7 @@ const meta: CommandMeta = {
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`.' },
   ],
-  example: "ask-marcel download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
   producesBytes: true,

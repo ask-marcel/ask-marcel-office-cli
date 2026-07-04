@@ -29,10 +29,11 @@ type BuildCliDeps = {
   readonly packageManager?: 'npm' | 'bun';
   readonly onCommandError?: () => void;
   /**
-   * Builds the AuthManager for an interactive `login` run from the `--use-extension`
-   * flag. Supplied by the composition root (`build-deps.ts`); when omitted (tests),
-   * the login action falls back to the injected `auth`, so a single fake drives both
-   * `login.execute` and `getLastElevatedOutcome`.
+   * Builds the AuthManager for an interactive `login` run (it may recapture
+   * secondary tokens via the browser, unlike the command-path `auth`).
+   * Supplied by the composition root (`build-deps.ts`); when omitted (tests),
+   * the login action falls back to the injected `auth`, so a single fake
+   * drives both `login.execute` and `getLastElevatedOutcome`.
    */
   readonly makeLoginAuth?: LoginAuthFactory;
 };
@@ -51,12 +52,12 @@ const buildCli = (deps: BuildCliDeps): Command => {
     deps.onCommandError?.();
   };
 
-  // v1.4.0 fresh-pass #5 (round 2): map the discriminated GraphError type to
+  // map the discriminated GraphError type to
   // the presenter's ErrorSource. `api_error` and `network_error` both surface
   // Graph endpoint failures (the latter is "couldn't even reach Graph"), so
   // both classify as `graph`. `validation_error` is Zod / use-case-side
   // schema rejection. `auth_failed` is a CLI-side concern (the remedy is
-  // `ask-marcel login`, not a Graph operation). When the hint table matches
+  // `ask-marcel-office login`, not a Graph operation). When the hint table matches
   // a more specific source (e.g. `substrate` for chatsvcagg-coded errors),
   // the hint's source wins — this explicit source is just the fallback so
   // bare envelopes still carry the classifier.
@@ -66,7 +67,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return 'graph';
   };
 
-  // Audit round-8 Wave E2: manifest-driven --output-path-supporting list.
+  // manifest-driven --output-path-supporting list.
   const bytesProducingCommands = Object.entries(cmdRegistry)
     .filter(([, c]) => c.meta.producesBytes === true)
     .map(([n]) => n)
@@ -80,17 +81,17 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
     if (error.type === 'no_inlined_bytes')
-      return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel ${commandName} ... > out.json\`.`;
+      return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel-office ${commandName} ... > out.json\`.`;
     if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
-    // Audit v1.0.0 §B11: paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
+    // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
     if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
-    // Audit v1.0.0 §B4: *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
+    // *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
     if (error.type === 'passthrough_extension_mismatch')
       return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
     // Large-payload guard: refuse to dump a multi-MB base64 blob to stdout (context bomb). Point at --output-path.
     if (error.type === 'inline_too_large')
       return `--output-path: ${commandName} returned a ~${(error.base64Length * 0.75e-6).toFixed(1)} MB inline payload — too large to print to stdout (it would flood the context). Re-run with \`--output-path <file>\` to write the bytes to disk; the envelope then carries \`savedTo\` instead of \`base64\`.`;
-    // Audit v1.0.0 §B10: humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
+    // humanise the ENOENT/mkdir shape; preserve EACCES/ENOSPC verbatim — they're already actionable.
     const enoent = /^ENOENT:.*'([^']+)'/.exec(error.message);
     if (enoent !== null) return `--output-path: parent directory missing or not writable: ${enoent[1]}`;
     return `--output-path: write failed: ${error.message}`;
@@ -103,7 +104,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return `--output-dir: write failed: ${error.message}`;
   };
 
-  // Audit v1.0.0 §B5: route help-json / docs through persistIfRequested so --output-path is honoured (was silently ignored).
+  // route help-json / docs through persistIfRequested so --output-path is honoured (was silently ignored).
   const writeOrPrintText = async (textBody: string, contentType: string, commandName: string): Promise<void> => {
     const outputPath = program.opts<{ outputPath?: string }>().outputPath;
     if (outputPath === undefined) {
@@ -133,24 +134,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
     // redundant prefix so consumers don't see `{"ok":false,"error":"error: ..."}`.
     const stripped = err.message.startsWith('error: ') ? err.message.slice('error: '.length) : err.message;
-    // Audit Alex-session §2 follow-up: pass Commander's structured code
+    // pass Commander's structured code
     // (`commander.unknownOption`, `commander.missingMandatoryOptionValue`,
     // etc.) through to the error renderer so the hint table can match it and
     // surface `hint:` / `source:` for the CLI-input failure cases too. Prior
     // behaviour dropped the code, leaving Commander errors as bare
     // `{ok:false,error}` envelopes — inconsistent with the Graph error shape.
-    // v1.4.0 fresh-pass #5 (round 2): also stamp `source: 'cli'` explicitly
+    // also stamp `source: 'cli'` explicitly
     // so the envelope shape stays stable even if a future Commander error
     // code variant doesn't have a matching rule yet.
     fail(stripped, err.code, 'cli');
     throw err;
   });
 
-  // Audit Alex-session §B: previous default `--help` ran ~60 KB because the
+  // previous default `--help` ran ~60 KB because the
   // top-level subcommand listing rendered each command's full summary (often
   // 2-3 sentences). Default `--help` now truncates each subcommand description
   // to its first sentence in the top-level listing (~34 KB total). Per-command
-  // `ask-marcel <cmd> --help` is never compacted — it always shows the full
+  // `ask-marcel-office <cmd> --help` is never compacted — it always shows the full
   // description plus the `addHelpText` block, and `help-json` ships the full
   // summary unchanged. v1.4.0 surface-consolidation: the `--verbose` opt-out
   // was dropped (it was a one-trick toggle on this top-level listing only;
@@ -164,7 +165,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
   // POST) when search-all-accessible-sites was added without updating it.
   const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET').length;
-  // 2026-06-15 (F-03): the only write commands are the two mail-draft ones
+  // 2026-06-15 (F-03), extended 2026-07-04: the only write commands are the three mail-draft ones
   // (create=POST, update=PATCH); everything else is a read or a search. Derive
   // BOTH lists from the manifest's `mutates` flag so the read-only narrative can
   // never drift from the registry. The previous code took every POST command and
@@ -182,13 +183,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
   const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are the ${mutatingCommandNames.length} mail-draft commands (${mutatingCommandNames.join(', ')}), which can only create or update an UNSENT draft; the CLI cannot send mail, create or modify calendar items, or write files (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
 
   program
-    .name('ask-marcel')
+    .name('ask-marcel-office')
     .description(surfaceDescription)
     .version(version ?? '0.0.0')
-    // Audit Alex-session §B: override the help-formatter's subcommand
+    // override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
-    // sentence in the TOP-LEVEL `ask-marcel --help` listing. Per-subcommand
-    // `ask-marcel <cmd> --help` is untouched — Commander only consults
+    // sentence in the TOP-LEVEL `ask-marcel-office --help` listing. Per-subcommand
+    // `ask-marcel-office <cmd> --help` is untouched — Commander only consults
     // `subcommandDescription` when formatting parent's child list.
     .configureHelp({
       subcommandDescription: (cmd) => firstSentence(cmd.description()),
@@ -203,7 +204,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     )
     .addOption(
       ((): Option => {
-        // Audit round-8 Wave G: reject duplicate `--output` flags AND
+        // reject duplicate `--output` flags AND
         // validate the choice. Adding an argParser bypasses Commander's
         // built-in `.choices()` enforcement, so the parser has to do both
         // jobs. Track invocations via a closure flag (Commander seeds
@@ -229,20 +230,20 @@ const buildCli = (deps: BuildCliDeps): Command => {
       })()
     );
 
-  // Audit Alex-session §B: explicit pointers to per-command help and the
+  // explicit pointers to per-command help and the
   // machine-readable manifest. Without this, an LLM that hits the compact
   // top-level help has no in-band signal that `help-json` even exists.
   program.addHelpText(
     'after',
     [
       '',
-      'For full per-command help:   ask-marcel <command> --help',
-      'For machine-readable docs:   ask-marcel help-json [--terse] [--category mail]',
-      'For per-command Markdown:    ask-marcel docs <command>',
+      'For full per-command help:   ask-marcel-office <command> --help',
+      'For machine-readable docs:   ask-marcel-office help-json [--terse] [--category mail]',
+      'For per-command Markdown:    ask-marcel-office docs <command>',
     ].join('\n  ')
   );
 
-  // Audit v1.0.0 §2.3: bare `ask-marcel` (no subcommand) used to silently
+  // bare `ask-marcel-office` (no subcommand) used to silently
   // exit 1 with zero output. We intercept that case BEFORE Commander parses
   // so we don't break the existing `unknown subcommand` error path. Hooked on
   // `preAction` of every subcommand would be wrong (it never fires for the
@@ -277,16 +278,16 @@ const buildCli = (deps: BuildCliDeps): Command => {
         process.stdout.write(`${result.value}\n`);
         return;
       }
-      // Audit Alex-session §6 follow-up: pass an explicit `cli_unknown_command`
+      // pass an explicit `cli_unknown_command`
       // code so error-hints can match it structurally — gives the same
       // envelope shape as Commander's own `commander.unknownCommand` path.
-      fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`, 'cli_unknown_command');
+      fail(`Unknown command "${result.error.name}". Run \`ask-marcel-office --help\` to list every command.`, 'cli_unknown_command');
     });
 
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~6 KB for one category, vs ~440 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~30 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~6 KB for one category, vs ~440 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~30 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',
@@ -297,7 +298,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Filter the manifest to a single category (one of: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta). Composes with `--terse`. Unknown categories return a structured `{ ok: false, error }` envelope.'
     )
     .action(async (opts: { readonly terse?: boolean; readonly category?: string }) => {
-      // Audit round-8 Wave G1: --output text was silently honored on
+      // --output text was silently honored on
       // help-json, contradicting the global flag's contract. The manifest IS
       // JSON; serializing as text has no use case. Reject only when the user
       // EXPLICITLY passed `--output text` (defaulting to text and getting
@@ -305,11 +306,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
       const outputSource = program.getOptionValueSource('output');
       if (outputSource === 'cli' && getFormat() === 'text') {
         fail(
-          "help-json always emits JSON (that's the contract — the manifest is the LLM-consumable serialized form of every command's meta). Drop `--output text` for this command. To browse the manifest as Markdown, use `ask-marcel docs <command>` instead."
+          "help-json always emits JSON (that's the contract — the manifest is the LLM-consumable serialized form of every command's meta). Drop `--output text` for this command. To browse the manifest as Markdown, use `ask-marcel-office docs <command>` instead."
         );
         return;
       }
-      // Audit Alex-session §B: --terse projects to `{name, summary, category}`;
+      // --terse projects to `{name, summary, category}`;
       // --category filters to a single category (validated against
       // CATEGORY_LABELS). Both flags compose.
       const fullOrTerse =
@@ -332,21 +333,19 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const loginCmd = program
     .command('login')
-    .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback).')
-    .option('--use-extension', 'Use browser extension for authentication (requires Ask Marcel Companion extension)')
-    .action(async (opts: { useExtension?: boolean }) => {
-      // The login auth manager varies its browser strategy by `--use-extension`
-      // (default: Playwright fallback; --use-extension: the companion browser
-      // extension). The composition root supplies `makeLoginAuth`; tests omit it
-      // and the injected `auth` fake drives both execute and the elevated read.
-      const useExtension = opts.useExtension ?? false;
-      const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth({ useExtension }) : auth;
+    .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → Playwright browser fallback).')
+    .action(async () => {
+      // The composition root supplies `makeLoginAuth` (a login-configured
+      // manager that may recapture secondary tokens via the browser); tests
+      // omit it and the injected `auth` fake drives both execute and the
+      // elevated read.
+      const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
       const result = await login.execute(loginAuth);
       if (!result.ok) {
         fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
         return;
       }
-      // Login-fix round-1 Wave D: surface the elevated-capture outcome so
+      // surface the elevated-capture outcome so
       // an LLM consumer can predict whether the elevated-dependent
       // commands (list-chats / get-chat / list-chat-members /
       // historical-version downloads) will work without invoking them.
@@ -370,16 +369,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel login   (default: opens a Playwright-driven Edge/Chrome window)',
-      '               ask-marcel login --use-extension   (use the Ask Marcel Companion browser extension instead)',
+      'Example:       ask-marcel-office login   (opens a Playwright-driven Edge/Chrome window)',
       'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
-      'Browser ext:   Install "Ask Marcel Companion" for faster login (no Playwright needed).',
-      '               See browser-extension/README.md for installation instructions.',
-      'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context — the default browser path; not used with --use-extension).',
+      'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
       '               this CLI cannot request additional scopes. To inspect the granted set,',
-      '               run `ask-marcel scopes-check`.',
-      'Stuck flow:    `ask-marcel logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
+      '               run `ask-marcel-office scopes-check`.',
+      'Stuck flow:    `ask-marcel-office logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
     ].join('\n  ')
   );
 
@@ -395,7 +391,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel logout',
+      'Example:       ask-marcel-office logout',
       'Removes:       ~/.ask-marcel/token-cache.json (access + refresh tokens).',
       'Leaves alone:  ~/.ask-marcel/browser-profile/ (delete it manually if you want a clean Playwright session too).',
       'Verify clean:  ls ~/.ask-marcel/  (token-cache.json should be gone).',
@@ -404,7 +400,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const updateCmd = program
     .command('update')
-    .description('Re-install the latest published ask-marcel from npm, in place. Auto-detects whether you originally installed via npm or bun.')
+    .description('Re-install the latest published ask-marcel-office from npm, in place. Auto-detects whether you originally installed via npm or bun.')
     .action(async () => {
       const manager = deps.packageManager ?? detectPackageManager(process.argv[1] ?? '');
       const result = await update.execute(processRunner, manager);
@@ -416,7 +412,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:      ask-marcel update',
+      'Example:      ask-marcel-office update',
       'Detection:    based on the bin path of the running CLI.',
       '              `/usr/local/lib/node_modules/...` -> npm, `~/.bun/install/...` -> bun.',
       'Side effect:  shells out to `npm i -g ask-marcel-office-cli@latest` or `bun add -g ...`.',
@@ -430,14 +426,14 @@ const buildCli = (deps: BuildCliDeps): Command => {
     .description(
       'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/update/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
     )
-    .argument('<command>', 'Command name to show docs for (run `ask-marcel --help` to list every command).')
+    .argument('<command>', 'Command name to show docs for (run `ask-marcel-office --help` to list every command).')
     .action(async (commandName: string) => {
       const result = renderSingleCommand(cmdRegistry, commandName);
       if (!result.ok) {
-        // Audit Alex-session §6 follow-up: structured `cli_unknown_command`
+        // structured `cli_unknown_command`
         // code so the envelope matches the `help <unknown>` and
         // `commander.unknownCommand` paths — single branch for LLM consumers.
-        fail(`Unknown command "${result.error.name}". Run \`ask-marcel --help\` to list every command.`, 'cli_unknown_command');
+        fail(`Unknown command "${result.error.name}". Run \`ask-marcel-office --help\` to list every command.`, 'cli_unknown_command');
         return;
       }
       await writeOrPrintText(result.value, 'text/markdown', 'docs');
@@ -446,8 +442,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel docs list-mail-messages',
-      'Lifecycle:     `ask-marcel docs login` (or logout / update / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
+      'Example:       ask-marcel-office docs list-mail-messages',
+      'Lifecycle:     `ask-marcel-office docs login` (or logout / update / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
     ].join('\n  ')
   );
 

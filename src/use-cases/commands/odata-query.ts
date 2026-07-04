@@ -4,7 +4,7 @@ import type { CommandOptionMeta } from './command-types.ts';
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 const NON_NEGATIVE_INTEGER = /^\d+$/;
 const SIGNED_INTEGER = /^-?\d+$/;
-// Audit v1.4.0 #7: `--top 1.5` used to fall through to "not a number" —
+// `--top 1.5` used to fall through to "not a number" —
 // but 1.5 IS a number, just not an integer. Match the decimal shape
 // explicitly so the rejection message names the actual problem.
 const SIGNED_DECIMAL = /^-?\d+\.\d+$/;

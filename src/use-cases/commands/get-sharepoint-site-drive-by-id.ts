@@ -13,11 +13,11 @@ const meta: CommandMeta = {
   graphPathTemplate: '/sites/{site-id}/drives/{drive-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-get',
   options: [
-    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.' },
-    { name: 'drive-id', key: 'driveId', required: true, description: 'Drive (document library) ID on the site. Returned by `ask-marcel list-sharepoint-site-drives`.' },
+    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel-office search-sharepoint-sites-by-name`.' },
+    { name: 'drive-id', key: 'driveId', required: true, description: 'Drive (document library) ID on the site. Returned by `ask-marcel-office list-sharepoint-site-drives`.' },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
+  example: "ask-marcel-office get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
   responseShape: 'single Microsoft Graph `drive` resource',
 };
 

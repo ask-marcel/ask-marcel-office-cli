@@ -47,7 +47,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.data).toEqual({ value: [{ id: 'm1' }, { id: 'm2' }] });
   });
 
-  it('lifts @odata.deltaLink to the top level alongside nextLink so resumption tokens sit at the envelope level (audit v1.0.0 §4)', async () => {
+  it('lifts @odata.deltaLink to the top level alongside nextLink so resumption tokens sit at the envelope level', async () => {
     const logger = createLoggerFake();
     const data = {
       value: [{ id: 'e1', subject: 'standup' }],
@@ -84,7 +84,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(JSON.parse(out.trim())).toEqual({ ok: false, error: 'Authentication cancelled' });
   });
 
-  // Audit Alex-session §2 — structured-error path. The hint table maps the
+  // — structured-error path. The hint table maps the
   // high-frequency Graph errors (InvalidIdMalformed, MissingScope, …) to a
   // one-line remedy + a source classifier ('graph' | 'cli' | 'validation').
   // The envelope is additive — old consumers keying on `error: string` still
@@ -105,7 +105,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.source).toBeUndefined();
   });
 
-  // v1.4.0 fresh-pass #5 (round 2) — envelope-shape stability fix. The user
+  // — envelope-shape stability fix. The user
   // reported 5 bare-Graph error codes that lacked `source` even though every
   // CLI-side validation error carries it. The fix: callers that know the
   // failure category (cli.ts maps the GraphError discriminated-union type to
@@ -179,7 +179,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(out).toBe('error: Some weird new failure mode\n');
   });
 
-  // Audit Alex-session §3 — sizeHint when the rendered envelope crosses
+  // — sizeHint when the rendered envelope crosses
   // 50 KB. Generic remedy (presenter has no idea which command produced the
   // data) — `--select` / `--top` / `--output-path`.
   it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB and frames the universal remedy (--output-path) ahead of the conditional remedies (--select / --top, which some endpoints ignore)', async () => {
@@ -193,7 +193,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.sizeHint).toBeDefined();
     expect(parsed.sizeHint).toContain('--select');
     expect(parsed.sizeHint).toContain('--output-path');
-    // Audit v1.4.0 fresh-pass #3: the hint used to say "Trim with --select"
+    // the hint used to say "Trim with --select"
     // unconditionally; some endpoints (list-shared-with-me,
     // microsoft-search-query, delta family) silently drop $select. The
     // reworded hint puts the universal remedy first and names the
@@ -326,17 +326,17 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
 describe('presenter output — text format (default for LLM consumers)', () => {
   it('renders a single user profile as YAML-ish key:value lines an LLM can scan without parsing', async () => {
     const logger = createLoggerFake();
-    const user = { id: '0c1d', displayName: 'Vincent Delacourt', mail: 'vincent@example.com' };
+    const user = { id: '0c1d', displayName: 'Jordan Avery', mail: 'jordan.avery@example.com' };
     const out = await captureStream('stdout', () => render(user, logger, 'text'));
-    expect(out).toBe('id: 0c1d\ndisplayName: Vincent Delacourt\nmail: vincent@example.com\n');
+    expect(out).toBe('id: 0c1d\ndisplayName: Jordan Avery\nmail: jordan.avery@example.com\n');
     expect(logger.calls.some((c) => c.event === 'output_rendered')).toBe(true);
   });
 
   it('renders a nested object by indenting the sub-keys two spaces under their parent', async () => {
     const logger = createLoggerFake();
-    const data = { user: { displayName: 'Vincent', mail: 'vincent@example.com' }, primaryDriveId: 'b!abc' };
+    const data = { user: { displayName: 'Jordan', mail: 'jordan.avery@example.com' }, primaryDriveId: 'b!abc' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe('user:\n  displayName: Vincent\n  mail: vincent@example.com\nprimaryDriveId: b!abc\n');
+    expect(out).toBe('user:\n  displayName: Jordan\n  mail: jordan.avery@example.com\nprimaryDriveId: b!abc\n');
   });
 
   it('renders a Graph collection { value: [...] } as one YAML-ish item block per record separated by blank lines', async () => {

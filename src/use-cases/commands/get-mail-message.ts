@@ -3,7 +3,7 @@ import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
-// Audit Alex-session §A: a full Graph `message` resource is 41+ KB by default
+// a full Graph `message` resource is 41+ KB by default
 // (huge `body.content`, full `internetMessageHeaders`, `uniqueBody`, etc.). LLM
 // callers almost always want subject + sender + preview; the body itself is
 // usually re-fetched via `convert-mail-to-markdown` only when the preview is
@@ -27,11 +27,11 @@ const meta: CommandMeta = {
       key: 'messageId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
+      description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-mail-message --message-id 'AAMkAGI2...'",
+  example: "ask-marcel-office get-mail-message --message-id 'AAMkAGI2...'",
   responseShape:
     'single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML.',
 };

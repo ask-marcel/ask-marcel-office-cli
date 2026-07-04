@@ -29,7 +29,7 @@ const pptxToMarkdown = async (bytes: Uint8Array, options: { readonly includeMeta
   if (!meta.ok) return meta;
   const body = meta.value.slides.map(slideSection).join('\n\n');
   const text = options.includeMetadata === true ? `${body}\n\n${formatPptxMetadata(meta.value)}` : body;
-  // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `text.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

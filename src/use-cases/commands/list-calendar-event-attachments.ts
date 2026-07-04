@@ -32,11 +32,11 @@ const meta: CommandMeta = {
       key: 'eventId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'Outlook calendar event ID. Returned by `ask-marcel list-calendar-events` or `get-calendar-event`.',
+      description: 'Outlook calendar event ID. Returned by `ask-marcel-office list-calendar-events` or `get-calendar-event`.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-calendar-event-attachments --event-id 'AAMkAGI2...'",
+  example: "ask-marcel-office list-calendar-event-attachments --event-id 'AAMkAGI2...'",
   responseShape:
     'collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — that discriminator is what the attachment-converting commands branch on.',
   pagination: true,

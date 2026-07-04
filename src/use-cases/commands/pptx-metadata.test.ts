@@ -30,7 +30,7 @@ describe('extractPptxMetadata', () => {
     if (!result.ok) return;
     const m = result.value;
 
-    expect(m.core.creator).toBe('Vincent Delacourt');
+    expect(m.core.creator).toBe('Jordan Avery');
     expect(m.custom).toContainEqual({ name: 'ClientID', value: 'ACME-42' });
 
     // Slide tag — the pptx equivalent of a docVar

@@ -45,10 +45,6 @@ const SKIPPED: ReadonlyArray<SkipRule> = [
   // runtime dep. Cannot be unit-tested without launching a real browser.
   // Documented at the top of the file itself.
   { name: 'production-wiring', match: (p) => p === 'src/infra/playwright-loader.ts' },
-  // production-wiring: the default system-browser auth function dynamically
-  // imports the localhost-callback + browser flow. Same untestable boundary as
-  // playwright-loader.ts; tests inject a fake systemBrowserAuthFn instead.
-  { name: 'production-wiring (system browser)', match: (p) => p === 'src/infra/system-browser-loader.ts' },
   // public library barrel: re-exports only — no executable logic to cover.
   { name: 'library barrel', match: (p) => p === 'src/index.ts' },
 ];

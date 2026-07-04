@@ -41,7 +41,7 @@ const meta: CommandMeta = {
     },
     ...noFilterOptions,
   ],
-  example: "ask-marcel search-onenote-pages --title-substring 'meeting notes' --top 25",
+  example: "ask-marcel-office search-onenote-pages --title-substring 'meeting notes' --top 25",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]` whose title contains the substring',
   pagination: true,
 };

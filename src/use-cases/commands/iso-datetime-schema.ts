@@ -8,7 +8,7 @@ import { parseIsoDateTime } from '../../domain/iso-datetime.ts';
  * compose this into their schemas in place of `z.string().min(1)`; the
  * URL-builder sees the already-resolved canonical ISO form.
  *
- * Audit Alex-session §C: removes the manual ISO arithmetic an LLM had to do
+ * removes the manual ISO arithmetic an LLM had to do
  * to ask "what changed this week" against `list-calendar-view`. Type
  * inference is left to Zod so the calendar commands' shape signatures stay
  * compatible with `buildListCommand`'s `ZodRawShape` constraint.

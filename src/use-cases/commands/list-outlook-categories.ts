@@ -16,7 +16,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/outlook/masterCategories',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories',
   options: [],
-  example: 'ask-marcel list-outlook-categories',
+  example: 'ask-marcel-office list-outlook-categories',
   responseShape: 'collection of Microsoft Graph `outlookCategory` resources under `value[]`',
 };
 

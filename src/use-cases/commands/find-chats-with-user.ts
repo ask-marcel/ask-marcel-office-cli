@@ -32,13 +32,13 @@ const QUERY_BASE = 'enableMembershipSummary=true&supportsAdditionalSystemGenerat
 //     (so `é` ↔ `e`, `ç` ↔ `c`, etc.).
 //   - Lowercasing.
 //
-// Audit Alex-session §D follow-up: a real dual-identity user had the
+// a real dual-identity user had the
 // CORPORATE-MRI member entry's displayName populated as the email
 // (`alex.kim@example.com`, no accent) while the GUEST-MRI entry's
 // displayName carried the accented "Alex Kim". A search for `Alex`
 // returned only the guest chat; the corporate 1:1 was invisible because
 // `é`.toLowerCase() and `e` are different bytes. Folding diacritics on
-// both sides makes `Alex` ↔ `Alex` ↔ `JANE` ↔ `alex.kim@example.com`
+// both sides makes `Alex` ↔ `Alex` ↔ `ALEX` ↔ `alex.kim@example.com`
 // all match against the same query.
 type Member = {
   readonly mri?: string;
@@ -284,7 +284,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `JANE` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). Cross-tenant resolution: the summary roster returns externally-homed counterparts as a bare object-id (no name/email), which a name search cannot match; for every bare DIRECT (1:1) chat the command hydrates the roster via the per-chat members endpoint and re-matches — so an external counterpart who is bare in your 1:1 is still found, even when they were already resolved in some meeting (the dual-identity case). Bare members in group/meeting chats are not deep-probed; when nothing matches and such members exist it returns a `hint` plus `unresolvedMemberCount` rather than a confident empty result. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.',
+    'Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `ALEX` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). Cross-tenant resolution: the summary roster returns externally-homed counterparts as a bare object-id (no name/email), which a name search cannot match; for every bare DIRECT (1:1) chat the command hydrates the roster via the per-chat members endpoint and re-matches — so an external counterpart who is bare in your 1:1 is still found, even when they were already resolved in some meeting (the dual-identity case). Bare members in group/meeting chats are not deep-probed; when nothing matches and such members exist it returns a `hint` plus `unresolvedMemberCount` rather than a confident empty result. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.',
   category: 'chats',
   needsSubstrateToken: true,
   graphMethod: 'GET',
@@ -296,7 +296,7 @@ const meta: CommandMeta = {
       key: 'name',
       required: true,
       description:
-        "Substring to search across each chat member's `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Both the query and each field are NFD-normalized + diacritics-stripped + lowercased before comparison, so `Alex` ↔ `Alex` ↔ `JANE` are equivalent and a query for the accented name still matches a member whose displayName is the un-accented email. Use the full name or an unambiguous fragment. Quoted multi-word values match on the joined substring, not per-token.",
+        "Substring to search across each chat member's `displayName`, `email`, `userPrincipalName`, `givenName`, `surname`, `mri`, `objectId`, and `jobTitle`. Both the query and each field are NFD-normalized + diacritics-stripped + lowercased before comparison, so `Alex` ↔ `Alex` ↔ `ALEX` are equivalent and a query for the accented name still matches a member whose displayName is the un-accented email. Use the full name or an unambiguous fragment. Quoted multi-word values match on the joined substring, not per-token.",
     },
     {
       name: 'max-pages',
@@ -312,7 +312,7 @@ const meta: CommandMeta = {
       description: 'Chats per page (positive integer; default 100, same value Teams web uses). Server may silently cap.',
     },
   ],
-  example: "ask-marcel find-chats-with-user --name 'Alex Kim'",
+  example: "ask-marcel-office find-chats-with-user --name 'Alex Kim'",
   responseShape:
     "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, chatsHydrated, unresolvedMemberCount, hasMore, nextContinuationToken?, hint? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `chatsHydrated` counts the per-chat members lookups spent resolving bare cross-tenant members in direct (1:1) chats. `unresolvedMemberCount` is how many cross-tenant members are still unresolved by name (bare members in group/meeting chats, which are not deep-probed, plus any 1:1 hydration that errored); when `matchCount` is 0 and this is non-zero, a `hint` is present explaining the likely cause and the object-id / read-by-chat-id remedy — so an empty result is never silently confident. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
   stability: 'experimental',

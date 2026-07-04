@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-special-folder --folder-name 'documents'",
+  example: "ask-marcel-office get-drive-special-folder --folder-name 'documents'",
   responseShape: 'single Microsoft Graph `driveItem` resource (folder)',
 };
 

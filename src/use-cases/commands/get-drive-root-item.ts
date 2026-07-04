@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-root-item --drive-id 'b!1234'",
+  example: "ask-marcel-office get-drive-root-item --drive-id 'b!1234'",
   responseShape: 'single Microsoft Graph `driveItem` resource (the root folder)',
 };
 

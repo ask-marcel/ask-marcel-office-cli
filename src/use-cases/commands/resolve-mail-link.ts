@@ -132,7 +132,7 @@ const meta: CommandMeta = {
         'Outlook web URL for a single mail message. Accepted hosts: `outlook.office.com`, `outlook.office365.com`, `outlook.live.com`. Accepted shapes: OWA query-style (`/owa/?itemid=AAMkA...` or `/owa/?ItemID=AAMkA...`), modern path-style (`/mail/inbox/id/AAMkA...`), legacy short (`/mail/AAMkA...`). Calendar links (`/calendar/item/...` or `?path=/calendar/item`) are rejected with `cli_reject_calendar_link_on_mail_resolver` — use `resolve-calendar-link` for those.',
     },
   ],
-  example: "ask-marcel resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
+  example: "ask-marcel-office resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
   responseShape: '`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`.',
 };
 

@@ -72,7 +72,7 @@ const meta: CommandMeta = {
         'Per-sheet cell cap (positive integer; default 50 000) for xlsx sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on non-xlsx sources.',
     },
   ],
-  example: "ask-marcel download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: "text/plain", size, text }` for plain-text passthrough sources (txt/md/html/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.',
   producesBytes: true,

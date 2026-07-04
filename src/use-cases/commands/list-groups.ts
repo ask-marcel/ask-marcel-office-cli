@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/groups',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/group-list',
   options: [...noSkipOptions],
-  example: 'ask-marcel list-groups',
+  example: 'ask-marcel-office list-groups',
   responseShape: 'collection of Microsoft Graph `group` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

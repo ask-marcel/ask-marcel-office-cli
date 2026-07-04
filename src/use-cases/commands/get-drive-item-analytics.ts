@@ -27,7 +27,7 @@ const meta: CommandMeta = {
       description: 'driveItem ID.',
     },
   ],
-  example: "ask-marcel get-drive-item-analytics --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office get-drive-item-analytics --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'single Microsoft Graph `itemAnalytics` resource',
 };
 

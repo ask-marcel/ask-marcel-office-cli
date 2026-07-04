@@ -106,7 +106,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['Low', 'Normal', 'High'] },
     },
   ],
-  example: 'ask-marcel update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
+  example: 'ask-marcel-office update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
   bodyTemplate:
     "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent",
   mutates: true,

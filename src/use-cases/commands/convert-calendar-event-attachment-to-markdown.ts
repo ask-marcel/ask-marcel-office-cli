@@ -38,7 +38,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "ask-marcel-office convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ contentType: "text/markdown", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.',
   producesBytes: true,

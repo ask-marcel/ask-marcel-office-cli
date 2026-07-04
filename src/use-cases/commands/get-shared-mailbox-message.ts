@@ -28,7 +28,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...' --select 'id,subject,from'",
+  example: "ask-marcel-office get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...' --select 'id,subject,from'",
   responseShape: 'single Microsoft Graph `message` resource',
 };
 

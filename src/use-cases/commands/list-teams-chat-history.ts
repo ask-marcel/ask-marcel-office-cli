@@ -34,7 +34,7 @@ const schema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
     .optional(),
-  // Audit Alex-session §A: default response is ~108 KB for 200 messages
+  // default response is ~108 KB for 200 messages
   // because every message carries the full IC3 envelope (annotations, threads,
   // properties.policyViolation, etc.). Project to a slim default and truncate
   // long `content` bodies to keep the payload LLM-tractable; users that need
@@ -182,7 +182,7 @@ const meta: CommandMeta = {
         'When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set.',
     },
   ],
-  example: "ask-marcel list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
+  example: "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
   responseShape:
     "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
   stability: 'experimental',

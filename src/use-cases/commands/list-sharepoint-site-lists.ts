@@ -6,7 +6,7 @@ import { appendOData, noSkipOptions, noSkipShape } from './odata-query.ts';
 
 // Graph rejects $skip on `/sites/{id}/lists` with `invalidRequest: $skip is
 // not supported on this API. Only URLs returned by the API can be used to
-// page.` (audit v1.0.0 §2.3) — drop the flag from the advertised set;
+// page.` — drop the flag from the advertised set;
 // pagination still works through nextLink → next-page.
 const schema = z.object({ siteId: z.string().min(1) }).extend(noSkipShape);
 
@@ -30,11 +30,11 @@ const meta: CommandMeta = {
       key: 'siteId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.',
+      description: 'SharePoint site ID. Returned by `ask-marcel-office search-sharepoint-sites-by-name`.',
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
+  example: "ask-marcel-office list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
   responseShape: 'collection of Microsoft Graph `list` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

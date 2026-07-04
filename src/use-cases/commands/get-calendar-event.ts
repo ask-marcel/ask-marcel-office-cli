@@ -19,11 +19,11 @@ const meta: CommandMeta = {
       key: 'eventId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'Microsoft Graph event ID. Returned by `ask-marcel list-calendar-events` in the `id` field of each event.',
+      description: 'Microsoft Graph event ID. Returned by `ask-marcel-office list-calendar-events` in the `id` field of each event.',
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
+  example: "ask-marcel-office get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
   responseShape: 'single Microsoft Graph `event` resource (or projection of the requested `--select` fields)',
 };
 

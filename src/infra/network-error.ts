@@ -8,7 +8,7 @@
  * also construct the adapter-specific error variant (`GraphError`,
  * `TeamsError`, …) — only the string-level helpers belong here.
  *
- * Audit v1.0.0 — SharePoint PDF download timeout fix introduced the
+ * SharePoint PDF download timeout fix introduced the
  * two-tier split. Audit follow-up extracted the helpers into this
  * module so TeamsClient (chatsvcagg) and any future client adapter can
  * reuse the same formatting without depending on `graph-client.ts`.
@@ -24,7 +24,7 @@ export const BINARY_TRANSFER_TIMEOUT_MS = 5 * 60_000; // 5 min
 export const REQUEST_TIMEOUT_LABEL = '60s';
 export const BINARY_TRANSFER_TIMEOUT_LABEL = '5min';
 
-// Audit v1.0.0 §2.5: bare `fetch failed` / `request timed out after 60s` had
+// bare `fetch failed` / `request timed out after 60s` had
 // zero context about which URL or method failed — an LLM caller cannot
 // decide whether to retry without that. Prepend the request label
 // (`GET /me/messages`) so the error envelope always names the call site.

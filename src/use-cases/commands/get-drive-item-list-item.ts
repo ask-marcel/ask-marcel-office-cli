@@ -29,7 +29,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'single Microsoft Graph `listItem` resource',
 };
 

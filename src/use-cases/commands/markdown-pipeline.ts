@@ -8,11 +8,11 @@ import { embedInlineImages, type InlineAttachment } from './inline-image-embedde
  * Orchestrate the four steps that turn a Graph `?format=html` content
  * call into a markdown envelope:
  *
- *   1. getBinary(contentPath)
- *   2. if Graph returned a 302 downloadUrl, follow via fetchUrl (host
- *      allow-list enforced inside fetchUrl, Hardening #3)
- *   3. embedInlineImages over any cid: refs (Hardening #1: image/* only)
- *   4. htmlToMarkdown via turndown
+ * 1. getBinary(contentPath)
+ * 2. if Graph returned a 302 downloadUrl, follow via fetchUrl (host
+ * allow-list enforced inside fetchUrl, Hardening #3)
+ * 3. embedInlineImages over any cid: refs (Hardening #1: image/* only)
+ * 4. htmlToMarkdown via turndown
  *
  * Returns `{ contentType: 'text/markdown', size, text }` on success.
  */
@@ -75,7 +75,7 @@ const convertToMarkdown = async (graph: GraphClient, contentPath: string, option
   const inlined = inlineAttachments.length > 0 ? embedInlineImages(transformed, inlineAttachments) : transformed;
   const md = htmlToMarkdown(inlined);
   if (!md.ok) return md;
-  // size = UTF-8 byte count (audit §2.1); `.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md.value).byteLength, text: md.value });
 };
 

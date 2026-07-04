@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/memberOf',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-memberof',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-my-memberships',
+  example: 'ask-marcel-office list-my-memberships',
   responseShape: 'collection of Microsoft Graph `directoryObject` resources under `value[]`',
   pagination: true,
 };

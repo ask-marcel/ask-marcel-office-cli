@@ -23,7 +23,7 @@ export type CommandManifestEntry = {
   readonly stability?: CommandMeta['stability'];
 };
 
-// Audit Alex-session §5 follow-up: PAGINATION_HINT used to be one
+// PAGINATION_HINT used to be one
 // `nextLink`-shaped string applied to every paginated command, including the
 // 5 deltaLink and 2 preferMaxPageSize commands where the cursor and the
 // `--top` semantics differ. `paginationHintFor` returns the right variant
@@ -60,7 +60,7 @@ export type CommandManifest = {
   readonly commands: ReadonlyArray<CommandManifestEntry>;
 };
 
-// Audit Alex-session §4 follow-up: `auth` and `contacts` were declared here
+// `auth` and `contacts` were declared here
 // but no command ever set `category: 'auth' | 'contacts'` — they surfaced
 // as bogus options in the unknown-category error from `help-json --category
 // <bad>`, misleading LLMs into burning round-trips on empty categories.
@@ -132,11 +132,11 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
     const tagged = entry.scopesRequired.map((s) => `\`${s}\``).join(', ');
-    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel scopes-check\` to verify before invoking.`);
+    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel-office scopes-check\` to verify before invoking.`);
   }
   if (entry.needsElevatedToken) {
     lines.push(
-      '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `ask-marcel login` to retry the capture.'
+      '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `ask-marcel-office login` to retry the capture.'
     );
   }
   if (entry.stability === 'experimental') {

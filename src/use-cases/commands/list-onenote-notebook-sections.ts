@@ -19,11 +19,11 @@ const meta: CommandMeta = {
       key: 'notebookId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'OneNote notebook ID. Returned by `ask-marcel list-onenote-notebooks`.',
+      description: 'OneNote notebook ID. Returned by `ask-marcel-office list-onenote-notebooks`.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-onenote-notebook-sections --notebook-id '1-12abc...'",
+  example: "ask-marcel-office list-onenote-notebook-sections --notebook-id '1-12abc...'",
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
   pagination: true,
 };

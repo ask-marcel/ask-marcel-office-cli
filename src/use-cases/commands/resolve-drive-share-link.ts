@@ -110,9 +110,9 @@ const meta: CommandMeta = {
         'A OneDrive / SharePoint sharing URL — the address from the "Copy link" / "Share" action in the OneDrive or SharePoint UI. Examples: `https://contoso.sharepoint.com/:b:/s/sitename/EaB1cD...`, `https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/file.pdf`, `https://1drv.ms/b/s!AbCdEfGh...`. The CLI does not follow the redirect on `1drv.ms` links — the short URL itself is encoded as the share token (Graph resolves it on the server side).',
     },
   ],
-  example: "ask-marcel resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
+  example: "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
   responseShape:
-    '`{ shareToken: string, graphPath: string, originalUrl: string }`. `shareToken` is the `u!<base64url>` form. `graphPath` is the ready-to-use `/shares/{token}/driveItem` URL — pass it to `ask-marcel next-page --url <link>` for a one-shot driveItem fetch, or feed the `shareToken` into any future `/shares/{token}/...` endpoint. `originalUrl` is echoed back for round-trip confirmation.',
+    '`{ shareToken: string, graphPath: string, originalUrl: string }`. `shareToken` is the `u!<base64url>` form. `graphPath` is the ready-to-use `/shares/{token}/driveItem` URL — pass it to `ask-marcel-office next-page --url <link>` for a one-shot driveItem fetch, or feed the `shareToken` into any future `/shares/{token}/...` endpoint. `originalUrl` is echoed back for round-trip confirmation.',
 };
 
 export { execute, meta, schema };

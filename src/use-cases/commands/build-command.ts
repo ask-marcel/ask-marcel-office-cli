@@ -23,7 +23,7 @@ type NoSkipParams = Omit<ODataQueryParams, 'skip'>;
  * passthroughs at all). `defaultSelect`, when set and the user did NOT pass
  * `--select`, is injected into the OData query string so default invocations
  * return a slim projection instead of a 50 KB resource. User-supplied
- * `--select` always wins. Audit Alex-session §A: pairs the `list-mail-attachments`
+ * `--select` always wins. pairs the `list-mail-attachments`
  * pattern with the builder layer so the 6 heaviest endpoints stop returning
  * the full Graph resource by default.
  */

@@ -12,7 +12,7 @@ const execute: Command['execute'] = async (graph, params) => {
   const path = appendOData(`/me/messages/${parsed.data.messageId}/attachments/${parsed.data.attachmentId}`, parsed.data);
   const result = await graph.get(path);
   if (!result.ok) return result;
-  // Audit round-6 §6: surface `contentBytes` as `base64` so the global
+  // surface `contentBytes` as `base64` so the global
   // --output-path interceptor can land the attachment on disk. Keep
   // contentBytes too so existing consumers don't break — the response
   // grows a `base64` mirror of `contentBytes` only for fileAttachment
@@ -35,11 +35,11 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/attachment-get',
   options: [
-    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages`.' },
-    { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID. Returned by `ask-marcel list-mail-attachments`.' },
+    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages`.' },
+    { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID. Returned by `ask-marcel-office list-mail-attachments`.' },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
+  example: "ask-marcel-office get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
   responseShape:
     'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.',
   producesBytes: true,

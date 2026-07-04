@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/insights/shared',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-shared',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-shared-insights',
+  example: 'ask-marcel-office list-shared-insights',
   responseShape: 'collection of Microsoft Graph `sharedInsight` resources under `value[]`',
   pagination: true,
 };

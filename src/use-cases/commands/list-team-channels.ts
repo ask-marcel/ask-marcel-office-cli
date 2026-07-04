@@ -14,10 +14,16 @@ const meta: CommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/channel-list',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, aliases: [{ name: 'id', key: 'id' }], description: 'Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`.' },
+    {
+      name: 'team-id',
+      key: 'teamId',
+      required: true,
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.',
+    },
     ...filterSelectOptions,
   ],
-  example: "ask-marcel list-team-channels --team-id 'abc-1234-...'",
+  example: "ask-marcel-office list-team-channels --team-id 'abc-1234-...'",
   responseShape: 'collection of Microsoft Graph `channel` resources under `value[]`',
 };
 

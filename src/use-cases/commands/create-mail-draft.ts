@@ -104,7 +104,7 @@ const meta: CommandMeta = {
     },
   ],
   example:
-    'ask-marcel create-mail-draft --subject "Q3 Report" --body-content "Please review the attached report." --to-recipients "alice@example.com,bob@example.com" --importance High',
+    'ask-marcel-office create-mail-draft --subject "Q3 Report" --body-content "Please review the attached report." --to-recipients "alice@example.com,bob@example.com" --importance High',
   bodyTemplate:
     "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
   mutates: true,

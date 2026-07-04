@@ -28,7 +28,7 @@ const execute: Command['execute'] = async (graph, params) => {
     result.error.message.includes('Request_ResourceNotFound') &&
     result.error.message.includes("Resource 'manager'")
   ) {
-    // Audit v1.0.0 §B7: shape matches get-my-manager so consumers can
+    // shape matches get-my-manager so consumers can
     // detect "no manager set" with the same check on either command.
     return ok({ manager: null, note: 'target user has no manager set in the directory (Graph returned 404 Request_ResourceNotFound)' });
   }
@@ -53,7 +53,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
+  example: "ask-marcel-office get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
   responseShape:
     'single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`).',
 };

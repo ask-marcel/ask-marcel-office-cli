@@ -11,7 +11,7 @@ describe('pdfToMarkdown', () => {
     if (!result.ok) return;
     expect(result.value.contentType).toBe('text/plain');
     expect(result.value.text).toContain('Hello from the');
-    // size = byte length of the produced text, NOT the source PDF (audit B3)
+    // size = byte length of the produced text, NOT the source PDF
     expect(result.value.size).toBe(new TextEncoder().encode(result.value.text).byteLength);
     expect(result.value.pageCount).toBeGreaterThan(0); // pageCount surfaced for read-chunking (R6)
   });

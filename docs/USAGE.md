@@ -15,15 +15,15 @@ npm i -g ask-marcel-office-cli
 bun add -g ask-marcel-office-cli
 
 # authenticate (cached → refresh → browser fallback)
-ask-marcel login
+ask-marcel-office login
 
 # the rest is discoverable
-ask-marcel --help                                # ~34 KB, one-sentence summaries
-ask-marcel help-json --terse --category mail     # ~6 KB JSON for one category
-ask-marcel docs list-mail-messages               # full per-command Markdown
+ask-marcel-office --help                                # ~34 KB, one-sentence summaries
+ask-marcel-office help-json --terse --category mail     # ~6 KB JSON for one category
+ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
 
-`ask-marcel update` auto-detects whether the CLI was installed via npm or bun (based on the bin path) and reinstalls globally with the matching tool. From a clone you can keep using `bun run src/main.ts <command>` directly.
+`ask-marcel-office update` auto-detects whether the CLI was installed via npm or bun (based on the bin path) and reinstalls globally with the matching tool. From a clone you can keep using `bun run src/main.ts <command>` directly.
 
 The first launch prints a one-time notice if a newer version is on npm.
 
@@ -36,12 +36,12 @@ Every command writes its output as a single document to **stdout** (success or e
 YAML-ish `key: value` lines, generally smaller than the JSON envelope on long listings (the win grows with page size and shrinks toward parity on small projected pages — a 3-message page is ~3.3 KB in either format). Errors render as `error: <message>` followed by `hint:`, `source:`, and (when Graph throttles) `retryAfter: Ns` lines so an LLM can match the line shape without parsing JSON. Designed for LLMs reading and summarising; not for piping into other tools.
 
 ```bash
-$ ask-marcel get-current-user
+$ ask-marcel-office get-current-user
 id: 0c1d2e3f-…
-displayName: Vincent Delacourt
-mail: vincent@example.com
+displayName: Jordan Avery
+mail: jordan.avery@example.com
 
-$ ask-marcel list-mail-folder-messages --mail-folder-id inbox --top 2
+$ ask-marcel-office list-mail-folder-messages --mail-folder-id inbox --top 2
 id: AAMkAGI2…
 subject: Re: Q2 planning
 from: alice@example.com
@@ -52,7 +52,7 @@ from: bob@example.com
 
 --- next: https://graph.microsoft.com/v1.0/me/messages?$skip=2
 
-$ ask-marcel get-mail-message --message-id "bad-id"
+$ ask-marcel-office get-mail-message --message-id "bad-id"
 error: ErrorInvalidIdMalformed: Id is malformed.
 hint: The ID you passed isn't valid for this endpoint. Source IDs from a sibling `list-*` command (e.g. `list-mail-messages`, `list-folder-files`, `list-chats`) — never construct them by hand.
 source: graph
@@ -102,9 +102,9 @@ The stable `{ok, data, nextLink?, deltaLink?, count?}` envelope, unambiguous for
 Most `list-*`, `search-*`, and `*-delta` commands accept the standard OData query parameters as optional flags. Use them to shrink large responses on the fly — particularly important for context-window-bound LLM consumers:
 
 ```bash
-ask-marcel list-mail-messages --top 5 --select id,subject,from,receivedDateTime
-ask-marcel list-recent-files --filter "name eq 'budget.xlsx'" --orderby lastModifiedDateTime desc
-ask-marcel list-folder-files --drive-id b!abc --item-id 01DEF --select id,name --top 10
+ask-marcel-office list-mail-messages --top 5 --select id,subject,from,receivedDateTime
+ask-marcel-office list-recent-files --filter "name eq 'budget.xlsx'" --orderby lastModifiedDateTime desc
+ask-marcel-office list-folder-files --drive-id b!abc --item-id 01DEF --select id,name --top 10
 ```
 
 The canonical set is `--top <n>`, `--skip <n>`, `--select <csv>`, `--filter <kql>`, `--orderby <kql>`, `--expand <nav>`. `--top` is capped at 1000 with a clear validation error (Graph silently truncates beyond that on every endpoint). **The CLI advertises only the flags the underlying Graph endpoint honors — flags Graph silently rejects or ignores are dropped from the option set, so the manifest never lies.**
@@ -124,10 +124,10 @@ Narrower variants (a sample — see each command's `--help` for the exact list):
 Every `--start-date-time` / `--end-date-time` flag on the calendar-view family (`list-calendar-view`, `list-calendar-view-delta`, `list-specific-calendar-view`, `list-shared-calendar-view`, `list-group-calendar-view`, `list-calendar-event-instances`) accepts strict ISO 8601 (`2026-04-01T00:00:00Z`) AND a relative vocabulary, so an LLM doesn't have to compute timestamps before answering "what's on my calendar this week":
 
 ```bash
-ask-marcel list-calendar-view --start-date-time "start-of-week"  --end-date-time "end-of-week"
-ask-marcel list-calendar-view --start-date-time "today"          --end-date-time "+7d"
-ask-marcel list-calendar-view --start-date-time "monday"         --end-date-time "next-monday"
-ask-marcel list-calendar-view --start-date-time "start-of-month" --end-date-time "end-of-month"
+ask-marcel-office list-calendar-view --start-date-time "start-of-week"  --end-date-time "end-of-week"
+ask-marcel-office list-calendar-view --start-date-time "today"          --end-date-time "+7d"
+ask-marcel-office list-calendar-view --start-date-time "monday"         --end-date-time "next-monday"
+ask-marcel-office list-calendar-view --start-date-time "start-of-month" --end-date-time "end-of-month"
 ```
 
 Accepted shapes (UTC, week starts Monday): strict ISO; date-only (`2026-04-01` → midnight UTC); past offsets `7d` / `1w` / `2h` / `30m`; future offsets `+7d` / `+1w`; named `now` / `today` / `yesterday` / `tomorrow`; weekday names (`monday`-`sunday` — most-recent occurrence including today); `last-<weekday>` / `next-<weekday>`; boundary anchors `start-of-week|month|year`, `end-of-week|month|year`. An unrecognised input returns a structured validation error listing every accepted shape — no second round-trip needed.
@@ -137,7 +137,7 @@ Accepted shapes (UTC, week starts Monday): strict ISO; date-only (`2026-04-01` �
 Every download / convert command (PDF, image, raw bytes, MIME, OneNote HTML, the markdown converters) returns its bytes as `{ contentType, size, base64 }` (binary) or `{ contentType, size, text }` (text). In default text mode the binary variant prints `binary: <contentType>, <size> bytes — use --output-path to save` rather than spilling base64 to stdout. For multi-MB payloads — a 5 MB PDF round-tripped through stdout would blow most LLM context windows — pass the **global** `--output-path <path>` flag and the CLI lands the bytes locally:
 
 ```bash
-ask-marcel convert-mail-attachment-to-pdf \
+ask-marcel-office convert-mail-attachment-to-pdf \
   --message-id "AAMkAD..." --attachment-id "AAMkAD...attach1" \
   --output-path /tmp/deck.pdf
 # Text mode:
@@ -158,21 +158,21 @@ When a response contains a `nextLink` cursor, feed that URL back through `next-p
 
 ```bash
 # page 1
-ask-marcel --output json list-mail-folders > p1.json
+ask-marcel-office --output json list-mail-folders > p1.json
 
 # page 2..N — loop until nextLink is gone
 next=$(jq -r '.nextLink // empty' p1.json)
 while [ -n "$next" ]; do
-  ask-marcel --output json next-page --url "$next" > pN.json
+  ask-marcel-office --output json next-page --url "$next" > pN.json
   next=$(jq -r '.nextLink // empty' pN.json)
 done
 ```
 
-Every paginated command advertises this in three places: `ask-marcel <cmd> --help` prints a `Pagination:` line, `ask-marcel docs <cmd>` adds a `**Pagination:**` field, and [`docs/commands.json`](commands.json) ships `"pagination": true` on each entry so agents can detect it programmatically.
+Every paginated command advertises this in three places: `ask-marcel-office <cmd> --help` prints a `Pagination:` line, `ask-marcel-office docs <cmd>` adds a `**Pagination:**` field, and [`docs/commands.json`](commands.json) ships `"pagination": true` on each entry so agents can detect it programmatically.
 
 ## Quick context
 
-`ask-marcel my-quick-context` returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }` in a single round trip — five Graph calls in parallel. Use it as the first call in any LLM session that needs per-user IDs to feed into other commands.
+`ask-marcel-office my-quick-context` returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }` in a single round trip — five Graph calls in parallel. Use it as the first call in any LLM session that needs per-user IDs to feed into other commands.
 
 ## Library API
 
@@ -231,7 +231,7 @@ src/
 
 `download-drive-item-version --format <original|pdf|markdown>` needs a Graph token whose `appid` is on Microsoft's ODSP allow-list — the Teams web client token returns 403 with `logicalPermissionAccessDenied` against historical-version bytes.
 
-Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used only by the historical-version command. Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed (e.g. IdP-fronted tenants), interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command (including `list-chats` / `get-chat`, which use the regular Teams token) still works.
+Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used only by the historical-version command. Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command (including `list-chats` / `get-chat`, which use the regular Teams token) still works.
 
 ## Configuration
 

@@ -3,13 +3,13 @@ import { buildElevatedSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
-// Audit round-8 §1.5: round-6 moved this off elevation on the hypothesis
+// round-6 moved this off elevation on the hypothesis
 // that the basic Teams web client token would reach `/chats/{id}`. The
 // audit verified the hypothesis was wrong — Graph rejects with `Missing
 // scope permissions ... Chat.ReadBasic`. Revert to the elevated
 // M365ChatClient path (which DOES carry Chat.ReadBasic).
 //
-// Audit Alex-session §A: a default `/chats/{id}` response carries `viewpoint`,
+// a default `/chats/{id}` response carries `viewpoint`,
 // `webUrl`, `tenantId`, `onlineMeetingInfo`, etc. — most callers want only
 // chat metadata. Ship a slim default and let the LLM widen via `--select`
 // or `--expand members` (which is rejected by Graph at the list level but
@@ -36,7 +36,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-chat --chat-id '19:abc...@thread.v2'",
+  example: "ask-marcel-office get-chat --chat-id '19:abc...@thread.v2'",
   responseShape:
     'single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.',
   needsElevatedToken: true,

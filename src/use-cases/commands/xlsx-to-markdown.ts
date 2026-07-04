@@ -104,7 +104,7 @@ const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {
     if (!meta.ok) return meta;
     md = `${md}\n\n${formatXlsxMetadata(meta.value)}`;
   }
-  // size = UTF-8 byte count (audit §2.1); `md.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `md.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 

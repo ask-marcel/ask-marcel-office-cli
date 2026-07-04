@@ -26,11 +26,11 @@ const meta: CommandMeta = {
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
       description:
-        'Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `ask-marcel list-calendars` to discover non-default calendar IDs.',
+        'Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `ask-marcel-office list-calendars` to discover non-default calendar IDs.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-specific-calendar-events --calendar-id 'primary'",
+  example: "ask-marcel-office list-specific-calendar-events --calendar-id 'primary'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
 };

@@ -15,7 +15,7 @@ export type DocsError = { type: 'unknown_command'; readonly name: string; readon
  * `scopesRequired` — everything the LLM only needs once it's already decided
  * to invoke. `stability` is kept (it's a discovery-time concern: LLMs prefer
  * stable siblings when they exist, so they need to see the tag at discovery
- * time, not after a second full-manifest fetch). Audit Alex-session §B/§6.
+ * time, not after a second full-manifest fetch). /§6.
  */
 export type TerseManifestEntry = {
   readonly name: string;
@@ -36,11 +36,11 @@ export type ManifestFilterError = { readonly type: 'unknown_category'; readonly 
 const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
   // Default every `pagination: true` command to `nextLink` strategy when the
   // command file doesn't specify one — that's the standard $top + nextLink
-  // shape, true of ~80% of paginated commands. Audit-round-7 Wave F: makes
+  // shape, true of ~80% of paginated commands. Audit-makes
   // the manifest field always populated on paginated commands so LLM
   // consumers don't need to read prose to learn the cursor mechanism.
   const paginationStrategy = cmd.meta.paginationStrategy ?? (cmd.meta.pagination ? 'nextLink' : undefined);
-  // Audit round-8 Wave C: scopesRequired now comes from a central map by
+  // scopesRequired now comes from a central map by
   // default (`graph-scopes.ts`). Per-command inline overrides win so that
   // future commands with non-standard scope needs can declare them locally.
   const scopesRequired = cmd.meta.scopesRequired ?? lookupScopes(name);
@@ -88,7 +88,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     graphPathTemplate: '(lifecycle) browser-OAuth via Teams web client; not a Graph endpoint',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
     options: [],
-    example: 'ask-marcel login',
+    example: 'ask-marcel-office login',
     responseShape: '{ status: "authenticated" } on success; envelope error on cancel/failure.',
   },
   {
@@ -100,19 +100,19 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     graphPathTemplate: '(lifecycle) deletes ~/.ask-marcel/token-cache.json; not a Graph endpoint',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
     options: [],
-    example: 'ask-marcel logout',
+    example: 'ask-marcel-office logout',
     responseShape: '{ status: "logged_out" } on success.',
   },
   {
     name: 'update',
     summary:
-      'Re-install the latest published ask-marcel from npm, in place. Auto-detects whether you originally installed via npm or bun based on the bin path. Token cache is preserved. Do NOT use from a local clone — pull and re-run `bun install` instead.',
+      'Re-install the latest published ask-marcel-office from npm, in place. Auto-detects whether you originally installed via npm or bun based on the bin path. Token cache is preserved. Do NOT use from a local clone — pull and re-run `bun install` instead.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) shells out to `npm i -g` or `bun add -g`; not a Graph endpoint',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
     options: [],
-    example: 'ask-marcel update',
+    example: 'ask-marcel-office update',
     responseShape: '{ status: "updated", via: "npm" | "bun" } on success.',
   },
   {
@@ -129,22 +129,22 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
         name: 'command',
         required: true,
         description:
-          'Name of the command to show docs for (e.g. `list-mail-messages`). Run `ask-marcel --help` or `ask-marcel help-json` for the full list. Passed as a bare positional — do NOT prefix with `--command`.',
+          'Name of the command to show docs for (e.g. `list-mail-messages`). Run `ask-marcel-office --help` or `ask-marcel-office help-json` for the full list. Passed as a bare positional — do NOT prefix with `--command`.',
       },
     ],
-    example: 'ask-marcel docs list-mail-messages',
+    example: 'ask-marcel-office docs list-mail-messages',
     responseShape: 'Markdown text on stdout (NOT JSON-wrapped — this is the one command whose stdout is plain text).',
   },
   {
     name: 'help-json',
     summary:
-      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~6 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}` (summary compacted to its first sentence). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.',
+      'Print the machine-readable command manifest as JSON. For fresh-session discovery use `--terse --category <name>` (~6 KB for one category). The unflagged form is the *full* reference (every option / example / response shape per command) and is roughly 13× the size of `ask-marcel-office --help` — reach for it only after `--terse` has narrowed the search. `--terse` alone projects each entry to `{name, summary, category}` (summary compacted to its first sentence). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders the in-process command manifest',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
     options: [],
-    example: 'ask-marcel help-json',
+    example: 'ask-marcel-office help-json',
     responseShape: '{ package, version, generatedAt, commands: [{ name, summary, category, ... }, ...] }',
   },
 ];

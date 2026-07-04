@@ -6,7 +6,7 @@ const WAC_NEEDLE = 'Could not obtain a WAC access token';
 // Graph's `/workbook` endpoint also surfaces a different leaky error when
 // the underlying item is the wrong file type: a generic
 // `InvalidRequest: Missing header Client-Request-Id. Header Client-Request-Id is not a guid.`
-// (audit v1.0.0 §2.2). The header isn't actually missing — Graph reports
+//. The header isn't actually missing — Graph reports
 // that misleading error when it can't engage the Excel runtime for the
 // item. Detect the same way and rewrite to the friendly envelope.
 const NON_WORKBOOK_NEEDLES = [WAC_NEEDLE, 'Missing header Client-Request-Id'];

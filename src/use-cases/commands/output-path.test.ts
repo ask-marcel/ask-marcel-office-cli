@@ -94,7 +94,7 @@ describe('persistIfRequested', () => {
 
   it('returns no_inlined_bytes when --output-path is set but the data has neither base64 nor text', async () => {
     const fs = createFileSystemFake();
-    const data = { displayName: 'Vincent', mail: 'vincent@example.com' };
+    const data = { displayName: 'Jordan', mail: 'jordan.avery@example.com' };
     const result = await persistIfRequested(fs, '/work/test-output/profile.json', data);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('no_inlined_bytes');
@@ -176,7 +176,7 @@ describe('persistIfRequested', () => {
     if (!result.ok && result.error.type === 'write_failed') expect(result.error.message).toBe('not_found');
   });
 
-  // Audit v1.0.0 §B4: when a *-as-pdf command silently falls back to raw
+  // when a *-as-pdf command silently falls back to raw
   // source bytes (Graph cannot convert this version on this tenant), the
   // response carries `passthrough: true` and the source contentType. Saving
   // those bytes under `.pdf` produces a corrupt "PDF" — an LLM that then
@@ -217,7 +217,7 @@ describe('persistIfRequested', () => {
     expect(fs.has('/work/test-output/source-was-pdf.pdf')).toBe(true);
   });
 
-  // Audit v1.0.0 §B11: passing a path ending in `/` to --output-path used
+  // passing a path ending in `/` to --output-path used
   // to surface a cryptic Node `EISDIR: illegal operation on a directory`.
   // Reject at the validation layer with a clear "must be a file path" message.
   it('rejects an --output-path that ends in / or \\ (looks like a directory, not a file)', async () => {
@@ -272,7 +272,7 @@ describe('persistMediaIfRequested', () => {
     expect(Array.from(fs.snapshotBytes('/work/imgs/word_media_photo.jpeg') ?? [])).toEqual([0xff, 0xd8]);
   });
 
-  it('keeps page-scoped PDF images distinct: same XObject key on two pages writes two files, not one overwrite (audit A4)', async () => {
+  it('keeps page-scoped PDF images distinct: same XObject key on two pages writes two files, not one overwrite', async () => {
     const fs = createFileSystemFake();
     const pdfMedia = {
       count: 2,

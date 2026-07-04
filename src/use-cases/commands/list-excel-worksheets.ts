@@ -27,12 +27,12 @@ const meta: CommandMeta = {
       key: 'driveId',
       required: true,
       description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     ...pickODataOptions(WORKSHEETS_ODATA_KEYS),
   ],
-  example: "ask-marcel list-excel-worksheets --drive-id 'b!1234' --item-id '01XLSX'",
+  example: "ask-marcel-office list-excel-worksheets --drive-id 'b!1234' --item-id '01XLSX'",
   responseShape: 'collection of Microsoft Graph `worksheet` resources under `value[]`',
   pagination: true,
 };

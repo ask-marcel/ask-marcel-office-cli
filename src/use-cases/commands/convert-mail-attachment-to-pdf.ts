@@ -21,7 +21,7 @@ const safeExtension = (name: string): string => {
 };
 
 // Graph's `?format=pdf` rejects image inputs with `InputFormatNotSupported`.
-// Audit v1.0.0 §2.4 caught the raw error leaking through. Mirror the markdown
+// caught the raw error leaking through. Mirror the markdown
 // sibling's friendly guard and point the LLM at `get-mail-attachment` for the
 // raw bytes — feeding those into a vision-capable model is the right shape
 // for image content anyway.
@@ -52,7 +52,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
       size: bytes.byteLength,
       base64: contentBytes,
       // A non-pdf body is a passthrough (raw source bytes, not a real PDF conversion),
-      // so output-path's guard blocks writing e.g. a .txt body into a `.pdf` (audit A5).
+      // so output-path's guard blocks writing e.g. a .txt body into a `.pdf`.
       // Mirrors tagPdfPassthrough on the reference path, which also only tags non-pdf.
       ...(pdf ? {} : { passthrough: true }),
       note: `pre-checked source (${name}); raw bytes returned without Graph conversion`,
@@ -78,7 +78,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
   const converted = tagPdfPassthrough(await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
-  // Audit v1.4.0 fresh-pass #7: the temp `.ask-marcel-temp` parent folder
+  // the temp `.ask-marcel-temp` parent folder
   // used to linger at OneDrive root because we only deleted the file. Now
   // check `--top=1` children; if empty (our file was the last), delete the
   // folder too. Race: a concurrent invocation could upload between the
@@ -89,7 +89,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
 };
 
 const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
-  // QA-008: pre-rename versions used an un-dotted `ask-marcel-temp` folder and
+  // pre-rename versions used an un-dotted `ask-marcel-temp` folder and
   // never removed it — QA run-1 found one orphaned (empty) at a real tenant's
   // OneDrive root. Sweep BOTH names, best-effort, only when empty.
   for (const folder of ['.ask-marcel-temp', 'ask-marcel-temp']) {
@@ -127,7 +127,7 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   }
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard
-    // blocks writing it into a `.pdf` — same protection as the fileAttachment path (audit A5).
+    // blocks writing it into a `.pdf` — same protection as the fileAttachment path.
     return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`), name);
   }
   const refExt = extensionOf(name);
@@ -184,7 +184,7 @@ const meta: CommandMeta = {
     { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' },
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that message. Returned by `list-mail-attachments`.' },
   ],
-  example: "ask-marcel convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "ask-marcel-office convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
   producesBytes: true,

@@ -42,7 +42,7 @@ const meta: CommandMeta = {
     },
     ...allowedOptions,
   ],
-  example: "ask-marcel list-conversation-messages --conversation-id 'AAQkAD...=' --top 5 --select id,subject,receivedDateTime",
+  example: "ask-marcel-office list-conversation-messages --conversation-id 'AAQkAD...=' --top 5 --select id,subject,receivedDateTime",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]` (unordered)',
   pagination: true,
 };

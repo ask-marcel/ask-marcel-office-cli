@@ -14,10 +14,16 @@ const meta: CommandMeta = {
   graphPathTemplate: '/teams/{team-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/team-get',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, aliases: [{ name: 'id', key: 'id' }], description: 'Microsoft Teams team ID. Returned by `ask-marcel list-joined-teams`.' },
+    {
+      name: 'team-id',
+      key: 'teamId',
+      required: true,
+      aliases: [{ name: 'id', key: 'id' }],
+      description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.',
+    },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-team --team-id 'abc-1234-...' --select displayName,description,visibility",
+  example: "ask-marcel-office get-team --team-id 'abc-1234-...' --select displayName,description,visibility",
   responseShape: 'single Microsoft Graph `team` resource (or projection of the requested `--select` fields)',
 };
 

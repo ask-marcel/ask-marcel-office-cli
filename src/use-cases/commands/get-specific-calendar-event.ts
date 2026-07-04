@@ -27,12 +27,12 @@ const meta: CommandMeta = {
       name: 'calendar-id',
       key: 'calendarId',
       required: true,
-      description: "Calendar ID, or `primary` / `default` for the signed-in user's default calendar. Returned by `ask-marcel list-calendars`.",
+      description: "Calendar ID, or `primary` / `default` for the signed-in user's default calendar. Returned by `ask-marcel-office list-calendars`.",
     },
-    { name: 'event-id', key: 'eventId', required: true, description: 'Event ID. Returned by `ask-marcel list-specific-calendar-events`.' },
+    { name: 'event-id', key: 'eventId', required: true, description: 'Event ID. Returned by `ask-marcel-office list-specific-calendar-events`.' },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...' --select 'id,subject,start,end'",
+  example: "ask-marcel-office get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...' --select 'id,subject,start,end'",
   responseShape: 'single Microsoft Graph `event` resource',
 };
 

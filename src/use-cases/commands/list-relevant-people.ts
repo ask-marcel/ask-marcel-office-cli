@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/people',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-people',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-relevant-people',
+  example: 'ask-marcel-office list-relevant-people',
   responseShape: 'collection of Microsoft Graph `person` resources under `value[]`',
   pagination: true,
 };

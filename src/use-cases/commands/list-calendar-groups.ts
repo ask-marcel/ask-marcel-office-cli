@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/calendarGroups',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-calendargroups',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-calendar-groups',
+  example: 'ask-marcel-office list-calendar-groups',
   responseShape: 'collection of Microsoft Graph `calendarGroup` resources under `value[]`',
   pagination: true,
 };

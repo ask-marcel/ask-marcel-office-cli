@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/inferenceClassification/overrides',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/inferenceclassification-list-overrides',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-focused-inbox-overrides',
+  example: 'ask-marcel-office list-focused-inbox-overrides',
   responseShape: 'collection of Microsoft Graph `inferenceClassificationOverride` resources under `value[]`',
   pagination: true,
 };

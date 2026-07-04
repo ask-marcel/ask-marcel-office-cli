@@ -52,7 +52,7 @@ export const createFileSystemFake = (): FileSystemFake => {
       bytesStore.delete(path);
       return ok(undefined);
     },
-    // Login-fix round-1: directories aren't modeled (the fake is flat),
+    // directories aren't modeled (the fake is flat),
     // so wipe every key that has `path/` as a prefix to approximate a
     // recursive delete. Returns ok regardless — matches port contract.
     deleteDirIfExists: async (path) => {

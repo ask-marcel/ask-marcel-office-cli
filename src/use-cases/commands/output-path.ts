@@ -15,10 +15,10 @@ import { base64ToBytes } from './fetch-raw-bytes.ts';
  * Two recognized inline shapes — both produced by `inlineBinary` and
  * `office-to-markdown`:
  *
- *   1. `{ contentType, size, base64 }` — written via `fs.writeBytes`,
- *      with `base64` replaced by `savedTo`.
- *   2. `{ contentType, size, text }`    — written via `fs.writeText`,
- *      with `text` replaced by `savedTo`.
+ * 1. `{ contentType, size, base64 }` — written via `fs.writeBytes`,
+ * with `base64` replaced by `savedTo`.
+ * 2. `{ contentType, size, text }` — written via `fs.writeText`,
+ * with `text` replaced by `savedTo`.
  *
  * Anything else (plain JSON gets, error envelopes, etc.) returns
  * `no_inlined_bytes` so the CLI can surface a clear error rather than
@@ -41,7 +41,7 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => valu
 
 const looksLikeDirectoryPath = (path: string): boolean => path.endsWith('/') || path.endsWith('\\');
 
-// Audit v1.0.0 §B4: when a *-as-pdf command silently falls back to raw source
+// when a *-as-pdf command silently falls back to raw source
 // bytes (`passthrough: true`), saving those bytes under a `.pdf` extension
 // produces a corrupt PDF. Detect the mismatch upfront so the LLM caller sees
 // a clear error pointing at the right extension instead of producing garbage.
@@ -62,11 +62,11 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
     if (typeof inline === 'string' && inline.length > INLINE_BASE64_LIMIT) return err({ type: 'inline_too_large', base64Length: inline.length });
     return ok(data);
   }
-  // Audit v1.0.0 §bug-5: `--output-path ""` was silently treated as
+  // -5: `--output-path ""` was silently treated as
   // "no flag", which masked shell-quoting mistakes (`--output-path "$VAR"`
   // where VAR is empty). Reject with a clear error instead.
   if (outputPath === '') return err({ type: 'empty_path' });
-  // Audit v1.0.0 §B11: a path ending in `/` or `\` looks like a directory.
+  // a path ending in `/` or `\` looks like a directory.
   // Reject upfront with a clear message rather than surfacing Node's
   // `EISDIR: illegal operation on a directory` further down.
   if (looksLikeDirectoryPath(outputPath)) return err({ type: 'is_directory' });

@@ -11,7 +11,7 @@ describe('extractXlsxMetadata', () => {
     if (!result.ok) return;
     const m = result.value;
 
-    expect(m.core.creator).toBe('Vincent Delacourt');
+    expect(m.core.creator).toBe('Jordan Avery');
     expect(m.custom).toContainEqual({ name: 'ClientID', value: 'ACME-42' });
 
     // Defined names — both the plain named range and the hidden one, with their formulas
@@ -70,7 +70,7 @@ describe('formatXlsxMetadata', () => {
 
     expect(md).toContain('## Workbook metadata');
     expect(md).toContain('### Core properties');
-    expect(md).toContain('**creator**: Vincent Delacourt');
+    expect(md).toContain('**creator**: Jordan Avery');
     expect(md).toContain('### Custom properties');
     expect(md).toMatch(/\|\s*ClientID\s*\|\s*ACME-42\s*\|/);
     expect(md).toContain('### Defined names');

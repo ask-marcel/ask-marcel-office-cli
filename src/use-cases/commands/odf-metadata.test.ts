@@ -52,7 +52,7 @@ describe('extractOdfMetadata', () => {
     expect(result.value.properties).toEqual({
       generator: 'LibreOffice/7.4.2',
       title: 'Q4 Plan',
-      creator: 'Vincent',
+      creator: 'Jordan',
       description: 'Internal draft',
       'initial-creator': 'Alice',
       'creation-date': '2026-05-01T10:00:00',
@@ -100,7 +100,7 @@ describe('formatOdfMetadata', () => {
     expect(formatOdfMetadata(extracted.value)).toBe(
       '## OpenDocument metadata\n\n' +
         '### Document properties\n\n' +
-        '- **generator**: LibreOffice/7.4.2\n- **title**: Q4 Plan\n- **creator**: Vincent\n- **description**: Internal draft\n- **initial-creator**: Alice\n- **creation-date**: 2026-05-01T10:00:00\n- **editing-cycles**: 7\n\n' +
+        '- **generator**: LibreOffice/7.4.2\n- **title**: Q4 Plan\n- **creator**: Jordan\n- **description**: Internal draft\n- **initial-creator**: Alice\n- **creation-date**: 2026-05-01T10:00:00\n- **editing-cycles**: 7\n\n' +
         '### Keywords\n\n- budget\n- confidential\n\n' +
         '### User-defined properties\n\n| name | value |\n| --- | --- |\n| ClientID | ACME-42 |\n| Reviewer | Bob |\n'
     );

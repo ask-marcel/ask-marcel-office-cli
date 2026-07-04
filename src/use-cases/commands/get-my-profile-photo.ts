@@ -22,7 +22,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/photo/$value',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/profilephoto-get',
   options: [],
-  example: 'ask-marcel get-my-profile-photo',
+  example: 'ask-marcel-office get-my-profile-photo',
   responseShape:
     '`{ contentType: "image/jpeg", size: <bytes>, base64: "<encoded>" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`.',
   producesBytes: true,

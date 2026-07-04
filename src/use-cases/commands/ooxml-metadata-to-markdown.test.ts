@@ -27,7 +27,7 @@ describe('renderKv', () => {
   });
 
   it('renders one `- **key**: value` line per non-empty entry, dropping empty values', () => {
-    expect(renderKv({ creator: 'Vincent', title: 'Q4', empty: '' })).toBe('- **creator**: Vincent\n- **title**: Q4');
+    expect(renderKv({ creator: 'Jordan', title: 'Q4', empty: '' })).toBe('- **creator**: Jordan\n- **title**: Q4');
   });
 
   it('escapes pipes in values', () => {

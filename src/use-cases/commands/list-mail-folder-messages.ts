@@ -18,11 +18,11 @@ const meta: CommandMeta = {
       key: 'mailFolderId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'mailFolder ID. Returned by `ask-marcel list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`.',
+      description: 'mailFolder ID. Returned by `ask-marcel-office list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-mail-folder-messages --mail-folder-id 'inbox'",
+  example: "ask-marcel-office list-mail-folder-messages --mail-folder-id 'inbox'",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',
   pagination: true,
 };

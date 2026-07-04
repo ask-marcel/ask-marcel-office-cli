@@ -22,7 +22,7 @@ const meta: CommandMeta = {
     { name: 'end-date-time', key: 'endDateTime', required: true, aliases: [{ name: 'end', key: 'end' }], description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
+  example: "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
 };
 

@@ -3,7 +3,7 @@ import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
-// Audit Alex-session §A: the full `/me` resource carries 20+ fields most LLM
+// the full `/me` resource carries 20+ fields most LLM
 // callers don't need (preferredLanguage, surname, accountEnabled, etc.). Ship a
 // slim default that covers the common "who am I" question. Override with
 // `--select` for the full profile.
@@ -20,7 +20,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get',
   options: [...selectExpandOptions],
-  example: 'ask-marcel get-current-user',
+  example: 'ask-marcel-office get-current-user',
   responseShape: 'single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)',
 };
 

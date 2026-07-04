@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
+  example: "ask-marcel-office list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
   responseShape: 'collection of Microsoft Graph `columnDefinition` resources under `value[]`',
 };
 

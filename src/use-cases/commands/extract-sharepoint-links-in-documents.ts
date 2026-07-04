@@ -93,7 +93,7 @@ const meta: CommandMeta = {
       description: 'driveItem ID of the .docx/.xlsx/.pptx or .odt/.ods/.odp file. Returned by `list-folder-files` or `search-onedrive-files`.',
     },
   ],
-  example: "ask-marcel extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships.',
 };

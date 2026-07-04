@@ -7,7 +7,7 @@ import { err, ok } from './result.ts';
  * built from a calendar-window parameter accepts this type so an unvalidated
  * `string` can't slip through.
  *
- * Audit Alex-session §C: the previous calendar commands accepted any
+ * the previous calendar commands accepted any
  * `z.string().min(1)`, so the LLM had to compute "last week" → ISO by hand.
  * `parseIsoDateTime` turns "7d" / "monday" / "today" / "2026-04-01" / a strict
  * ISO timestamp into the canonical ISO form, so the URL builders stay

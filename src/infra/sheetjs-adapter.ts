@@ -8,7 +8,7 @@ const readSheetsAsCsv = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<
   try {
     // Lazy-load SheetJS (~181 ms init — the single heaviest dep) so non-Excel
     // commands don't pay for it at startup; loads on the first .xlsx/.xls/.csv
-    // conversion only (QA-012 cold-start).
+    // conversion only.
     const XLSX = await import('xlsx');
     const workbook = XLSX.read(bytes, { type: 'array' });
     const sheets = workbook.SheetNames.map((name) => {

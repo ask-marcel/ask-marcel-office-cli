@@ -3,7 +3,7 @@
  * recognise when the caller passed a URL belonging to a different sibling.
  * Returns the sibling resolver name so each command can emit a precise
  * cross-pointer rejection (mirrors the existing mail↔calendar pair the
- * audit Alex-session §B baseline shipped — extended here to cover
+ * baseline shipped — extended here to cover
  * teams + drive-share, closing the 5-gap matrix flagged in the
  * v1.4.0 re-audit Nit 1).
  *

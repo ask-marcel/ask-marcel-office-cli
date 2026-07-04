@@ -48,7 +48,7 @@ const meta: CommandMeta = {
     },
     ...topOnlyOptions,
   ],
-  example: "ask-marcel list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
+  example: "ask-marcel-office list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
   responseShape:
     'collection of changed Microsoft Graph `event` occurrences under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

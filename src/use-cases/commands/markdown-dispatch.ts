@@ -31,7 +31,7 @@ type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly max
 // Hints for files NESTED inside a container (zip entry, .msg attachment). The
 // caller-specific hints point at sibling commands (`download-drive-item-as-pdf`,
 // `extract-drive-item-images`, …) that can only address top-level drive items /
-// attachments — they cannot reach a file INSIDE a container (QA-007). Nested
+// attachments — they cannot reach a file INSIDE a container. Nested
 // conversions therefore always use this container-neutral wording.
 const NESTED_HINTS: ConversionHints = {
   pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — extract it from the archive/message first, then read it with a vision-capable model',
@@ -71,7 +71,7 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
     // Outlook .msg: render headers + body and recurse each attachment through this
     // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't
     // loop. Attachments are NESTED files — container-neutral hints, not the
-    // caller's (QA-007: a png inside a .msg must not point at drive-item commands).
+    // caller's (a png inside a .msg must not point at drive-item commands).
     const depth = opts.depth ?? 0;
     return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
   }

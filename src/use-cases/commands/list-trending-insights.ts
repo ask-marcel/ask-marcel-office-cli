@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/insights/trending',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-trending',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-trending-insights',
+  example: 'ask-marcel-office list-trending-insights',
   responseShape: 'collection of Microsoft Graph `trending` resources under `value[]`',
   pagination: true,
 };

@@ -28,7 +28,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
+  example: "ask-marcel-office list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
   responseShape: 'collection of Microsoft Graph `columnDefinition` resources under `value[]`',
 };
 

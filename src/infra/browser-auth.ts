@@ -18,7 +18,7 @@ type BrowserTokenResult = { accessToken: AccessToken; refreshToken: string | nul
  * one retry after wiping the profile; `navigation_failed` is a network
  * issue, not worth retrying).
  *
- * Login-fix round-1: was previously `AccessToken | null`, which conflated
+ * was previously `AccessToken | null`, which conflated
  * "browser launch hung", "navigation broke", and "silent-SSO polling
  * timed out" into a single null and made the error message inaccurate.
  */
@@ -57,7 +57,7 @@ type Ic3TokenResult = { readonly ok: true; readonly token: AccessToken; readonly
 /**
  * Combined outcome of capturing all four tokens (Teams basic / M365
  * elevated / chatsvcagg substrate / IC3 substrate) inside one browser
- * session. Login-fix round-2 introduced this for the basic+elevated
+ * session. introduced this for the basic+elevated
  * pair; chatsvcagg was added next; IC3 is the most recent leg, capturing
  * the bearer Teams web uses for unbounded chat-history reads.
  *
@@ -72,7 +72,7 @@ type BothTokensResult = {
   readonly ic3: Ic3TokenResult;
   /**
    * Set when the Teams poll short-circuited because `freshCachedToken`
-   * found a token written by a concurrent process (QA-010). The caller
+   * found a token written by a concurrent process. The caller
    * must NOT persist this result — the cache is already the source of
    * truth, and `refreshToken` is null here (persisting would clobber the
    * winner's rotated refresh token).
@@ -81,7 +81,6 @@ type BothTokensResult = {
 };
 
 type BrowserAuth = {
-  acquireToken: (scopes: string[], startUrl: string) => Promise<BrowserTokenResult | null>;
   /**
    * Capture an "elevated" Graph access token by navigating to a
    * different Microsoft web app whose first-party app identity is on
@@ -125,11 +124,11 @@ type BrowserAuth = {
    */
   acquireIc3Token: () => Promise<Ic3TokenResult>;
   /**
-   * Login-fix round-2: capture BOTH tokens inside ONE browser session.
+   * capture BOTH tokens inside ONE browser session.
    * After the Teams response listener intercepts the Teams token,
    * navigate the SAME page to the elevated URL and harvest the
    * M365ChatClient bearer from outgoing request headers. Cookies are
-   * live in memory, so federated SSO chains (e.g. IdP-fronted
+   * live in memory, so federated SSO chains (e.g. third-party-IdP-fronted
    * tenants) work without a second visible sign-in.
    *
    * Returns `teams: null` if no Teams token came back within the full
@@ -138,7 +137,7 @@ type BrowserAuth = {
    * failed inside the same session — caller decides whether to surface
    * the partial success.
    */
-  acquireBothTokens: (scopes: string[], teamsUrl: string) => Promise<BothTokensResult>;
+  acquireBothTokens: (teamsUrl: string) => Promise<BothTokensResult>;
   close: () => Promise<void>;
 };
 
@@ -195,7 +194,7 @@ type BrowserAuthConfig = {
   readonly fs: FileSystem;
   readonly trace?: TraceFn;
   /**
-   * QA-010 (login hang): probe for a fresh token that landed in the cache
+   * (login hang): probe for a fresh token that landed in the cache
    * WHILE the browser capture is polling. AAD SPA refresh tokens rotate, so
    * when two processes race, the loser's refresh fails and it falls into the
    * full multi-minute browser dance — while the winner's fresh token sits in
@@ -206,7 +205,7 @@ type BrowserAuthConfig = {
   /**
    * User-visible progress sink (stderr in production). The browser capture
    * can legitimately take minutes (federated SSO, interactive sign-in); these
-   * one-liners are what separates "waiting on the user" from "hung" (QA-010).
+   * one-liners are what separates "waiting on the user" from "hung".
    */
   readonly onProgress?: (line: string) => void;
   readonly profileDir?: string;
@@ -218,19 +217,19 @@ type BrowserAuthConfig = {
   /**
    * Deadline for the SILENT elevated-token recapture flow (no user
    * interaction expected — persistent profile cookies do the SSO).
-   * Defaults to 20s. The audit (v1.0.0 §1.1) flagged that reusing the
+   * Defaults to 20s. The audit () flagged that reusing the
    * 5-minute interactive `pollDeadlineMs` for this silent path made
    * `list-chats` etc. hang for minutes when cookies were stale, blowing
    * the LLM tool-call window. With a tight cap, the flow either yields
    * a token quickly or fails with `auth_failed: elevated token capture
-   * timed out — run `ask-marcel login` to refresh.`
+   * timed out — run `ask-marcel-office login` to refresh.`
    */
   readonly elevatedRecaptureTimeoutMs?: number;
   /**
    * Hard deadline on `launchPersistentContext` + `newPage` for the
    * elevated capture path. Defaults to 15s. Distinct from
    * `elevatedRecaptureTimeoutMs` so the error message can name which
-   * step hung — launch vs polling. Audit login-fix round-1: previously
+   * step hung — launch vs polling. Audit previously
    * unguarded, so a hung Playwright launch (corrupt persistent profile
    * with stale `Singleton*` locks, or a slow browser binary) would
    * block the whole command indefinitely.
@@ -434,114 +433,6 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     return ctx;
   };
 
-  const acquireToken = async (scopes: string[], startUrl: string): Promise<BrowserTokenResult | null> => {
-    trace('[DEBUG] acquireToken: ENTER\n');
-    await cleanupSingletonLocks(profileDir, fs);
-    trace(`[DEBUG] acquireToken: profile = ${profileDir}\n`);
-
-    let capturedAccess: AccessToken | null = null;
-    let capturedRefresh: string | null = null;
-
-    context = await launchContext(false);
-    trace('[DEBUG] acquireToken: launchContext returned ctx\n');
-    page = await context.newPage();
-    trace('[DEBUG] acquireToken: newPage returned\n');
-    const activePage = page;
-
-    const handleResponse = async (response: ResponseLike): Promise<void> => {
-      if (capturedAccess) return;
-      const url = response.url();
-      if (!TOKEN_HOSTS.some((d) => url.includes(d))) return;
-      const ct = response.headers()['content-type'] ?? '';
-      if (!ct.includes('json')) return;
-      try {
-        const body = await response.text();
-        if (!body.includes('access_token')) return;
-        const data = JSON.parse(body) as { access_token?: string; refresh_token?: string };
-        const raw = data.access_token ?? '';
-        const validated = accessToken(raw);
-        if (!validated.ok) {
-          trace(`[DEBUG] non-graph token skipped, len: ${raw.length}\n`);
-          return;
-        }
-        capturedAccess = validated.value;
-        capturedRefresh = data.refresh_token ?? null;
-        logger.info('token_captured', { len: validated.value.length });
-        trace(`[DEBUG] graph token captured, len: ${validated.value.length}\n`);
-      } catch {
-        // ignore parse errors
-      }
-    };
-    activePage.on('response', (r) => {
-      void handleResponse(r);
-    });
-
-    logger.info('browser_navigating', { url: startUrl });
-    trace(`[DEBUG] navigating to: ${startUrl}\n`);
-    try {
-      await activePage.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-      logger.info('browser_navigated', { url: startUrl });
-    } catch (navError) {
-      const navMsg = navError instanceof Error ? navError.message : String(navError);
-      trace(`[DEBUG] navigation error (non-fatal): ${navMsg}\n`);
-      logger.info('browser_navigation_error', { message: navMsg });
-    }
-
-    const tryReturnCaptured = async (label: string): Promise<BrowserTokenResult | null> => {
-      if (!capturedAccess) return null;
-      trace(`[DEBUG] ${label}\n`);
-      await cleanup();
-      return { accessToken: capturedAccess, refreshToken: capturedRefresh };
-    };
-
-    trace(`[DEBUG] acquireToken: initial settle for ${initialSettleMs}ms\n`);
-    await sleep(initialSettleMs);
-    const settleResult = await tryReturnCaptured('token captured during initial settle');
-    if (settleResult) return settleResult;
-
-    const currentUrl = activePage.url();
-    trace(`[DEBUG] acquireToken: after settle, currentUrl = ${currentUrl}\n`);
-    if (!currentUrl.includes('login.microsoftonline.com') && !currentUrl.includes('login.live.com')) {
-      trace('[DEBUG] already signed in — clearing session to force fresh login\n');
-      logger.info('browser_force_relogin', { url: currentUrl });
-      await context.clearCookies();
-      try {
-        await activePage.evaluate(() => {
-          localStorage.clear();
-          sessionStorage.clear();
-        });
-      } catch {
-        // ignore
-      }
-      try {
-        await activePage.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-      } catch {
-        // non-fatal
-      }
-      await sleep(postReloginSettleMs);
-      const reloginResult = await tryReturnCaptured('token captured after force relogin');
-      if (reloginResult) return reloginResult;
-    }
-
-    trace(`[DEBUG] acquireToken: entering polling loop, ${pollDeadlineMs / 1000}s deadline, ${pollIntervalMs}ms interval\n`);
-    const deadline = Date.now() + pollDeadlineMs;
-    let pollCount = 0;
-    while (Date.now() < deadline) {
-      const polledResult = await tryReturnCaptured('token found in polling loop, closing browser');
-      if (polledResult) return polledResult;
-      pollCount += 1;
-      if (pollCount % 10 === 0) {
-        const elapsed = Math.floor((Date.now() - (deadline - pollDeadlineMs)) / 1000);
-        trace(`[DEBUG] acquireToken: still polling after ${elapsed}s (capturedAccess=${capturedAccess === null ? 'null' : 'set'}, url=${activePage.url()})\n`);
-      }
-      await sleep(pollIntervalMs);
-    }
-
-    trace('[DEBUG] acquireToken: polling loop timeout expired, no token captured\n');
-    await cleanup();
-    return null;
-  };
-
   /**
    * Capture an elevated Graph token by navigating to m365.cloud.microsoft
    * (or another candidate Microsoft web app). The persistent profile's
@@ -564,7 +455,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * requires rejection reasons to be Errors, and atelier rule 10
    * forbids custom Error subclasses.
    */
-  const ELEVATED_LAUNCH_TIMEOUT_MESSAGE = 'ask-marcel:elevated_launch_timeout';
+  const ELEVATED_LAUNCH_TIMEOUT_MESSAGE = 'ask-marcel-office:elevated_launch_timeout';
   const isLaunchTimeout = (e: unknown): boolean => e instanceof Error && e.message === ELEVATED_LAUNCH_TIMEOUT_MESSAGE;
   const withLaunchTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -589,10 +480,10 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // safer default. The window opens and closes within seconds; user
     // sees a brief flash but no interaction is required.
     //
-    // Login-fix round-1 Wave A: wrap launch + newPage in a hard timeout
+    // wrap launch + newPage in a hard timeout
     // so a hung Playwright doesn't block the whole command. Previously
     // unguarded — a corrupt profile with stale Singleton locks would
-    // hang indefinitely (audit-confirmed).
+    // hang indefinitely.
     let elevatedCtx: ContextLike;
     let elevatedPage: PageLike;
     try {
@@ -657,30 +548,17 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // we don't drive. Use a SHORT deadline (default 20s) and fail fast with
     // a clear discriminated failure so the caller can decide whether to
     // retry (after wiping the profile) or surface the error.
-    const closeAll = async (): Promise<void> => {
-      try {
-        await elevatedPage.close();
-      } catch {
-        // ignore
-      }
-      try {
-        await elevatedCtx.close();
-      } catch {
-        // ignore
-      }
-    };
-
     const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < elevatedDeadline) {
       if (captured) {
         trace('[DEBUG] elevated capture: token found, closing\n');
-        await closeAll();
+        await closeBrowserSession(elevatedPage, elevatedCtx);
         return { ok: true, token: captured };
       }
       await sleep(pollIntervalMs);
     }
 
-    await closeAll();
+    await closeBrowserSession(elevatedPage, elevatedCtx);
     if (navigationFailed) {
       trace('[DEBUG] elevated capture: deadline expired after navigation failure\n');
       logger.info('elevated_token_navigation_failed');
@@ -692,7 +570,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   };
 
   /**
-   * Login-fix round-2: single-session capture of BOTH tokens.
+   * single-session capture of BOTH tokens.
    *
    * Opens ONE browser context, attaches both response (Teams token) and
    * request (elevated token) listeners up front, navigates the page
@@ -702,14 +580,14 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * browser exactly once at the end.
    *
    * Fixes the user-visible "loop of browser open/close" symptom on
-   * federated tenants (ExampleCorp / ThirdPartyIdP): the old two-session flow opened a
+   * federated tenants (ExampleCorp / a third-party IdP): the old two-session flow opened a
    * separate browser for the elevated step and silent SSO couldn't
    * re-establish the federated cookie chain quickly enough — the
    * second browser would flash through what looked like a fresh login
    * prompt. With this method, the elevated step runs on the same
    * already-authenticated page.
    */
-  const acquireBothTokens = async (scopes: string[], teamsUrl: string): Promise<BothTokensResult> => {
+  const acquireBothTokens = async (teamsUrl: string): Promise<BothTokensResult> => {
     const elevatedUrl = M365_CLOUD_URL;
     trace('[DEBUG] acquireBothTokens: ENTER\n');
     await cleanupSingletonLocks(profileDir, fs);
@@ -792,13 +670,13 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // Unified request listener — captures three things from outgoing
     // Authorization bearers (multiplexed by MSAL on a single
     // teams.microsoft.com session):
-    //   1. Elevated Graph bearer (ODSP-allowlisted appid + Graph aud)
-    //   2. chatsvcagg-audience bearer (basic Teams appid + chatsvcagg aud)
-    //   3. The substrate region from `/api/csa/<region>/` URLs the
-    //      chatsvcagg bearer rides on (post-2026-05 substrate move:
-    //      `chatsvcagg.teams.microsoft.com` was retired in favour of
-    //      `teams.microsoft.com/api/csa/<region>/api/...` per-region
-    //      routing — see `gotcha_chatsvcagg_substrate_moved` in memory).
+    // 1. Elevated Graph bearer (ODSP-allowlisted appid + Graph aud)
+    // 2. chatsvcagg-audience bearer (basic Teams appid + chatsvcagg aud)
+    // 3. The substrate region from `/api/csa/<region>/` URLs the
+    // chatsvcagg bearer rides on (post-2026-05 substrate move:
+    // `chatsvcagg.teams.microsoft.com` was retired in favour of
+    // `teams.microsoft.com/api/csa/<region>/api/...` per-region
+    // routing — see `gotcha_chatsvcagg_substrate_moved` in memory).
     // Also emits a `chatsvcagg_request` trace per unique URL the bearer
     // rides on so the next substrate migration is self-diagnosable.
     const seenChatsvcaggRoutes = new Set<string>();
@@ -907,7 +785,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     // Poll until Teams token captured OR poll-deadline expires (5 min) OR a
-    // concurrent process lands a fresh token in the cache (QA-010 short-circuit).
+    // concurrent process lands a fresh token in the cache.
     trace(`[DEBUG] acquireBothTokens: polling for Teams token, ${pollDeadlineMs / 1000}s deadline\n`);
     onProgress(`Browser window open — if a sign-in screen appears, complete it there (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`);
     const teamsDeadline = Date.now() + pollDeadlineMs;
@@ -1120,12 +998,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     await cleanup();
   };
 
-  return { acquireToken, acquireElevatedToken, acquireChatsvcaggToken, acquireIc3Token, acquireBothTokens, close };
+  return { acquireElevatedToken, acquireChatsvcaggToken, acquireIc3Token, acquireBothTokens, close };
 };
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
-// Login-fix round-2 diagnostic: when `ASKMARCEL_TRACE=1` is set in the
+// diagnostic: when `ASKMARCEL_TRACE=1` is set in the
 // environment, wire the trace function to stderr AND echo every `.info`
 // logger event through it. (browser-auth only ever logs at info level —
 // warn/error are pass-through.) Lets a user capture the full

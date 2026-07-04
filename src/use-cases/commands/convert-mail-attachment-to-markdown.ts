@@ -77,7 +77,7 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
     return err({ type: 'api_error', status: 400, message: 'itemAttachment.item missing @odata.type discriminator' });
   }
 
-  // size = UTF-8 byte count (audit §2.1); `md.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `md.length` is UTF-16 code units.
   const renderToEnvelope = (md: string): { contentType: 'text/markdown'; size: number; text: string } => ({
     contentType: 'text/markdown',
     size: new TextEncoder().encode(md).byteLength,
@@ -153,7 +153,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ contentType: "text/markdown", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.',
   producesBytes: true,

@@ -41,7 +41,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/events/delta()',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/event-delta',
   options: [...topOnlyOptions],
-  example: 'ask-marcel list-calendar-events-delta --top 50',
+  example: 'ask-marcel-office list-calendar-events-delta --top 50',
   responseShape:
     'collection of changed Microsoft Graph `event` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

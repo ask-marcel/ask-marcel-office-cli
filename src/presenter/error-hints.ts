@@ -1,7 +1,7 @@
 /**
  * Translate Graph / substrate / CLI / validation errors into actionable hints.
  *
- * Audit Alex-session §2: bare `error: ErrorInvalidIdMalformed: Id is
+ * bare `error: ErrorInvalidIdMalformed: Id is
  * malformed.` had no remedy for the LLM — it had to guess where the bad ID
  * came from. This module is the centralised "what should I do about this"
  * lookup: pattern-match the error code (or, as a fallback, a substring of
@@ -12,14 +12,14 @@
  * `--output text` (as `hint:` / `source:` lines under the existing `error:`
  * line).
  *
- * Audit Alex-session §2 follow-up: the four error-envelope variants are
- *   - `graph`      — public Microsoft Graph API at /v1.0/
- *   - `substrate`  — Microsoft-internal chat substrates (chatsvcagg / IC3).
- *                    Tagged at the infra layer with `substrateHttp{N}_{name}`.
- *   - `cli`        — CLI itself (Commander parser, CLI rewrites of Graph
- *                    errors via `cli_rewrite_*` and `cli_reject_*` codes)
- *   - `validation` — Zod schema validation from use-cases (no `code` — pure
- *                    message-pattern fallback)
+ * the four error-envelope variants are
+ * - `graph` — public Microsoft Graph API at /v1.0/
+ * - `substrate` — Microsoft-internal chat substrates (chatsvcagg / IC3).
+ * Tagged at the infra layer with `substrateHttp{N}_{name}`.
+ * - `cli` — CLI itself (Commander parser, CLI rewrites of Graph
+ * errors via `cli_rewrite_*` and `cli_reject_*` codes)
+ * - `validation` — Zod schema validation from use-cases (no `code` — pure
+ * message-pattern fallback)
  *
  * Rule precedence: specific code matchers run FIRST, then message-pattern
  * fallbacks. The generic-validation rule sits LAST so it never overrides a
@@ -51,21 +51,21 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_search_with_filter',
-    hint: 'Use `ask-marcel list-mail-messages --filter ...` for OData filtering, or drop `--filter` here and rely on the KQL query string alone. Graph rejects `$search` + `$filter` together on /me/messages.',
+    hint: 'Use `ask-marcel-office list-mail-messages --filter ...` for OData filtering, or drop `--filter` here and rely on the KQL query string alone. Graph rejects `$search` + `$filter` together on /me/messages.',
   },
-  // Audit Alex-session §B (resolver siblings): the two cross-rejection codes
+  // (resolver siblings): the two cross-rejection codes
   // emitted by resolve-mail-link and resolve-calendar-link when handed the
   // wrong link type. Both point at the correct sibling so the LLM gets the
   // remedy in `hint` instead of generic validation boilerplate.
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_calendar_link_on_mail_resolver',
-    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a mail message link. The returned `eventId` feeds `get-calendar-event`; the mail equivalent is `messageId` from `resolve-mail-link`.',
+    hint: 'Re-run with `ask-marcel-office resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a mail message link. The returned `eventId` feeds `get-calendar-event`; the mail equivalent is `messageId` from `resolve-mail-link`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_mail_link_on_calendar_resolver',
-    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a calendar item link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+    hint: 'Re-run with `ask-marcel-office resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a calendar item link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
   },
   // v1.4.0 re-audit Nit 1 — cross-resolver pointer completeness. Five
   // gaps in the mail/calendar/drive-share/teams pointer matrix close with
@@ -75,37 +75,37 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_teams_link_on_mail_resolver',
-    hint: 'Re-run with `ask-marcel resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not an Outlook mail message link. The returned `chatId` + `messageId` feed `get-teams-chat-message` or `list-teams-chat-history`.',
+    hint: 'Re-run with `ask-marcel-office resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not an Outlook mail message link. The returned `chatId` + `messageId` feed `get-teams-chat-message` or `list-teams-chat-history`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_mail_link_on_drive_share_resolver',
-    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a OneDrive / SharePoint sharing URL. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+    hint: 'Re-run with `ask-marcel-office resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a OneDrive / SharePoint sharing URL. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_calendar_link_on_drive_share_resolver',
-    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a OneDrive / SharePoint sharing URL. The returned `eventId` feeds `get-calendar-event`.',
+    hint: 'Re-run with `ask-marcel-office resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a OneDrive / SharePoint sharing URL. The returned `eventId` feeds `get-calendar-event`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_teams_link_on_drive_share_resolver',
-    hint: 'Re-run with `ask-marcel resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not a OneDrive / SharePoint sharing URL. The returned `chatId` + `messageId` feed `get-teams-chat-message`.',
+    hint: 'Re-run with `ask-marcel-office resolve-teams-link --url <same-url>` — the URL is a Teams `/l/message/...` link, not a OneDrive / SharePoint sharing URL. The returned `chatId` + `messageId` feed `get-teams-chat-message`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_drive_share_link_on_teams_resolver',
-    hint: 'Re-run with `ask-marcel resolve-drive-share-link --url <same-url>` — the URL is a OneDrive / SharePoint share link (`*.sharepoint.com` or `1drv.ms`), not a Teams message link. The returned `graphPath` (`/shares/{token}/driveItem`) feeds `get-drive-item`, `download-drive-item-content`, or the conversion siblings.',
+    hint: 'Re-run with `ask-marcel-office resolve-drive-share-link --url <same-url>` — the URL is a OneDrive / SharePoint share link (`*.sharepoint.com` or `1drv.ms`), not a Teams message link. The returned `graphPath` (`/shares/{token}/driveItem`) feeds `get-drive-item`, `download-drive-item-content`, or the conversion siblings.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_mail_link_on_teams_resolver',
-    hint: 'Re-run with `ask-marcel resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a Teams message link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
+    hint: 'Re-run with `ask-marcel-office resolve-mail-link --url <same-url>` — the URL is an Outlook mail message link, not a Teams message link. The returned `messageId` feeds `get-mail-message` or `convert-mail-to-markdown`.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'cli_reject_calendar_link_on_teams_resolver',
-    hint: 'Re-run with `ask-marcel resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a Teams message link. The returned `eventId` feeds `get-calendar-event`.',
+    hint: 'Re-run with `ask-marcel-office resolve-calendar-link --url <same-url>` — the URL is an Outlook calendar item link, not a Teams message link. The returned `eventId` feeds `get-calendar-event`.',
   },
   {
     source: 'cli',
@@ -116,45 +116,45 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.unknownOption',
-    hint: 'Unknown CLI flag. Run `ask-marcel <command> --help` for the supported flags on that command, or `ask-marcel help-json --terse --category <name>` (~6 KB) to scan the whole category.',
+    hint: 'Unknown CLI flag. Run `ask-marcel-office <command> --help` for the supported flags on that command, or `ask-marcel-office help-json --terse --category <name>` (~6 KB) to scan the whole category.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.excessArguments',
-    hint: 'Unexpected bare-word argument(s). This command takes only `--flags`, never positional words — a token like `item--id` or `id` is read as a stray positional. The usual cause is a mistyped flag: `item--id` should be `--item-id`, and every flag needs its leading `--`. Run `ask-marcel <command> --help` for the exact flag spellings.',
+    hint: 'Unexpected bare-word argument(s). This command takes only `--flags`, never positional words — a token like `item--id` or `id` is read as a stray positional. The usual cause is a mistyped flag: `item--id` should be `--item-id`, and every flag needs its leading `--`. Run `ask-marcel-office <command> --help` for the exact flag spellings.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.missingMandatoryOptionValue' || c === 'commander.optionMissingArgument',
-    hint: 'A required CLI flag is missing or was passed without its value. Run `ask-marcel <command> --help` for the full required-params list with their value shapes.',
+    hint: 'A required CLI flag is missing or was passed without its value. Run `ask-marcel-office <command> --help` for the full required-params list with their value shapes.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.missingArgument',
-    hint: 'A required positional argument is missing (typically `ask-marcel docs <command>` or `ask-marcel help <command>`). Run `ask-marcel <command> --help` for the argument shape.',
+    hint: 'A required positional argument is missing (typically `ask-marcel-office docs <command>` or `ask-marcel-office help <command>`). Run `ask-marcel-office <command> --help` for the argument shape.',
   },
   {
     source: 'cli',
-    // Audit Alex-session §6 follow-up: `cli_unknown_command` is emitted by
+    // `cli_unknown_command` is emitted by
     // the CLI's own `docs <unknown>` and `help <unknown>` paths so the
     // envelope shape matches Commander's `commander.unknownCommand`. Same
     // hint — both are the "this subcommand doesn't exist" surface.
     matchCode: (c) => c === 'commander.unknownCommand' || c === 'cli_unknown_command',
-    hint: 'Unknown ask-marcel subcommand. Run `ask-marcel help-json --terse` (~31 KB across all categories) or `ask-marcel help-json --terse --category mail` (~6 KB for one category) to discover the right command.',
+    hint: 'Unknown ask-marcel-office subcommand. Run `ask-marcel-office help-json --terse` (~31 KB across all categories) or `ask-marcel-office help-json --terse --category mail` (~6 KB for one category) to discover the right command.',
   },
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.invalidArgument',
-    hint: 'A CLI flag value failed type validation (e.g. `--top abc` when an integer was expected). Run `ask-marcel <command> --help` for the expected value shape per flag.',
+    hint: 'A CLI flag value failed type validation (e.g. `--top abc` when an integer was expected). Run `ask-marcel-office <command> --help` for the expected value shape per flag.',
   },
   // ─── Substrate: Microsoft-internal chat substrates (chatsvcagg / IC3) ────
   {
     source: 'substrate',
     matchCode: (c) => c.startsWith('substrateHttp'),
-    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The 5 commands flagged `stability: experimental` in `help-json` all surface this code.',
+    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel-office login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The 5 commands flagged `stability: experimental` in `help-json` all surface this code.',
   },
   // ─── Graph: ID malformed / item not found ────────────────────────────────
-  // Audit Alex-session §8 follow-up: when the failing URL was against
+  // when the failing URL was against
   // `/mailFolders/`, the infra layer (`contextualizeCode` in graph-client.ts)
   // tags the code with `_mailFolders` so the hint can specifically recommend
   // well-known folder names. This rule must run BEFORE the generic
@@ -162,7 +162,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'ErrorInvalidIdMalformed_mailFolders' || c === 'InvalidIdMalformed_mailFolders',
-    hint: 'The `--mail-folder-id` value is malformed. Well-known folder names ALSO work — try `inbox`, `sentitems`, `drafts`, `outbox`, `deleteditems`, `archive`, `junkemail`. For a tenant-specific folder, source the ID via `ask-marcel list-mail-folders` or `ask-marcel list-mail-child-folders --mail-folder-id inbox`.',
+    hint: 'The `--mail-folder-id` value is malformed. Well-known folder names ALSO work — try `inbox`, `sentitems`, `drafts`, `outbox`, `deleteditems`, `archive`, `junkemail`. For a tenant-specific folder, source the ID via `ask-marcel-office list-mail-folders` or `ask-marcel-office list-mail-child-folders --mail-folder-id inbox`.',
   },
   {
     source: 'graph',
@@ -192,23 +192,23 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   // discovery command.
   //
   // 1. Groups directory: `Request_BadRequest` + "Invalid object identifier"
-  //    (`get-group --group-id 12345-not-real` etc.)
+  // (`get-group --group-id 12345-not-real` etc.)
   {
     source: 'graph',
     matchMessage: (m) => /Invalid object identifier/i.test(m),
-    hint: 'The directory object ID is malformed. For groups, source a valid one via `ask-marcel list-groups --select id,displayName`. For users, via `ask-marcel list-relevant-people --select id,userPrincipalName,displayName` or `ask-marcel get-current-user` (for the signed-in user). IDs are 36-character GUIDs (e.g. `19a8c4f0-1234-5678-90ab-cdef01234567`), not display names.',
+    hint: 'The directory object ID is malformed. For groups, source a valid one via `ask-marcel-office list-groups --select id,displayName`. For users, via `ask-marcel-office list-relevant-people --select id,userPrincipalName,displayName` or `ask-marcel-office get-current-user` (for the signed-in user). IDs are 36-character GUIDs (e.g. `19a8c4f0-1234-5678-90ab-cdef01234567`), not display names.',
   },
   // 2. Teams channels: `BadRequest: channelId is not valid.`
-  //    (`get-team-channel --channel-id x` etc.)
+  // (`get-team-channel --channel-id x` etc.)
   {
     source: 'graph',
     matchMessage: (m) => /channelId is not valid|invalid channel id/i.test(m),
-    hint: 'The Teams channel ID is not valid. Source it via `ask-marcel list-team-channels --team-id <team-id>` and pass the `id` field of the channel verbatim — Graph rejects display names and short aliases. The team ID itself comes from `ask-marcel list-joined-teams`.',
+    hint: 'The Teams channel ID is not valid. Source it via `ask-marcel-office list-team-channels --team-id <team-id>` and pass the `id` field of the channel verbatim — Graph rejects display names and short aliases. The team ID itself comes from `ask-marcel-office list-joined-teams`.',
   },
   // 3. Planner / generic resource-not-found bare message: `The requested
-  //    item is not found.` Planner notably emits this with `code: ""` so
-  //    the existing `itemNotFound | ResourceNotFound` code-rule cannot
-  //    match — message-pattern fallback is the only path.
+  // item is not found.` Planner notably emits this with `code: ""` so
+  // the existing `itemNotFound | ResourceNotFound` code-rule cannot
+  // match — message-pattern fallback is the only path.
   {
     source: 'graph',
     matchMessage: (m) => /requested item is not found/i.test(m),
@@ -221,36 +221,36 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchMessage: (m) => /Missing scope/i.test(m),
-    hint: "The cached token doesn't include the required scope. Run `ask-marcel scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling (see memory.decision_teams_token_scopes) so missing scopes can't be added without a different Azure registration.",
+    hint: "The cached token doesn't include the required scope. Run `ask-marcel-office scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling (see memory.decision_teams_token_scopes) so missing scopes can't be added without a different Azure registration.",
   },
   // ─── Graph: generic access denied / forbidden ────────────────────────────
-  // v1.4.0 fresh-pass #5 (round 2): user reported `ErrorAccessDenied` as a
+  // user reported `ErrorAccessDenied` as a
   // bare-envelope case. Add it to the same rule — semantically identical.
   {
     source: 'graph',
     matchCode: (c) => c === 'accessDenied' || c === 'Forbidden' || c === 'AccessDenied' || c === 'ErrorAccessDenied',
-    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel login` to refresh. Also run `ask-marcel scopes-check` to confirm the cached token actually includes the scope this endpoint needs.",
+    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel-office login` to refresh. Also run `ask-marcel-office scopes-check` to confirm the cached token actually includes the scope this endpoint needs.",
   },
   // ─── Graph: unknown $select / $orderby field (RequestBroker--ParseUri) ───
-  // v1.4.0 fresh-pass #5 (round 2): pattern-matched on errorCode because the
+  // pattern-matched on errorCode because the
   // RequestBroker-- prefix is Graph's structural OData parser signature —
   // every unknown-field rejection lands here regardless of message wording.
   {
     source: 'graph',
     matchCode: (c) => c === 'RequestBroker--ParseUri',
-    hint: 'OData parser rejected the URL — usually because a field name passed to `--select` or `--orderby` (or referenced in `--filter`) does not exist on this resource type. Look up the valid field names in `ask-marcel docs <command>` (the `responseShape` section); Graph silently DROPS unknown fields from `--select` but REJECTS them from `--orderby` and `--filter`.',
+    hint: 'OData parser rejected the URL — usually because a field name passed to `--select` or `--orderby` (or referenced in `--filter`) does not exist on this resource type. Look up the valid field names in `ask-marcel-office docs <command>` (the `responseShape` section); Graph silently DROPS unknown fields from `--select` but REJECTS them from `--orderby` and `--filter`.',
   },
   // ─── Graph: ErrorInvalidUser (bad UPN / object ID on shared-mailbox & friends) ─
-  // v1.4.0 fresh-pass #5 (round 2): /users/{upn-or-id} family. The bad
+  // /users/{upn-or-id} family. The bad
   // identifier is usually a typo'd email or a guest-user upn that doesn't
   // exist in this tenant.
   {
     source: 'graph',
     matchCode: (c) => c === 'ErrorInvalidUser' || c === 'Request_ResourceNotFound',
-    hint: 'User principal name or object ID not found in this tenant. Source a real one via `ask-marcel list-relevant-people --select id,userPrincipalName,displayName`, `ask-marcel get-current-user` (for the signed-in user), or `ask-marcel list-groups --select id,displayName` (when you wanted a group, not a user). Guest UPNs use the `_` form: `alice_contoso.com#EXT#@yourtenant.onmicrosoft.com`, not `alice@contoso.com`.',
+    hint: 'User principal name or object ID not found in this tenant. Source a real one via `ask-marcel-office list-relevant-people --select id,userPrincipalName,displayName`, `ask-marcel-office get-current-user` (for the signed-in user), or `ask-marcel-office list-groups --select id,displayName` (when you wanted a group, not a user). Guest UPNs use the `_` form: `alice_contoso.com#EXT#@yourtenant.onmicrosoft.com`, not `alice@contoso.com`.',
   },
   // ─── Graph: ErrorInvalidParameter (Excel & calendar-view families) ───────
-  // v1.4.0 fresh-pass #5 (round 2): two rules — the specific calendar
+  // two rules — the specific calendar
   // date-inversion message wins first (pure message-pattern, no code-match
   // so it doesn't gate on the code label); the generic `ErrorInvalidParameter`
   // code rule catches the rest. `ruleMatches` is OR-semantic — keeping the
@@ -264,22 +264,22 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'ErrorInvalidParameter',
-    hint: 'An input parameter to this endpoint is invalid. Re-read `ask-marcel <command> --help` for the exact value shapes (calendar windows want ISO-8601 or relative dates; Excel ranges want A1-style addresses; user/group references want GUIDs or UPNs). The Graph error message names the offending parameter — read past the `ErrorInvalidParameter:` prefix for the specifics.',
+    hint: 'An input parameter to this endpoint is invalid. Re-read `ask-marcel-office <command> --help` for the exact value shapes (calendar windows want ISO-8601 or relative dates; Excel ranges want A1-style addresses; user/group references want GUIDs or UPNs). The Graph error message names the offending parameter — read past the `ErrorInvalidParameter:` prefix for the specifics.',
   },
   // ─── Graph: invalidArgument (Excel range malformed is the canonical case) ─
-  // v1.4.0 fresh-pass #5 (round 2): /workbook/range, /workbook/tables/...,
+  // /workbook/range, /workbook/tables/...,
   // and a few /me/calendar paths emit `invalidArgument` for parameter shape
   // failures. The Excel-range case is the high-frequency one an LLM hits.
   {
     source: 'graph',
     matchCode: (c) => c === 'invalidArgument',
-    hint: 'A request argument has the wrong shape. The most common case is an Excel `--address` that is not A1-style — valid forms are `A1`, `A1:C5`, `Sheet1!A1:C5`, or a defined-name from `ask-marcel list-excel-defined-names`. For other endpoints, the Graph message text names the offending parameter — read past the `invalidArgument:` prefix for the specifics.',
+    hint: 'A request argument has the wrong shape. The most common case is an Excel `--address` that is not A1-style — valid forms are `A1`, `A1:C5`, `Sheet1!A1:C5`, or a defined-name from `ask-marcel-office list-excel-defined-names`. For other endpoints, the Graph message text names the offending parameter — read past the `invalidArgument:` prefix for the specifics.',
   },
   // ─── Graph: auth token expired ───────────────────────────────────────────
   {
     source: 'graph',
     matchCode: (c) => c === 'InvalidAuthenticationToken' || c === 'TokenExpired',
-    hint: 'The cached access token is invalid or expired. Run `ask-marcel login` to re-authenticate, then retry. Use `ask-marcel scopes-check` to inspect `expiresInSeconds` ahead of time on long-running sessions.',
+    hint: 'The cached access token is invalid or expired. Run `ask-marcel-office login` to re-authenticate, then retry. Use `ask-marcel-office scopes-check` to inspect `expiresInSeconds` ahead of time on long-running sessions.',
   },
   // ─── Graph: throttling ───────────────────────────────────────────────────
   {
@@ -295,15 +295,15 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     hint: 'KQL parse error — usually means `--query` was wrapped in extra double-quotes. The CLI already wraps the value in `"..."` on the wire; pass the raw KQL (`subject:invoice from:alice`), not `"subject:invoice"`.',
   },
   // ─── Graph: invalid $orderby column ──────────────────────────────────────
-  // v1.4.0 fresh-pass #5: covers `Invalid orderby property 'foo' for resource 'message'`
+  // covers `Invalid orderby property 'foo' for resource 'message'`
   // and variants. The remedy is always "use a column that actually exists".
   {
     source: 'graph',
     matchMessage: (m) => /Invalid orderby property/i.test(m),
-    hint: 'The `--orderby` column is not a valid sort key on this resource. Run `ask-marcel docs <command>` and use a column that appears in `responseShape`. Common gotchas: `subject` and `body` are not sortable on `message`; `displayName` is rarely sortable on `chat`. Stick to id/dateTime/numeric fields.',
+    hint: 'The `--orderby` column is not a valid sort key on this resource. Run `ask-marcel-office docs <command>` and use a column that appears in `responseShape`. Common gotchas: `subject` and `body` are not sortable on `message`; `displayName` is rarely sortable on `chat`. Stick to id/dateTime/numeric fields.',
   },
   // ─── Graph: $filter parse error / OData quoting ──────────────────────────
-  // v1.4.0 fresh-pass #5 (round 2): broadened the regex to catch the spaced
+  // broadened the regex to catch the spaced
   // form `Invalid filter clause: Syntax error at position N` (the
   // RequestBroker emits this on bare `iswhatever 12` etc.) on top of the
   // older `The expression '...' is not valid` shape.
@@ -331,7 +331,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchMessage: (m) => /\$skip is not supported/i.test(m),
-    hint: 'This endpoint rejects `$skip`. Paginate via the top-level `nextLink` cursor → `ask-marcel next-page --url <link>` instead of offsetting client-side.',
+    hint: 'This endpoint rejects `$skip`. Paginate via the top-level `nextLink` cursor → `ask-marcel-office next-page --url <link>` instead of offsetting client-side.',
   },
   // ─── Graph: $search + $filter / $orderby combo ───────────────────────────
   {
@@ -348,15 +348,15 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'validation',
     matchMessage: (m) => (/^--[a-z][a-z0-9-]*\b/u.test(m) || m.startsWith('Validation error')) && !hasActionableAdvice(m),
-    hint: 'CLI input failed schema validation. Re-read the per-command help (`ask-marcel <cmd> --help` or `ask-marcel docs <cmd>`) for the exact required flags and their types.',
+    hint: 'CLI input failed schema validation. Re-read the per-command help (`ask-marcel-office <cmd> --help` or `ask-marcel-office docs <cmd>`) for the exact required flags and their types.',
   },
 ];
 
 // "Already-actionable" detector: messages that name a sibling command in
-// backticks (e.g. "Use `ask-marcel list-mail-messages` instead") don't need a
+// backticks (e.g. "Use `ask-marcel-office list-mail-messages` instead") don't need a
 // generic hint piled on top — the remedy is in the message text. Used by the
 // validation fallback rule below to avoid overriding per-command advice.
-const hasActionableAdvice = (message: string): boolean => /`(ask-marcel\s+)?[a-z][a-z0-9-]+(\s+--[a-z-]+)?`/u.test(message);
+const hasActionableAdvice = (message: string): boolean => /`(ask-marcel-office\s+)?[a-z][a-z0-9-]+(\s+--[a-z-]+)?`/u.test(message);
 
 const ruleMatches = (rule: HintRule, message: string, code: string | undefined): boolean => {
   if (rule.matchCode !== undefined && code !== undefined && rule.matchCode(code)) return true;

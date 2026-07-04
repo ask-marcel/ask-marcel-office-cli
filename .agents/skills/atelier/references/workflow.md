@@ -116,7 +116,7 @@ A ready-to-copy `check-coverage.ts` lives in the skill at `assets/check-coverage
 | `src/composition/**` (env.ts AND build-deps.ts) | **80%** |
 | `src/presenter/**` | 80% |
 | `src/infra/**` | **80% from day one** — not "once tests exist" |
-| `src/test-helpers/**` | skip during normal runs (audit periodically — see below) |
+| `src/test-helpers/**` | skip during normal runs |
 | `src/main.ts` | skip (entry point; verified by integration) |
 
 **`build-deps.ts` is no longer skipped.** The earlier policy excluded it as "composition root, verified live, no logic worth unit-testing". That was hedging. The composition root becomes fully unit-testable when (a) every "where do I read state from" point (file path, env var, system clock) is parameterisable, and (b) every "what do I write to / log to" sink can be injected as a port. See `references/architecture.md` (Composition root testability) for the optional-config-DI pattern.
@@ -211,8 +211,8 @@ export default [
       }],
     },
   },
-  // Type-aware rules — gated by LINT_STRICT=1. Inner-loop `bun run lint`
-  // does not pay the ~25s parserOptions.projectService cost.
+ // Type-aware rules — gated by LINT_STRICT=1. Inner-loop `bun run lint`
+ // does not pay the ~25s parserOptions.projectService cost.
   ...(process.env['LINT_STRICT']
     ? [{
         files: ['src/**/*.ts'],
@@ -230,7 +230,7 @@ export default [
     : []),
   sonarjsPlugin.configs.recommended,
   {
-    // SonarJS rule overrides — always-on, justified per rule.
+ // SonarJS rule overrides — always-on, justified per rule.
     rules: {
       'sonarjs/no-unused-vars': 'off',          // duplicates @typescript-eslint/no-unused-vars
       'sonarjs/no-empty-test-file': 'off',      // false positives on `describe` test layout
@@ -241,8 +241,8 @@ export default [
     rules: {
       'security/detect-object-injection': 'off',
       'security/detect-unsafe-regex': 'off',
-      // false-positive on chmodSync(mkdtempSync(...)) in FS-adapter tests;
-      // production uses Bun.file (not covered by this rule), so no real loss.
+ // false-positive on chmodSync(mkdtempSync(...)) in FS-adapter tests;
+ // production uses Bun.file (not covered by this rule), so no real loss.
       'security/detect-non-literal-fs-filename': 'off',
     },
   },
@@ -597,7 +597,7 @@ Two guardrails prevent Prettier ↔ VS Code TS-formatter drift:
 {
   "compilerOptions": {
     "types": ["bun"]
-    // ... rest of config
+ // ... rest of config
   }
 }
 ```

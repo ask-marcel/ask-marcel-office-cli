@@ -22,7 +22,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
+  example: "ask-marcel-office list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
   responseShape: 'collection of Microsoft Graph `calendar` resources under `value[]`',
   pagination: true,
 };

@@ -40,12 +40,12 @@ describe('command meta — invariants on every registered command', () => {
     expect(flagged).toEqual(expected);
   });
 
-  it('marks EXACTLY the two mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
+  it('marks EXACTLY the three mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
     const mutating = Object.entries(commands)
       .filter(([, cmd]) => cmd.meta.mutates === true)
       .map(([name]) => name)
       .toSorted((a, b) => a.localeCompare(b));
-    expect(mutating).toEqual(['create-mail-draft', 'update-mail-draft']);
+    expect(mutating).toEqual(['create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
   });
 
   for (const [name, cmd] of populated) {
@@ -71,14 +71,14 @@ describe('command meta — invariants on every registered command', () => {
         }
       });
 
-      it('exposes the short --start/--end aliases on any date-window option (calendar-view family, QA-2026-06-16)', () => {
+      it('exposes the short --start/--end aliases on any date-window option (calendar-view family, 6-06-16)', () => {
         for (const opt of cmd.meta.options) {
           if (opt.name === 'start-date-time') expect(opt.aliases?.some((a) => a.name === 'start' && a.key === 'start')).toBe(true);
           if (opt.name === 'end-date-time') expect(opt.aliases?.some((a) => a.name === 'end' && a.key === 'end')).toBe(true);
         }
       });
 
-      it('exposes the --id alias on a SOLE required id-option (uniform sole-id convention, QA-2026-06-16)', () => {
+      it('exposes the --id alias on a SOLE required id-option (uniform sole-id convention, 6-06-16)', () => {
         // When a command has exactly one required `*-id` option, `--id` is unambiguous and
         // every such command must accept it (matches the mail-message family). Commands with
         // two required ids deliberately do NOT (—id would be ambiguous).
@@ -119,13 +119,13 @@ describe('command meta — invariants on every registered command', () => {
           // its own startTime + cursor token); not path placeholders.
           'sync-state',
           'max-pages',
-          // Audit Alex-session §A: projection knobs on `list-teams-chat-history`
+          // projection knobs on `list-teams-chat-history`
           // AND `get-excel-used-range` — all four are post-fetch processing
           // flags (slim default + size cap), not URL placeholders.
           'full',
           'max-content-chars',
           'max-cells',
-          // v1.4.0 fresh-pass #6: `convert-mail-to-markdown --inline-images
+          // `convert-mail-to-markdown --inline-images
           // false` is a post-fetch processing knob (skip the per-image bytes
           // fetch + base64 embedding), not a URL placeholder.
           'inline-images',
@@ -173,8 +173,8 @@ describe('command meta — invariants on every registered command', () => {
         expect(cmd.meta.graphDocsUrl).toMatch(/^https:\/\/learn\.microsoft\.com\/en-us\/graph\//);
       });
 
-      it('provides a runnable example beginning with `ask-marcel`', () => {
-        expect(cmd.meta.example).toMatch(/^ask-marcel /);
+      it('provides a runnable example beginning with `ask-marcel-office`', () => {
+        expect(cmd.meta.example).toMatch(/^ask-marcel-office /);
       });
 
       it('has a non-empty category, graphMethod from the HTTP-verb set, non-empty graphPathTemplate, and non-empty responseShape when declared (invariants on the meta block itself, killing inert-config-string mutants)', () => {
@@ -222,7 +222,7 @@ describe('command meta — invariants on every registered command', () => {
   }
 
   it('references no PHANTOM command names in any prose (summary / option descriptions / responseShape / example / bodyTemplate)', () => {
-    // Phantom-name guard (QA-2026-06-16): a prose hint pointing at a command that
+    // Phantom-name guard: a prose hint pointing at a command that
     // does not exist (e.g. the plugin once taught `get-event` for `get-calendar-event`)
     // ships silently — meta.test previously validated only per-command FLAGS. Validate
     // every command-shaped reference against the registry + lifecycle names + aliases.
@@ -235,8 +235,8 @@ describe('command meta — invariants on every registered command', () => {
     const phantom: string[] = [];
     for (const [name, cmd] of populated) {
       const prose = [cmd.meta.summary, cmd.meta.example, cmd.meta.responseShape ?? '', cmd.meta.bodyTemplate ?? '', ...cmd.meta.options.map((o) => o.description)].join('\n');
-      // (a) explicit `ask-marcel <name>` invocations — unambiguous
-      for (const m of prose.matchAll(/ask-marcel\s+([a-z][a-z0-9-]+)/g)) if (!valid.has(m[1] ?? '')) phantom.push(`${name}: ask-marcel ${m[1]}`);
+      // (a) explicit `ask-marcel-office <name>` invocations — unambiguous
+      for (const m of prose.matchAll(/ask-marcel-office\s+([a-z][a-z0-9-]+)/g)) if (!valid.has(m[1] ?? '')) phantom.push(`${name}: ask-marcel-office ${m[1]}`);
       // (b) backticked command-shaped tokens (verb-prefixed kebab) — `feeds \`get-calendar-event\``
       for (const m of prose.matchAll(/`([a-z][a-z0-9-]+)`/g)) {
         const tok = m[1] ?? '';

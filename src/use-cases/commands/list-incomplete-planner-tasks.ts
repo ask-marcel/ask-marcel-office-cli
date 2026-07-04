@@ -6,7 +6,7 @@ import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.
 
 // Hardcoded `$filter=percentComplete ne 100` in the path means a user-supplied
 // `--filter` would cause Graph to receive two `$filter` query params. Audit
-// round-6 §2.7: accept --filter at the schema layer so we can return a
+// accept --filter at the schema layer so we can return a
 // helpful "use list-planner-tasks instead" error rather than Commander's
 // generic "unknown option".
 const schema = z.object({}).extend(odataQuerySchema.shape);
@@ -33,7 +33,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/planner/tasks?$filter=percentComplete ne 100',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-tasks',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-incomplete-planner-tasks --top 25',
+  example: 'ask-marcel-office list-incomplete-planner-tasks --top 25',
   responseShape: 'collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`',
   pagination: true,
 };

@@ -24,7 +24,7 @@ const meta: CommandMeta = {
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     ...noSkipOptions,
   ],
-  example: "ask-marcel list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `driveItemVersion` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

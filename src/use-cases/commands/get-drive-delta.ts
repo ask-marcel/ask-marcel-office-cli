@@ -30,7 +30,7 @@ const meta: CommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
+  example: "ask-marcel-office get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
   responseShape:
     'collection of changed Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

@@ -1,12 +1,12 @@
 # ask-marcel-office-cli
 
-**A Microsoft Graph CLI built for LLMs.** 177 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus local-file tools (markdown conversion, image extraction) that need no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+**A Microsoft Graph CLI built for LLMs.** 179 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus local-file tools (markdown conversion, image extraction) that need no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
 
 ```bash
 npm i -g ask-marcel-office-cli
-ask-marcel login                 # browser opens once, token cached
-ask-marcel my-quick-context      # who am I + my IDs, in one round trip
-ask-marcel list-mail-messages --top 5
+ask-marcel-office login                 # browser opens once, token cached
+ask-marcel-office my-quick-context      # who am I + my IDs, in one round trip
+ask-marcel-office list-mail-messages --top 5
 ```
 
 ---
@@ -19,13 +19,13 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 2. **Default payloads are tuned for backend services, not context windows.** Listing endpoints return every field on every item, used-range Excel calls return four redundant 2D arrays, attachment endpoints inline base64 by default. An agent that reads "what's in my inbox" without trimming burns its budget on metadata it never needed.
 3. **Errors are opaque.** `BadRequest: Invalid filter clause` doesn't tell a model what to fix.
 
-`ask-marcel` fixes all three at the CLI layer, so the model just calls commands and reads back-pressure-friendly responses.
+`ask-marcel-office` fixes all three at the CLI layer, so the model just calls commands and reads back-pressure-friendly responses.
 
 ## What you get
 
 ### Read-only by design
 
-**This is the most important property.** 173 GET endpoints + 2 POST (searches) + 1 POST (create draft) + 1 PATCH (update draft) = 177 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 173 GET endpoints + 3 read-only POST (two searches + free/busy lookup) + 2 POST (create mail draft / create threaded reply draft) + 1 PATCH (update draft) = 179 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation (a new mail or a threaded reply-all) and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -68,20 +68,11 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
 
-**Login flow:** By default, the CLI uses Playwright to open a browser for authentication. Alternatively, you can use the [Ask Marcel Companion](./browser-extension/) browser extension for faster authentication.
+**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600).
 
 ```bash
-ask-marcel login              # default: Playwright browser
-ask-marcel login --use-extension  # use browser extension (requires setup)
+ask-marcel-office login
 ```
-
-**Browser extension setup (optional, one-time):**
-
-1. Open `chrome://extensions/` (Chrome) or `edge://extensions/` (Edge)
-2. Enable "Developer mode" (top-right toggle)
-3. Click "Load unpacked" → select the `browser-extension/` folder from this repo
-4. **Enable in incognito/inprivate mode:** Click the extension's "Details" button, then enable "Allow in incognito" (Chrome) or "Allow in InPrivate" (Edge). **This is required** — the CLI opens an incognito/inprivate window, and extensions are disabled there by default.
-5. Done — use `ask-marcel login --use-extension` to authenticate via the extension
 
 ### Stable error envelope with actionable hints
 
@@ -111,14 +102,14 @@ Two flag patterns avoid the round-trip:
 npm i -g ask-marcel-office-cli
 
 # authenticate (cached → refresh → browser fallback)
-ask-marcel login
+ask-marcel-office login
 
 # the rest is read-only (the only writes are mail drafts) and discoverable from --help
-ask-marcel list-drives
-ask-marcel search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
-ask-marcel convert-mail-to-markdown --message-id "AAMkAD..."
-ask-marcel list-calendar-view --start-date-time today --end-date-time +7d
-ask-marcel convert-mail-attachment-to-pdf \
+ask-marcel-office list-drives
+ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
+ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
+ask-marcel-office list-calendar-view --start-date-time today --end-date-time +7d
+ask-marcel-office convert-mail-attachment-to-pdf \
   --message-id "AAMkAD..." --attachment-id "AAMkAD...attach1" \
   --output-path /tmp/deck.pdf
 ```
@@ -129,11 +120,11 @@ Five discovery surfaces, each tuned for a different audience and token budget:
 
 | When you want | Run | Returns |
 |---|---|---|
-| Help with a single command | `ask-marcel <command> --help` | Required flags, optional flags, an example, pagination notes |
-| A scan of every command | `ask-marcel --help` | One-sentence summary per command, grouped by category |
-| The slim LLM-friendly index | `ask-marcel help-json --terse` | JSON manifest with heavy fields (options, response shape) stripped — best first-call for an agent meeting the CLI for the first time |
-| The slim index for one domain | `ask-marcel help-json --terse --category mail` | Same as above, filtered to one of 12 categories — keeps the response tiny when the agent already knows the domain |
-| Rich docs for one command | `ask-marcel docs <command>` | Full Markdown to stdout (response shape, examples, the underlying Graph endpoint, Microsoft Learn link) |
+| Help with a single command | `ask-marcel-office <command> --help` | Required flags, optional flags, an example, pagination notes |
+| A scan of every command | `ask-marcel-office --help` | One-sentence summary per command, grouped by category |
+| The slim LLM-friendly index | `ask-marcel-office help-json --terse` | JSON manifest with heavy fields (options, response shape) stripped — best first-call for an agent meeting the CLI for the first time |
+| The slim index for one domain | `ask-marcel-office help-json --terse --category mail` | Same as above, filtered to one of 12 categories — keeps the response tiny when the agent already knows the domain |
+| Rich docs for one command | `ask-marcel-office docs <command>` | Full Markdown to stdout (response shape, examples, the underlying Graph endpoint, Microsoft Learn link) |
 
 Pair `help-json --terse --category <name>` with `docs <command>` for the canonical agent loop: scan the category, pick a command, fetch its full docs, then call it.
 
@@ -141,7 +132,7 @@ Pair `help-json --terse --category <name>` with `docs <command>` for the canonic
 
 Most agents already know how to read JSON from stdout. Two patterns work:
 
-**1. Drop in as a shell tool** — the agent learns the manifest, then runs `ask-marcel <command> --output json`. The slim defaults + structured error hints mean it can self-recover from typos.
+**1. Drop in as a shell tool** — the agent learns the manifest, then runs `ask-marcel-office <command> --output json`. The slim defaults + structured error hints mean it can self-recover from typos.
 
 **2. Embed as a library** — every command is exported. Compose it inside your own MCP server, Claude Agent, or LangChain tool:
 
@@ -185,7 +176,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Deep docs
 
-- **[All 177 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
+- **[All 179 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
@@ -193,7 +184,7 @@ The `AuthManager` interface is two async methods that return `Result<T, AuthErro
 
 ## Agent skill (progressive disclosure)
 
-A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 177 commands into context at once.
+A [Codex skill](https://docs.anthropic.com/en/docs/agents-and-tools/codex) lives at `.agents/skills/ask-marcel-office/` and teaches agents how to use the CLI without loading all 179 commands into context at once.
 
 **Structure**
 

@@ -707,7 +707,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-content rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint instead of empty error (audit round-6 §1.1)', async () => {
+  it('download-drive-item-content rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint instead of empty error', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'Reports', folder: { childCount: 12 } }) },
     ]);
@@ -723,7 +723,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-as-pdf rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint (audit round-6 §1.1)', async () => {
+  it('download-drive-item-as-pdf rejects a folder --item-id with a clear "this is a folder, use list-folder-files" hint', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iFolder', method: 'GET', response: Response.json({ name: 'Reports', folder: { childCount: 12 } }) },
     ]);
@@ -739,7 +739,7 @@ describe('commands', () => {
     }
   });
 
-  it('get-mail-attachment surfaces `base64` mirror of `contentBytes` for fileAttachments so --output-path can land on disk (audit round-6 §6)', async () => {
+  it('get-mail-attachment surfaces `base64` mirror of `contentBytes` for fileAttachments so --output-path can land on disk', async () => {
     const result = await callCommand(
       'get-mail-attachment',
       { messageId: 'm1', attachmentId: 'a1' },
@@ -784,7 +784,7 @@ describe('commands', () => {
     }
   });
 
-  it('list-todo-tasks rewrites the opaque RequestBroker--ParseUri error to a hint that names the workaround (audit round-6 §1.5)', async () => {
+  it('list-todo-tasks rewrites the opaque RequestBroker--ParseUri error to a hint that names the workaround', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$select=id%2Ctitle',
@@ -807,7 +807,7 @@ describe('commands', () => {
     }
   });
 
-  it('list-todo-tasks also rewrites RequestBroker--ParseUri when --orderby trips the same parser quirk (audit v1.0.0 Bug 3)', async () => {
+  it('list-todo-tasks also rewrites RequestBroker--ParseUri when --orderby trips the same parser quirk', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$orderby=title%20asc',
@@ -946,7 +946,7 @@ describe('commands', () => {
     expect(r.error.message).not.toContain('Drop `title`');
   });
 
-  it('list-calendar-event-instances rewrites the opaque ExpandSeries error to a seriesMaster hint (audit v1.0.0 Issue 9)', async () => {
+  it('list-calendar-event-instances rewrites the opaque ExpandSeries error to a seriesMaster hint', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/calendar/events/e1/instances',
@@ -997,7 +997,7 @@ describe('commands', () => {
     }
   });
 
-  it('list-chat-members rewrites the opaque `1: NotFound` error to a clear chat-id hint (audit round-7 B3)', async () => {
+  it('list-chat-members rewrites the opaque `1: NotFound` error to a clear chat-id hint', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/chats/19:bogus@thread.v2/members',
@@ -1108,7 +1108,7 @@ describe('commands', () => {
     expect(via).toEqual(['basic']);
   });
 
-  it('get-team-channel rewrites the opaque `1: NotFound` error to a clear channel-id hint (audit v1.0.0 B2)', async () => {
+  it('get-team-channel rewrites the opaque `1: NotFound` error to a clear channel-id hint', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/teams/tm1/channels/19:bogus@thread.skype',
@@ -1211,7 +1211,7 @@ describe('commands', () => {
     }
   });
 
-  it('list-incomplete-todo-tasks rewrites --orderby title with the parser-quirk hint (audit round-8 §1.1)', async () => {
+  it('list-incomplete-todo-tasks rewrites --orderby title with the parser-quirk hint', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: "https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$filter=status ne 'completed'&$orderby=title%20asc",
@@ -1236,7 +1236,7 @@ describe('commands', () => {
     expect(r.error.code).toBe('cli_rewrite_todo_orderby_title');
   });
 
-  it('list-incomplete-todo-tasks rewrites the title-quirk RequestBroker--ParseUri error like its sibling (audit round-8 §1.1)', async () => {
+  it('list-incomplete-todo-tasks rewrites the title-quirk RequestBroker--ParseUri error like its sibling', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: "https://graph.microsoft.com/v1.0/me/todo/lists/l1/tasks?$filter=status ne 'completed'&$select=id%2Ctitle",
@@ -1259,7 +1259,7 @@ describe('commands', () => {
     }
   });
 
-  it('list-incomplete-todo-tasks rejects --filter with a pointer at list-todo-tasks (audit round-6 §2.7)', async () => {
+  it('list-incomplete-todo-tasks rejects --filter with a pointer at list-todo-tasks', async () => {
     const cmd = cmdMap['list-incomplete-todo-tasks'];
     if (!cmd) throw new Error('list-incomplete-todo-tasks not registered');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { todoTaskListId: 'tasks', filter: "subject eq 'x'" });
@@ -1271,7 +1271,7 @@ describe('commands', () => {
     expect(r.error.message).toContain('list-todo-tasks');
   });
 
-  it('list-incomplete-planner-tasks rejects --filter with a pointer at list-planner-tasks (audit round-6 §2.7)', async () => {
+  it('list-incomplete-planner-tasks rejects --filter with a pointer at list-planner-tasks', async () => {
     const cmd = cmdMap['list-incomplete-planner-tasks'];
     if (!cmd) throw new Error('list-incomplete-planner-tasks not registered');
     const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { filter: 'priority eq 1' });
@@ -1282,7 +1282,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — audit v1.0.0 §bug-3)', async () => {
+  it('download-drive-item-content returns plain-text source extensions inline as `{contentType: "text/plain", text}` (no 33% base64 bloat — -3)', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 5 }) },
       {
@@ -1355,7 +1355,7 @@ describe('commands', () => {
     }
   });
 
-  it('download-drive-item-as-pdf short-circuits plain-text source extensions to `{contentType: "text/plain", size, text}` for envelope parity with download-drive-item-content (audit round-7 B5)', async () => {
+  it('download-drive-item-as-pdf short-circuits plain-text source extensions to `{contentType: "text/plain", size, text}` for envelope parity with download-drive-item-content', async () => {
     const fetchFn = stagedFetch([
       { urlPrefix: 'https://graph.microsoft.com/v1.0/drives/d1/items/iText', method: 'GET', response: Response.json({ name: 'README.md', size: 4 }) },
       {
@@ -2734,7 +2734,7 @@ describe('commands', () => {
     expect(v.text ?? '').toContain('forwarded.msg');
   });
 
-  it("convert-mail-to-markdown --inline-images false skips the per-image bytes fetch entirely (no /attachments/{id} requests) and surfaces inline images in the file-attachments list so the LLM caller doesn't lose visibility (v1.4.0 fresh-pass #6)", async () => {
+  it("convert-mail-to-markdown --inline-images false skips the per-image bytes fetch entirely (no /attachments/{id} requests) and surfaces inline images in the file-attachments list so the LLM caller doesn't lose visibility ()", async () => {
     const urls: string[] = [];
     const fetchFn: FetchFn = async (url) => {
       urls.push(url);
@@ -2944,7 +2944,7 @@ describe('commands', () => {
     expect(calls.some((c) => c.url.endsWith('/content?format=pdf'))).toBe(true);
   });
 
-  it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (v1.4.0 fresh-pass #7: folder used to linger at OneDrive root)', async () => {
+  it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (folder used to linger at OneDrive root)', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
       calls.push({ url, method: init?.method });
@@ -2981,7 +2981,7 @@ describe('commands', () => {
     expect(calls.some((c) => c.url.includes('/.ask-marcel-temp:/children'))).toBe(true);
   });
 
-  it('convert-mail-attachment-to-pdf also sweeps the legacy un-dotted `ask-marcel-temp` folder when empty (QA-008: pre-rename orphan found at a real tenant root)', async () => {
+  it('convert-mail-attachment-to-pdf also sweeps the legacy un-dotted `ask-marcel-temp` folder when empty (pre-rename orphan found at a real tenant root)', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
       calls.push({ url, method: init?.method });
@@ -3052,7 +3052,7 @@ describe('commands', () => {
       const v = result.value as { contentType: string; size: number; base64: string; note: string; passthrough: boolean };
       expect(v.contentType).toBe('text/plain');
       expect(v.note).toContain('pre-checked source');
-      expect(v.passthrough).toBe(true); // so --output-path guard blocks writing text into a .pdf (audit A5)
+      expect(v.passthrough).toBe(true); // so --output-path guard blocks writing text into a .pdf
       expect(atob(v.base64)).toBe('# Hello');
     }
   });
@@ -3115,7 +3115,7 @@ describe('commands', () => {
     expect(formatPdfCalled).toBe(false);
   });
 
-  it('convert-mail-attachment-to-pdf tags a plain-text referenceAttachment short-circuit as passthrough so --output-path cannot write it into a .pdf (audit A5)', async () => {
+  it('convert-mail-attachment-to-pdf tags a plain-text referenceAttachment short-circuit as passthrough so --output-path cannot write it into a .pdf', async () => {
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aRefTxt')) {
         return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/notes.txt' });
@@ -3167,7 +3167,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-pdf rejects an image fileAttachment with a friendly hint pointing at get-mail-attachment + a vision-capable model (audit v1.0.0 §2.4)', async () => {
+  it('convert-mail-attachment-to-pdf rejects an image fileAttachment with a friendly hint pointing at get-mail-attachment + a vision-capable model', async () => {
     const fetchFn: FetchFn = async (url) => {
       if (url.endsWith('/attachments/aPng')) {
         return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'screenshot.png', contentBytes: btoa('fake-png-bytes') });
@@ -4281,7 +4281,7 @@ describe('convert-drive-item-zip', () => {
     expect(at('mail.msg').text).toContain('Attachment body text');
     expect(at('mail.msg').contentType).toBe('text/markdown');
     expect(at('photo.png').note).toContain('png is an image'); // raster image → noted, not unpacked
-    // QA-007: entries INSIDE a container get container-neutral guidance — the
+    // entries INSIDE a container get container-neutral guidance — the
     // sibling commands can only address top-level drive items, never zip entries.
     expect(at('photo.png').note).toContain('extract it from the archive/message');
     expect(at('photo.png').note).not.toContain('extract-drive-item-images');
@@ -5279,7 +5279,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     params: {},
     expectedPath: '/me/messages?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview',
   },
-  // Audit Alex-session §A: explicit --select wins over the slim default.
+  // explicit --select wins over the slim default.
   { name: 'list-mail-messages', params: { select: 'id,subject' }, expectedPath: '/me/messages?$select=id%2Csubject' },
   { name: 'list-mail-folders', params: {}, expectedPath: '/me/mailFolders' },
   { name: 'list-mail-child-folders', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/childFolders' },
@@ -5298,7 +5298,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-mail-attachment', params: { messageId: 'm1', attachmentId: 'a1' }, expectedPath: '/me/messages/m1/attachments/a1' },
   { name: 'list-mail-rules', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messageRules' },
   { name: 'get-mailbox-settings', params: {}, expectedPath: '/me/mailboxSettings' },
-  // v1.4.0 fresh-pass #4: search-mail-messages now mirrors list-mail-messages'
+  // search-mail-messages now mirrors list-mail-messages'
   // slim default. The path always carries the inlined $select.
   {
     name: 'search-mail-messages',
@@ -5698,7 +5698,7 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     const cmd = cmdMap['find-chats-with-user'];
     if (!cmd) throw new Error('command not found');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const r = await cmd.execute(graph, { name: 'alex doe' });
+    const r = await cmd.execute(graph, { name: 'alex kim' });
     expect(r.ok).toBe(true);
     if (r.ok) {
       const v = r.value as { matchCount: number; matches: Array<{ chatId: string; matchedMembers: Array<{ mri?: string; userSubType?: string }> }> };
@@ -5713,14 +5713,14 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     }
   });
 
-  // Audit Alex-session §D follow-up — the live failure mode that the
+  // follow-up — the live failure mode that the
   // synthetic dual-identity test above DID NOT cover: the corporate-MRI
   // member entry's `displayName` is the email itself (no accent), while
   // the guest-MRI entry's displayName carries the accented form. A search
   // for `Alex` used to return ONLY the guest chat because `é` and `e`
   // are different bytes — the corporate 1:1 (843 chats deep) was invisible.
   // Diacritic-folding both sides at compare time fixes it.
-  it('surfaces dual-identity when the corporate identity stores its displayName as the un-accented email and the guest identity stores the accented name (Audit Alex-session §D)', async () => {
+  it('surfaces dual-identity when the corporate identity stores its displayName as the un-accented email and the guest identity stores the accented name', async () => {
     const fetchFn = sequencedFetch([
       {
         chats: [
@@ -5900,10 +5900,10 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
   });
 
   // ── Cross-tenant hydration (the Chen Robin repro): an externally-homed
-  //    counterpart returns in the summary roster as a bare `{mri}` — no name,
-  //    no email — so a name search can't match it. `/chats/{id}/members`
-  //    (elevated) resolves the member; the matcher re-runs on the hydrated
-  //    roster. The bug was a silent `matchCount:0` on a real, active chat.
+  // counterpart returns in the summary roster as a bare `{mri}` — no name,
+  // no email — so a name search can't match it. `/chats/{id}/members`
+  // (elevated) resolves the member; the matcher re-runs on the hydrated
+  // roster. The bug was a silent `matchCount:0` on a real, active chat.
   const robinChenChatId = '19:aaaaaaaa-1111-2222-3333-444444444444_bbbbbbbb-1111-2222-3333-444444444444@unq.gbl.spaces';
   const robinChenMri = '8:orgid:aaaaaaaa-1111-2222-3333-444444444444';
 
@@ -5947,7 +5947,7 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
     // The live failure: the cheap pass found Yu in a small meeting (resolved as
     // a Guest, a DIFFERENT object-id), so a "hydrate only when empty" gate never
     // probed the 1:1 where her HOME identity is bare. Both chats must come back.
-    const meetingId = '19:meeting_ProjectGroup@thread.v2';
+    const meetingId = '19:meeting_project@thread.v2';
     const fetchFn = hydratingFetch(
       [
         {
@@ -6062,10 +6062,10 @@ describe('find-chats-with-user paginates the chat-list and filters members', () 
   });
 
   // ── Shape & boundary hardening (QA 2026-06-23). The cases above pin matchCount
-  //    but not the projected SHAPE, the page-1 cursor, the member-count/title/
-  //    lastMessageAt projection, the undefined-id guard, or the validation
-  //    boundary — leaving killable logic mutants alive. Behavioural assertions,
-  //    not string pins.
+  // but not the projected SHAPE, the page-1 cursor, the member-count/title/
+  // lastMessageAt projection, the undefined-id guard, or the validation
+  // boundary — leaving killable logic mutants alive. Behavioural assertions,
+  // not string pins.
   it('projects only the identifying fields a matched member carries — absent fields are omitted, never emitted as undefined keys', async () => {
     const fetchFn = sequencedFetch([{ chats: [{ id: '19:sparse@unq.gbl.spaces', chatType: 'chat', members: [{ mri: '8:orgid:x', displayName: 'Solo Name' }] }] }]);
     const cmd = cmdMap['find-chats-with-user'];
@@ -6723,7 +6723,7 @@ describe('list-teams-chat-history follows syncState URLs through IC3 history', (
   });
 });
 
-// Audit Alex-session §A: a default `list-teams-chat-history` invocation used
+// a default `list-teams-chat-history` invocation used
 // to return ~108 KB for 200 messages because every message carried the full
 // IC3 envelope (annotations, threads, properties.policyViolation, etc.). The
 // slim default projects each message to id/sequenceId/composetime/
@@ -6837,7 +6837,7 @@ describe('list-teams-chat-history applies slim projection by default', () => {
   });
 });
 
-// Audit Alex-session §3 follow-up — get-excel-used-range slim projection.
+// follow-up — get-excel-used-range slim projection.
 // Raw Graph payload for usedRange() includes four parallel 2D arrays
 // (values / text / numberFormat / formulas); the audit measured a 3×148
 // sheet at 125 KB, mostly duplicate `"General"` numberFormat strings. The
@@ -6972,7 +6972,7 @@ describe('get-excel-used-range applies slim projection by default', () => {
   });
 });
 
-// Audit v1.0.0 §B1 — these collection endpoints all reject `$skip` server-side
+// — these collection endpoints all reject `$skip` server-side
 // (`invalidRequest: $skip is not supported on this API.`). The CLI must NOT
 // advertise `--skip` in the option set for these commands. Regression guard.
 const NO_SKIP_COMMANDS: Array<{ name: string; meta: { options: ReadonlyArray<{ name: string }> } }> = [
@@ -7001,7 +7001,7 @@ describe('no-skip endpoints do not advertise --skip', () => {
   });
 });
 
-// Audit v1.0.0 §B1/B2/B3 — Graph's `/chats/{id}/members` rejects `$top`,
+// /B2/B3 — Graph's `/chats/{id}/members` rejects `$top`,
 // `$orderby`, `$expand` with `BadRequest`; `/me/chats` rejects `$orderby`
 // and hangs on `$expand`. Both endpoints DO honour the subset listed below.
 // Regression guard: the CLI must advertise ONLY the working flags.
@@ -7027,7 +7027,7 @@ describe('chats endpoints advertise only the OData flags Graph honours', () => {
   });
 });
 
-// Audit v1.0.0 §B9 — the single-resource GET on a Microsoft task list was
+// — the single-resource GET on a Microsoft task list was
 // the only "get" without `--select`. Sister GETs (get-my-manager,
 // get-user-manager, get-mail-message, etc.) all expose `--select`/`--expand`
 // so an LLM can slim the response payload. Regression guard: advertise both.
@@ -7044,7 +7044,7 @@ describe('get-todo-task supports --select and --expand', () => {
   });
 });
 
-// Audit v1.0.0 §B6 / D1 — Graph rejects `$search` with `$filter` together
+// / D1 — Graph rejects `$search` with `$filter` together
 // (the real Graph error is `SearchWithFilter`, not the docs' previous
 // `InvalidRestriction`). Reject the conflict client-side before round-trip
 // so the LLM gets a precise pointer to the right alternative command
@@ -7059,7 +7059,7 @@ describe('search-mail-messages rejects --filter client-side', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
-      // Audit Alex-session §2 follow-up: error is now the short DIAGNOSIS
+      // error is now the short DIAGNOSIS
       // ("--filter is incompatible..."); the actionable remedy (`list-mail-messages
       // --filter ...`) lives in the matching `hint` rule keyed by `code` so
       // the LLM gets remedy-in-hint, not diagnosis-and-remedy-in-error.

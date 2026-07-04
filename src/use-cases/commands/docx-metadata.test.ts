@@ -64,12 +64,12 @@ describe('extractDocxMetadata', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const m = result.value;
-    expect(m.core.creator).toBe('Vincent Delacourt');
+    expect(m.core.creator).toBe('Jordan Avery');
     expect(m.core.title).toBe('Q4 Report');
     expect(m.custom).toContainEqual({ name: 'ClientID', value: 'ACME-42' });
     expect(m.custom).toContainEqual({ name: 'ReviewStatus', value: 'pending' });
     expect(m.comments).toHaveLength(1);
-    expect(m.comments[0]?.author).toBe('Vincent Delacourt');
+    expect(m.comments[0]?.author).toBe('Jordan Avery');
     expect(m.comments[0]?.text).toContain('Please double-check');
     // the comment is anchored to its commentRange span in document.xml
     expect(m.comments[0]?.anchor).toBe('the Q4 revenue figure');

@@ -1,5 +1,5 @@
 /**
- * Central Microsoft Graph permission scope map (audit round-8 Wave C).
+ * Central Microsoft Graph permission scope map.
  *
  * Source of truth: Microsoft Graph permissions reference
  * (https://learn.microsoft.com/en-us/graph/permissions-reference). Each
@@ -117,6 +117,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'extract-mail-attachment-images': ['Mail.Read'],
   'extract-sharepoint-links-in-mail': ['Mail.Read'],
   'create-mail-draft': ['Mail.ReadWrite'],
+  'create-reply-draft': ['Mail.ReadWrite'],
   'update-mail-draft': ['Mail.ReadWrite'],
   'extract-sharepoint-links-in-documents': ['Files.Read'],
   'list-shared-mailbox-messages': ['Mail.Read.Shared'],
@@ -125,6 +126,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-conversation-messages': ['Mail.Read'],
 
   // — Calendar —
+  'get-schedule': ['Calendars.Read'],
   'list-calendar-events': ['Calendars.Read'],
   'get-calendar-event': ['Calendars.Read'],
   'list-specific-calendar-events': ['Calendars.Read'],

@@ -34,7 +34,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
+  example: "ask-marcel-office get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
   responseShape: 'single Microsoft Graph `columnDefinition` resource',
 };
 

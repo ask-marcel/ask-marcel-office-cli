@@ -19,7 +19,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/drive/sharedWithMe',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-sharedwithme',
   options: [],
-  example: 'ask-marcel list-shared-with-me',
+  example: 'ask-marcel-office list-shared-with-me',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)',
 };
 

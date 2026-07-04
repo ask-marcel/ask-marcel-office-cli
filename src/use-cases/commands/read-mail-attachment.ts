@@ -99,7 +99,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     'Polymorphic by attachment content-type. A zip → `{ count, files: [{ path, contentType, size, text } | { path, note }], truncated? }` (the convert-mail-attachment-zip shape). Everything else → `{ contentType: "text/markdown" | "text/plain", size, text, pageCount? }` (the convert-mail-attachment-to-markdown shape; `pageCount` present for PDF sources). Unsupported types (image / scanned PDF / legacy .ppt) return an api_error (415/400) naming the right next command.',
   producesBytes: true,

@@ -13,17 +13,17 @@ const meta: CommandMeta = {
   graphPathTemplate: '/sites/{site-id}/lists/{list-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/list-get',
   options: [
-    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel search-sharepoint-sites-by-name`.' },
+    { name: 'site-id', key: 'siteId', required: true, description: 'SharePoint site ID. Returned by `ask-marcel-office search-sharepoint-sites-by-name`.' },
     {
       name: 'list-id',
       key: 'listId',
       required: true,
-      description: 'SharePoint list ID or display name. Returned by `ask-marcel list-sharepoint-site-lists`.',
+      description: 'SharePoint list ID or display name. Returned by `ask-marcel-office list-sharepoint-site-lists`.',
       argumentHint: { kind: 'idOrName' },
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
+  example: "ask-marcel-office get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
   responseShape: 'single Microsoft Graph `list` resource',
 };
 

@@ -19,12 +19,12 @@ const meta: CommandMeta = {
       key: 'driveId',
       required: true,
       description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel list-drives` for the personal OneDrive, or `ask-marcel list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
-    { name: 'table-id', key: 'tableId', required: true, description: 'Workbook table ID or table name. Returned by `ask-marcel list-excel-tables`.' },
+    { name: 'table-id', key: 'tableId', required: true, description: 'Workbook table ID or table name. Returned by `ask-marcel-office list-excel-tables`.' },
   ],
-  example: "ask-marcel get-excel-table --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
+  example: "ask-marcel-office get-excel-table --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
   responseShape: 'single Microsoft Graph `workbookTable` resource',
 };
 

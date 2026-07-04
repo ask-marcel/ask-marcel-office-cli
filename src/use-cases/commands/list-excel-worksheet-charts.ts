@@ -39,7 +39,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-excel-worksheet-charts --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
+  example: "ask-marcel-office list-excel-worksheet-charts --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
   responseShape: 'collection of Microsoft Graph `workbookChart` resources under `value[]`',
   pagination: true,
 };

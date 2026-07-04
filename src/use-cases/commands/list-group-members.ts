@@ -22,7 +22,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-group-members --group-id 'a1b2c3d4-...'",
+  example: "ask-marcel-office list-group-members --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `directoryObject` resources under `value[]`',
   pagination: true,
 };

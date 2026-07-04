@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/drive/recent',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-recent',
   options: [...noSkipOptions],
-  example: 'ask-marcel list-recent-files',
+  example: 'ask-marcel-office list-recent-files',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

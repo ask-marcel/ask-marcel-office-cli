@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/calendars',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-calendars',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-calendars',
+  example: 'ask-marcel-office list-calendars',
   responseShape: 'collection of Microsoft Graph `calendar` resources under `value[]`',
   pagination: true,
 };

@@ -112,7 +112,7 @@ const meta: CommandMeta = {
         'Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources.',
     },
   ],
-  example: 'ask-marcel convert-local-file --path ./report.docx',
+  example: 'ask-marcel-office convert-local-file --path ./report.docx',
   responseShape:
     '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
   producesBytes: true,

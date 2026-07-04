@@ -81,7 +81,7 @@ describe('graph client', () => {
     }
   });
 
-  it('truncates the granted-scope dump from `Missing scope permissions` 403 errors (audit round-8 Wave F)', async () => {
+  it('truncates the granted-scope dump from `Missing scope permissions` 403 errors', async () => {
     const longScopeDump =
       "Forbidden: Missing scope permissions on the request. API requires one of 'Chat.ReadBasic, Chat.Read, Chat.ReadWrite'. Scopes on the request 'profile,openid,email,User.Read,Mail.Read,Calendars.Read,Tasks.Read,Sites.Read.All,Notes.Read.All,Group.Read.All,Team.ReadBasic.All,Channel.ReadBasic.All,People.Read,MailboxSettings.Read,Files.Read.All'";
     const fetchFn = fakeFetch([{ match: (url) => url.includes('/me/chats'), body: { error: { code: 'Forbidden', message: longScopeDump } }, status: 403 }]);
@@ -96,12 +96,12 @@ describe('graph client', () => {
     }
   });
 
-  // Audit Alex-session §8 follow-up: when an `ErrorInvalidIdMalformed`
+  // when an `ErrorInvalidIdMalformed`
   // happens against a `/mailFolders/` URL, the infra layer suffixes the
   // code with `_mailFolders` so the presenter's hint table can recommend
   // the well-known folder names (inbox, sentitems, …) instead of the
   // generic "use a list-* command" advice.
-  it('contextualises `ErrorInvalidIdMalformed` to `ErrorInvalidIdMalformed_mailFolders` when the failing URL is on the /mailFolders/ path (Audit Alex-session §8)', async () => {
+  it('contextualises `ErrorInvalidIdMalformed` to `ErrorInvalidIdMalformed_mailFolders` when the failing URL is on the /mailFolders/ path', async () => {
     const fetchFn = fakeFetch([
       {
         match: (url) => url.includes('/mailFolders/'),
@@ -261,7 +261,7 @@ describe('graph client', () => {
     }
   });
 
-  // Audit v1.0.0 — SharePoint PDF download timeout fix. CDN body transfers
+  // SharePoint PDF download timeout fix. CDN body transfers
   // for multi-MB files take longer than the JSON-tier 60s budget, so
   // fetchUrl / simplePut / chunkedPut sit on a separate 5-minute tier. The
   // network-error message reflects which tier fired so a caller knows
@@ -431,7 +431,7 @@ describe('graph client', () => {
     }
   });
 
-  it('drops the empty-string `code` prefix Graph Planner returns on bogus IDs (was rendering as `": message"` — audit v1.0.0 §2.7)', async () => {
+  it('drops the empty-string `code` prefix Graph Planner returns on bogus IDs (was rendering as `": message"` — )', async () => {
     const body = JSON.stringify({ error: { code: '', message: 'The requested item is not found.' } });
     const fetchFn: FetchFn = async () => new Response(body, { status: 404, statusText: 'Not Found', headers: { 'content-type': 'application/json' } });
     const client = createGraphClient(fakeAuth(), fetchFn);

@@ -25,7 +25,7 @@ const meta: CommandMeta = {
       ],
     },
   ],
-  example: "ask-marcel list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
+  example: "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
   responseShape:
     'collection of Microsoft Graph `todoTask` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

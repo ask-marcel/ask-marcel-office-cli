@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel search-my-documents --query 'q1 budget'",
+  example: "ask-marcel-office search-my-documents --query 'q1 budget'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

@@ -2,6 +2,68 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.0.0
+
+Breaking auth simplification, a repo-wide privacy scrub (including a rewrite of
+the full git history), two new commands, and a headless self-heal for the Teams
+chat-substrate tokens.
+
+### BREAKING
+
+- **The CLI binary is renamed `ask-marcel` → `ask-marcel-office`** (matching the
+  package name; the bare `ask-marcel` name is freed for future use and no longer
+  ships as an alias). Update shell scripts, agent prompts, and skills that invoke
+  the old name. npm removes the stale `ask-marcel` bin link on upgrade; if one
+  lingers (e.g. bun global installs), delete it manually.
+- **`ask-marcel login --use-extension` is removed.** The companion browser
+  extension and the system-browser / localhost-callback capture path are gone
+  (`browser-extension/`, the `system-browser-auth` + `token-callback-server`
+  infra, and the `--use-extension` flag). `ask-marcel-office login` — a
+  Playwright-driven Edge/Chrome window that captures all four tokens in one
+  session — is the only login flow. The token cache format is unchanged;
+  existing sessions keep working without re-login.
+
+### Added
+
+- **`get-schedule`** — free/busy availability for a comma-separated list of
+  people and/or meeting rooms over a time window
+  (`POST /me/calendar/getSchedule`, `Calendars.Read` — already on the basic
+  token). Returns each person's `availabilityView` slot string (0 free /
+  1 tentative / 2 busy / 3 OOF / 4 working-elsewhere), the underlying busy
+  blocks, and their working hours. Both bounds accept the relative-date
+  vocabulary (`today`, `+1d`, `start-of-week`, …).
+- **`create-reply-draft`** — create a threaded reply-all draft to an existing
+  message (`createReplyAll` + a body patch), so an agent can prepare a response
+  in-thread. Produces an UNSENT draft only — like `create-mail-draft` /
+  `update-mail-draft`, the CLI can never send. (Third and last write command.)
+- **Teams substrate tokens now self-heal on the command path.** When a
+  chatsvcagg or ic3 token lapses (~hourly), the CLI redeems the shared Teams
+  refresh token for that substrate audience over HTTP — headless, no browser —
+  instead of dead-ending in a "run `ask-marcel-office login`" error. The four
+  Teams chat commands (`list-teams-chats-with-messages`, `list-teams-chat-messages`,
+  `get-teams-chat-message`, `find-chats-with-user`) plus `list-teams-chat-history`
+  now keep working for as long as your Graph token does, rather than dying an hour
+  into a session. Falls back to the interactive-login prompt only when no refresh
+  token is cached or Entra ID rejects the redemption. The elevated token
+  (historical-version downloads) is unaffected — a different app identity with no
+  shared-RT path — and still needs `login` when it lapses.
+
+### Changed
+
+- The npm tarball no longer double-ships the ~500 KB command manifest:
+  `docs/commands.json` was dropped from `files[]` (the importable
+  `ask-marcel-office-cli/commands.json` subpath still resolves to
+  `dist/commands.json`, which remains). Unpacked size ~3.5 → ~3.0 MB.
+
+### Internal
+
+- Privacy scrub: personal/tenant fixture data and internal audit-session
+  labels removed across source, tests, fixtures, and docs — and purged from
+  the entire git history (rewritten and force-pushed).
+- Dead code removed: the single-token browser capture (`acquireToken`), two
+  orphan probe scripts, an unused env module; the four graph-client
+  auth-header closures collapsed into one factory.
+
 ## 1.5.2
 
 ### Fixed
@@ -29,9 +91,11 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   each launched a _visible_ browser that "opens and closes within seconds" to
   silently re-capture — per command, per process, with no cross-process throttle —
   so after the short-lived elevated token (~59 min) expired, every elevated or
-  Teams-chat command popped a window. The command-path auth now **fails fast** with
-  an actionable "run `ask-marcel login`" instead; browser capture is reserved for
-  the explicit `login` command, which re-captures all four tokens in one session.
+  Teams-chat command popped a window. The command-path auth now **self-heals** the
+  chat-substrate tokens with a headless refresh of the shared Teams RT (and, when
+  that can't renew them, fails fast with an actionable "run `ask-marcel-office
+  login`") instead; interactive browser capture is reserved for the explicit
+  `login` command, which re-captures all four tokens in one session.
 
 ## 1.5.0
 

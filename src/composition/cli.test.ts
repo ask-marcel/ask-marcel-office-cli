@@ -86,7 +86,7 @@ describe('buildCli command surface', () => {
   it('renders an authenticated envelope when login succeeds (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
     expect(out).toContain('"status":"authenticated"');
   });
 
@@ -115,11 +115,11 @@ describe('buildCli command surface', () => {
   it('renders an authenticated status as plain "status: authenticated" by default (text format)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toBe('status: authenticated\n');
   });
 
-  it('renders login envelope with elevated=captured when the browser auth captured the M365ChatClient token (audit login-fix round-1 Wave D)', async () => {
+  it('renders login envelope with elevated=captured when the browser auth captured the M365ChatClient token', async () => {
     const elevatedCapturedAuth: AuthManager = {
       getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
       getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
@@ -132,12 +132,12 @@ describe('buildCli command surface', () => {
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: elevatedCapturedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
     expect(out).toContain('"status":"authenticated"');
     expect(out).toContain('"elevated":"captured"');
   });
 
-  it('renders login envelope with elevated=failed AND elevatedReason when elevated capture failed (audit login-fix round-1 Wave D)', async () => {
+  it('renders login envelope with elevated=failed AND elevatedReason when elevated capture failed', async () => {
     const elevatedFailedAuth: AuthManager = {
       getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
       getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
@@ -150,7 +150,7 @@ describe('buildCli command surface', () => {
     };
     const logger = createLoggerFake();
     const cli = buildCli({ auth: elevatedFailedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
     expect(out).toContain('"status":"authenticated"');
     expect(out).toContain('"elevated":"failed"');
     expect(out).toContain('"elevatedReason":"sso_timeout"');
@@ -160,12 +160,12 @@ describe('buildCli command surface', () => {
     // Default okAuth returns null from getLastElevatedOutcome — old behavior preserved.
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
     expect(out).toContain('"status":"authenticated"');
     expect(out).not.toContain('"elevated"');
   });
 
-  it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — v1.4.0 fresh-pass #5 round 2 — stamps the source even when the hint table did not match)', async () => {
+  it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — round 2 — stamps the source even when the hint table did not match)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
       auth: okAuth(),
@@ -174,7 +174,7 @@ describe('buildCli command surface', () => {
       processRunner: createProcessRunnerFake(),
       fs: createFileSystemFake(),
     });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-current-user']));
     // The api_error → 'graph' mapping in `sourceFromGraphError` makes `source`
     // present on every Graph-originating failure, hint-matched or not. The
     // 404 message "not found" has no rule match → no `hint:` line → but the
@@ -191,7 +191,7 @@ describe('buildCli command surface', () => {
       processRunner: createProcessRunnerFake(),
       fs: createFileSystemFake(),
     });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-current-user']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'get-current-user']));
     const parsed = JSON.parse(out.trim()) as { ok: false; retryAfterSeconds?: number };
     expect(parsed.ok).toBe(false);
     expect(parsed.retryAfterSeconds).toBe(120);
@@ -200,7 +200,7 @@ describe('buildCli command surface', () => {
   it('renders an Authentication cancelled error when the user closes the browser', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toContain('Authentication cancelled');
   });
 
@@ -217,7 +217,7 @@ describe('buildCli command surface', () => {
         errorReports += 1;
       },
     });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(errorReports).toBe(1);
   });
 
@@ -234,36 +234,36 @@ describe('buildCli command surface', () => {
         errorReports += 1;
       },
     });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(errorReports).toBe(0);
   });
 
   it('renders the underlying message when login fails for a non-cancellation reason', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toContain('browser launch failed');
   });
 
   it('renders a logged_out envelope when logout succeeds (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'logout']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'logout']));
     expect(out).toContain('"status":"logged_out"');
   });
 
   it('renders the underlying message when logout fails', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'logout']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'logout']));
     expect(out).toContain('rm denied');
   });
 
   it('runs a generic Graph command and renders the value as JSON', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Vincent' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
-    expect(out).toContain('Vincent');
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-current-user']));
+    expect(out).toContain('Jordan');
   });
 
   it('accepts both the canonical and the alias spelling of a command flag (e.g. --task-list-id alongside --todo-task-list-id)', async () => {
@@ -276,7 +276,7 @@ describe('buildCli command surface', () => {
     });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-todo-tasks', '--task-list-id', 'AAMkABC']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--task-list-id', 'AAMkABC']));
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
@@ -291,7 +291,7 @@ describe('buildCli command surface', () => {
     const fs = createFileSystemFake();
     fs.seed('/work/data.csv', 'name,age\nAlice,30');
     const cli = buildCli({ auth: okAuth(), graph: tripwireGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
     const parsed = JSON.parse(out.trim()) as { ok: boolean; data: { text: string } };
     expect(parsed.ok).toBe(true);
     expect(parsed.data.text).toContain('| Alice | 30 |');
@@ -301,7 +301,7 @@ describe('buildCli command surface', () => {
   it('stamps a failed local-only command with source `cli`, not `graph` — it never touched Graph (F-02)', async () => {
     const fs = createFileSystemFake(); // nothing seeded → readBytes returns a not-found error
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'convert-local-file', '--path', '/work/missing.csv']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/missing.csv']));
     const parsed = JSON.parse(out.trim()) as { ok: boolean; source?: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.source).toBe('cli');
@@ -316,7 +316,7 @@ describe('buildCli command surface', () => {
       },
     });
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-mail-message', '--id', 'AAMkAGI2']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-mail-message', '--id', 'AAMkAGI2']));
     // --id maps to messageId → the message path (a default $select is appended by the command).
     expect(capturedPath.startsWith('/me/messages/AAMkAGI2')).toBe(true);
   });
@@ -330,11 +330,11 @@ describe('buildCli command surface', () => {
       },
     });
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update-mail-draft', '--id', 'AAMkAGI2', '--subject', 'Updated']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update-mail-draft', '--id', 'AAMkAGI2', '--subject', 'Updated']));
     expect(capturedPath).toBe('/me/messages/AAMkAGI2');
   });
 
-  it('accepts --start/--end as aliases for --start-date-time/--end-date-time on the calendar-view family (QA-2026-06-16)', async () => {
+  it('accepts --start/--end as aliases for --start-date-time/--end-date-time on the calendar-view family', async () => {
     const pathFor = async (args: ReadonlyArray<string>): Promise<string> => {
       let captured = '';
       const graph: GraphClient = fakeGraphClient({
@@ -344,7 +344,7 @@ describe('buildCli command surface', () => {
         },
       });
       const cli = buildCli({ auth: okAuth(), graph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-calendar-view', ...args]));
+      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-calendar-view', ...args]));
       return captured;
     };
     // The short --start/--end forms agents reach for must produce the identical Graph
@@ -355,7 +355,7 @@ describe('buildCli command surface', () => {
     expect(aliased).toContain('/me/calendarView?startDateTime=');
   });
 
-  it('rewrites a validation-error message to reference the alias the user typed (audit round-7 B4)', async () => {
+  it('rewrites a validation-error message to reference the alias the user typed', async () => {
     const captureGraph: GraphClient = fakeGraphClient({
       get: async () => ({ ok: true, value: { value: [] } }),
     });
@@ -363,7 +363,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', 'search-onenote-pages', '--query', '']);
+        await cli.parseAsync(['node', 'ask-marcel-office', 'search-onenote-pages', '--query', '']);
       } catch {
         /* commander may exit on validation failure */
       }
@@ -372,12 +372,12 @@ describe('buildCli command surface', () => {
     expect(out).not.toContain('--title-substring is empty');
   });
 
-  it('help-json rejects an explicit --output text (manifest is JSON by contract — audit round-8 Wave G1)', async () => {
+  it('help-json rejects an explicit --output text (manifest is JSON by contract — audit )', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'text', 'help-json']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'text', 'help-json']);
       } catch {
         /* commander may exit */
       }
@@ -391,7 +391,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', 'help-json']);
+        await cli.parseAsync(['node', 'ask-marcel-office', 'help-json']);
       } catch {
         /* commander may exit */
       }
@@ -399,7 +399,7 @@ describe('buildCli command surface', () => {
     expect(out).toContain('"commands"');
   });
 
-  // Audit Alex-session §B — compact default `--help` + help-json projections
+  // — compact default `--help` + help-json projections
   // (--terse / --category). These tests fix the discoverability gap an LLM
   // hits today: `--help` returns ~60 KB so the model is forced to truncate
   // or dump-to-disk before it can read the listing; `help-json` returns
@@ -409,15 +409,15 @@ describe('buildCli command surface', () => {
   //
   // Notes on test mechanics:
   // - Triggering Commander's `--help` flag directly would call `process.exit(0)`
-  //   even with `exitOverride` (the override returns, Commander then calls
-  //   `process.exit(exitCode)`), killing the test process. The custom `help`
-  //   subcommand goes through `program.outputHelp()` which renders without
-  //   exiting, so we use it for assertion. Production behaviour for `--help`
-  //   is exercised by the bare-args test at the bottom of this file.
+  // even with `exitOverride` (the override returns, Commander then calls
+  // `process.exit(exitCode)`), killing the test process. The custom `help`
+  // subcommand goes through `program.outputHelp()` which renders without
+  // exiting, so we use it for assertion. Production behaviour for `--help`
+  // is exercised by the bare-args test at the bottom of this file.
   it('compact default help listing truncates each subcommand description to its first sentence', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
     // get-mail-message has a multi-sentence summary post-§A; the compact
     // help should carry only the first sentence. The post-first-sentence
     // "ships a slim default" prose is the marker that we successfully cut.
@@ -430,7 +430,7 @@ describe('buildCli command surface', () => {
   it('compact help listing stays under the 20 KB token-budget ceiling (byte-count regression guard — replaces the dropped --verbose opt-out)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
+    const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
     // First-sentence truncation keeps the listing well under 20 KB. The pre-
     // compaction full-summary form ran ~60 KB; if compaction silently
     // regresses (e.g. compactSummary cuts wrong), this guard fires.
@@ -445,7 +445,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     let unknown = false;
     try {
-      await cli.parseAsync(['node', 'ask-marcel', '--verbose', 'help']);
+      await cli.parseAsync(['node', 'ask-marcel-office', '--verbose', 'help']);
     } catch (e) {
       // Commander throws a CommanderError with code 'commander.unknownOption'
       // when it doesn't recognise a flag. exitOverride routes that through.
@@ -459,7 +459,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--terse']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--terse']);
       } catch {
         /* commander exits */
       }
@@ -475,7 +475,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--category', 'mail']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'mail']);
       } catch {
         /* commander exits */
       }
@@ -490,7 +490,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--terse', '--category', 'mail']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--terse', '--category', 'mail']);
       } catch {
         /* commander exits */
       }
@@ -505,7 +505,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
       } catch {
         /* commander exits */
       }
@@ -517,12 +517,12 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('drive');
   });
 
-  it('rejects a duplicate --output flag (audit round-8 Wave G2)', async () => {
+  it('rejects a duplicate --output flag', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({ id: 'u1' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', '--output', 'text', 'get-current-user']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output', 'text', 'get-current-user']);
       } catch {
         /* commander may exit */
       }
@@ -530,12 +530,12 @@ describe('buildCli command surface', () => {
     expect(out).toContain('--output cannot be passed more than once');
   });
 
-  it('rejects a single-value flag passed more than once (audit round-7 B6)', async () => {
+  it('rejects a single-value flag passed more than once', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({ value: [] }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', 'list-folder-files', '--drive-id', 'd1', '--item-id', 'i1', '--filter', 'A', '--filter', 'B']);
+        await cli.parseAsync(['node', 'ask-marcel-office', 'list-folder-files', '--drive-id', 'd1', '--item-id', 'i1', '--filter', 'A', '--filter', 'B']);
       } catch {
         /* commander may exit on validation failure */
       }
@@ -555,7 +555,7 @@ describe('buildCli command surface', () => {
     });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'list-todo-tasks', '--todo-task-list-id', 'AAMkXYZ']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--todo-task-list-id', 'AAMkXYZ']));
     expect(capturedPath).toBe('/me/todo/lists/AAMkXYZ/tasks');
   });
 
@@ -568,7 +568,7 @@ describe('buildCli command surface', () => {
       processRunner: createProcessRunnerFake(),
       fs: createFileSystemFake(),
     });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'get-current-user']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-current-user']));
     expect(out).toContain('not found');
   });
 
@@ -576,7 +576,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'update']));
     expect(runner.calls[0]).toEqual({ command: 'npm', args: ['i', '-g', 'ask-marcel-office-cli@latest'] });
     expect(out).toContain('"status":"updated"');
     expect(out).toContain('"via":"npm"');
@@ -586,7 +586,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'bun', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'update']));
     expect(runner.calls[0]).toEqual({ command: 'bun', args: ['add', '-g', 'ask-marcel-office-cli@latest'] });
     expect(out).toContain('"via":"bun"');
   });
@@ -595,7 +595,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake({ resultPerCall: [{ exitCode: 7 }] });
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
     expect(out).toContain('exited with code 7');
   });
 
@@ -603,7 +603,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const runner = createProcessRunnerFake({ throwOn: [0] });
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
     expect(out).toContain('update failed');
   });
 
@@ -614,7 +614,7 @@ describe('buildCli command surface', () => {
     process.argv[1] = '/Users/anyone/.bun/install/global/node_modules/ask-marcel-office-cli/dist/cli.js';
     try {
       const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'update']));
+      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
       expect(runner.calls[0]).toEqual({ command: 'bun', args: ['add', '-g', 'ask-marcel-office-cli@latest'] });
     } finally {
       process.argv[1] = previousArgv;
@@ -624,7 +624,7 @@ describe('buildCli command surface', () => {
   it('prints Markdown for a single command when the user runs `docs <cmd>`', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'get-current-user']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'get-current-user']));
     expect(out).toContain('# `get-current-user`');
     expect(out).toContain('## Example');
   });
@@ -632,7 +632,7 @@ describe('buildCli command surface', () => {
   it('renders an unknown-command message when the user runs `docs` with a name that does not exist', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'this-is-not-a-real-command']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'this-is-not-a-real-command']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('this-is-not-a-real-command');
   });
@@ -640,7 +640,7 @@ describe('buildCli command surface', () => {
   it('prints rich Markdown docs when `docs <lifecycle-command>` is invoked, since lifecycle commands now have manifest entries', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'login']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'login']));
     expect(out).toContain('# `login`');
     expect(out).toContain('**Category:** Lifecycle');
     expect(out).toContain('Authenticate against Microsoft Graph');
@@ -649,7 +649,7 @@ describe('buildCli command surface', () => {
   it('falls back to the unknown-command error when `docs help` is invoked (commander does not register `help` as a regular subcommand)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'docs', 'help']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'help']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('help');
   });
@@ -657,7 +657,7 @@ describe('buildCli command surface', () => {
   it("'help-json' subcommand prints the full machine-readable manifest (same shape as docs/commands.json) to stdout", async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), version: '1.0.0', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help-json']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help-json']));
     const parsed = JSON.parse(out.trim()) as { package: string; version: string; commands: ReadonlyArray<{ name: string }> };
     expect(parsed.package).toBe('ask-marcel-office-cli');
     expect(parsed.version).toBe('1.0.0');
@@ -665,7 +665,7 @@ describe('buildCli command surface', () => {
     expect(parsed.commands.some((c) => c.name === 'list-drives')).toBe(true);
   });
 
-  // Audit v1.0.0 §B5 — `help-json` and `docs` used to bypass --output-path
+  // — `help-json` and `docs` used to bypass --output-path
   // entirely, neither writing the file nor surfacing a "not supported"
   // error. Both now honour the flag and write their text body. On error
   // (e.g. directory path) the same envelope as every other bytes-producing
@@ -675,21 +675,21 @@ describe('buildCli command surface', () => {
     const fs = createFileSystemFake();
     const make = (): ReturnType<typeof buildCli> => buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), version: '1.0.0', fs });
     const helpOut = await captureStream('stdout', () =>
-      make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/manifest.json', 'help-json'])
+      make().parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/manifest.json', 'help-json'])
     );
     const helpParsed = JSON.parse(helpOut.trim()) as { ok: true; data: { savedTo: string } };
     expect(helpParsed.data.savedTo).toBe('/work/test-output/manifest.json');
     const manifest = JSON.parse(fs.snapshot('/work/test-output/manifest.json') ?? '{}') as { commands: ReadonlyArray<unknown> };
     expect(manifest.commands.length).toBeGreaterThan(100);
     const docsOut = await captureStream('stdout', () =>
-      make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/get-current-user.md', 'docs', 'get-current-user'])
+      make().parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/get-current-user.md', 'docs', 'get-current-user'])
     );
     const docsParsed = JSON.parse(docsOut.trim()) as { ok: true; data: { savedTo: string } };
     expect(docsParsed.data.savedTo).toBe('/work/test-output/get-current-user.md');
     expect(fs.snapshot('/work/test-output/get-current-user.md') ?? '').toContain('get-current-user');
     const failOut = await captureStream('stdout', async () => {
       try {
-        await make().parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/', 'help-json']);
+        await make().parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/', 'help-json']);
       } catch {
         /* expected */
       }
@@ -698,7 +698,7 @@ describe('buildCli command surface', () => {
     expect(failParsed.error).toContain('must be a file path, not a directory');
   });
 
-  // Audit v1.0.0 §B11 — `--output-path` to a directory path used to surface
+  // — `--output-path` to a directory path used to surface
   // Node's `EISDIR: illegal operation on a directory`. Now it returns a
   // clear "must be a file path, not a directory" message.
   it('renders --output-path ending in / as "must be a file path, not a directory" rather than EISDIR', async () => {
@@ -714,7 +714,7 @@ describe('buildCli command surface', () => {
       try {
         await cli.parseAsync([
           'node',
-          'ask-marcel',
+          'ask-marcel-office',
           '--output',
           'json',
           '--output-path',
@@ -734,7 +734,7 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('must be a file path, not a directory');
   });
 
-  // Audit v1.0.0 §B4 — `*-as-pdf` commands silently falling back to source
+  // — `*-as-pdf` commands silently falling back to source
   // bytes used to write a corrupt "PDF" to disk. Now the CLI rejects the
   // write with a clear message naming the actual content type.
   it('renders --output-path: passthrough source bytes (not converted PDF) — save as <contentType>, not .pdf, when the response carries passthrough:true', async () => {
@@ -753,7 +753,7 @@ describe('buildCli command surface', () => {
       try {
         await cli.parseAsync([
           'node',
-          'ask-marcel',
+          'ask-marcel-office',
           '--output',
           'json',
           '--output-path',
@@ -779,7 +779,7 @@ describe('buildCli command surface', () => {
     expect(fs.has('/work/test-output/doc-v1.pdf')).toBe(false);
   });
 
-  // Audit v1.0.0 §B10 — when --output-path parent dir is missing /
+  // — when --output-path parent dir is missing /
   // non-writable, the raw Node `ENOENT: no such file or directory, mkdir
   // '/x'` used to leak through. Now translated to a clear message.
   it('translates a Node ENOENT/mkdir error from --output-path into a clear "parent directory missing or not writable" message', async () => {
@@ -802,7 +802,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
-        'ask-marcel',
+        'ask-marcel-office',
         '--output',
         'json',
         '--output-path',
@@ -825,7 +825,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'search-mail-messages']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'search-mail-messages']);
       } catch {
         /* expected — commander throws via exitOverride on missing required option */
       }
@@ -842,7 +842,7 @@ describe('buildCli command surface', () => {
     const stderrOut = await captureStream('stderr', async () => {
       const stdoutOut = await captureStream('stdout', async () => {
         try {
-          await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'list-drives', '--no-such-flag']);
+          await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'list-drives', '--no-such-flag']);
         } catch {
           /* expected — commander throws on parser error after exitOverride */
         }
@@ -861,7 +861,7 @@ describe('buildCli command surface', () => {
     const stderrOut = await captureStream('stderr', async () => {
       const stdoutOut = await captureStream('stdout', async () => {
         try {
-          await cli.parseAsync(['node', 'ask-marcel', 'list-drives', '--no-such-flag']);
+          await cli.parseAsync(['node', 'ask-marcel-office', 'list-drives', '--no-such-flag']);
         } catch {
           /* expected */
         }
@@ -878,7 +878,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'this-command-does-not-exist']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'this-command-does-not-exist']);
       } catch {
         /* expected */
       }
@@ -896,7 +896,7 @@ describe('buildCli command surface', () => {
     // moves required-ness to schema validation (commander no longer throws).
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-mail-attachment']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'get-mail-attachment']);
       } catch {
         /* expected */
       }
@@ -911,7 +911,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'bogus', 'get-current-user']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'bogus', 'get-current-user']);
       } catch {
         /* expected */
       }
@@ -932,7 +932,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
-        'ask-marcel',
+        'ask-marcel-office',
         '--output',
         'json',
         '--output-path',
@@ -965,7 +965,7 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
-        'ask-marcel',
+        'ask-marcel-office',
         '--output',
         'json',
         '--output-path',
@@ -987,10 +987,10 @@ describe('buildCli command surface', () => {
   it('global --output-path is a no-op when the command returns plain JSON (no base64 / no text) — surfaces a clear error rather than silently no-op-ing (under --output json)', async () => {
     const logger = createLoggerFake();
     const fs = createFileSystemFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Vincent' }), logger, processRunner: createProcessRunnerFake(), fs });
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', async () => {
       try {
-        await cli.parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/work/test-output/profile.json', 'get-current-user']);
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/profile.json', 'get-current-user']);
       } catch {
         /* commander may throw after exitOverride for explicit failures */
       }
@@ -1020,7 +1020,7 @@ describe('buildCli command surface', () => {
     };
     const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', '--output-path', '/root/forbidden.pdf', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/root/forbidden.pdf', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
     );
     const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
     expect(parsed.ok).toBe(false);
@@ -1028,19 +1028,19 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('EACCES');
   });
 
-  it('`ask-marcel` with NO subcommand prints --help to stdout instead of silently exiting 1 (audit v1.0.0 §2.3)', async () => {
+  it('`ask-marcel-office` with NO subcommand prints --help to stdout instead of silently exiting 1', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel']));
-    expect(out).toContain('Usage: ask-marcel');
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office']));
+    expect(out).toContain('Usage: ask-marcel-office');
     expect(out).toContain('login');
     expect(out).toContain('list-drives');
   });
 
-  it('`help <unknown>` returns a JSON-envelope error rather than silently exiting (under --output json; audit v1.0.0 §1.2)', async () => {
+  it('`help <unknown>` returns a JSON-envelope error rather than silently exiting (under --output json; )', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'help', 'no-such-command']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help', 'no-such-command']));
     const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain('no-such-command');
@@ -1049,15 +1049,15 @@ describe('buildCli command surface', () => {
   it('`help <known>` prints the markdown docs (alias of `docs <known>`)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help', 'list-drives']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help', 'list-drives']));
     expect(out).toContain('list-drives');
   });
 
   it('`help` with no argument prints the global --help text', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'help']));
-    expect(out).toContain('Usage: ask-marcel');
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
+    expect(out).toContain('Usage: ask-marcel-office');
   });
 
   it('omitting --output-path leaves the JSON envelope unchanged (existing consumers still get base64) (under --output json)', async () => {
@@ -1070,7 +1070,7 @@ describe('buildCli command surface', () => {
     };
     const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
     );
     const parsed = JSON.parse(out.trim()) as { ok: true; data: { base64?: string; savedTo?: string } };
     expect(parsed.ok).toBe(true);
@@ -1087,7 +1087,7 @@ describe('buildCli command surface', () => {
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 12345, base64: 'JVBERi0=' } }),
     };
     const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1']));
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1']));
     expect(out).toBe('binary: application/pdf, 12345 bytes — use --output-path to save\n');
   });
 
@@ -1107,18 +1107,18 @@ describe('buildCli command surface', () => {
     const fs = createFileSystemFake();
     const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs });
     const out = await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
     );
     expect(out).toContain('savedTo');
-    expect(out).toContain('/work/imgs/word_media_image1.png'); // full path flattened, not basename (audit A4)
+    expect(out).toContain('/work/imgs/word_media_image1.png'); // full path flattened, not basename
     expect(out).not.toContain('base64');
     expect(Array.from(fs.snapshotBytes('/work/imgs/word_media_image1.png') ?? [])).toEqual([0x89, 0x50, 0x4e, 0x47]);
   });
 
   it('--output-dir on a command that returns no media array emits a clear error pointing at the image-extraction commands', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Vincent' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'get-current-user', '--output-dir', '/work/imgs']));
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'get-current-user', '--output-dir', '/work/imgs']));
     expect(out).toContain('did not return a media array');
     expect(out).toContain('extract-drive-item-images');
     expect(out).toContain('extract-mail-attachment-images');
@@ -1128,7 +1128,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', ''])
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', ''])
     );
     expect(out).toContain('directory argument is empty');
   });
@@ -1146,7 +1146,7 @@ describe('buildCli command surface', () => {
     };
     const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, processRunner: createProcessRunnerFake(), fs: failingFs });
     const out = await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
     );
     expect(out).toContain('write failed');
     expect(out).toContain('ENOSPC');

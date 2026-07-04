@@ -27,7 +27,7 @@ const odfToMarkdown = async (bytes: Uint8Array, opts: OdfToMarkdownOptions = {})
     const block = formatOdfMetadata(meta.value);
     text = text === '' ? block : `${text}\n\n${block}`;
   }
-  // size = UTF-8 byte count (audit §2.1); `text.length` is UTF-16 code units.
+  // size = UTF-8 byte count; `text.length` is UTF-16 code units.
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

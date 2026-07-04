@@ -5,7 +5,7 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 type CommandSchema = z.ZodType;
 type CommandExecute = (graph: GraphClient, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
 
-// Audit Alex-session §4 follow-up: `'auth'` and `'contacts'` were declared
+// `'auth'` and `'contacts'` were declared
 // but no command ever used them — removed so the type system enforces "no
 // command can ever claim a dead category" and `help-json --category <bad>`
 // no longer advertises them as valid.
@@ -19,7 +19,7 @@ type CommandOptionAlias = {
 };
 
 /*
- * Alias policy (audit round-7 I3): the `--folder-id` alias is only exposed
+ * Alias policy: the `--folder-id` alias is only exposed
  * on commands whose path is folder-scoped (e.g. `list-folder-files`,
  * `get-drive-delta` — the item ID MUST point at a folder). Commands like
  * `get-drive-item`, `list-drive-item-versions`, and
@@ -67,7 +67,7 @@ type CommandOptionMeta = {
 
 /**
  * A positional argument (i.e. NOT a `--flag`). Used today only for the
- * `docs` lifecycle command (`ask-marcel docs <command>`) but kept as its
+ * `docs` lifecycle command (`ask-marcel-office docs <command>`) but kept as its
  * own field so the manifest never claims a positional is a flag. An LLM
  * consumer reading `help-json` can branch on the presence of
  * `positionalArguments` to know to skip the `--` prefix.
@@ -117,7 +117,7 @@ type CommandMeta = {
   readonly paginationStrategy?: PaginationStrategy;
   /**
    * Graph permission scopes the endpoint requires. The basic Teams web-client
-   * token grants ~30 scopes (run `ask-marcel scopes-check` to see). Commands
+   * token grants ~30 scopes (run `ask-marcel-office scopes-check` to see). Commands
    * with unmet scopes return `403 Forbidden: Missing scope` at the wire. Use
    * this for pre-flight checks rather than failing on-the-wire. Optional —
    * populated only on commands where the audit confirmed a scope-failure
@@ -137,7 +137,7 @@ type CommandMeta = {
    * captured at login from `teams.microsoft.com`) — the Teams chat-content
    * commands. Like `needsElevatedToken`, an LLM should check this before
    * invoking and warm up an interactive `login`; a headless or stale session
-   * times out on these (the non-interactive silent-SSO limitation, QA-011).
+   * times out on these (the non-interactive silent-SSO limitation, ).
    */
   readonly needsSubstrateToken?: true;
   /**
@@ -145,7 +145,7 @@ type CommandMeta = {
    * or `{contentType, size, text}`) and is therefore a valid target for the
    * global `--output-path` flag. Used by the CLI composition to derive the
    * rejection-message whitelist from the manifest rather than hand-keeping it
-   * as a string literal. Audit round-8 Wave E2.
+   * as a string literal. Audit .
    */
   readonly producesBytes?: true;
   /**
@@ -174,7 +174,7 @@ type CommandMeta = {
    * substrate (chatsvcagg / IC3) that is not in the public Graph API and can
    * break on a Teams web-client update — the docstring "Best-effort, may break
    * on Microsoft client updates" warnings now have a structured pair.
-   * Audit Alex-session §6.
+   *
    */
   readonly stability?: 'experimental';
 };

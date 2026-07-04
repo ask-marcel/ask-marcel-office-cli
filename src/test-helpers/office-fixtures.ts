@@ -147,7 +147,7 @@ const buildRichXlsx = async (): Promise<Uint8Array> => {
     'docProps/core.xml',
     `<?xml version="1.0"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <dc:creator>Vincent Delacourt</dc:creator>
+  <dc:creator>Jordan Avery</dc:creator>
   <dc:title>Budget Model</dc:title>
 </cp:coreProperties>`
   );
@@ -218,8 +218,8 @@ const buildRichXlsx = async (): Promise<Uint8Array> => {
  */
 const buildRichDocx = async (): Promise<Uint8Array> => {
   const doc = new Document({
-    creator: 'Vincent Delacourt',
-    lastModifiedBy: 'Vincent Delacourt',
+    creator: 'Jordan Avery',
+    lastModifiedBy: 'Jordan Avery',
     title: 'Q4 Report',
     subject: 'Quarterly Numbers',
     description: 'Internal review draft',
@@ -232,7 +232,7 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
       children: [
         {
           id: 1,
-          author: 'Vincent Delacourt',
+          author: 'Jordan Avery',
           initials: 'VD',
           date: new Date('2026-05-12T10:00:00Z'),
           children: [new Paragraph({ children: [new TextRun('Please double-check this figure.')] })],
@@ -259,8 +259,8 @@ const buildRichDocx = async (): Promise<Uint8Array> => {
           }),
           new Paragraph({
             children: [
-              new InsertedTextRun({ id: 100, author: 'Vincent Delacourt', date: '2026-05-12T10:05:00Z', children: [new TextRun({ text: 'inserted-phrase' })] }),
-              new DeletedTextRun({ id: 101, author: 'Vincent Delacourt', date: '2026-05-12T10:06:00Z', text: 'deleted-phrase' }),
+              new InsertedTextRun({ id: 100, author: 'Jordan Avery', date: '2026-05-12T10:05:00Z', children: [new TextRun({ text: 'inserted-phrase' })] }),
+              new DeletedTextRun({ id: 101, author: 'Jordan Avery', date: '2026-05-12T10:06:00Z', text: 'deleted-phrase' }),
             ],
           }),
           new Paragraph({
@@ -298,7 +298,7 @@ const buildRichOdt = async (): Promise<Uint8Array> => {
     `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${ODF_META_NS}><office:meta>` +
       '<meta:generator>LibreOffice/7.4.2</meta:generator>' +
       '<dc:title>Q4 Plan</dc:title>' +
-      '<dc:creator>Vincent</dc:creator>' +
+      '<dc:creator>Jordan</dc:creator>' +
       '<dc:description>Internal draft</dc:description>' +
       '<meta:initial-creator>Alice</meta:initial-creator>' +
       '<meta:creation-date>2026-05-01T10:00:00</meta:creation-date>' +
@@ -398,7 +398,7 @@ const buildRichPptx = async (): Promise<Uint8Array> => {
   zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
   zip.file(
     'docProps/core.xml',
-    '<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Vincent Delacourt</dc:creator><dc:title>Board Deck</dc:title></cp:coreProperties>'
+    '<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Jordan Avery</dc:creator><dc:title>Board Deck</dc:title></cp:coreProperties>'
   );
   zip.file(
     'docProps/custom.xml',

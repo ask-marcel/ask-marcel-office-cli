@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/planner/tasks',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-tasks',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-planner-tasks',
+  example: 'ask-marcel-office list-planner-tasks',
   responseShape: 'collection of Microsoft Graph `plannerTask` resources under `value[]`',
   pagination: true,
 };

@@ -34,11 +34,11 @@ const meta: CommandMeta = {
       key: 'messageId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'Outlook message ID. Returned by `ask-marcel list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
+      description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-mail-attachments --message-id 'AAMkAGI2...'",
+  example: "ask-marcel-office list-mail-attachments --message-id 'AAMkAGI2...'",
   responseShape:
     "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
   pagination: true,

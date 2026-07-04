@@ -7,7 +7,7 @@ import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 
 // Hardcoded `$filter=status ne 'completed'` in the path means a user-supplied
 // `--filter` would cause Graph to receive two `$filter` query params and
-// reject with `InvalidFilterClause`. Audit round-6 §2.7: previously --filter
+// reject with `InvalidFilterClause`. previously --filter
 // was dropped from the schema entirely so Commander rejected with the
 // generic "unknown option" — the LLM didn't know why or what to use instead.
 // Accept --filter at the schema layer and reject in execute with a sharp
@@ -46,7 +46,7 @@ const meta: CommandMeta = {
       key: 'todoTaskListId',
       required: true,
       description:
-        'todoTaskList ID. Returned by `ask-marcel list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
+        'todoTaskList ID. Returned by `ask-marcel-office list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
       aliases: [
         { name: 'id', key: 'id' },
         { name: 'task-list-id', key: 'taskListId' },
@@ -55,7 +55,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
+  example: "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
   responseShape: 'collection of Microsoft Graph `todoTask` resources under `value[]` where `status != "completed"`',
   pagination: true,
 };

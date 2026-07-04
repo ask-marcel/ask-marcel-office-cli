@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
+  example: "ask-marcel-office list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `sitePage` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

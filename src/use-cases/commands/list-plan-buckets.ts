@@ -20,7 +20,7 @@ const meta: CommandMeta = {
       name: 'planner-plan-id',
       key: 'plannerPlanId',
       required: true,
-      description: 'Planner plan ID. Returned in the `planId` field of any task from `ask-marcel list-planner-tasks`.',
+      description: 'Planner plan ID. Returned in the `planId` field of any task from `ask-marcel-office list-planner-tasks`.',
       aliases: [
         { name: 'id', key: 'id' },
         { name: 'plan-id', key: 'planId' },
@@ -28,7 +28,7 @@ const meta: CommandMeta = {
     },
     ...selectOnlyOptions,
   ],
-  example: "ask-marcel list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
+  example: "ask-marcel-office list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
   responseShape: 'collection of Microsoft Graph `plannerBucket` resources under `value[]`',
   pagination: true,
 };

@@ -106,7 +106,7 @@ const meta: CommandMeta = {
         'Outlook web URL for a single calendar item. Accepted hosts: `outlook.office.com`, `outlook.office365.com`, `outlook.live.com`. Accepted shapes: path-style (`/calendar/item/AAMkA...`) and OWA query-style with calendar path (`/owa/?itemid=AAMkA...&path=/calendar/item`). Mail links (`/mail/...` or `/owa/?itemid=...` without `path=/calendar`) are rejected with `cli_reject_mail_link_on_calendar_resolver` — use `resolve-mail-link` for those.',
     },
   ],
-  example: "ask-marcel resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
+  example: "ask-marcel-office resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
   responseShape: '`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`.',
 };
 

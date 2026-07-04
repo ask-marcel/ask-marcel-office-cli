@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-team-primary-channel --team-id 'tm1'",
+  example: "ask-marcel-office get-team-primary-channel --team-id 'tm1'",
   responseShape: 'single Microsoft Graph `channel` resource',
 };
 

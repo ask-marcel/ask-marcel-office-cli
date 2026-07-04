@@ -27,7 +27,7 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
 ]);
 
 describe('graph-scopes — central scope map', () => {
-  it('has an entry for every registered command except the meta/cursor exceptions (audit round-8 Wave C)', () => {
+  it('has an entry for every registered command except the meta/cursor exceptions', () => {
     const missing: string[] = [];
     for (const name of Object.keys(commands)) {
       if (COMMANDS_WITHOUT_SCOPES.has(name)) continue;

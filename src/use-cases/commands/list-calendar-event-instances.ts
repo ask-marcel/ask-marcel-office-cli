@@ -39,7 +39,7 @@ const execute: Command['execute'] = async (graph, params) => {
       type: 'api_error',
       status: result.error.status,
       message:
-        'The --event-id is not a recurring series — Graph rejects /instances for singleInstance events. Find a seriesMaster event with `ask-marcel list-calendar-events --filter "type eq \'seriesMaster\'"` and pass that ID instead.',
+        'The --event-id is not a recurring series — Graph rejects /instances for singleInstance events. Find a seriesMaster event with `ask-marcel-office list-calendar-events --filter "type eq \'seriesMaster\'"` and pass that ID instead.',
       code: 'cli_rewrite_expand_series_not_recurring',
     });
   }
@@ -59,7 +59,8 @@ const meta: CommandMeta = {
       name: 'calendar-id',
       key: 'calendarId',
       required: false,
-      description: 'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel list-calendars`.',
+      description:
+        'Calendar ID, or `primary` / `default` for the signed-in user’s default calendar. Optional; defaults to `primary`. Returned by `ask-marcel-office list-calendars`.',
       argumentHint: { kind: 'magicValue', values: ['primary', 'default'] },
     },
     {
@@ -67,14 +68,14 @@ const meta: CommandMeta = {
       key: 'eventId',
       required: true,
       aliases: [{ name: 'id', key: 'id' }],
-      description: 'Recurring event ID. Returned by `ask-marcel list-specific-calendar-events`.',
+      description: 'Recurring event ID. Returned by `ask-marcel-office list-specific-calendar-events`.',
     },
     { name: 'start-date-time', key: 'startDateTime', required: true, aliases: [{ name: 'start', key: 'start' }], description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
     { name: 'end-date-time', key: 'endDateTime', required: true, aliases: [{ name: 'end', key: 'end' }], description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
   example:
-    "ask-marcel list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+    "ask-marcel-office list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
   pagination: true,
 };

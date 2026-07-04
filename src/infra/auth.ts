@@ -9,7 +9,6 @@ import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
-import { defaultSystemBrowserAuth } from './system-browser-loader.ts';
 
 type CachedToken = {
   access_token: string;
@@ -39,10 +38,9 @@ type CachedToken = {
   /**
    * The Teams substrate is region-routed under
    * `teams.microsoft.com/api/csa/<region>/api/...` (post-2026-05 host
-   * migration — see `gotcha_chatsvcagg_substrate_moved` in memory).
-   * Captured from the first `/api/csa/<region>/` URL the chatsvcagg
-   * bearer rides on during login. Absent in caches written before the
-   * migration; readers fall back to `DEFAULT_CHATSVCAGG_REGION`.
+   * migration). Captured from the first `/api/csa/<region>/` URL the
+   * chatsvcagg bearer rides on during login. Absent in caches written
+   * before the migration; readers fall back to `DEFAULT_CHATSVCAGG_REGION`.
    * Shared by both chatsvcagg and IC3 paths (regions match per tenant).
    */
   chatsvcagg_region?: string;
@@ -65,7 +63,7 @@ type AuthError = { type: 'auth_failed'; message: string } | { type: 'auth_cancel
  * `{ elevated: 'captured' | 'failed', elevatedReason?: ... }` field on
  * the login response so an LLM consumer can predict whether the
  * elevated-dependent commands (chat metadata, historical-version
- * downloads) will work without invoking them. Login-fix round-1 Wave D.
+ * downloads) will work without invoking them.
  */
 type ElevatedOutcome = { captured: true } | { captured: false; reason: ElevatedFailureReason | 'unknown_error' };
 type AuthManager = {
@@ -105,7 +103,6 @@ type AuthManager = {
    * Inspect the elevated-capture outcome from the most recent
    * `acquireViaBrowser` invocation. Returns null if no browser-acquired
    * session has happened in this process (cache hit / refresh-only).
-   * Login-fix round-1 Wave D.
    */
   getLastElevatedOutcome: () => ElevatedOutcome | null;
   /**
@@ -130,28 +127,21 @@ const TEAMS_URL = 'https://teams.microsoft.com/';
  */
 const DEFAULT_CHATSVCAGG_REGION = 'emea';
 
-type SystemBrowserAuthFn = () => Promise<
-  Result<
-    {
-      accessToken: AccessToken;
-      refreshToken: string | null;
-      elevatedAccessToken?: AccessToken | null;
-      chatsvcaggAccessToken?: AccessToken | null;
-      ic3AccessToken?: AccessToken | null;
-      chatsvcaggRegion?: string;
-    },
-    { type: string; message: string }
-  >
->;
+// Substrate resource audiences. The Teams web client (CLIENT_ID) is consented
+// for all three (it mints them in-browser), so the shared refresh_token
+// redeems for each by requesting `${resource}/.default` at the token endpoint.
+const CHATSVCAGG_RESOURCE = 'https://chatsvcagg.teams.microsoft.com';
+const IC3_RESOURCE = 'https://ic3.teams.office.com';
 
-// Fail-fast (no browser) message for the secondary-token getters when browser
-// recapture is disabled (the command path). These tokens have no refresh token,
-// so the only renewal is a browser capture — which must happen at an interactive
-// `login`, not by popping a window per command (friction-plan #3, the completion
-// of E-01: the secondary recaptures open a visible window that "opens and closes
-// within seconds" per command, and the CLI runs one process per command).
+// Fail-fast (no browser) message for the secondary-token getters, used on the
+// command path only AFTER the headless refresh (`refreshSubstrateToken`) has
+// been tried and could not produce a token (no cached RT, or AAD rejected the
+// redemption). A browser recapture per command is off-limits — the CLI runs one
+// process per command and the recaptures open a visible window — so the remedy
+// is an interactive `login`. (The elevated token has no HTTP-refresh path at
+// all — different appid — so it always lands here on the command path.)
 const failFastSecondaryMessage = (token: string, commands: string): string =>
-  `${token} token is expired or was not captured at login. Run \`ask-marcel login\` to (re)capture it — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+  `${token} token is expired or was not captured at login. Run \`ask-marcel-office login\` to (re)capture it — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
 
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
@@ -159,12 +149,8 @@ const createAuthManagerFromApi = (
   browserProfileDir: string,
   logger: Logger,
   fs: FileSystem,
-  systemBrowserAuthFn?: SystemBrowserAuthFn,
-  usePlaywrightFallback: boolean = true,
-  skipSystemBrowser: boolean = false,
   recaptureSecondaryViaBrowser: boolean = true
 ): AuthManager => {
-  const systemBrowserAuth = systemBrowserAuthFn ?? defaultSystemBrowserAuth(logger, skipSystemBrowser);
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
     return r.ok ? r.value : null;
@@ -172,7 +158,7 @@ const createAuthManagerFromApi = (
 
   const writeCache = async (next: CachedToken): Promise<void> => {
     await fs.writeText(cachePath, JSON.stringify(next));
-    // QA-001: the cache holds access + refresh tokens — owner-only. Best-effort:
+    // The cache holds access + refresh tokens — owner-only. Best-effort:
     // a chmod failure must not fail the auth flow (the write itself succeeded).
     await fs.chmod(cachePath, 0o600);
   };
@@ -254,70 +240,76 @@ const createAuthManagerFromApi = (
     return ok(validated.value);
   };
 
-  // Login-fix round-1 Wave D: track the elevated-capture outcome from
-  // the most recent browser-acquired session so the login command can
-  // surface it to the user via `getLastElevatedOutcome()`. Reset to
-  // null on every fresh `acquireViaBrowser` so stale outcomes don't
-  // leak across login attempts.
+  // Substrate tokens (chatsvcagg / ic3) carry the SAME Teams appid as the Graph
+  // token, so the shared refresh_token redeems for their audiences too — a
+  // headless HTTP refresh, no browser. This lets the command path self-heal a
+  // lapsed substrate token instead of dead-ending in "run login". The rotated
+  // refresh_token is written back to the shared slot (AAD rotates + single-uses
+  // it) so the Graph token keeps refreshing from the same RT. The region is not
+  // observable here (we never hit the substrate URL) — reuse the last-known
+  // region from cache; a mismatch surfaces later as a clean 404, never a wrong
+  // read. Callers guard on `cached.refresh_token` being present.
+  const refreshSubstrateToken = async (
+    cached: CachedToken,
+    resource: string,
+    persist: (token: AccessToken, region: string) => Promise<void>,
+    rung: string
+  ): Promise<Result<AccessToken, AuthError>> => {
+    const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: cached.refresh_token, scope: `${resource}/.default offline_access` });
+    let res: Response;
+    try {
+      res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Origin: SPA_ORIGIN },
+        body,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `${rung}: ${msg}` });
+    }
+    if (!res.ok) return err({ type: 'auth_failed', message: `${rung} failed (${res.status})` });
+    const json = (await res.json()) as { access_token?: string; refresh_token?: string };
+    const raw = json.access_token ?? '';
+    // Substrate tokens carry a non-Graph audience, so `accessToken()` (the Graph
+    // validator) would reject them — accept any well-formed JWT AAD just minted.
+    if (!raw.startsWith('eyJ')) return err({ type: 'auth_failed', message: `${rung} returned an unusable token` });
+    const substrateToken = accessTokenUnsafe(raw);
+    await persist(substrateToken, cached.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION);
+    if (json.refresh_token && json.refresh_token !== cached.refresh_token) {
+      const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
+      await writeCache({ ...latest, refresh_token: json.refresh_token });
+    }
+    logger.info('auth.ladder.rung', { rung });
+    return ok(substrateToken);
+  };
+
+  // Track the elevated-capture outcome from the most recent
+  // browser-acquired session so the login command can surface it to the
+  // user via `getLastElevatedOutcome()`. Reset to null on every fresh
+  // `acquireViaBrowser` so stale outcomes don't leak across login attempts.
   let lastElevatedOutcome: ElevatedOutcome | null = null;
   let lastChatsvcaggOutcome: ElevatedOutcome | null = null;
 
   const acquireViaBrowser = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
-      // System browser + extension flow (primary): opens the user's default
-      // browser with a callback port in the URL. The ask-marcel-companion
-      // browser extension captures the token and POSTs it back to the CLI's
-      // temporary localhost server. Falls back to Playwright if the extension
-      // doesn't respond within 10 seconds.
-      logger.info('auth.system_browser.trying');
-      const systemResult = await systemBrowserAuth();
-      if (systemResult.ok) {
-        const { accessToken: token, refreshToken, elevatedAccessToken, chatsvcaggAccessToken, ic3AccessToken, chatsvcaggRegion } = systemResult.value;
-        lastElevatedOutcome = elevatedAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
-        lastChatsvcaggOutcome = chatsvcaggAccessToken ? { captured: true } : { captured: false, reason: 'navigation_failed' };
-        await persistTeams(token, refreshToken, elevatedAccessToken ?? null);
-        if (chatsvcaggAccessToken) {
-          await persistChatsvcagg(chatsvcaggAccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
-        }
-        if (ic3AccessToken) {
-          await persistIc3(ic3AccessToken, chatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION);
-        }
-        logger.info('auth.ladder.rung', { rung: 'system_browser' });
-        return ok(token);
-      }
-      // System browser failed
-      logger.info('auth.system_browser.failed', { reason: systemResult.error.type });
-
-      // If Playwright fallback is disabled, return error immediately
-      if (!usePlaywrightFallback) {
-        const errorMessage =
-          systemResult.error.type === 'extension_timeout'
-            ? 'Browser extension did not respond. Make sure the Ask Marcel Companion extension is installed and enabled.'
-            : systemResult.error.message;
-        return err({ type: 'auth_failed', message: errorMessage });
-      }
-
-      // Fall back to Playwright
-      logger.info('auth.system_browser.fallback_to_playwright', { reason: systemResult.error.type });
-
-      // Login-fix round-2: single-session capture. The old flow opened
-      // a second browser at m365.cloud.microsoft for the elevated step,
-      // which on federated tenants (ExampleCorp / ThirdPartyIdP) flashed a fresh sign-in
-      // prompt because the elevated identity's silent-SSO cookies hadn't
-      // settled from disk. We now reuse the same browser context: after
+      // Single-session capture: one Playwright-driven browser window does
+      // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
+      // for the elevated step flashed a fresh sign-in prompt on federated
+      // tenants because the elevated identity's silent-SSO cookies hadn't
+      // settled from disk — so we reuse the same browser context: after
       // the Teams token comes through the network listener, the SAME
       // page navigates to m365.cloud.microsoft so cookies stay live in
-      // memory. Also drops the round-1 auto-heal profile wipe — it was
-      // wiping the freshly-authenticated Teams cookies and making
-      // federated tenants strictly worse.
+      // memory. (An earlier auto-heal profile wipe was dropped for the
+      // same reason — it wiped the freshly-authenticated Teams cookies
+      // and made federated tenants strictly worse.)
       //
       // Substrate (chatsvcagg) round: same teams.microsoft.com session
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(SCOPES.split(' '), TEAMS_URL);
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL);
       if (!result) return err({ type: 'auth_cancelled' });
-      // QA-010: the poll short-circuited because a concurrent process landed a
+      // The poll short-circuited because a concurrent process landed a
       // fresh token in the cache. Do NOT persist (refreshToken is null here —
       // writing would clobber the winner's rotated refresh token) and leave the
       // elevated/chatsvcagg outcomes null: no browser-tested state to report.
@@ -356,10 +348,10 @@ const createAuthManagerFromApi = (
     }
   };
 
-  // Audit round-5 #3: concurrent first-time auth was racing — two parallel
-  // commands would both fall through to acquireViaBrowser, one would win and
-  // one would return `auth_cancelled` from the lost Playwright context. Cache
-  // the in-flight browser-acquire promise so concurrent callers share one
+  // Concurrent first-time auth was racing — two parallel commands would
+  // both fall through to acquireViaBrowser, one would win and one would
+  // return `auth_cancelled` from the lost Playwright context. Cache the
+  // in-flight browser-acquire promise so concurrent callers share one
   // login attempt. Cleared on settle (success or failure) so the next call
   // re-checks the cache instead of returning a stale failure.
   let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
@@ -405,17 +397,17 @@ const createAuthManagerFromApi = (
     return cached.elevated_access_token;
   };
 
-  // Login-fix round-1 Wave E: distinct error messages per failure mode
-  // (launch-hang, navigation failure, silent-SSO timeout) so an LLM gets
-  // actionable remediation rather than the old one-size-fits-all message.
+  // Distinct error messages per failure mode (launch-hang, navigation
+  // failure, silent-SSO timeout) so an LLM gets actionable remediation
+  // rather than a one-size-fits-all message.
   const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
-      return 'elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
+      return 'elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel-office logout && ask-marcel-office login` to wipe the profile and retry. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
     }
     if (reason === 'navigation_failed') {
       return 'elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the elevated commands (list-chats / get-chat / historical-version downloads) will be unavailable.';
     }
-    return 'elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
+    return 'elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel-office logout && ask-marcel-office login` — this now wipes the profile too. (Commands that need this token: list-chats, get-chat, the historical-version download / convert commands.)';
   };
 
   const recaptureElevated = async (): Promise<Result<AccessToken, AuthError>> => {
@@ -462,8 +454,10 @@ const createAuthManagerFromApi = (
     return recaptureElevatedShared();
   };
 
-  // chatsvcagg shares the elevated buffer + recovery shape: token has no
-  // refresh, and silent re-capture rides on the persistent profile.
+  // chatsvcagg shares the elevated expiry buffer. The token itself carries no
+  // refresh_token, but it shares the Teams appid with the Graph token — so the
+  // shared RT redeems for it (see `refreshSubstrateToken`); browser re-capture
+  // is the fallback when that RT is absent or rejected.
   const freshChatsvcaggToken = (cached: CachedToken | null): string | undefined => {
     if (!cached?.chatsvcagg_access_token || !cached.chatsvcagg_expires_on) return undefined;
     if (Date.now() / 1000 >= cached.chatsvcagg_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
@@ -472,12 +466,12 @@ const createAuthManagerFromApi = (
 
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
-      return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
+      return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel-office logout && ask-marcel-office login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
     }
     if (reason === 'navigation_failed') {
       return 'chatsvcagg capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
     }
-    return 'chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
+    return 'chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel-office logout && ask-marcel-office login` — this now wipes the profile too. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
   };
 
   const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => {
@@ -514,16 +508,24 @@ const createAuthManagerFromApi = (
     // would reject every cached chatsvcagg token and force a recapture on
     // every call. `freshChatsvcaggToken` already validates expiry from the
     // JWT payload, which is the only thing we need at this boundary.
-    const fresh = freshChatsvcaggToken(await readCache());
+    const cached = await readCache();
+    const fresh = freshChatsvcaggToken(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.chatsvcagg.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
-    if (!recaptureSecondaryViaBrowser)
+    if (!recaptureSecondaryViaBrowser) {
+      // Command path: self-heal via a headless refresh of the shared RT before
+      // giving up. Only fail fast when there's no RT or the refresh is rejected.
+      if (cached?.refresh_token) {
+        const refreshed = await refreshSubstrateToken(cached, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.refresh');
+        if (refreshed.ok) return refreshed;
+      }
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('chatsvcagg (Teams chat)', 'list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user'),
       });
+    }
     return recaptureChatsvcaggShared();
   };
 
@@ -537,9 +539,10 @@ const createAuthManagerFromApi = (
     return cached?.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION;
   };
 
-  // IC3 shares the same expiry buffer / recovery shape as chatsvcagg: no
-  // refresh token, silent re-capture rides on the persistent profile cookies.
-  // Region is reused from the chatsvcagg slot.
+  // IC3 shares the same expiry buffer / recovery shape as chatsvcagg: the token
+  // has no refresh_token of its own but rides the shared Teams RT for a headless
+  // refresh, with browser re-capture as the fallback. Region is reused from the
+  // chatsvcagg slot.
   const freshIc3Token = (cached: CachedToken | null): string | undefined => {
     if (!cached?.ic3_access_token || !cached.ic3_expires_on) return undefined;
     if (Date.now() / 1000 >= cached.ic3_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
@@ -548,12 +551,12 @@ const createAuthManagerFromApi = (
 
   const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
-      return 'ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel logout && ask-marcel login` to wipe the profile and retry. (Commands that need this token: list-teams-chat-history.)';
+      return 'ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel-office logout && ask-marcel-office login` to wipe the profile and retry. (Commands that need this token: list-teams-chat-history.)';
     }
     if (reason === 'navigation_failed') {
       return 'ic3 capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
     }
-    return 'ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel logout && ask-marcel login` — this now wipes the profile too. (Commands that need this token: list-teams-chat-history.)';
+    return 'ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run `ask-marcel-office logout && ask-marcel-office login` — this now wipes the profile too. (Commands that need this token: list-teams-chat-history.)';
   };
 
   const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => {
@@ -590,22 +593,29 @@ const createAuthManagerFromApi = (
     // cached IC3 token and force a recapture on every call. `freshIc3Token`
     // validates expiry from the JWT payload, which is the only thing we
     // need at this boundary.
-    const fresh = freshIc3Token(await readCache());
+    const cached = await readCache();
+    const fresh = freshIc3Token(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.ic3.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
-    if (!recaptureSecondaryViaBrowser) return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history') });
+    if (!recaptureSecondaryViaBrowser) {
+      if (cached?.refresh_token) {
+        const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
+        if (refreshed.ok) return refreshed;
+      }
+      return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history') });
+    }
     return recaptureIc3Shared();
   };
 
   const logout = async (): Promise<Result<void, AuthError>> => {
     try {
       await fs.deleteIfExists(cachePath);
-      // Login-fix round-1 Wave B: wipe the Playwright persistent browser
-      // profile too. Previously `logout` only cleared the token cache,
-      // leaving stale auth cookies behind — so the audit-documented
-      // remediation `ask-marcel logout && ask-marcel login` would reuse
+      // Wipe the Playwright persistent browser profile too. Previously
+      // `logout` only cleared the token cache, leaving stale auth cookies
+      // behind — so the documented remediation
+      // `ask-marcel-office logout && ask-marcel-office login` would reuse
       // the same expired cookies on the next elevated-capture attempt
       // and fail again. The profile contains only auth-flow state;
       // wiping it forces silent SSO to re-authenticate against
@@ -639,9 +649,9 @@ const createAuthManagerFromApi = (
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
-// Login-fix round-1 Wave B: matches the convention in
-// `browser-auth.ts:defaultProfileDir`. Kept in sync so `logout` wipes
-// the same directory that `acquireElevatedToken` reads/writes.
+// Matches the convention in `browser-auth.ts:defaultProfileDir`. Kept in
+// sync so `logout` wipes the same directory that `acquireElevatedToken`
+// reads/writes.
 const defaultBrowserProfileDir = (): string => {
   const envOverride = process.env['ASKMARCEL_BROWSER_PROFILE'];
   if (envOverride) return envOverride;
@@ -650,8 +660,8 @@ const defaultBrowserProfileDir = (): string => {
 };
 
 /**
- * QA-010: probe the token cache for a fresh access token. Handed to the
- * browser capture so its poll loop can short-circuit the multi-minute dance
+ * Probe the token cache for a fresh access token. Handed to the browser
+ * capture so its poll loop can short-circuit the multi-minute dance
  * when a concurrent process refreshes first (AAD rotates SPA refresh tokens,
  * so the loser of the race cannot refresh and falls into the browser leg).
  * Exported for the composition test; pure read, never writes.
@@ -671,16 +681,7 @@ const stderrProgress = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
-const createAuthManager = (deps: {
-  cachePath: string;
-  logger: Logger;
-  fs?: FileSystem;
-  browserProfileDir?: string;
-  systemBrowserAuth?: SystemBrowserAuthFn;
-  usePlaywrightFallback?: boolean;
-  skipSystemBrowser?: boolean;
-  recaptureSecondaryViaBrowser?: boolean;
-}): AuthManager => {
+const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileSystem; browserProfileDir?: string; recaptureSecondaryViaBrowser?: boolean }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
   const browserAuth = createBrowserAuth({
@@ -689,18 +690,8 @@ const createAuthManager = (deps: {
     freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
     onProgress: stderrProgress,
   });
-  return createAuthManagerFromApi(
-    browserAuth,
-    deps.cachePath,
-    browserProfileDir,
-    deps.logger,
-    fs,
-    deps.systemBrowserAuth,
-    deps.usePlaywrightFallback,
-    deps.skipSystemBrowser,
-    deps.recaptureSecondaryViaBrowser
-  );
+  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs, deps.recaptureSecondaryViaBrowser);
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };
-export type { AuthError, AuthManager, ElevatedOutcome, SystemBrowserAuthFn };
+export type { AuthError, AuthManager, ElevatedOutcome };

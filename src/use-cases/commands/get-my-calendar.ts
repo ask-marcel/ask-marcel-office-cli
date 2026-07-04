@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/calendar',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get-calendar',
   options: [...selectExpandOptions],
-  example: "ask-marcel get-my-calendar --select 'id,name'",
+  example: "ask-marcel-office get-my-calendar --select 'id,name'",
   responseShape: 'single Microsoft Graph `calendar` resource',
 };
 

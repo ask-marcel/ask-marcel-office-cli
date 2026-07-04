@@ -101,8 +101,8 @@ type TokenInfo = {
   /**
    * Seconds remaining until the cached token's `exp` claim — derived from
    * `expiresAt - now`. Negative when the token has already expired. Absent
-   * when the JWT did not carry an `exp` claim. Audit Alex-session §4: lets
-   * an LLM decide pre-emptively to run `ask-marcel login` (re-auth typically
+   * when the JWT did not carry an `exp` claim. lets
+   * an LLM decide pre-emptively to run `ask-marcel-office login` (re-auth typically
    * worth doing under ~5 minutes) without parsing the ISO string itself.
    */
   readonly expiresInSeconds: number | undefined;
@@ -165,13 +165,13 @@ type GraphErrorBody = {
 
 const emptyOnJsonFailure = (): GraphErrorBody => ({});
 
-// Audit round-6 §1.2: Graph occasionally returns `{error: {code: "UnknownError",
+// Graph occasionally returns `{error: {code: "UnknownError",
 // message: ""}}` as a transient backend glitch. Without context the LLM sees
 // "UnknownError: " (or just "UnknownError") and has nothing to act on. Detect
 // the empty-message case and rewrite to a clear "retry / capture" hint.
 const looksEmpty = (s: string | undefined): boolean => s === undefined || s.trim() === '';
 
-// Audit round-8 Wave F: Graph's `Missing scope permissions` 403 inlines the
+// Graph's `Missing scope permissions` 403 inlines the
 // caller's entire granted-scope list (~30 scopes, 700+ chars) into the error
 // message. The trailing "Scopes on the request 'X,Y,Z,...'" is noise — the
 // LLM only needs the *required* scope name(s) to know what's missing.
@@ -181,7 +181,7 @@ const SCOPE_DUMP_PATTERN = /^(.*Missing scope permissions[^.]*\.\s*API requires 
 const truncateScopeDump = (message: string): string => {
   const match = SCOPE_DUMP_PATTERN.exec(message);
   if (match === null) return message;
-  return `${match[1]} Run \`ask-marcel scopes-check\` to see granted scopes, or \`ask-marcel help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
+  return `${match[1]} Run \`ask-marcel-office scopes-check\` to see granted scopes, or \`ask-marcel-office help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
 };
 
 // HTTP/2 servers (chatsvcagg, Kestrel-fronted Teams substrates) routinely
@@ -193,7 +193,7 @@ const truncateScopeDump = (message: string): string => {
 const synthesizeEmptyBodyMessage = (status: number, url: string): string =>
   `HTTP ${status} with no error body (path: ${new URL(url).pathname}; the endpoint may have moved — see the command's "best-effort" note in --help)`;
 
-// Audit Alex-session §8 follow-up: when an `ErrorInvalidIdMalformed`
+// when an `ErrorInvalidIdMalformed`
 // happens against a `/mailFolders/` URL, surface a more specific code so
 // the presenter's hint table can recommend the well-known folder names
 // (inbox, sentitems, drafts, …) instead of the generic "use a list-*
@@ -229,7 +229,7 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
   const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
   const message = errBody.error?.message;
-  // Audit round-7 Wave G: surface the Graph error code as a structured field
+  // surface the Graph error code as a structured field
   // so LLM consumers can branch on `errorCode === "itemNotFound"` etc.
   // instead of substring-matching the human message.
   const rawCode = typeof tag === 'string' && tag !== '' ? tag : undefined;
@@ -271,8 +271,8 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
  * (chatsvcagg `/api/csa/<region>/...` or IC3 `/api/chatsvc/<region>/...`)
  * with a `substrateHttp{status}_{substrate}` code so the presenter's hint
  * table can match it and add the "best-effort substrate may have moved"
- * actionable hint plus `source: "substrate"` classifier. Audit Alex-session
- * §2 follow-up: prior shape left substrate errors with whatever code (or
+ * actionable hint plus `source: "substrate"` classifier. Prior shape left
+ * substrate errors with whatever code (or
  * none) Graph returned, indistinguishable from regular Graph errors and
  * without the experimental-substrate context an LLM needs to decide whether
  * to retry, switch substrates, or surface the failure to the user.
@@ -287,14 +287,21 @@ const asSubstrateError = (e: GraphError, substrate: 'chatsvcagg' | 'ic3'): Graph
 };
 
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
-  const authHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
-    const tokenResult = await auth.getAccessToken();
+  // All four token tiers (basic / elevated / chatsvcagg / ic3) share the same
+  // "fetch a bearer, map an auth failure to a GraphError" shape — only the
+  // AuthManager getter differs. One helper, four thin bindings.
+  const authHeadersFrom = async (getToken: AuthManager['getAccessToken']): Promise<Result<{ Authorization: string }, GraphError>> => {
+    const tokenResult = await getToken();
     if (!tokenResult.ok) {
       const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
       return err({ type: 'auth_failed', message: msg });
     }
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
+  const authHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getAccessToken);
+  const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getElevatedAccessToken);
+  const chatsvcaggAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getChatsvcaggAccessToken);
+  const ic3AuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getIc3AccessToken);
 
   const request = async (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
@@ -313,15 +320,6 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     } catch (e: unknown) {
       return err(wrapNetworkError(e, method, path, 'json'));
     }
-  };
-
-  const elevatedAuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
-    const tokenResult = await auth.getElevatedAccessToken();
-    if (!tokenResult.ok) {
-      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      return err({ type: 'auth_failed', message: msg });
-    }
-    return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
 
   const getElevated = async (path: string): Promise<Result<unknown, GraphError>> => {
@@ -347,15 +345,6 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   // since the 2026-05 substrate move). We piggy-back the captured bearer to
   // read chat message bodies — Graph's `Chat.Read*`-gated endpoints can't
   // reach them with the scopes the basic Teams token carries.
-  const chatsvcaggAuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
-    const tokenResult = await auth.getChatsvcaggAccessToken();
-    if (!tokenResult.ok) {
-      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      return err({ type: 'auth_failed', message: msg });
-    }
-    return ok({ Authorization: `Bearer ${tokenResult.value}` });
-  };
-
   const teamsChat = async (path: string): Promise<Result<unknown, GraphError>> => {
     const headers = await chatsvcaggAuthHeaders();
     if (!headers.ok) return headers;
@@ -381,15 +370,6 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   // Teams web actually uses for chat-message scrollback — it supports
   // `syncState` + `startTime` pagination that chatsvcagg lacks. See
   // `gotcha_chatsvcagg_substrate_moved` in memory for the discovery.
-  const ic3AuthHeaders = async (): Promise<Result<{ Authorization: string }, GraphError>> => {
-    const tokenResult = await auth.getIc3AccessToken();
-    if (!tokenResult.ok) {
-      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      return err({ type: 'auth_failed', message: msg });
-    }
-    return ok({ Authorization: `Bearer ${tokenResult.value}` });
-  };
-
   const teamsChatIc3 = async (path: string): Promise<Result<unknown, GraphError>> => {
     const headers = await ic3AuthHeaders();
     if (!headers.ok) return headers;
@@ -429,7 +409,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         // `size` is documented as the byte count of the source. JS strings are
         // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
         // with multi-byte chars (any non-ASCII) reported a `size` smaller than
-        // the actual byte count an `--output-path` write produced (audit §2.1).
+        // the actual byte count an `--output-path` write produced.
         // Use the encoded byte length so envelope `size` matches the disk size.
         return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
       }
@@ -477,7 +457,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         // `size` is documented as the byte count of the source. JS strings are
         // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
         // with multi-byte chars (any non-ASCII) reported a `size` smaller than
-        // the actual byte count an `--output-path` write produced (audit §2.1).
+        // the actual byte count an `--output-path` write produced.
         // Use the encoded byte length so envelope `size` matches the disk size.
         return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
       }

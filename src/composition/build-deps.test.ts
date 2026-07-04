@@ -17,14 +17,13 @@ describe('buildDeps composition root', () => {
     expect(typeof deps.processRunner.runInherit).toBe('function');
   });
 
-  it('exposes a login-auth factory that builds an auth manager for both the default Playwright flow and extension mode', () => {
+  it('exposes a login-auth factory that builds an auth manager for the interactive login flow', () => {
     const fs = createFileSystemFake();
     const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs });
-    expect(typeof deps.makeLoginAuth({ useExtension: false }).getAccessToken).toBe('function');
-    expect(typeof deps.makeLoginAuth({ useExtension: true }).getAccessToken).toBe('function');
+    expect(typeof deps.makeLoginAuth().getAccessToken).toBe('function');
   });
 
-  it('builds the command-path auth manager with the system-browser/extension capture disabled so re-auth uses headed Edge, never a per-command Chrome popup', () => {
+  it('builds the command-path auth manager with secondary browser recapture disabled so a lapsed secondary token fails fast instead of popping a per-command browser', () => {
     const fs = createFileSystemFake();
     const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
     const recordingCreateAuth: typeof createAuthManager = (opts) => {
@@ -32,8 +31,6 @@ describe('buildDeps composition root', () => {
       return createAuthManager(opts);
     };
     buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, createAuth: recordingCreateAuth });
-    expect(calls[0]?.skipSystemBrowser).toBe(true);
-    expect(calls[0]?.usePlaywrightFallback).toBe(true);
     expect(calls[0]?.recaptureSecondaryViaBrowser).toBe(false); // secondary getters fail-fast, no per-command browser
   });
 
@@ -41,15 +38,6 @@ describe('buildDeps composition root', () => {
     const fs = createFileSystemFake();
     const deps = buildDeps({ home: '/virtual/home', logLevel: 'error', fs });
     expect(typeof deps.auth.getAccessToken).toBe('function');
-  });
-
-  it('exposes a makeLoginAuth factory that builds a login AuthManager for either browser flow', () => {
-    const fs = createFileSystemFake();
-    const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs });
-    const extensionAuth = deps.makeLoginAuth({ useExtension: true });
-    const playwrightAuth = deps.makeLoginAuth({ useExtension: false });
-    expect(typeof extensionAuth.getAccessToken).toBe('function');
-    expect(typeof playwrightAuth.getAccessToken).toBe('function');
   });
 
   it('uses default config values when no config is provided', () => {

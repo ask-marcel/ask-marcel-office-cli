@@ -13,7 +13,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
     graphPathTemplate: '/fake',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/fake',
     options: [],
-    example: 'ask-marcel fake',
+    example: 'ask-marcel-office fake',
     ...overrides,
   },
 });
@@ -88,7 +88,7 @@ describe('buildManifest', () => {
   });
 });
 
-describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () => {
+describe('buildTerseManifest — discovery view', () => {
   it('strips every per-command field other than name/summary/category from each entry', () => {
     const registry: Readonly<Record<string, Command>> = {
       'list-foo': fakeCmd({ summary: 'lists foos', responseShape: 'array of foos', bodyTemplate: '{ "x": 1 }', pagination: true }),
@@ -113,7 +113,7 @@ describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () =>
     for (const lifecycle of LIFECYCLE_NAMES) expect(names).toContain(lifecycle);
   });
 
-  it('keeps the `stability` tag on terse entries so an LLM sees the experimental marker at discovery time (Audit Alex-session §6 — no second full-manifest fetch needed)', () => {
+  it('keeps the `stability` tag on terse entries so an LLM sees the experimental marker at discovery time (— no second full-manifest fetch needed)', () => {
     const registry: Readonly<Record<string, Command>> = {
       'list-stable-thing': fakeCmd(),
       'list-experimental-thing': fakeCmd({ stability: 'experimental' }),
@@ -150,7 +150,7 @@ describe('buildTerseManifest — discovery view (Audit Alex-session §B)', () =>
   });
 });
 
-describe('filterManifestByCategory — single-category projection (Audit Alex-session §B)', () => {
+describe('filterManifestByCategory — single-category projection', () => {
   const registry: Readonly<Record<string, Command>> = {
     'list-foo': fakeCmd({ category: 'mail' }),
     'list-bar': fakeCmd({ category: 'drive' }),

@@ -10,7 +10,7 @@ const calendarEvent: CommandManifestEntry = {
   graphPathTemplate: '/me/events/{event-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/event-get',
   options: [{ name: 'event-id', key: 'eventId', required: true, description: 'The Graph event ID.' }],
-  example: "ask-marcel get-calendar-event --event-id 'AAMk...'",
+  example: "ask-marcel-office get-calendar-event --event-id 'AAMk...'",
   responseShape: 'single event',
 };
 
@@ -22,7 +22,7 @@ const listDrives: CommandManifestEntry = {
   graphPathTemplate: '/me/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
   options: [],
-  example: 'ask-marcel list-drives',
+  example: 'ask-marcel-office list-drives',
 };
 
 const sampleManifest: CommandManifest = {
@@ -59,7 +59,7 @@ describe('renderReadmeTables', () => {
     expect(md.indexOf('list-apple-drives')).toBeLessThan(md.indexOf('list-zebra-drives'));
   });
 
-  it("renders positional arguments in the readme table's required-params column with `<name>` markers (audit round-7 Wave A)", () => {
+  it("renders positional arguments in the readme table's required-params column with `<name>` markers", () => {
     const positional: CommandManifestEntry = {
       ...listDrives,
       name: 'docs',
@@ -83,7 +83,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('## Options');
     expect(md).toContain('| `--event-id` | The Graph event ID. |');
     expect(md).toContain('## Example');
-    expect(md).toContain("ask-marcel get-calendar-event --event-id 'AAMk...'");
+    expect(md).toContain("ask-marcel-office get-calendar-event --event-id 'AAMk...'");
   });
 
   it('omits the Options section when the command has no options', () => {
@@ -110,7 +110,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).not.toContain('**Pagination:**');
   });
 
-  // Audit Alex-session §5 follow-up: PAGINATION_HINT used to be one string
+  // PAGINATION_HINT used to be one string
   // for every paginated command, including the 5 deltaLink and 2
   // preferMaxPageSize ones where the cursor + `--top` semantics differ.
   // `paginationHintFor(strategy)` returns the matching variant.
@@ -136,7 +136,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('rejects `$top` as a query parameter');
   });
 
-  it('appends an _(aliases: ...)_ suffix on options with aliases so the markdown surface matches the manifest (audit v1.0.0 §3.2)', () => {
+  it('appends an _(aliases: ...)_ suffix on options with aliases so the markdown surface matches the manifest', () => {
     const aliased: CommandManifestEntry = {
       ...calendarEvent,
       options: [
@@ -162,7 +162,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).not.toContain('aliases:');
   });
 
-  it('renders a Scopes required line when scopesRequired is set (audit round-7 Wave E)', () => {
+  it('renders a Scopes required line when scopesRequired is set', () => {
     const withScopes: CommandManifestEntry = { ...calendarEvent, scopesRequired: ['Chat.ReadBasic', 'User.Read'] };
     const md = renderCommandMarkdown(withScopes);
     expect(md).toContain('**Scopes required:**');
@@ -171,15 +171,15 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('scopes-check');
   });
 
-  it('renders an elevated-token warning when needsElevatedToken is true (audit round-7 Wave E)', () => {
+  it('renders an elevated-token warning when needsElevatedToken is true', () => {
     const elevated: CommandManifestEntry = { ...calendarEvent, needsElevatedToken: true };
     const md = renderCommandMarkdown(elevated);
     expect(md).toContain('**Needs elevated token:**');
     expect(md).toContain('M365ChatClient');
-    expect(md).toContain('ask-marcel login');
+    expect(md).toContain('ask-marcel-office login');
   });
 
-  it('renders a Positional arguments section when positionalArguments is set (audit round-7 Wave A)', () => {
+  it('renders a Positional arguments section when positionalArguments is set', () => {
     const positional: CommandManifestEntry = {
       ...listDrives,
       positionalArguments: [{ name: 'command', required: true, description: 'Name of the command to show docs for.' }],
@@ -189,7 +189,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('| `<command>` | yes | Name of the command to show docs for. |');
   });
 
-  it('renders a Stability line when the entry is flagged experimental — surfaces the "may break without notice" warning structurally (Audit Alex-session §6)', () => {
+  it('renders a Stability line when the entry is flagged experimental — surfaces the "may break without notice" warning structurally', () => {
     const experimental: CommandManifestEntry = { ...listDrives, stability: 'experimental' };
     const md = renderCommandMarkdown(experimental);
     expect(md).toContain('**Stability:** `experimental`');

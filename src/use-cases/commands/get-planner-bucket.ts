@@ -16,14 +16,14 @@ const meta: CommandMeta = {
       name: 'planner-bucket-id',
       key: 'plannerBucketId',
       required: true,
-      description: 'Planner bucket ID. Returned by `ask-marcel list-plan-buckets`.',
+      description: 'Planner bucket ID. Returned by `ask-marcel-office list-plan-buckets`.',
       aliases: [
         { name: 'id', key: 'id' },
         { name: 'bucket-id', key: 'bucketId' },
       ],
     },
   ],
-  example: "ask-marcel get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",
+  example: "ask-marcel-office get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",
   responseShape: 'single Microsoft Graph `plannerBucket` resource',
 };
 

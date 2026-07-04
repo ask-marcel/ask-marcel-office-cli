@@ -24,7 +24,7 @@ const meta: CommandMeta = {
         'mailFolder ID. Optional; defaults to `inbox`. In practice only `inbox` (or its resolved ID) works — Graph rejects every other folder for messageRules with `MailFolderNotSupportedError`.',
     },
   ],
-  example: 'ask-marcel list-mail-rules',
+  example: 'ask-marcel-office list-mail-rules',
   responseShape: 'collection of Microsoft Graph `messageRule` resources under `value[]`',
 };
 

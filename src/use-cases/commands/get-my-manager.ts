@@ -31,7 +31,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/manager',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-manager',
   options: [...selectExpandOptions],
-  example: "ask-marcel get-my-manager --select 'id,displayName,mail'",
+  example: "ask-marcel-office get-my-manager --select 'id,displayName,mail'",
   responseShape:
     'single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description).',
 };

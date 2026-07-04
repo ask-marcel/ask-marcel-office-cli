@@ -4,7 +4,7 @@ import { buildListCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
-// Audit v1.4.0 fresh-pass #4: mirror `list-mail-messages`'s slim default
+// mirror `list-mail-messages`'s slim default
 // so the search results don't ship full HTML bodies by default. Same
 // rationale and same field set — diverging would put the two flagship
 // mail-listing commands on opposite token-cost philosophies. User-supplied
@@ -14,14 +14,14 @@ const DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTi
 const baseSchema = z.object({ query: z.string().min(1) });
 const inner = buildListCommand((p) => `/me/messages?$search="${p.query}"`, baseSchema, { defaultSelect: DEFAULT_SELECT });
 
-// Audit v1.0.0 §B6: Graph rejects `$search` + `$filter` together with
+// Graph rejects `$search` + `$filter` together with
 // `SearchWithFilter` (not the previously documented `InvalidRestriction`).
 // Reject the conflict client-side so the LLM gets a precise pointer to the
 // alternative command instead of paying a 500ms round-trip for an opaque
 // Graph code.
 const execute: Command['execute'] = async (graph, params) => {
   if (typeof params['filter'] === 'string' && params['filter'].length > 0) {
-    // Audit Alex-session §2 follow-up: short `error` headline, with the
+    // short `error` headline, with the
     // actionable remedy carried by the matching `hint` rule in
     // src/presenter/error-hints.ts (matched by `code`). Prior shape packed
     // both diagnosis AND remedy into `message`, leaving the generic
@@ -53,7 +53,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel search-mail-messages --query 'from:alice subject:Q3'",
+  example: "ask-marcel-office search-mail-messages --query 'from:alice subject:Q3'",
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
   pagination: true,

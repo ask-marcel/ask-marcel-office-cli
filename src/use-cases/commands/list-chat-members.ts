@@ -17,7 +17,7 @@ import { pickODataOptions } from './odata-query.ts';
 // NOTE: chat METADATA (`/me/chats`, `/chats/{id}`) still needs `Chat.ReadBasic`,
 // which only the elevated token grants — `list-chats` / `get-chat` stay elevated.
 //
-// Audit v1.0.0 §B1: `/chats/{id}/members` rejects `$top`, `$orderby`, and
+// `/chats/{id}/members` rejects `$top`, `$orderby`, and
 // `$expand` with `BadRequest`. Advertise only the subset Graph honours.
 const baseSchema = z.object({ chatId: z.string().min(1) });
 const CHAT_MEMBERS_ODATA_KEYS = ['skip', 'select', 'filter'] as const;
@@ -36,7 +36,7 @@ const execute: Command['execute'] = async (graph, params) => {
     return err({
       type: 'api_error',
       status: result.error.status,
-      message: `NotFound: Microsoft Teams chat not found (chat-id: "${chatId}"). The chat ID format must be \`19:<thread>@thread.v2\` (or \`19:meeting_<id>@thread.v2\` for meeting chats). Source IDs via \`ask-marcel list-chats\` — or URL-decode the \`19%3a...%40thread.v2\` segment of a \`joinUrl\` returned by \`list-calendar-events\`.`,
+      message: `NotFound: Microsoft Teams chat not found (chat-id: "${chatId}"). The chat ID format must be \`19:<thread>@thread.v2\` (or \`19:meeting_<id>@thread.v2\` for meeting chats). Source IDs via \`ask-marcel-office list-chats\` — or URL-decode the \`19%3a...%40thread.v2\` segment of a \`joinUrl\` returned by \`list-calendar-events\`.`,
       code: 'cli_rewrite_chat_not_found',
     });
   }
@@ -59,13 +59,13 @@ const meta: CommandMeta = {
       aliases: [{ name: 'id', key: 'id' }],
       description:
         'Microsoft Teams chat ID, e.g. `19:abc...@thread.v2`. ' +
-        'Source the ID via `ask-marcel list-chats` (returns chat metadata for the signed-in user). ' +
+        'Source the ID via `ask-marcel-office list-chats` (returns chat metadata for the signed-in user). ' +
         'Alternative sources outside the CLI: the Teams desktop / web client (Open in browser → URL contains the chat thread ID), Microsoft Graph Explorer, ' +
         'or URL-decode the `19%3ameeting_...%40thread.v2` segment of an `onlineMeeting.joinUrl` from `list-calendar-events`.',
     },
     ...pickODataOptions(CHAT_MEMBERS_ODATA_KEYS),
   ],
-  example: "ask-marcel list-chat-members --chat-id '19:abc...@thread.v2'",
+  example: "ask-marcel-office list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',
   pagination: true,
 };

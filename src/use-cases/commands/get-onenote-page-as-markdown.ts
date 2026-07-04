@@ -50,7 +50,7 @@ const meta: CommandMeta = {
       name: 'onenote-page-id',
       key: 'onenotePageId',
       required: true,
-      description: 'OneNote page ID. Returned by `ask-marcel list-onenote-section-pages`.',
+      description: 'OneNote page ID. Returned by `ask-marcel-office list-onenote-section-pages`.',
       aliases: [
         { name: 'id', key: 'id' },
         { name: 'page-id', key: 'pageId' },
@@ -73,7 +73,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
+  example: "ask-marcel-office get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
   responseShape:
     '`{ contentType: "text/markdown", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body.',
   producesBytes: true,

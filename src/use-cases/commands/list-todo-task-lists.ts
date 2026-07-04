@@ -20,7 +20,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/todo/lists',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/todo-list-lists',
   options: [...pickODataOptions(TODO_LISTS_ODATA_KEYS)],
-  example: 'ask-marcel list-todo-task-lists',
+  example: 'ask-marcel-office list-todo-task-lists',
   responseShape: 'collection of Microsoft Graph `todoTaskList` resources under `value[]`',
   pagination: true,
 };

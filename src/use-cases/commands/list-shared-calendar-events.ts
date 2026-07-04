@@ -22,7 +22,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-shared-calendar-events --user-id 'colleague@contoso.com'",
+  example: "ask-marcel-office list-shared-calendar-events --user-id 'colleague@contoso.com'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
 };

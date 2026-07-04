@@ -35,7 +35,7 @@ const meta: CommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel list-sharepoint-list-item-versions --site-id 'contoso.sharepoint.com,...' --list-id 'list-guid' --list-item-id '12'",
+  example: "ask-marcel-office list-sharepoint-list-item-versions --site-id 'contoso.sharepoint.com,...' --list-id 'list-guid' --list-item-id '12'",
   responseShape: 'collection of Microsoft Graph `listItemVersion` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

@@ -22,7 +22,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
+  example: "ask-marcel-office get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
   responseShape: 'single Microsoft Graph `group` resource',
 };
 

@@ -28,7 +28,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
+  example: "ask-marcel-office get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
   responseShape: 'single Microsoft Graph `driveItem` resource (folder)',
 };
 

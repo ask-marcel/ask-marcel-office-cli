@@ -29,7 +29,7 @@ const meta: CommandMeta = {
     { name: 'event-id', key: 'eventId', required: true, description: 'Outlook calendar event ID. Returned by `list-calendar-events` or `get-calendar-event`.' },
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that event. Returned by `list-calendar-event-attachments`.' },
   ],
-  example: "ask-marcel convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
+  example: "ask-marcel-office convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
   producesBytes: true,

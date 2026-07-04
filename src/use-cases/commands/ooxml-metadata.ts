@@ -17,7 +17,7 @@ const stripNs = (tag: string): string => {
 };
 
 // `cp:coreProperties` / `Properties` (extended) — children are direct
-// text-only elements like `<dc:creator>Vincent</dc:creator>`. Flatten to
+// text-only elements like `<dc:creator>Jordan</dc:creator>`. Flatten to
 // a Record by stripping the namespace prefix from the local name.
 const flattenLeafProps = (root: unknown, rootTag: string): Readonly<Record<string, string>> => {
   const containers = findAll(root, rootTag);

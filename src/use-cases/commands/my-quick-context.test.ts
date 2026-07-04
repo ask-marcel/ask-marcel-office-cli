@@ -17,7 +17,7 @@ const buildGraph = (responses: Record<string, Result<unknown, GraphError>>): { g
   return { graph, calls };
 };
 
-// Audit round-7 Wave H: my-quick-context is partial-result. Each sub-call is
+// my-quick-context is partial-result. Each sub-call is
 // optional except `/me` (load-bearing); failures of the others produce
 // `undefined` fields rather than aborting the whole command.
 //
@@ -103,7 +103,7 @@ describe('my-quick-context', () => {
     }
   });
 
-  it('leaves tenant timezone/locale/workingHours undefined when /me/mailboxSettings fails — partial-result mode (Audit Alex-session §5.2)', async () => {
+  it('leaves tenant timezone/locale/workingHours undefined when /me/mailboxSettings fails — partial-result mode', async () => {
     const apiError: GraphError = { type: 'api_error', status: 403, message: 'tenant disabled mailboxSettings' };
     const { graph } = buildGraph({ ...FULL_RESPONSES, '/me/mailboxSettings?$select=timeZone,language,workingHours': err(apiError) });
 

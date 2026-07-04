@@ -29,6 +29,7 @@ import * as getSharepointSiteDriveById from './get-sharepoint-site-drive-by-id.t
 import * as getSharepointSiteListItem from './get-sharepoint-site-list-item.ts';
 import * as getSharepointSiteList from './get-sharepoint-site-list.ts';
 import * as getSharepointSite from './get-sharepoint-site.ts';
+import * as getSchedule from './get-schedule.ts';
 import * as getSpecificCalendarEvent from './get-specific-calendar-event.ts';
 import * as getSpecificCalendarView from './get-specific-calendar-view.ts';
 import * as getTeamChannel from './get-team-channel.ts';
@@ -88,6 +89,7 @@ import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-ev
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as createMailDraft from './create-mail-draft.ts';
+import * as createReplyDraft from './create-reply-draft.ts';
 import * as updateMailDraft from './update-mail-draft.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip.ts';
 import * as convertLocalFile from './convert-local-file.ts';
@@ -237,6 +239,7 @@ const commands: Record<string, Command> = {
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-to-markdown': convertMailToMarkdown,
   'create-mail-draft': createMailDraft,
+  'create-reply-draft': createReplyDraft,
   'update-mail-draft': updateMailDraft,
   'convert-drive-item-zip': convertDriveItemZip,
   'convert-local-file': convertLocalFile,
@@ -268,6 +271,7 @@ const commands: Record<string, Command> = {
   'list-calendars': listCalendars,
   'list-calendar-events-delta': listCalendarEventsDelta,
   'list-calendar-view-delta': listCalendarViewDelta,
+  'get-schedule': getSchedule,
   'list-chat-members': listChatMembers,
   'list-joined-teams': listJoinedTeams,
   'get-team': getTeam,

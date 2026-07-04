@@ -18,10 +18,10 @@ describe('extractCoreProps', () => {
     const zip = await open((z) =>
       z.file(
         'docProps/core.xml',
-        '<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Vincent</dc:creator><dc:title>Q4</dc:title></cp:coreProperties>'
+        '<?xml version="1.0"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Jordan</dc:creator><dc:title>Q4</dc:title></cp:coreProperties>'
       )
     );
-    expect(extractCoreProps(zip)).toEqual({ creator: 'Vincent', title: 'Q4' });
+    expect(extractCoreProps(zip)).toEqual({ creator: 'Jordan', title: 'Q4' });
   });
 
   it('returns an empty record when docProps/core.xml is absent', async () => {

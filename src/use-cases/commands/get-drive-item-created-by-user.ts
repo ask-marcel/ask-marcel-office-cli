@@ -29,7 +29,7 @@ const meta: CommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,jobTitle,mail'",
+  example: "ask-marcel-office get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,jobTitle,mail'",
   responseShape: 'single Microsoft Graph `user` resource',
 };
 

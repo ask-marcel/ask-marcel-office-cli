@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/insights/used',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-used',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-recently-used-insights',
+  example: 'ask-marcel-office list-recently-used-insights',
   responseShape: 'collection of Microsoft Graph `usedInsight` resources under `value[]`',
   pagination: true,
 };

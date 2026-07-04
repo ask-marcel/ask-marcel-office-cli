@@ -79,7 +79,7 @@ export const createNodeFileSystem = (): FileSystem => ({
       return err({ type: 'io_failed', message: formatError(e) });
     }
   },
-  // Login-fix round-1 Wave B: wipe the Playwright persistent browser
+  // wipe the Playwright persistent browser
   // profile during `logout`. Best-effort recursive delete — returns ok
   // even when the directory does not exist (port contract).
   deleteDirIfExists: async (path) => {

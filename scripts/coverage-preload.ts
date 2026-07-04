@@ -40,7 +40,6 @@ import '../src/index.ts';
 import '../src/composition/package-manager.ts';
 import '../src/use-cases/commands/update.ts';
 
-import '../src/composition/env.ts';
 import '../src/composition/build-deps.ts';
 import '../src/composition/cli.ts';
 

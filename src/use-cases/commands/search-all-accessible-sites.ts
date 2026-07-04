@@ -114,7 +114,7 @@ const meta: CommandMeta = {
         "Pass `--count-files true` to add `estimatedFileCount` to each kept site — the Microsoft Search index's security-trimmed `driveItem` total (files + folders) scoped to that site's `webUrl` via KQL `path:`. OFF by default because it issues ONE extra Search query per site (chunked, capped at 200) — a real fan-out with 429-throttling risk; narrow with `--query` first. It is an estimate, not an exact count.",
     },
   ],
-  example: 'ask-marcel search-all-accessible-sites --output json',
+  example: 'ask-marcel-office search-all-accessible-sites --output json',
   bodyTemplate:
     "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
   responseShape:

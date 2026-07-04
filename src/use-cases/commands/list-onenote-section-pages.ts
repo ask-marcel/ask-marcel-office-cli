@@ -17,7 +17,7 @@ const meta: CommandMeta = {
       name: 'onenote-section-id',
       key: 'onenoteSectionId',
       required: true,
-      description: 'OneNote section ID. Returned by `ask-marcel list-onenote-notebook-sections` or `list-all-onenote-sections`.',
+      description: 'OneNote section ID. Returned by `ask-marcel-office list-onenote-notebook-sections` or `list-all-onenote-sections`.',
       aliases: [
         { name: 'id', key: 'id' },
         { name: 'section-id', key: 'sectionId' },
@@ -25,7 +25,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-onenote-section-pages --onenote-section-id '1-abc...'",
+  example: "ask-marcel-office list-onenote-section-pages --onenote-section-id '1-abc...'",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]`',
   pagination: true,
 };

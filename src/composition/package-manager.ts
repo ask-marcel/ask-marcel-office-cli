@@ -1,6 +1,6 @@
 /*
  * Heuristic detection of which package manager originally installed the CLI.
- * Used by the `ask-marcel update` command to invoke the matching install
+ * Used by the `ask-marcel-office update` command to invoke the matching install
  * tool (`npm i -g …` vs `bun add -g …`).
  *
  * Heuristic: if the bin path contains a `.bun` segment, it is a bun-installed

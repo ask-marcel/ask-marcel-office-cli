@@ -23,7 +23,7 @@ const meta: CommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-user-direct-reports --user-id 'alice@contoso.com'",
+  example: "ask-marcel-office list-user-direct-reports --user-id 'alice@contoso.com'",
   responseShape: 'collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`',
   pagination: true,
 };

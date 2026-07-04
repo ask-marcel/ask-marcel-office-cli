@@ -56,7 +56,7 @@ const meta: CommandMeta = {
         'KQL query string. Supports field operators where indexed by the corpus (e.g. `from:alice`, `subject:"q3 budget"`, `filetype:xlsx`). Free-text works everywhere.',
     },
   ],
-  example: "ask-marcel microsoft-search-query --query 'q3 budget'",
+  example: "ask-marcel-office microsoft-search-query --query 'q3 budget'",
   bodyTemplate:
     "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType",
   responseShape:

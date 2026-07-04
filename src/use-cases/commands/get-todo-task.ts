@@ -5,7 +5,7 @@ import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 
-// Audit v1.0.0 §B9: sibling single-resource GETs (get-my-manager,
+// sibling single-resource GETs (get-my-manager,
 // get-user-manager, get-mail-message, etc.) all expose `--select`/`--expand`
 // so an LLM can slim a fetched resource. This command was the only Microsoft
 // task-list "get" without them. It also hits the same `/tasks` endpoint as its
@@ -35,7 +35,7 @@ const meta: CommandMeta = {
       name: 'todo-task-list-id',
       key: 'todoTaskListId',
       required: true,
-      description: 'To Do task list ID. Returned by `ask-marcel list-todo-task-lists`.',
+      description: 'To Do task list ID. Returned by `ask-marcel-office list-todo-task-lists`.',
       aliases: [
         { name: 'task-list-id', key: 'taskListId' },
         { name: 'todo-list-id', key: 'todoListId' },
@@ -46,12 +46,12 @@ const meta: CommandMeta = {
       key: 'todoTaskId',
       required: true,
       description:
-        "To Do task ID. Returned by `ask-marcel list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
+        "To Do task ID. Returned by `ask-marcel-office list-todo-tasks`. Accepts `--task-id` as a shorter alias (within this command's flag set the To Do context is unambiguous).",
       aliases: [{ name: 'task-id', key: 'taskId' }],
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
+  example: "ask-marcel-office get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
   responseShape: 'single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied)',
 };
 

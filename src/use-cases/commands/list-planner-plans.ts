@@ -19,7 +19,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/planner/plans',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-plans',
   options: [...selectOnlyOptions],
-  example: 'ask-marcel list-planner-plans',
+  example: 'ask-marcel-office list-planner-plans',
   responseShape: 'collection of Microsoft Graph `plannerPlan` resources under `value[]`',
   pagination: true,
 };

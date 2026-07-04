@@ -13,7 +13,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/mailFolders',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-mailfolders',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-mail-folders',
+  example: 'ask-marcel-office list-mail-folders',
   responseShape: 'collection of Microsoft Graph `mailFolder` resources under `value[]`',
   pagination: true,
 };

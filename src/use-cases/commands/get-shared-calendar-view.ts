@@ -28,7 +28,7 @@ const meta: CommandMeta = {
     { name: 'end-date-time', key: 'endDateTime', required: true, aliases: [{ name: 'end', key: 'end' }], description: `End of the window. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel list-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
+  example: "ask-marcel-office list-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
 };

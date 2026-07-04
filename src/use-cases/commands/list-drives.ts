@@ -14,7 +14,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
   options: [...odataQueryOptions],
-  example: 'ask-marcel list-drives',
+  example: 'ask-marcel-office list-drives',
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,
 };

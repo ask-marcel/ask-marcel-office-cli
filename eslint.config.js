@@ -128,9 +128,6 @@ export default [
     },
   },
   {
-    // browser-extension/ is a vendored Chrome WebExtension (its own `chrome.*`
-    // runtime + manifest), not part of the Bun/TS CLI the gates govern — same
-    // rationale as the excluded scripts/ and .agents/ artefacts.
-    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**', 'browser-extension/**'],
+    ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];

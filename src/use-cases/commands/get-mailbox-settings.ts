@@ -16,7 +16,7 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/mailboxSettings',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings',
   options: [],
-  example: 'ask-marcel get-mailbox-settings',
+  example: 'ask-marcel-office get-mailbox-settings',
   responseShape: 'single Microsoft Graph `mailboxSettings` resource',
 };
 
