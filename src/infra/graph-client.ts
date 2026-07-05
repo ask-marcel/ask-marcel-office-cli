@@ -294,7 +294,11 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const tokenResult = await getToken();
     if (!tokenResult.ok) {
       const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      return err({ type: 'auth_failed', message: msg });
+      // Carry the auth layer's machine-readable code (e.g. the secondary-token
+      // fail-fast) through to the envelope's `errorCode` so an agent can branch
+      // on it without substring-matching the message.
+      const code = tokenResult.error.type === 'auth_failed' ? tokenResult.error.code : undefined;
+      return err({ type: 'auth_failed', message: msg, ...(code ? { code } : {}) });
     }
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };

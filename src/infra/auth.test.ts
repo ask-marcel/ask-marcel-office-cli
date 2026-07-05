@@ -130,7 +130,12 @@ describe('auth manager recovery ladder', () => {
     for (const getToken of [auth.getElevatedAccessToken, auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
       const result = await getToken();
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.type === 'auth_failed' ? result.error.message : '').toContain('login');
+      if (!result.ok && result.error.type === 'auth_failed') {
+        expect(result.error.message).toContain('login');
+        // Machine-readable code so an agent can branch on "warm up auth" without
+        // substring-matching the message — same code across all three tiers.
+        expect(result.error.code).toBe('secondary_token_unavailable');
+      }
     }
   });
 
@@ -1375,6 +1380,32 @@ describe('auth manager — substrate token headless refresh (command path)', () 
     const cached = await fs.readJson<{ refresh_token?: string; chatsvcagg_access_token?: string }>(CACHE_PATH);
     expect(cached.ok && cached.value.refresh_token).toBe('rotated-rt');
     expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(futureChatsvcagg()); // token persisted too
+  });
+
+  it('preserves the cached tenant region across a self-heal — persists under that region, never the emea default', async () => {
+    // Region MUST stay paired with the live bearer: a mismatched region routes
+    // the substrate call to a 404. `region ?? DEFAULT` must keep the cached
+    // 'amer', not collapse to the 'emea' fallback.
+    const refreshed = futureChatsvcagg();
+    mock = installFetchMock([{ match: (url) => url.includes('/oauth2/v2.0/token'), respond: () => new Response(JSON.stringify({ access_token: refreshed, expires_in: 3600 })) }]);
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({
+        access_token: 'unused',
+        expires_on: stalePast(),
+        refresh_token: 'shared-rt',
+        chatsvcagg_access_token: 'stale',
+        chatsvcagg_expires_on: stalePast(),
+        chatsvcagg_region: 'amer',
+      })
+    );
+    const auth = createAuthManagerFromApi(noBrowser(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+
+    await auth.getChatsvcaggAccessToken();
+
+    const cached = await fs.readJson<{ chatsvcagg_region?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_region).toBe('amer');
   });
 
   it('falls back to the fail-fast "run login" error when the HTTP refresh is rejected', async () => {

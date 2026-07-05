@@ -65,6 +65,24 @@ describe('graph client', () => {
     if (!result.ok) expect(result.error.type).toBe('auth_failed');
   });
 
+  it('carries the auth layer machine-readable code through to the GraphError (elevated fail-fast)', async () => {
+    const client = createGraphClient(
+      {
+        ...fakeAuth(),
+        getElevatedAccessToken: async () => ({
+          ok: false as const,
+          error: { type: 'auth_failed' as const, message: 'Elevated (M365) token … Run `ask-marcel-office login`', code: 'secondary_token_unavailable' },
+        }),
+      },
+      async () => {
+        throw new Error('fetch must not run when auth fails');
+      }
+    );
+    const result = await client.getElevated('/me/chats');
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.code).toBe('secondary_token_unavailable');
+  });
+
   it('returns network_error when fetch throws', async () => {
     const throwingFetch: FetchFn = async () => {
       throw new Error('fetch failed');

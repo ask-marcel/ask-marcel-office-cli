@@ -56,7 +56,7 @@ type CachedToken = {
   ic3_access_token?: string;
   ic3_expires_on?: number;
 };
-type AuthError = { type: 'auth_failed'; message: string } | { type: 'auth_cancelled' };
+type AuthError = { type: 'auth_failed'; message: string; code?: string } | { type: 'auth_cancelled' };
 /**
  * Outcome of the elevated-token capture leg of the most recent
  * browser-acquired session. Read by `login.execute` to surface a
@@ -142,6 +142,12 @@ const IC3_RESOURCE = 'https://ic3.teams.office.com';
 // all — different appid — so it always lands here on the command path.)
 const failFastSecondaryMessage = (token: string, commands: string): string =>
   `${token} token is expired or was not captured at login. Run \`ask-marcel-office login\` to (re)capture it — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+
+// Stable machine-readable code for the secondary-token fail-fast (elevated /
+// chatsvcagg / ic3). The remedy is identical across the three tiers — run
+// `login` — so an agent can branch on `errorCode` instead of substring-matching
+// the human message. The message still names which token and which commands.
+const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
 
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
@@ -449,7 +455,11 @@ const createAuthManagerFromApi = (
     }
     // Elevated absent, expired, or malformed; need to re-capture.
     if (!recaptureSecondaryViaBrowser)
-      return err({ type: 'auth_failed', message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, download-drive-item-version') });
+      return err({
+        type: 'auth_failed',
+        message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, download-drive-item-version'),
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+      });
     // The persistent profile cookies do the silent SSO, no UI prompt.
     return recaptureElevatedShared();
   };
@@ -524,6 +534,7 @@ const createAuthManagerFromApi = (
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('chatsvcagg (Teams chat)', 'list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user'),
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }
     return recaptureChatsvcaggShared();
@@ -604,7 +615,7 @@ const createAuthManagerFromApi = (
         const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
         if (refreshed.ok) return refreshed;
       }
-      return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history') });
+      return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history'), code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
     }
     return recaptureIc3Shared();
   };
