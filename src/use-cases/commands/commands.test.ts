@@ -2944,6 +2944,30 @@ describe('commands', () => {
     expect(calls.some((c) => c.url.endsWith('/content?format=pdf'))).toBe(true);
   });
 
+  it('convert-mail-attachment-to-pdf turns a 406 from the format=pdf transform (an input it refuses — xlsx observed live) into an actionable error pointing at the markdown fallback, NOT the misleading "endpoint may have moved" text, and still cleans up the temp item', async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchFn: FetchFn = async (url, init) => {
+      calls.push({ url, method: init?.method });
+      if (url.endsWith('/attachments/a1')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'budget.xlsx', contentBytes: btoa('xlsx-bytes') });
+      if (url.includes(':/content') && init?.method === 'PUT') return Response.json({ id: 'temp-i1' });
+      if (url.endsWith('/content?format=pdf')) return new Response(null, { status: 406 });
+      if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') return new Response(null, { status: 204 });
+      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'a1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain('convert-mail-attachment-to-markdown');
+      expect(result.error.message).toContain('get-mail-attachment');
+      expect(result.error.message).toMatch(/406|refused|could not/i);
+      expect(result.error.message).not.toContain('endpoint may have moved');
+    }
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(true); // temp item cleaned up even on failure
+  });
+
   it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (folder used to linger at OneDrive root)', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {

@@ -78,6 +78,20 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
   const converted = tagPdfPassthrough(await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
+  // A 406 from the transform means Graph accepted the upload but refused to
+  // render THIS source to PDF (observed live 2026-07-05 on an xlsx attachment;
+  // docx/pptx/pdf and drive-item xlsx→pdf all succeed — so it's input-specific,
+  // not our code). The default empty-body message ("the endpoint may have
+  // moved") is misleading here — point at the markdown route, which works.
+  if (!converted.ok && converted.error.type === 'api_error' && converted.error.status === 406) {
+    await cleanupTempFolderIfEmpty(graph);
+    return err({
+      type: 'api_error',
+      status: 406,
+      code: 'transform_pdf_refused',
+      message: `Graph's PDF transform refused this ${ext} attachment (406) — it may be too large, protected, or a variant the renderer can't handle (xlsx is the known-fragile case; docx/pptx/pdf convert fine). Convert it to markdown instead with \`convert-mail-attachment-to-markdown\` (same --message-id / --attachment-id), or fetch the raw bytes with \`get-mail-attachment\`.`,
+    });
+  }
   // the temp `.ask-marcel-temp` parent folder
   // used to linger at OneDrive root because we only deleted the file. Now
   // check `--top=1` children; if empty (our file was the last), delete the
