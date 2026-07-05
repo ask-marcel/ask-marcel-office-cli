@@ -39,7 +39,25 @@ describe('create-reply-draft', () => {
     expect(patchedBody.subject).toBe('RE: TEMPO PATH - Concur confirmed');
 
     await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
-    expect(patchedBody.subject).toBeUndefined();
+    // Key-absence, not merely `=== undefined`: an `if (true) patch.subject = subject`
+    // regression sets `subject: undefined`, which still passes `toBeUndefined()`.
+    expect('subject' in patchedBody).toBe(false);
+  });
+
+  it('accepts the explicit Text body content type', async () => {
+    let patchedBody: Record<string, unknown> = {};
+    const graph = fakeGraphClient({
+      post: async () => ok({ id: 'draft-9', isDraft: true }),
+      patch: async (_path, body) => {
+        patchedBody = body as Record<string, unknown>;
+        return ok({ id: 'draft-9' });
+      },
+    });
+
+    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', bodyContentType: 'Text' });
+
+    expect(result.ok).toBe(true);
+    expect(patchedBody.body).toEqual({ contentType: 'Text', content: 'x' });
   });
 
   it('patches an HTML body with the HTML content type', async () => {
@@ -72,6 +90,28 @@ describe('create-reply-draft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('api_error');
     expect(patchCalls).toBe(0);
+  });
+
+  it('refuses any createReplyAll response that is not a well-formed unsent draft - and never patches it', async () => {
+    // One malformed shape per conjunct of the isUnsentDraft guard: non-object,
+    // null, missing id, non-string id, and isDraft-absent must each be rejected.
+    const malformed: unknown[] = ['not-an-object', null, { isDraft: true }, { id: 42, isDraft: true }, { id: 'draft-9' }];
+    for (const value of malformed) {
+      let patchCalls = 0;
+      const graph = fakeGraphClient({
+        post: async () => ok(value),
+        patch: async () => {
+          patchCalls += 1;
+          return ok({});
+        },
+      });
+
+      const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.type).toBe('api_error');
+      expect(patchCalls).toBe(0);
+    }
   });
 
   it('passes a createReplyAll failure through untouched, without patching', async () => {
