@@ -5,43 +5,25 @@
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier/SKILL.md",
-      "computedHash": "2288a8162da35e19013a890fbe615c4575c17b46c194c81191d407a6a03cb1ee"
+      "computedHash": "56d8f5659623fdf43dc8dc10e1ef6bf0dd6c03f4ce694c6704dce70b88b5fb25"
     },
     "atelier-greenfield": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-greenfield/SKILL.md",
-      "computedHash": "dc6d995a976758e1f7896513f966c50098c78a1e5ac40e2f920a6bd8cb42fbff"
+      "computedHash": "cc1aad8594237825f10d27c2ed5e912ee7ed800842b9c661294ef2af80cb3f72"
     },
     "atelier-grill-me": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-grill-me/SKILL.md",
-      "computedHash": "d7b9b47fab9a52ed87a18ddd3c3f897eba78cdd6de7cbd337d22af0bc0e1ed38"
+      "computedHash": "63bd22f0d3df543a2d14db095e82bca5a76e993c57aad9b48e47d02aed9521d9"
     },
     "atelier-review-me": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-review-me/SKILL.md",
-      "computedHash": "31b2fc2fd5d68fd817fa5e958803c98d7eb5b8b27d4fdf565d028921b024ee56"
-    },
-    "greenfield": {
-      "source": "vdelacou/atelier",
-      "sourceType": "github",
-      "skillPath": "skills/greenfield/SKILL.md",
-      "computedHash": "3ccd3b463e3047f085bbf75ccdb4f5b2163d5f87406792a0810346146bc3ca20"
-    },
-    "grill-me": {
-      "source": "vdelacou/atelier",
-      "sourceType": "github",
-      "skillPath": "skills/grill-me/SKILL.md",
-      "computedHash": "12b1833209b3670afb03f439e6bd55c50b86088418a589c6ff29a538a674f1ea"
-    },
-    "review-me": {
-      "source": "vdelacou/atelier",
-      "sourceType": "github",
-      "skillPath": "skills/review-me/SKILL.md",
-      "computedHash": "d78156dab8ea72362dc7041dfe1ca57edb75b2a42d0c2f9244a2b84186bfeb3b"
+      "computedHash": "18681e3768c079401a73a1b395dd55a536249f71082b6cb3721252fa58a69846"
     }
   }
 }

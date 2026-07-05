@@ -46,19 +46,12 @@ type Args = {
   readonly out: string;
 };
 
-const SCAN_DIRS: ReadonlyArray<string> = [
-  'src/infra',
-  'src/composition',
-  'src/presenter',
-];
+const SCAN_DIRS: ReadonlyArray<string> = ['src/infra', 'src/composition', 'src/presenter'];
 
 // Files in scan dirs that should NOT be preloaded. Tests are obvious; ports
 // are type-only and have no runtime to preload; index.ts files are usually
 // barrel exports already pulled in by their siblings.
-const EXCLUDE = (relPath: string): boolean =>
-  relPath.endsWith('.test.ts') ||
-  relPath.includes('/ports/') ||
-  relPath.endsWith('/index.ts');
+const EXCLUDE = (relPath: string): boolean => relPath.endsWith('.test.ts') || relPath.includes('/ports/') || relPath.endsWith('/index.ts');
 
 const parseArgs = (argv: ReadonlyArray<string>): Args => {
   const check = argv.includes('--check');
@@ -107,8 +100,7 @@ const HEADER = `/*
  * spawns \`bun test --coverage --preload ./scripts/coverage-preload.ts\`.
  *
  * See skills/atelier/references/workflow.md.
- */
-`;
+ */`;
 
 const buildContent = (files: ReadonlyArray<string>, repoRoot: string, outPath: string): string => {
   const grouped = new Map<string, string[]>();
@@ -144,14 +136,16 @@ const main = async (): Promise<number> => {
   const content = buildContent(files, repoRoot, args.out);
 
   if (args.check) {
-    const existing = await Bun.file(args.out).text().catch(() => '');
+    const existing = await Bun.file(args.out)
+      .text()
+      .catch(() => '');
     if (existing.trim() === content.trim()) {
       console.log(`coverage-preload: in sync (${files.length} files)`);
       return 0;
     }
-    console.error(`coverage-preload: OUT OF SYNC.`);
+    console.error('coverage-preload: OUT OF SYNC.');
     console.error(`  ${args.out} does not match the current set of source files.`);
-    console.error(`  Run: bun run scripts/regenerate-coverage-preload.ts`);
+    console.error('  Run: bun run scripts/regenerate-coverage-preload.ts');
     console.error(`  Then: git add ${args.out} && commit.`);
     return 1;
   }

@@ -302,7 +302,7 @@ export const removeItemFromOrder = (order: Order, itemId: ItemId): Order => {
 };
 
 const validateOrderInvariants = (order: Order): void => {
-  if (moneyGreaterThan(orderItemsTotal(order.items), MAX_ORDER_VALUE)) {
+  if (greaterThanMoney(orderItemsTotal(order.items), MAX_ORDER_VALUE)) {
     throw new Error('OrderTotalExceeded');
   }
 };

@@ -124,7 +124,7 @@ export const callGemini = (fetchImpl?: typeof globalThis.fetch): GenerateOutput 
 
 // Production wiring — no fetch passed; SDK uses globalThis.fetch.
 export const createGeminiLlm = (): Llm => ({
-  summarise: (text) => callGemini()({ modelName: 'gemini-1.5-flash', prompt: `...${text}`, schema }),
+  summarise: (text) => callGemini()({ modelName: 'gemini-2.5-flash', prompt: `...${text}`, schema }),
 });
 ```
 

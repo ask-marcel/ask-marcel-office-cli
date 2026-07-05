@@ -9,6 +9,8 @@ Audit a change against the atelier standard before it lands. This is the conform
 
 The third on-demand companion to the always-on atelier standard: atelier-grill-me owns the pre-decision moment, atelier-greenfield owns repo-birth, atelier-review-me owns the pre-land moment.
 
+Interaction: terse, direct prose with no filler, praise, or recap; never use em dashes; ask via the AskUserQuestion tool (or the client's structured-options equivalent) with 2-4 concrete options led by your recommendation; on ambiguity, one question round max, then proceed with stated assumptions; propose next steps at wrap-up.
+
 ## When to use
 
 - The user asks to "review me", to review a diff / branch / PR against the standard, or to check changes for rule violations before committing.

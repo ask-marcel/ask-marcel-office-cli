@@ -43,7 +43,7 @@ Focus on HIGH and MEDIUM findings. Skip defence-in-depth hardening, theoretical 
 - **Random** | use `crypto.randomUUID()` or `crypto.getRandomValues()`. Never `Math.random()` for tokens, IDs, nonces.
 - **Password hashing** | `argon2id` or `bcrypt` at a sensible cost factor. Never SHA-256 / MD5 / any fast hash.
 - **TLS verification** | never disable certificate verification in production clients.
-- **Secrets in code** | no API keys, tokens, passwords, or private keys in source. Ever. Load from `process.env` only.
+- **Secrets in code** | no API keys, tokens, passwords, or private keys in source. Ever. Read `process.env` only inside the validated config module at the composition root, then thread the values as parameters — never sprinkle `process.env` across the codebase, and never mutate it (SKILL.md, Security).
 
 ### 5. Data exposure
 
@@ -88,7 +88,11 @@ export const fetchJson = async (url: SafeUrl): Promise<unknown> => {
 ```
 
 ```ts
-// HTML that has been sanitised for rendering via dangerouslySetInnerHTML
+// HTML that has been sanitised for rendering via dangerouslySetInnerHTML.
+// DOMPurify needs a DOM: in the browser it uses the real one; server-side
+// (Bun, static export, route handlers) `isomorphic-dompurify` bundles a jsdom
+// window for you — but that pulls jsdom in as a dependency (weigh it against the
+// lazy ladder). Prefer sanitising at render in a client boundary where a real DOM exists.
 import DOMPurify from 'isomorphic-dompurify';
 
 export type SanitizedHtml = string & { readonly __brand: 'SanitizedHtml' };
@@ -120,16 +124,27 @@ export const envEnum = <T extends string>(name: string, allowed: readonly T[]): 
   return value as T;
 };
 
-// one central config module; import from here, never read process.env directly elsewhere
-export const config = {
+// Build the config record ONCE, at the composition root, then inject it as a
+// dependency — do not import an env-reading singleton from arbitrary modules
+// (that reads real process.env at import time, which leaks into every test that
+// touches the importer). readConfig() lives in src/composition/**; use-cases and
+// adapters receive `config` (or the single value they need) as a parameter.
+export type AppConfig = {
+  readonly apiToken: EnvVar;
+  readonly databaseUrl: EnvVar;
+  readonly logLevel: 'error' | 'warn' | 'info' | 'debug';
+  readonly port: number;
+};
+
+export const readConfig = (): AppConfig => ({
   apiToken: envVar('API_TOKEN'),
   databaseUrl: envVar('DATABASE_URL'),
   logLevel: envEnum('LOG_LEVEL', ['error', 'warn', 'info', 'debug'] as const),
   port: envNumber('PORT'),
-};
+});
 ```
 
-`envVar` brands the string because a raw `string` could bypass the non-empty check; the coerced siblings return their **natural** narrow types — `envNumber` a `number`, `envEnum` the literal union — which you wrap into a domain brand (`Port`, `TimeoutMs`) only where the value carries domain meaning (hard rule 12). A connection string consumed by a driver stays an `EnvVar`; a URL that will reach `fetch` is read with `safeUrl`, not `envVar`. When env outgrows a handful of vars or needs cross-field rules, parse it once at the composition root with a Zod schema instead — `const Env = z.object({ PORT: z.coerce.number().int().positive(), LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']) }).parse(process.env)` — same principle either way: parse once, at the edge, fail loud at startup.
+`envVar` brands the string because a raw `string` could bypass the non-empty check; the coerced siblings return their **natural** narrow types — `envNumber` a `number`, `envEnum` the literal union — which you wrap into a domain brand (`Port`, `TimeoutMs`) only where the value carries domain meaning (hard rule 12). A connection string consumed by a driver stays an `EnvVar`; a URL that will reach `fetch` is read with `safeUrl`, not `envVar`. The one call to `readConfig()` belongs at the composition root; everything downstream takes the value as a parameter (SKILL.md, Security — never sprinkle `process.env`). When env outgrows a handful of vars or needs cross-field rules, parse it once there with a Zod schema instead — `const Env = z.object({ PORT: z.coerce.number().int().positive(), LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']) }).parse(process.env)` — same principle either way: parse once, at the edge, fail loud at startup, inject downstream.
 
 ```ts
 // file path that is guaranteed to live under a given root

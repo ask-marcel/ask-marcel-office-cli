@@ -145,10 +145,7 @@ it('when a premium customer buys a 100 EUR item, the order total is 80 EUR', asy
 
 ### Writing AAA backwards
 
-When stuck:
-1. Assert first. What do you want to verify?
-2. Act. What action produces that result?
-3. Arrange. What setup is needed?
+When stuck, write the test in reverse — Assert, then Act, then Arrange. The technique is `references/tdd.md`'s (§ Writing tests backwards).
 
 ---
 
@@ -412,9 +409,12 @@ it('round-trips through the factory', () => {
 **Boundary.** Production code must not import any `*Unsafe` helper. A simple lint rule (or a periodic grep) keeps it honest:
 
 ```js
-// eslint.config.js
+// eslint.config.js — scope with files + ignores (flat config's reliable idiom;
+// negated extglobs like `!(*.test).ts` in `files` are not dependable). This block
+// binds to production sources and excludes tests, so *Unsafe imports stay test-only.
 {
-  files: ['src/**/!(*.test).ts'],
+  files: ['src/**/*.ts'],
+  ignores: ['**/*.test.ts', 'src/test-helpers/**'],
   rules: {
     'no-restricted-imports': ['error', {
       patterns: [{ group: ['**'], importNamePattern: 'Unsafe$', message: '*Unsafe helpers are test-only' }],
@@ -455,8 +455,6 @@ Pair these with contract tests (below) so the fake and the real adapter cannot d
 Infra adapters need their own playbook because their job is to translate a third-party library's contract into `Result<T, PortError>`. Three patterns cover every adapter shape (HTTP via `fetch`, external SDK, filesystem), plus a production-wiring smoke test and the silent-gotcha around fetch-mock handler ordering.
 
 See `references/testing-infra.md` for the full treatment with worked examples.
-
----
 
 ---
 

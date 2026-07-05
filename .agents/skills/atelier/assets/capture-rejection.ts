@@ -32,7 +32,7 @@ export const captureRejection = async (promise: Promise<unknown>): Promise<Error
     await promise;
   } catch (e) {
     if (e instanceof Error) return e;
-    throw new Error(`captureRejection: rejected with non-Error value: ${formatNonError(e)}`);
+    throw new Error(`captureRejection: rejected with non-Error value: ${formatNonError(e)}`, { cause: e });
   }
   throw new Error('captureRejection: expected promise to reject, but it resolved');
 };

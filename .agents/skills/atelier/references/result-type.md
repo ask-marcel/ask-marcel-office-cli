@@ -136,7 +136,7 @@ export const placeOrder = async (input, deps): Promise<Result<Summary, StepError
     await deps.orders.save(input);
     return ok({ saved: 1, errored: 0 });
   } catch (e) {
-    return err({ step: 'placeOrder', cause: 'unknown', message: String(e) });
+    return err({ step: 'placeOrder', cause: 'unknown', message: formatError(e) });
   }
 };
 
@@ -305,18 +305,20 @@ The error-map value must be the port's discriminated-union error shape — cast 
 
 ### Rejection assertions: `captureRejection`
 
-SonarJS S4123 fires on `await expect(p).rejects.toThrow(...)` because the matcher chain is not recognised as a `Thenable`. The fix is a tiny helper that reads more clearly anyway.
+SonarJS S4123 fires on `await expect(p).rejects.toThrow(...)` because the matcher chain is not recognised as a `Thenable`. The fix is a tiny helper that reads more clearly anyway. The canonical implementation ships in `assets/capture-rejection.ts` — copy it verbatim (don't hand-retype `String(e)` into the non-Error branch; that would trip S6551, the very rule the helper set exists to respect). Shape:
 
 ```ts
-// src/test-helpers/capture-rejection.ts
+// src/test-helpers/capture-rejection.ts — see assets/capture-rejection.ts for the full body
 export const captureRejection = async (promise: Promise<unknown>): Promise<Error> => {
   try {
     await promise;
   } catch (e) {
     if (e instanceof Error) return e;
-    throw new Error(`rejected with non-Error: ${String(e)}`);
+    // formatNonError avoids String(e) (SonarJS S6551) — full impl in the asset.
+    // { cause: e } preserves the original value (ESLint preserve-caught-error).
+    throw new Error(`captureRejection: rejected with non-Error value: ${formatNonError(e)}`, { cause: e });
   }
-  throw new Error('expected promise to reject, but it resolved');
+  throw new Error('captureRejection: expected promise to reject, but it resolved');
 };
 
 // test

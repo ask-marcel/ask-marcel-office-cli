@@ -14,7 +14,12 @@
 export const formatError = (err: unknown): string => {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
-  if (typeof err === 'number' || typeof err === 'boolean') return String(err);
+  // Numbers only. String(NaN) is 'NaN' and String(Infinity) is 'Infinity', which the
+  // JSON.stringify fallback would flatten to 'null' — so the number branch earns its
+  // keep. Booleans are deliberately NOT special-cased: JSON.stringify renders them
+  // identically to String, making a boolean branch dead code (and an unkillable
+  // equivalent mutant that would cap this file below the 90% mutation gate).
+  if (typeof err === 'number') return String(err);
   try {
     return JSON.stringify(err);
   } catch {

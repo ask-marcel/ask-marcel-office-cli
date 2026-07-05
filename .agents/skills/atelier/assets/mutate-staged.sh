@@ -30,4 +30,11 @@ echo "mutate:staged: testing ${count} file(s)"
 # overwrite each other (the CLI keeps only the last one), so join the list.
 mutate_arg=$(echo "$files" | paste -sd, -)
 
+# Run the GATE fresh. Stryker's incremental cache (incremental:true in the
+# config, kept for fast dev `bun run mutate`) keys on source-file hashes, so a
+# test-only change — strengthening an assertion without touching the source —
+# does not invalidate it and the score reports stale. A commit gate must judge
+# the current tree, so clear the cache before the staged run.
+rm -f reports/stryker-incremental.json
+
 bunx stryker run --mutate "$mutate_arg"

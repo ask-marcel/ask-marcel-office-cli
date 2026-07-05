@@ -39,4 +39,9 @@ echo "mutate:changed: testing ${count} file(s) (base: ${BASE})"
 # overwrite each other (the CLI keeps only the last one), so join the list.
 mutate_arg=$(echo "$files" | paste -sd, -)
 
+# Run fresh. Stryker's incremental cache keys on source-file hashes, so a
+# test-only change (a stronger assertion, same source) does not invalidate it
+# and the score reports stale. Clear it so this pre-stage check is trustworthy.
+rm -f reports/stryker-incremental.json
+
 bunx stryker run --mutate "$mutate_arg"

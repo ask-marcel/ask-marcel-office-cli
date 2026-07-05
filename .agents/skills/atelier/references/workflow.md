@@ -1,6 +1,41 @@
 # Workflow
 
-The four-check loop, coverage gates, lint discipline, and the editor/CI rules that keep them enforced. Run through this after every code change; nothing ships until it is clean.
+The durable plan, the four-check loop, coverage gates, lint discipline, and the editor/CI rules that keep them enforced. Run through this after every code change; nothing ships until it is clean.
+
+## The durable plan (`.claude/PLAN.md`)
+
+Before a multi-step task, write the plan to `.claude/PLAN.md`, not just to the chat. Chat context is lost the moment the session ends or a fresh one starts; a committed file survives both. The plan is the resumability contract: a returning human or a cold Claude session reads it first and continues at the same place with the same information, instead of re-deriving the plan from a half-remembered thread.
+
+**What it holds.** The goal in a sentence or two; the whole-task definition of done; the ordered steps, each with a checkbox and a per-step DoD (the concrete check that proves the step is finished); and a short breadcrumbs section (paths touched, commands to rerun, decisions made and why). Enough that a reader with zero prior context could pick up the next unchecked step.
+
+```markdown
+# PLAN: <task>
+Status: in progress. Started YYYY-MM-DD.
+
+## Goal
+<one or two sentences>
+
+## Definition of done (whole task)
+- <checkable outcome> ...
+
+## Steps
+1. [x] <step>  DoD: <check> [met]
+2. [ ] <step>  DoD: <check>
+3. [ ] <step>  DoD: <check>
+
+## Notes / breadcrumbs
+- <decisions, paths, commands a cold reader needs>
+```
+
+**Lifecycle.**
+- **Write it before executing** a multi-step task; trivial one-step work does not need it.
+- **Keep it live.** Tick each box the moment its DoD is met; mark steps done / in-progress / blocked as you go. The on-disk file is the source of truth, current even between commits, so it survives a context loss immediately.
+- **Commit it alongside the work slices** it describes (it rides with the same commits, not a separate noisy stream), so a fresh clone has the current plan.
+- **Close it out at task end.** All boxes ticked, or a note on what remains for next time. When the next task begins, overwrite it.
+
+**PLAN.md is not LESSONS.md.** `PLAN.md` is the *mutable current plan* and is rewritten and overwritten freely. `.claude/LESSONS.md` is *append-only memory* (decisions, gotchas) and is never rewritten. A durable decision that outlives the task graduates from a PLAN breadcrumb into a `[decision]` lesson; the plan step itself is transient. See `references/lessons.md`.
+
+**On resume.** Start of session, read `.claude/PLAN.md` (alongside the lesson files). If it shows an unfinished task, continue from the first unchecked step rather than re-planning. If the user's new request supersedes the open plan, say so in one sentence and overwrite it.
 
 ## The four-check loop (after every change)
 
@@ -57,12 +92,13 @@ Never disable a rule globally just to silence a single test, a single commit, or
 
 `scripts/coverage-preload.ts` lists every file in `src/{infra,composition,presenter}/` so the coverage table can include them at 0% if untested. Keeping this file in sync by hand is tedious and the failure mode is silent — a missing import means the new file never appears in the coverage report and the gate trivially passes.
 
-Two scripts handle this. Both ship in the skill at `assets/`:
+One script handles this, shipped in the skill at `assets/`:
 
 | Script | Job |
 |---|---|
-| `assets/coverage-preload.ts` | Reference template; not used directly when the auto-regenerate flow is wired up |
 | `assets/regenerate-coverage-preload.ts` | Walks `src/{infra,composition,presenter}/`, excludes `*.test.ts` / `ports/` / `index.ts`, writes a fresh `scripts/coverage-preload.ts` |
+
+`scripts/coverage-preload.ts` itself is always **generated**, never hand-written — copy the regenerate script into a new repo and run it once to create the initial preload.
 
 **Two modes:**
 
@@ -116,7 +152,7 @@ A ready-to-copy `check-coverage.ts` lives in the skill at `assets/check-coverage
 | `src/composition/**` (env.ts AND build-deps.ts) | **80%** |
 | `src/presenter/**` | 80% |
 | `src/infra/**` | **80% from day one** — not "once tests exist" |
-| `src/test-helpers/**` | skip during normal runs |
+| `src/test-helpers/**` | skip during normal runs (audit periodically — see below) |
 | `src/main.ts` | skip (entry point; verified by integration) |
 
 **`build-deps.ts` is no longer skipped.** The earlier policy excluded it as "composition root, verified live, no logic worth unit-testing". That was hedging. The composition root becomes fully unit-testable when (a) every "where do I read state from" point (file path, env var, system clock) is parameterisable, and (b) every "what do I write to / log to" sink can be injected as a port. See `references/architecture.md` (Composition root testability) for the optional-config-DI pattern.
@@ -131,16 +167,14 @@ If a file cannot hit the gate, the fix is usually **restructure the code so the 
 
 `bun test --coverage` only reports rows for files the test runner imports. Untested infra files — no `*.test.ts`, no test imports them — are silently absent from the table, which makes the per-file gate trivially pass. Every adapter you forgot to test becomes invisible instead of failing loudly.
 
-The fix is a preload file that side-effect-imports every infra, composition, and presenter module, so they appear in the coverage table at 0% if no test exercises them. A ready-to-copy template lives in the skill at `assets/coverage-preload.ts`.
+The fix is a preload file that side-effect-imports every infra, composition, and presenter module, so they appear in the coverage table at 0% if no test exercises them. Generate it with `assets/regenerate-coverage-preload.ts` (§ Keeping `coverage-preload.ts` in sync, above) — never hand-write it. The generated file looks like:
 
 ```ts
 // scripts/coverage-preload.ts
+// Auto-generated by scripts/regenerate-coverage-preload.ts. Do not hand-edit.
 // This file forces every module that belongs under a coverage gate to appear
 // in `bun test --coverage` output, even when no test imports it. Without this,
 // an untested adapter is silently absent and the per-file gate passes.
-//
-// RULE: every new file in src/infra/, src/composition/, or src/presenter/
-// must be added here in the same commit. Enforced by code review.
 
 import '../src/infra/logger.ts';
 import '../src/infra/sheets-google.ts';
@@ -158,7 +192,7 @@ bun test --coverage --preload ./scripts/coverage-preload.ts
 
 Do not put `preload = [...]` under `[test]` in `bunfig.toml`. The preload pulls in heavy runtime deps (e.g. `googleapis`, `winston`, `twitter-api-v2`, `@ai-sdk/google`) that would add 1–2 seconds to every plain `bun test`. Loading it only at coverage time keeps the inner-loop fast without losing the gate.
 
-**Maintenance rule:** every new file in `src/infra/`, `src/composition/`, or `src/presenter/` must be added to `coverage-preload.ts` in the same commit. Reviewers check this explicitly. A pre-commit lint could enforce it automatically; not done yet, so it is a review obligation.
+**Maintenance rule:** every new file in `src/infra/`, `src/composition/`, or `src/presenter/` must be added to `coverage-preload.ts` in the same commit — run `bun run scripts/regenerate-coverage-preload.ts` and stage both files together. Enforcement is mechanical, not goodwill: wire `regenerate-coverage-preload.ts --check` as the pre-commit pre-flight (§ Keeping `coverage-preload.ts` in sync, above) so a forgotten regeneration blocks the commit.
 
 ### `bunfig.toml`: minimal, no `coverageThreshold`, no `preload`
 
@@ -186,7 +220,7 @@ When introducing a per-tier coverage gate in an existing repo, remove any global
 
 SonarLint runs IDE-side; CI and pre-commit do not see it. To keep IDE-only findings from drifting back in, ESLint is wired to catch them at lint time.
 
-In `eslint.config.js` (one config, two modes — `LINT_STRICT=1` switches on the type-aware block):
+In `eslint.config.js` (one config, two modes — `LINT_STRICT=1` switches on the type-aware block). The **canonical, complete** flat config lives in `references/bun-typescript.md` (§ `eslint.config.js`) — the excerpt below shows only the SonarJS / type-aware slice this section is about, so if the two ever disagree, `bun-typescript.md` wins:
 
 ```js
 import pluginJs from '@eslint/js';
@@ -211,8 +245,8 @@ export default [
       }],
     },
   },
- // Type-aware rules — gated by LINT_STRICT=1. Inner-loop `bun run lint`
- // does not pay the ~25s parserOptions.projectService cost.
+  // Type-aware rules — gated by LINT_STRICT=1. Inner-loop `bun run lint`
+  // does not pay the ~25s parserOptions.projectService cost.
   ...(process.env['LINT_STRICT']
     ? [{
         files: ['src/**/*.ts'],
@@ -230,7 +264,7 @@ export default [
     : []),
   sonarjsPlugin.configs.recommended,
   {
- // SonarJS rule overrides — always-on, justified per rule.
+    // SonarJS rule overrides — always-on, justified per rule.
     rules: {
       'sonarjs/no-unused-vars': 'off',          // duplicates @typescript-eslint/no-unused-vars
       'sonarjs/no-empty-test-file': 'off',      // false positives on `describe` test layout
@@ -241,8 +275,8 @@ export default [
     rules: {
       'security/detect-object-injection': 'off',
       'security/detect-unsafe-regex': 'off',
- // false-positive on chmodSync(mkdtempSync(...)) in FS-adapter tests;
- // production uses Bun.file (not covered by this rule), so no real loss.
+      // false-positive on chmodSync(mkdtempSync(...)) in FS-adapter tests;
+      // production uses Bun.file (not covered by this rule), so no real loss.
       'security/detect-non-literal-fs-filename': 'off',
     },
   },
@@ -354,7 +388,7 @@ The `git config core.hooksPath .githooks` is the one step that is easy to forget
 
 ### Commit size limits (gate 1)
 
-`scripts/check-commit-size.sh` blocks any commit exceeding **10 files OR 300 lines** (insertions + deletions). The thresholds are conservative because they force the discipline; loosening them undermines the rule.
+`scripts/check-commit-size.sh` enforces the rule "≤10 files **AND** ≤300 lines (insertions + deletions)" — i.e. it blocks any commit that exceeds *either* threshold. The limits are conservative because they force the discipline; loosening them undermines the rule.
 
 Why:
 - Small commits are easier to review, revert, and bisect.
@@ -559,11 +593,7 @@ If the audit finds drift, fix the README in the **same commit** as the code chan
 
 ### Five-check task-done gate
 
-1. `bun test` — passes
-2. `bun run lint` — 0 errors AND 0 warnings (fast, ~2 s cached / ~7 s cold)
-3. `bun run typecheck` — clean
-4. `bun run coverage` — per-directory gates pass
-5. `README.md` — audited against the surface table above; either updated, or one-sentence "nothing user-visible changed"
+The four inner-loop checks from the top of this file (`bun test`, `bun run lint`, `bun run typecheck`, `bun run coverage`) plus a fifth: `README.md` audited against the surface table above — either updated, or a one-sentence "nothing user-visible changed".
 
 ### End-of-session re-audit
 
@@ -597,7 +627,7 @@ Two guardrails prevent Prettier ↔ VS Code TS-formatter drift:
 {
   "compilerOptions": {
     "types": ["bun"]
- // ... rest of config
+    // ... rest of config
   }
 }
 ```

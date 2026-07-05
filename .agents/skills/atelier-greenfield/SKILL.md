@@ -9,6 +9,8 @@ Bring a repo into existence already conforming to the atelier standard, green fr
 
 Like atelier-grill-me, it is a focused, on-demand counterpart to the always-on atelier standard: atelier-grill-me owns the pre-decision moment, atelier-greenfield owns the repo-birth moment.
 
+Interaction: terse, direct prose with no filler, praise, or recap; never use em dashes; ask via the AskUserQuestion tool (or the client's structured-options equivalent) with 2-4 concrete options led by your recommendation; on ambiguity, one question round max, then proceed with stated assumptions; propose next steps at wrap-up.
+
 ## When to use
 
 - Starting a brand-new Bun/TypeScript script repo, or a new package in a Next.js monorepo.

@@ -376,3 +376,26 @@ If the user explicitly says "always capture X kind of thing", treat that as a st
 The lessons files capture what is specific to THIS codebase, THIS team, THIS deployment. They do not re-state universal engineering principles from atelier's other references.
 
 When a lesson directly contradicts a general atelier rule, the lesson wins for this repo only. State the contradiction once in the entry, so future Claude understands why the local rule overrides the global one.
+
+## Harvesting lessons as an audit source
+
+The lessons files are not only a memory for the next session. Across many repos they are the best available audit signal for the atelier standard itself, because they record the one thing a static review of the skill cannot produce: real friction, captured at the moment it cost someone time. A design review tells you whether the standard is internally coherent. Dogfooding tells you whether it executes. The accumulated lessons tell you whether it survives contact with real work.
+
+Each kind of entry maps to a distinct audit finding:
+
+- A recurring `[mistake]` across repos means a rule is not landing. Future Claude keeps doing the thing the standard forbids, which points to a rule that is buried, under-explained, or not loud enough in the red flags. The fix is usually in the skill, not the developer.
+- A `[gotcha]` is undocumented friction and a direct candidate for a doc fix or a shipped guard. If the same toolchain surprise shows up in three repos' journals, it belongs in a reference file or an asset, not rediscovered each time.
+- A `[decision]` that keeps getting re-litigated in different repos means the standard is missing a default it should state. If every team debates the same fork, atelier should pick a side, or name it explicitly as a real fork.
+
+### The harvest workflow
+
+1. Collect `.claude/LESSONS.md` from the repos that use atelier (the committed file, not the personal `lessons.local.md`).
+2. Cluster entries by theme, ignoring the repo-specific specifics. Five journals each carrying a `[gotcha]` about the same flag is one audit item, not five.
+3. Rank clusters by recurrence and cost. A gotcha in four repos outranks a one-off, however painful the one-off was.
+4. Each surviving cluster is an audit item: a doc gap to close, a rule to sharpen, a guard to ship, or a default to declare. Route it the way any conformance finding is routed (atelier-review-me owns that lens).
+
+### The caveat
+
+This is a sample of pain that someone bothered to write down, in repos that keep the journal. It is biased toward friction that was noticed and toward disciplined teams. It tells you what hurt, not what is silently wrong-but-tolerated, and it says nothing about the repos that never adopted the journal at all. So treat it as one leg of a tripod: static audit catches internal incoherence, dogfooding catches "does it execute", the lessons harvest catches "does it hold up in real use". No single leg replaces the others.
+
+The practical consequence: when dogfooding atelier on a real repo, keep its `.claude/LESSONS.md` rather than deleting the repo the moment the gates go green. A handful of retained journals becomes a standing audit backlog you can sweep periodically, a far stronger input than any single review pass.

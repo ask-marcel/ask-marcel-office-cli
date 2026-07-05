@@ -99,21 +99,7 @@ Higher priority = simpler. Do not jump to complex transformations too early.
 
 ## Arrange-Act-Assert
 
-Every test follows the same shape:
-
-```ts
-it('calculates total with discount', () => {
-  // ARRANGE - set up the world
-  const cart = addItem(emptyCart(), item({ price: money(100, 'EUR') }));
-  const discount = percentDiscount(10);
-
-  // ACT - execute the behaviour
-  const total = calculateCartTotal(cart, discount);
-
-  // ASSERT - verify the outcome
-  expect(moneyEquals(total, money(90, 'EUR'))).toBe(true);
-});
-```
+Every test follows the same shape: ARRANGE the world (real domain, faked secondary ports), ACT by calling the primary port, ASSERT on the returned result or the fake's final state. The worked port-level example lives in `references/testing.md` (§ Arrange-Act-Assert).
 
 ## Writing tests backwards
 
@@ -189,23 +175,7 @@ This is the single most important property of the school: **the domain can be re
 
 ### 3. No mocks, ever
 
-Never import from the `mock` namespace of `bun:test` — `mock()`, `mock.module()`, `.toHaveBeenCalled*`. The entire namespace is banned and enforced by `no-restricted-imports`. Write a fake (a working in-memory implementation of the secondary-port contract) and assert on its final state. For infra adapters wrapping external SDKs, expose the two-constructor pattern (`createX` + `createXFromApi`) instead — see `references/testing.md`.
-
-```ts
-// BANNED - verifies call sequence, not outcome
-const save = mock(async (_o: Order): Promise<void> => {});
-const repo: OrderRepo = { save, findById: async () => null };
-await placeOrder(input, { orders: repo });
-expect(save).toHaveBeenCalledWith(expectedOrder);
-
-// REQUIRED - verifies outcome, survives refactors
-const orders = createInMemoryOrderRepo();
-await placeOrder(input, { orders });
-const [saved] = await orders.all();
-expect(saved.total).toEqual(money(80, 'EUR'));
-```
-
-Mocks pin the test to the sequence of internal calls; the test breaks on every innocent refactor and stops proving that behaviour is correct. See `references/testing.md` for the full rationale and the permitted test-double shapes (dummy, stub, fake, hand-written spy).
+Never import from the `mock` namespace of `bun:test` — `mock()`, `mock.module()`, `.toHaveBeenCalled*`. The entire namespace is banned and enforced by `no-restricted-imports`. Write a fake (a working in-memory implementation of the secondary-port contract) and assert on its final state; for infra adapters wrapping external SDKs, expose the two-constructor pattern (`createX` + `createXFromApi`) instead. The philosophical reason belongs here: a mock verifies the *sequence of internal calls*, so the test breaks on every innocent refactor and stops proving behaviour; a fake verifies the *final state*, which is what the system is for. The banned/required code pair, the full five-point rationale, and the permitted test-double shapes (dummy, stub, fake, hand-written spy) live in `references/testing.md` (§ No `mock` from `bun:test`).
 
 ### What this buys
 

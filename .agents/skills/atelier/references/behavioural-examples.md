@@ -229,6 +229,4 @@ Red first, then the smallest change that turns it green.
 | Surgical changes | A bug fix that also adds validation, retypes, reflows | Change only the lines that fix the reported issue |
 | Goal-driven execution | "I'll review and improve the code" | RED test reproduces → GREEN → suite stays green |
 
-## The insight: timing, not correctness
-
-The over-reaching versions are not bad engineering in the abstract — a strategy map, a config object, a validation pass are all sound *when their need is real*. They become defects when they arrive early: more to read, more to test, more surface for bugs, and a commit whose diff no longer traces to the request. The simple version is not naïve — it is the smallest thing that is correct today, and it stays cheap to extend when tomorrow's requirement actually shows up. Solve today's problem simply, not tomorrow's prematurely.
+The through-line is the framing from the top of this file: the "before" versions are defects of **timing and reach**, not of engineering — the simple version is the smallest thing correct today, cheap to extend when tomorrow's requirement actually shows up.

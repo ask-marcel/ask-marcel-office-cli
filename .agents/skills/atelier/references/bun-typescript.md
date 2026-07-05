@@ -57,7 +57,9 @@ Minimal skeleton:
 The version ranges above are sample pins as of writing. **Never use `"latest"` or `"*"`** (atelier hard rule 19, enforced by `scripts/check-package-json.sh` in pre-commit gate 2). To get the actual current latest of every dep on a fresh repo, run `bun install` first (resolving the ranges above), then `bun update` (which rewrites the `^X.Y.Z` ranges to the latest matching version) and commit the lockfile change. After that, every new package goes in via `bun add <pkg>` (runtime) or `bun add -d <pkg>` (dev) — Bun pins it to `^X.Y.Z` automatically. Hand-editing `package.json` to add a dep is a smell.
 
 Common runtime deps in this class of repo (install on demand with `bun add <name>`):
-`@google/genai`, `axios`, `canvas`, `chardet`, `csv-writer`, `firebase-admin`, `iconv-lite`, `jsonwebtoken` (+ `@types/jsonwebtoken`), `papaparse`, `pdf-extract-image`, `pdf-to-png-converter`, `pdfjs-dist`, `winston`, `xlsx`.
+`@google/genai`, `canvas`, `chardet`, `csv-writer`, `firebase-admin`, `iconv-lite`, `jsonwebtoken` (+ `@types/jsonwebtoken`), `papaparse`, `pdf-extract-image`, `pdf-to-png-converter`, `pdfjs-dist`, `winston`, `xlsx`.
+
+For HTTP, reach for the native `fetch` (built into Bun) before adding an HTTP client — the lazy ladder's rung 3 (SKILL.md #2) and the whole `installFetchMock` test seam assume adapters call `globalThis.fetch` directly. Add `axios`/`got`/etc. only when you need something `fetch` genuinely lacks, and say what.
 
 ## `tsconfig.json`
 
@@ -68,7 +70,6 @@ Common runtime deps in this class of repo (install on demand with `bun add <name
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
     "allowJs": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -134,6 +135,15 @@ export default [
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
     },
+  },
+  {
+    // Gate scripts (scripts/check-coverage.ts, scripts/regenerate-coverage-preload.ts)
+    // are terminal tools, not production code: their whole job is printing to the
+    // console that invoked them. The Logger port (rule 4) governs src/**; injecting
+    // Winston into a pre-commit gate would be ceremony without observability value.
+    // Project-level severity change with a comment — never an inline ignore (rule 15).
+    files: ['scripts/**/*.ts'],
+    rules: { 'no-console': 'off' },
   },
   // Type-aware rules — slow (~25s on full repo), enabled only by
   // `bun run lint:strict` (which sets LINT_STRICT=1) and the pre-commit hook.
@@ -201,10 +211,13 @@ export default [
       'sonarjs/cognitive-complexity': 'off',    // we already cap function size; this is noise
     },
   },
-  // Stryker scratch dirs, the reports/ output dir, and other non-source paths
-  // must not be linted. Stryker copies the source tree into .stryker-tmp/ during a run.
+  // Non-source paths must not be linted: Stryker copies the tree into .stryker-tmp/
+  // during a run, reports/ is output, and the config file itself would trip no-undef
+  // on `process` (it runs under Node semantics, not the **/*.ts globals block).
+  // scripts/ IS linted — the gate scripts stay under the full rule set, with only
+  // no-console turned off for them above.
   {
-    ignores: ['.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
+    ignores: ['eslint.config.js', '.stryker-tmp/**', 'reports/**', 'docs/**', '.claude/**', '.agents/**'],
   },
 ];
 ```
@@ -213,7 +226,7 @@ Notes on the config:
 
 - **One config file, two modes.** Both scripts carry `--max-warnings=0`, so warnings fail either run (the zero-warning rule, hard rule 15) — the modes differ only in depth. The inner-loop `bun run lint` runs the fast non-type-aware rules (~2 s cached / ~7 s cold); `bun run lint:strict` sets `LINT_STRICT=1` and the conditional block adds `parserOptions.projectService: true` plus the type-aware `@typescript-eslint` rules (~25 s on a full repo). Pre-commit gate 5 runs the strict version. There is no separate `eslint.strict.config.js` — keeping one config eliminates drift.
 - **`sonarjsPlugin.configs.recommended`** catches SonarLint findings at lint time so they no longer escape the IDE. See `references/workflow.md` for the common ones (S4325, S6594, S4123, S6551, S6671). Three rules are turned off as always-on noise: `sonarjs/no-unused-vars` (duplicate), `sonarjs/no-empty-test-file` (false-positive on `describe` blocks), `sonarjs/cognitive-complexity` (we already cap function size).
-- **`no-console` is `error`**. Always use the logger port (see below), never `console.*`.
+- **`no-console` is `error`** under `src/**`. Always use the logger port (see below), never `console.*`. The one carve-out is `scripts/**` — the gate scripts shipped in `assets/` are terminal tools whose output *is* their interface; the config turns the rule off there at the project level rather than sprinkling inline ignores (rule 15).
 - **`security/detect-object-injection`, `detect-unsafe-regex`, and `detect-non-literal-fs-filename`** are disabled at the project level because they only false-positive on this codebase's idioms (branded-type `Record<K, V>` lookups, bounded regexes, `chmodSync(mkdtempSync(...))` in tests). Comments in the config explain why each is off. Never inline-ignore them per-line.
 - **`no-restricted-imports`** blocks `mock` from `bun:test` (the entire namespace) — see hard rule 13.
 
@@ -402,11 +415,13 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
 10. Create `src/use-cases/ports/logger.ts` and `src/infra/logger.ts` with the port + Winston adapter above; create `src/test-helpers/logger-fake.ts`.
 11. Copy the canonical helpers from the skill's `assets/`:
     - `cp <skill-path>/assets/format-error.ts src/domain/utilities/format-error.ts`
+    - `cp <skill-path>/assets/format-error.test.ts src/domain/utilities/format-error.test.ts` (format-error is in the mutation scope; its shipped test keeps it above the 90% gate)
     - `cp <skill-path>/assets/capture-rejection.ts src/test-helpers/capture-rejection.ts`
     - `cp <skill-path>/assets/fetch-mock.ts src/test-helpers/fetch-mock.ts`
 12. Set up the per-tier coverage gate:
     - `cp <skill-path>/assets/check-coverage.ts scripts/check-coverage.ts`
-    - `cp <skill-path>/assets/coverage-preload.ts scripts/coverage-preload.ts` (edit the `TODO: add every adapter here` list as you grow)
+    - `cp <skill-path>/assets/regenerate-coverage-preload.ts scripts/regenerate-coverage-preload.ts`
+    - `bun run scripts/regenerate-coverage-preload.ts` — generates `scripts/coverage-preload.ts` from the current tree; re-run it (or wire `--check` as the pre-commit pre-flight) whenever an infra/composition/presenter file is added. Never hand-edit the generated file.
     - In `bunfig.toml`: `[test]` section with `coverage = true`, `coverageSkipTestFiles = true`, `coverageReporter = ["text"]`. **Do not** add `coverageThreshold` (the per-tier script owns enforcement) and **do not** add `preload` (the coverage preload is loaded only by `scripts/check-coverage.ts` via `--preload` so plain `bun test` runs stay fast).
 13. Set up mutation testing:
     - `cp <skill-path>/assets/stryker.conf.json stryker.conf.json`

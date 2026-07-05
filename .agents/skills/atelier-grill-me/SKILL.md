@@ -9,6 +9,8 @@ Pressure-test a plan or design by interviewing the user until there is genuinely
 
 This is the on-demand, relentless counterpart to "think before coding." That habit asks for clarification when warranted; this skill commits to walking the *entire* tree before a line is written.
 
+Interaction: terse, direct prose with no filler, praise, or recap; never use em dashes; ask via the AskUserQuestion tool (or the client's structured-options equivalent) with 2-4 concrete options led by your recommendation; propose next steps when the interview wraps. (The one-clarification-round cap does not apply here: multi-round questioning is this skill's sanctioned purpose.)
+
 ## When to use
 
 - The user asks to be grilled, or to stress-test / pressure-test a plan or design.

@@ -21,6 +21,8 @@ Design for all three. Remember: developers read code 10x more than they write it
 
 ## Naming principles (priority order)
 
+The first five are SKILL.md's canonical priority order (Consistency → Understandability → Specificity → Brevity → Searchability). Pronounceability (6) and Austerity (7) are supplementary tie-breakers, not new top-level priorities.
+
 ### 1. Consistency and uniqueness (highest priority)
 
 One concept, one name, everywhere.

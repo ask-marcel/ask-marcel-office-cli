@@ -244,15 +244,17 @@ export const processOrder = async (order: Order, deps: ProcessOrderDeps): Promis
 2. Accidental | mistakes, lack of knowledge.
 3. Bit rot | code degrades as the world around it changes.
 
-### Boy Scout Rule
+### Boy Scout Rule (bounded by Surgical Changes)
 
 > "Leave the code better than you found it."
 
-Every time you touch code:
-- Improve one small thing.
-- Fix one naming issue.
-- Extract one function.
-- Add one missing test.
+This does **not** license drive-by edits. It is subordinate to SKILL.md Behavioural Guideline #3 (Surgical Changes): touch only what the task requires, match local style, and never "improve" adjacent code, reformat, or refactor things that are not broken. Unrelated dead code or naming you notice in passing gets *mentioned*, not fixed, unless the user asks.
+
+The Boy Scout impulse applies **only to lines your change already touches**, and only when tests protect it:
+- Improve one small thing on a line you were editing anyway.
+- Fix a name that your own change made inaccurate.
+- Extract a function when your change created the third duplication (Rule of Three).
+- Add a missing test for behaviour you just touched (proposed and confirmed first — rule 24).
 
 ### When to pay down debt
 
