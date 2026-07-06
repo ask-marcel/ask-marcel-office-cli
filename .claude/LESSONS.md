@@ -6,6 +6,11 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [decision] 2026-07-06 | Loop-doc access ships as a two-command recipe (search `filetype:loop` then `download-drive-item-as-markdown`), not a new command
+
+A live probe proved `microsoft-search-query --query 'filetype:loop'` returns `.loop` driveItem hits across every SharePoint site and OneDrive the delegated token can see, each carrying `resource.id` plus `resource.parentReference.driveId`, the exact pair `download-drive-item-as-markdown` (`?format=html`) needs. A `find-loop-pages` wrapper would only duplicate reachable surface, so the recipe was documented in BOTH commands' `meta` (drift-proof: it regenerates into `commands.json` / `COMMANDS.md` / `docs`) instead of shipping code. `filetype:fluid` returns zero on-tenant; Loop workspace enumeration (its SharePoint Embedded container) is unreachable on the token but unnecessary, because the search index holds the individual `.loop` pages directly.
+Rule for next time: when a "new capability" is reachable by composing shipped commands, close the gap in command `meta` so the generated docs pick it up, never a redundant wrapper; and prove reachability with a live probe before designing any surface.
+
 ## [gotcha] 2026-06-15 | the per-tier coverage gate masks per-file violations behind test failures — and every tier gates at 100%
 
 `scripts/check-coverage.ts` runs `bun test --coverage` first and returns early on any test failure ("fix test failures first") BEFORE the per-file tier check, so a red suite *hides* per-file coverage gaps until the tests pass. Restoring `main` after PR #1 (PR #2): the 9 login-test timeouts masked that `auth.ts` / `jwt-utils.ts` / `graph-client.ts` had dropped below 100% — the violations only surfaced once the tests went green. Also note `COVERAGE_RULES` gates EVERY tier at 100% (domain, use-cases, infra, composition, presenter), not the atelier 80% default for infra/composition/presenter. Untestable dynamic-import wiring (a real browser/HTTP launch) goes in a one-line loader added to `SKIPPED` — `src/infra/playwright-loader.ts`, `src/infra/system-browser-loader.ts`.
