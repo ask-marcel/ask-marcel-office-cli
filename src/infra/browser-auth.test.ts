@@ -615,7 +615,10 @@ describe('browser auth — single-session acquireBothTokens', () => {
     const { api } = makeFakeApi({
       pageOpts: { urlsAfterGoto: ['https://login.microsoftonline.com/...'] },
     });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ trace, pollDeadlineMs: 120, pollIntervalMs: 5 }));
+    // The trace fires at pollCount % 10, so at least 10 real-timer iterations
+    // must fit the deadline. 500ms / 5ms = 100 nominal iterations (10x margin)
+    // keeps this deterministic under CPU load; a tighter deadline flakes.
+    const browser = createBrowserAuthFromApi(api, fastConfig({ trace, pollDeadlineMs: 500, pollIntervalMs: 5 }));
     await browser.acquireBothTokens('https://teams.microsoft.com');
     expect(captured.some((m) => m.includes('still polling for Teams token'))).toBe(true);
   });
