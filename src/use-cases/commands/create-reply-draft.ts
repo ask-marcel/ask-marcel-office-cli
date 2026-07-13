@@ -6,7 +6,6 @@ import { formatZodError } from './format-zod-error.ts';
 const schema = z.object({
   replyToMessageId: z.string().min(1),
   bodyContent: z.string().min(1),
-  bodyContentType: z.enum(['Text', 'HTML']).optional(),
   subject: z.string().optional(),
 });
 
@@ -16,12 +15,13 @@ const isUnsentDraft = (value: unknown): value is { id: string } =>
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { replyToMessageId, bodyContent, bodyContentType, subject } = parsed.data;
+  const { replyToMessageId, bodyContent, subject } = parsed.data;
 
-  // Step 1: Graph mints the threaded reply-all draft - inherited recipients,
-  // RE: subject, quoted history. The empty body is deliberate: comment-based
-  // creation renders poorly, so the reply text lands via PATCH instead.
-  const created = await graph.post(`/me/messages/${replyToMessageId}/createReplyAll`, {});
+  // Graph mints the threaded reply-all draft (inherited recipients, RE: subject,
+  // quoted history) with the reply text placed ABOVE the quote in one call. The
+  // text MUST travel via `comment`, never a body PATCH: PATCHing `body` replaces
+  // the whole draft body and drops the quoted thread (fixed 2026-07-13).
+  const created = await graph.post(`/me/messages/${replyToMessageId}/createReplyAll`, { comment: bodyContent });
   if (!created.ok) return created;
 
   // Defense in depth: createReplyAll is documented to return an UNSENT draft.
@@ -30,25 +30,25 @@ const execute: Command['execute'] = async (graph, params) => {
     return err({
       type: 'api_error',
       status: 500,
+      code: 'not_an_unsent_draft',
       message: `createReplyAll did not return an unsent draft for message ${replyToMessageId} - refusing to patch. Inspect the message id and retry.`,
     });
   }
 
-  // Step 2: place the reply text (and optional subject override) into the draft.
-  const patch: Record<string, unknown> = {
-    body: { contentType: bodyContentType ?? 'Text', content: bodyContent },
-  };
+  // Optional subject override: PATCH ONLY the subject - never `body`, which
+  // carries the reply text + quoted history. No override -> return the draft.
+  const patch: Record<string, unknown> = {};
   if (subject) patch.subject = subject;
-
+  if (Object.keys(patch).length === 0) return created;
   return graph.patch(`/me/messages/${created.value.id}`, patch);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Create an UNSENT reply-all draft threaded on an existing message. POST /me/messages/{id}/createReplyAll mints the draft (inherited recipients, RE: subject, quoted history), then PATCH places the reply body above the quote. Reply-all by design - dropping recipients is a deliberate act for the human in Outlook, not a default. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
+    'Create an UNSENT reply-all draft threaded on an existing message. POST /me/messages/{id}/createReplyAll mints the draft (inherited recipients, RE: subject, quoted history) with your reply text placed above the quote, in one call. Reply-all by design - dropping recipients is a deliberate act for the human in Outlook, not a default. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
   category: 'mail',
   graphMethod: 'POST',
-  graphPathTemplate: '/me/messages/{reply-to-message-id}/createReplyAll (then PATCH the returned draft)',
+  graphPathTemplate: '/me/messages/{reply-to-message-id}/createReplyAll (+ optional body-free PATCH for subject)',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-createreplyall',
   options: [
     {
@@ -63,14 +63,7 @@ const meta: CommandMeta = {
       name: 'body-content',
       key: 'bodyContent',
       required: true,
-      description: 'The reply text, placed above the quoted history. Plain text by default; pass --body-content-type HTML for rich text.',
-    },
-    {
-      name: 'body-content-type',
-      key: 'bodyContentType',
-      required: false,
-      description: 'Reply body format: Text (default) or HTML.',
-      argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
+      description: 'The reply text, placed above the quoted history by Graph.',
     },
     {
       name: 'subject',
@@ -80,7 +73,7 @@ const meta: CommandMeta = {
     },
   ],
   example: 'ask-marcel-office create-reply-draft --reply-to-message-id "AAMkAD..." --body-content "Confirmed for Concur, aligned with the group choice."',
-  bodyTemplate: "POST {} then PATCH { body: { contentType: '{body-content-type}', content: '{body-content}' }, subject?: '{subject}' }",
+  bodyTemplate: "POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }",
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:

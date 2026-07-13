@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.1.0",
-  "generatedAt": "2026-07-13T06:01:07.323Z",
+  "generatedAt": "2026-07-13T07:01:05.302Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -313,10 +313,10 @@
     },
     {
       "name": "create-forward-draft",
-      "summary": "Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted history), then PATCH places the comment above the quote and sets the recipients. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.",
+      "summary": "Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted original) with your comment placed above the quote and the recipients set, in one call. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.",
       "category": "mail",
       "graphMethod": "POST",
-      "graphPathTemplate": "/me/messages/{forward-message-id}/createForward (then PATCH the returned draft)",
+      "graphPathTemplate": "/me/messages/{forward-message-id}/createForward (+ optional body-free PATCH for cc / subject)",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-createforward",
       "options": [
         {
@@ -350,20 +350,7 @@
           "name": "body-content",
           "key": "bodyContent",
           "required": true,
-          "description": "The comment text, placed above the quoted message being forwarded. Plain text by default; pass --body-content-type HTML for rich text."
-        },
-        {
-          "name": "body-content-type",
-          "key": "bodyContentType",
-          "required": false,
-          "description": "Comment body format: Text (default) or HTML.",
-          "argumentHint": {
-            "kind": "magicValue",
-            "values": [
-              "Text",
-              "HTML"
-            ]
-          }
+          "description": "The comment text, placed above the quoted forwarded message by Graph."
         },
         {
           "name": "subject",
@@ -374,7 +361,7 @@
       ],
       "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
       "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
-      "bodyTemplate": "POST {} then PATCH { body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+      "bodyTemplate": "POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
     {
@@ -459,10 +446,10 @@
     },
     {
       "name": "create-reply-draft",
-      "summary": "Create an UNSENT reply-all draft threaded on an existing message. POST /me/messages/{id}/createReplyAll mints the draft (inherited recipients, RE: subject, quoted history), then PATCH places the reply body above the quote. Reply-all by design - dropping recipients is a deliberate act for the human in Outlook, not a default. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.",
+      "summary": "Create an UNSENT reply-all draft threaded on an existing message. POST /me/messages/{id}/createReplyAll mints the draft (inherited recipients, RE: subject, quoted history) with your reply text placed above the quote, in one call. Reply-all by design - dropping recipients is a deliberate act for the human in Outlook, not a default. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.",
       "category": "mail",
       "graphMethod": "POST",
-      "graphPathTemplate": "/me/messages/{reply-to-message-id}/createReplyAll (then PATCH the returned draft)",
+      "graphPathTemplate": "/me/messages/{reply-to-message-id}/createReplyAll (+ optional body-free PATCH for subject)",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-createreplyall",
       "options": [
         {
@@ -484,20 +471,7 @@
           "name": "body-content",
           "key": "bodyContent",
           "required": true,
-          "description": "The reply text, placed above the quoted history. Plain text by default; pass --body-content-type HTML for rich text."
-        },
-        {
-          "name": "body-content-type",
-          "key": "bodyContentType",
-          "required": false,
-          "description": "Reply body format: Text (default) or HTML.",
-          "argumentHint": {
-            "kind": "magicValue",
-            "values": [
-              "Text",
-              "HTML"
-            ]
-          }
+          "description": "The reply text, placed above the quoted history by Graph."
         },
         {
           "name": "subject",
@@ -508,7 +482,7 @@
       ],
       "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --body-content \"Confirmed for Concur, aligned with the group choice.\"",
       "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
-      "bodyTemplate": "POST {} then PATCH { body: { contentType: '{body-content-type}', content: '{body-content}' }, subject?: '{subject}' }",
+      "bodyTemplate": "POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }",
       "mutates": true
     },
     {

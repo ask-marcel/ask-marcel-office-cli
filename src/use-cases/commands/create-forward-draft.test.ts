@@ -4,7 +4,7 @@ import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './create-forward-draft.ts';
 
 describe('create-forward-draft', () => {
-  it('creates a forward draft, then patches the comment, Text body, and parsed recipients into it', async () => {
+  it('puts the comment and recipients in the createForward POST so the quoted original survives, and patches nothing more', async () => {
     const posts: Array<{ path: string; body: unknown }> = [];
     const patches: Array<{ path: string; body: unknown }> = [];
     const graph = fakeGraphClient({
@@ -21,51 +21,35 @@ describe('create-forward-draft', () => {
     const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com, carol@example.com', bodyContent: 'Bob owns this, forwarding.' });
 
     expect(result.ok).toBe(true);
-    expect(posts).toEqual([{ path: '/me/messages/msg-1/createForward', body: {} }]);
-    expect(patches).toEqual([
+    // The comment travels via `comment` (Graph places it above the quote); a body
+    // PATCH would replace the draft body and drop the forwarded original.
+    expect(posts).toEqual([
       {
-        path: '/me/messages/draft-9',
-        body: {
-          body: { contentType: 'Text', content: 'Bob owns this, forwarding.' },
-          toRecipients: [{ emailAddress: { address: 'bob@example.com' } }, { emailAddress: { address: 'carol@example.com' } }],
-        },
+        path: '/me/messages/msg-1/createForward',
+        body: { comment: 'Bob owns this, forwarding.', toRecipients: [{ emailAddress: { address: 'bob@example.com' } }, { emailAddress: { address: 'carol@example.com' } }] },
       },
     ]);
+    expect(patches).toEqual([]);
   });
 
-  it('adds cc recipients and a subject override to the patch only when given', async () => {
-    let patchedBody: Record<string, unknown> = {};
+  it('sets cc recipients and a subject override via a body-free PATCH, and skips the PATCH entirely when neither is given', async () => {
+    const patches: Array<{ path: string; body: unknown }> = [];
     const graph = fakeGraphClient({
       post: async () => ok({ id: 'draft-9', isDraft: true }),
-      patch: async (_path, body) => {
-        patchedBody = body as Record<string, unknown>;
+      patch: async (path, body) => {
+        patches.push({ path, body });
         return ok({ id: 'draft-9' });
       },
     });
 
     await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'carol@example.com', bodyContent: 'x', subject: 'FW: reassigned' });
-    expect(patchedBody.ccRecipients).toEqual([{ emailAddress: { address: 'carol@example.com' } }]);
-    expect(patchedBody.subject).toBe('FW: reassigned');
+    // Body-free: the PATCH carries ONLY cc/subject. A `body` key would clobber the
+    // createForward comment + quoted original, so `toEqual` pins its absence.
+    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { ccRecipients: [{ emailAddress: { address: 'carol@example.com' } }], subject: 'FW: reassigned' } }]);
 
+    patches.length = 0;
     await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'x' });
-    // Key-absence, not merely `=== undefined`: an `if (true)` regression would
-    // set the key to undefined, which still passes `toBeUndefined()`.
-    expect('ccRecipients' in patchedBody).toBe(false);
-    expect('subject' in patchedBody).toBe(false);
-  });
-
-  it('patches an HTML comment body with the HTML content type', async () => {
-    let patchedBody: Record<string, unknown> = {};
-    const graph = fakeGraphClient({
-      post: async () => ok({ id: 'draft-9', isDraft: true }),
-      patch: async (_path, body) => {
-        patchedBody = body as Record<string, unknown>;
-        return ok({ id: 'draft-9' });
-      },
-    });
-
-    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: '<p>Forwarding.</p>', bodyContentType: 'HTML' });
-    expect(patchedBody.body).toEqual({ contentType: 'HTML', content: '<p>Forwarding.</p>' });
+    expect(patches).toEqual([]);
   });
 
   it('refuses any createForward response that is not a well-formed unsent draft - and never patches it', async () => {
@@ -87,6 +71,7 @@ describe('create-forward-draft', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.type).toBe('api_error');
+      if (!result.ok && result.error.type === 'api_error') expect(result.error.code).toBe('not_an_unsent_draft');
       expect(patchCalls).toBe(0);
     }
   });
@@ -107,13 +92,14 @@ describe('create-forward-draft', () => {
     expect(patchCalls).toBe(0);
   });
 
-  it('passes a PATCH failure through untouched (no swallow)', async () => {
+  it('passes a cc/subject PATCH failure through untouched (no swallow)', async () => {
     const graph = fakeGraphClient({
       post: async () => ok({ id: 'draft-9', isDraft: true }),
       patch: async () => err({ type: 'api_error', status: 400, message: 'ErrorInvalidRecipients' }),
     });
 
-    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'x' });
+    // A cc override triggers the body-free PATCH; its failure must propagate.
+    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'bad-addr', bodyContent: 'x' });
 
     expect(result).toEqual(err({ type: 'api_error', status: 400, message: 'ErrorInvalidRecipients' }));
   });
@@ -132,12 +118,6 @@ describe('create-forward-draft', () => {
 
   it('returns a validation_error when body-content is missing', async () => {
     const result = await execute(fakeGraphClient(), { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('validation_error');
-  });
-
-  it('returns a validation_error for an invalid body-content-type', async () => {
-    const result = await execute(fakeGraphClient(), { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'x', bodyContentType: 'Markdown' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });

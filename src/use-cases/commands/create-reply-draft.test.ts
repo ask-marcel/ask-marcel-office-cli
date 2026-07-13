@@ -4,7 +4,7 @@ import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './create-reply-draft.ts';
 
 describe('create-reply-draft', () => {
-  it('creates a reply-all draft threaded on the message, then patches the reply body in above the quoted history', async () => {
+  it('puts the reply text in the createReplyAll POST so the quoted thread survives, and patches nothing more', async () => {
     const posts: Array<{ path: string; body: unknown }> = [];
     const patches: Array<{ path: string; body: unknown }> = [];
     const graph = fakeGraphClient({
@@ -21,58 +21,30 @@ describe('create-reply-draft', () => {
     const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed for Concur.' });
 
     expect(result.ok).toBe(true);
-    expect(posts).toEqual([{ path: '/me/messages/msg-1/createReplyAll', body: {} }]);
-    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { body: { contentType: 'Text', content: 'Confirmed for Concur.' } } }]);
+    // The reply text travels via `comment` (Graph places it above the quote); a
+    // body PATCH would replace the draft body and drop the quoted thread.
+    expect(posts).toEqual([{ path: '/me/messages/msg-1/createReplyAll', body: { comment: 'Confirmed for Concur.' } }]);
+    expect(patches).toEqual([]);
   });
 
-  it('overrides the inherited RE: subject only when asked', async () => {
-    let patchedBody: Record<string, unknown> = {};
+  it('overrides the RE: subject via a body-free PATCH, and skips the PATCH when no override is given', async () => {
+    const patches: Array<{ path: string; body: unknown }> = [];
     const graph = fakeGraphClient({
       post: async () => ok({ id: 'draft-9', isDraft: true }),
-      patch: async (_path, body) => {
-        patchedBody = body as Record<string, unknown>;
+      patch: async (path, body) => {
+        patches.push({ path, body });
         return ok({ id: 'draft-9' });
       },
     });
 
     await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', subject: 'RE: TEMPO PATH - Concur confirmed' });
-    expect(patchedBody.subject).toBe('RE: TEMPO PATH - Concur confirmed');
+    // Body-free: the PATCH carries ONLY the subject. A `body` key would clobber the
+    // reply text + quoted thread, so `toEqual` pins its absence.
+    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { subject: 'RE: TEMPO PATH - Concur confirmed' } }]);
 
+    patches.length = 0;
     await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
-    // Key-absence, not merely `=== undefined`: an `if (true) patch.subject = subject`
-    // regression sets `subject: undefined`, which still passes `toBeUndefined()`.
-    expect('subject' in patchedBody).toBe(false);
-  });
-
-  it('accepts the explicit Text body content type', async () => {
-    let patchedBody: Record<string, unknown> = {};
-    const graph = fakeGraphClient({
-      post: async () => ok({ id: 'draft-9', isDraft: true }),
-      patch: async (_path, body) => {
-        patchedBody = body as Record<string, unknown>;
-        return ok({ id: 'draft-9' });
-      },
-    });
-
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', bodyContentType: 'Text' });
-
-    expect(result.ok).toBe(true);
-    expect(patchedBody.body).toEqual({ contentType: 'Text', content: 'x' });
-  });
-
-  it('patches an HTML body with the HTML content type', async () => {
-    let patchedBody: Record<string, unknown> = {};
-    const graph = fakeGraphClient({
-      post: async () => ok({ id: 'draft-9', isDraft: true }),
-      patch: async (_path, body) => {
-        patchedBody = body as Record<string, unknown>;
-        return ok({ id: 'draft-9' });
-      },
-    });
-
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>Confirmed.</p>', bodyContentType: 'HTML' });
-
-    expect(patchedBody.body).toEqual({ contentType: 'HTML', content: '<p>Confirmed.</p>' });
+    expect(patches).toEqual([]);
   });
 
   it('refuses a createReplyAll response that is not an unsent draft - and never patches it', async () => {
@@ -110,6 +82,7 @@ describe('create-reply-draft', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.type).toBe('api_error');
+      if (!result.ok && result.error.type === 'api_error') expect(result.error.code).toBe('not_an_unsent_draft');
       expect(patchCalls).toBe(0);
     }
   });

@@ -9,7 +9,6 @@ const schema = z.object({
   toRecipients: z.string().min(1),
   ccRecipients: z.string().optional(),
   bodyContent: z.string().min(1),
-  bodyContentType: z.enum(['Text', 'HTML']).optional(),
   subject: z.string().optional(),
 });
 
@@ -18,13 +17,21 @@ const isUnsentDraft = (value: unknown): value is { id: string } =>
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { forwardMessageId, toRecipients, ccRecipients, bodyContent, bodyContentType, subject } = parsed.data;
+  if (!parsed.success)
+    return err({
+      type: 'validation_error',
+      message: formatZodError(parsed.error),
+    });
+  const { forwardMessageId, toRecipients, ccRecipients, bodyContent, subject } = parsed.data;
 
-  // Step 1: Graph mints the forward draft - FW: subject, quoted history. The
-  // empty body is deliberate: comment-based createForward renders poorly, so
-  // the comment lands via PATCH instead (same rationale as create-reply-draft).
-  const created = await graph.post(`/me/messages/${forwardMessageId}/createForward`, {});
+  // Graph's createForward mints the draft with the comment placed ABOVE the
+  // quoted forwarded message in one call. The comment MUST travel via `comment`,
+  // never a body PATCH: PATCHing `body` replaces the whole draft body and drops
+  // the entire forwarded original (it did - fixed 2026-07-13 after a live smoke).
+  const created = await graph.post(`/me/messages/${forwardMessageId}/createForward`, {
+    comment: bodyContent,
+    toRecipients: parseRecipients(toRecipients),
+  });
   if (!created.ok) return created;
 
   // Defense in depth: createForward is documented to return an UNSENT draft.
@@ -33,28 +40,27 @@ const execute: Command['execute'] = async (graph, params) => {
     return err({
       type: 'api_error',
       status: 500,
+      code: 'not_an_unsent_draft',
       message: `createForward did not return an unsent draft for message ${forwardMessageId} - refusing to patch. Inspect the message id and retry.`,
     });
   }
 
-  // Step 2: place the comment above the quote and set the recipients (plus an
-  // optional subject override) into the draft.
-  const patch: Record<string, unknown> = {
-    body: { contentType: bodyContentType ?? 'Text', content: bodyContent },
-    toRecipients: parseRecipients(toRecipients),
-  };
+  // Optional cc recipients / subject override: PATCH ONLY these - never `body`,
+  // which carries the comment + quoted original. Nothing to set -> the draft is
+  // already complete, return it as-is.
+  const patch: Record<string, unknown> = {};
   if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
   if (subject) patch.subject = subject;
-
+  if (Object.keys(patch).length === 0) return created;
   return graph.patch(`/me/messages/${created.value.id}`, patch);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted history), then PATCH places the comment above the quote and sets the recipients. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
+    'Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted original) with your comment placed above the quote and the recipients set, in one call. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
   category: 'mail',
   graphMethod: 'POST',
-  graphPathTemplate: '/me/messages/{forward-message-id}/createForward (then PATCH the returned draft)',
+  graphPathTemplate: '/me/messages/{forward-message-id}/createForward (+ optional body-free PATCH for cc / subject)',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-createforward',
   options: [
     {
@@ -82,14 +88,7 @@ const meta: CommandMeta = {
       name: 'body-content',
       key: 'bodyContent',
       required: true,
-      description: 'The comment text, placed above the quoted message being forwarded. Plain text by default; pass --body-content-type HTML for rich text.',
-    },
-    {
-      name: 'body-content-type',
-      key: 'bodyContentType',
-      required: false,
-      description: 'Comment body format: Text (default) or HTML.',
-      argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
+      description: 'The comment text, placed above the quoted forwarded message by Graph.',
     },
     {
       name: 'subject',
@@ -100,8 +99,7 @@ const meta: CommandMeta = {
   ],
   example:
     'ask-marcel-office create-forward-draft --forward-message-id "AAMkAD..." --to-recipients "bob@example.com" --body-content "Bob owns this now, forwarding for your action."',
-  bodyTemplate:
-    "POST {} then PATCH { body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+  bodyTemplate: "POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
