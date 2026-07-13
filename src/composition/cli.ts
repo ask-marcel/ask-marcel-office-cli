@@ -334,7 +334,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const loginCmd = program
     .command('login')
-    .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → Playwright browser fallback).')
+    .description(
+      'Authenticate against Microsoft Graph via the Teams web client (cached token → refresh → browser). Already signed in? Reports all four cached tokens (basic / elevated / chatsvcagg / ic3) with their time-left and refresh route; --force re-captures every token via the browser.'
+    )
     .option(
       '--force',
       'Ignore the cache and re-capture every token via the browser. The only way to refresh the elevated (M365) token while the basic token is still valid; the persistent browser profile is reused, so you are usually not re-prompted for credentials.'
@@ -376,7 +378,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel-office login   (opens a Playwright-driven Edge/Chrome window)',
+      'Examples:      ask-marcel-office login          (sign in the first time, or show all four token statuses if already signed in)',
+      '               ask-marcel-office login --force  (re-capture every token via the browser, ignoring the cache)',
       'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
       'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
