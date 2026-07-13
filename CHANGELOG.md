@@ -7,20 +7,53 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 ### Added
 
 - **`create-forward-draft`** creates an UNSENT forward draft of an existing
-  message. `POST /me/messages/{id}/createForward` mints the draft with the
-  `FW:` subject and quoted history, then a `PATCH` places the comment above the
-  quote and sets the recipients (`Mail.ReadWrite`, already on the basic token).
+  message. `POST /me/messages/{id}/createForward` mints the draft (`FW:` subject,
+  quoted original) with your comment placed above the quote and the recipients
+  set, in one call (`Mail.ReadWrite`, already on the basic token).
   `--to-recipients` is required (a forward with no recipient is not actionable);
   `--cc-recipients` and a `--subject` override are optional. Like the other
   mail-draft commands, it produces an UNSENT draft only; the CLI can never send.
   This is the fourth and last write command, closing the "forward to the right
   owner" gap that `create-reply-draft` (in-thread) could not.
+- **`convert-local-file --include-images`** (a `.zip` only) also extracts every
+  archive entry's embedded images (docx/xlsx/pptx OOXML media parts, pdf page
+  images), so a screenshot pasted inside a zipped document is reachable in one
+  call.
+- **`scopes-check` now reports the elevated (M365ChatClient) token** in an
+  `elevated: { available, expiresInSeconds? }` block, so a fresh process can
+  pre-flight the historical-version download / convert commands instead of
+  discovering a 403 mid-run.
+- **Machine-readable `errorCode`s on more error paths** — the elevated /
+  substrate fail-fast (`secondary_token_unavailable`) and the client-side
+  unsupported-input rejections (`unsupported_image` / `unsupported_format` /
+  `unsupported_legacy_office` / `unsupported_document`), so an agent branches on
+  a stable code instead of substring-matching the message.
+
+### Fixed
+
+- **`create-forward-draft` and `create-reply-draft` no longer drop the forwarded
+  / quoted body.** They set the comment via Graph's `comment` parameter on the
+  `createForward` / `createReplyAll` POST, which places it above the preserved
+  quote. The previous implementation PATCHed `body` with only the comment, which
+  **replaced** the whole draft body and dropped the entire forwarded original (a
+  forward went out with just the comment, no message). Caught by a live smoke
+  test; the fix is live-verified.
 
 ### Changed
 
 - The `parseRecipients` helper shared by the mail-draft write commands moved to
   `parse-recipients.ts` (one definition, three call sites), with no behaviour
   change.
+- `scopes-check` `responseShape` corrected: `elevated.expiresInSeconds` is
+  omitted (the key is absent) when no elevated token is cached, not `null`.
+
+### Removed
+
+- The `--body-content-type` flag on **`create-forward-draft` and
+  `create-reply-draft`** is removed. It never affected the quoted body (Graph
+  embeds the comment / reply as text above the quote), so it was a no-op on those
+  two commands. It remains on `create-mail-draft` and `update-mail-draft`, which
+  set the body directly.
 
 ## 2.0.0
 
