@@ -25,6 +25,20 @@ describe('login command', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('auth_cancelled');
   });
+
+  it('forwards the force flag to getAccessToken so a warm session re-captures every token', async () => {
+    let captured: { force?: boolean } | undefined;
+    const fakeAuth = {
+      getAccessToken: async (options?: { force?: boolean }) => {
+        captured = options;
+        return ok('forced-token');
+      },
+      logout: async () => ok(undefined),
+    };
+    const result = await login(fakeAuth as never, { force: true });
+    expect(result).toEqual(ok('forced-token'));
+    expect(captured).toEqual({ force: true });
+  });
 });
 
 describe('logout command', () => {

@@ -9,6 +9,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
+import { buildLoginStatus } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
 import { persistIfRequested, persistMediaIfRequested } from '../use-cases/commands/output-path.ts';
@@ -334,36 +335,42 @@ const buildCli = (deps: BuildCliDeps): Command => {
   const loginCmd = program
     .command('login')
     .description('Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → Playwright browser fallback).')
+    .option(
+      '--force',
+      'Ignore the cache and re-capture every token via the browser. The only way to refresh the elevated (M365) token while the basic token is still valid; the persistent browser profile is reused, so you are usually not re-prompted for credentials.'
+    )
     .action(async () => {
+      const force = loginCmd.opts<{ force?: boolean }>().force ?? false;
       // The composition root supplies `makeLoginAuth` (a login-configured
       // manager that may recapture secondary tokens via the browser); tests
       // omit it and the injected `auth` fake drives both execute and the
-      // elevated read.
+      // token-status read.
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
-      const result = await login.execute(loginAuth);
+      const result = await login.execute(loginAuth, { force });
       if (!result.ok) {
         fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
         return;
       }
-      // surface the elevated-capture outcome so
-      // an LLM consumer can predict whether the elevated-dependent
-      // commands (list-chats / get-chat / list-chat-members /
-      // historical-version downloads) will work without invoking them.
-      // The outcome is null when getAccessToken hit cache (no browser
-      // step ran in this process) — leave the elevated field unset in
-      // that case so consumers don't think the elevated state was
-      // tested.
-      const outcome = loginAuth.getLastElevatedOutcome();
-      const envelope: { status: 'authenticated'; elevated?: 'captured' | 'failed'; elevatedReason?: string } = { status: 'authenticated' };
-      if (outcome !== null) {
-        if (outcome.captured) {
-          envelope.elevated = 'captured';
-        } else {
-          envelope.elevated = 'failed';
-          envelope.elevatedReason = outcome.reason;
-        }
+      // Report all four cached tokens (basic / elevated / chatsvcagg / ic3) with
+      // their runway and refresh route, so a warm re-login shows the full picture
+      // instead of a bare "authenticated". The decode-only read never opens a browser;
+      // a failed elevated capture this run surfaces its reason on the elevated token.
+      const info = await graph.getCachedTokenInfo();
+      if (!info.ok) {
+        fail(info.error.message);
+        return;
       }
-      renderOut(envelope);
+      const outcome = loginAuth.getLastElevatedOutcome();
+      const elevatedFailureReason = outcome && !outcome.captured ? outcome.reason : undefined;
+      renderOut(
+        buildLoginStatus({
+          basicExpiresInSeconds: info.value.expiresInSeconds,
+          elevated: info.value.elevated,
+          chatsvcagg: info.value.chatsvcagg,
+          ic3: info.value.ic3,
+          elevatedFailureReason,
+        })
+      );
     });
   loginCmd.addHelpText(
     'after',

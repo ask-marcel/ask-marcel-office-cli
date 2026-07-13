@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
 import type { AuthError, AuthManager } from '../infra/auth.ts';
-import type { GraphClient, GraphError } from '../infra/graph-client.ts';
+import type { GraphClient, GraphError, TokenInfo } from '../infra/graph-client.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
@@ -82,12 +82,28 @@ const errGraph = (error: GraphError): GraphClient =>
     getCachedTokenInfo: async () => ({ ok: false, error }),
   });
 
+const sampleTokenInfo = (over: Partial<TokenInfo> = {}): TokenInfo => ({
+  scopes: ['Mail.Read'],
+  audience: 'https://graph.microsoft.com',
+  expiresAt: '2026-12-31T00:00:00.000Z',
+  expiresInSeconds: 8938,
+  elevated: { available: false, expiresInSeconds: undefined },
+  chatsvcagg: { available: true, expiresInSeconds: 5400 },
+  ic3: { available: true, expiresInSeconds: 5400 },
+  ...over,
+});
+
+const graphWithTokenInfo = (info: TokenInfo): GraphClient => fakeGraphClient({ getCachedTokenInfo: async () => ({ ok: true, value: info }) });
+
 describe('buildCli command surface', () => {
-  it('renders an authenticated envelope when login succeeds (under --output json)', async () => {
+  it('renders the four-token status envelope (basic/elevated/chatsvcagg/ic3 + hint) when login succeeds (under --output json)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    expect(out).toContain('"status":"authenticated"');
+    const parsed = JSON.parse(out) as { data: { status: string; tokens: Record<string, unknown>; hint: string } };
+    expect(parsed.data.status).toBe('authenticated');
+    expect(Object.keys(parsed.data.tokens)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3']);
+    expect(parsed.data.hint).toContain('login --force');
   });
 
   it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
@@ -112,57 +128,82 @@ describe('buildCli command surface', () => {
     expect(description).not.toContain('searches, not mutations');
   });
 
-  it('renders an authenticated status as plain "status: authenticated" by default (text format)', async () => {
+  it('renders the four-token status in text format with the refresh hint', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toBe('status: authenticated\n');
+    expect(out).toContain('status: authenticated');
+    expect(out).toContain('refresh: interactive'); // the elevated token's route
+    expect(out).toContain('login --force');
   });
 
-  it('renders login envelope with elevated=captured when the browser auth captured the M365ChatClient token', async () => {
-    const elevatedCapturedAuth: AuthManager = {
-      getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
-      getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
-      logout: async () => ({ ok: true, value: undefined }),
-      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getChatsvcaggRegion: async () => 'emea',
-      getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getLastChatsvcaggOutcome: () => null,
-      getLastElevatedOutcome: () => ({ captured: true }),
+  it('reports the elevated token as available with the interactive refresh route when it is cached', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({
+      auth: okAuth(),
+      graph: graphWithTokenInfo(sampleTokenInfo({ elevated: { available: true, expiresInSeconds: 1800 } })),
+      logger,
+      processRunner: createProcessRunnerFake(),
+      fs: createFileSystemFake(),
+    });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
+    const parsed = JSON.parse(out) as { data: { tokens: { elevated: unknown } } };
+    expect(parsed.data.tokens.elevated).toEqual({ available: true, expiresInSeconds: 1800, refresh: 'interactive' });
+  });
+
+  it('surfaces the elevated capture reason on the elevated token when the browser step failed this run', async () => {
+    const elevatedFailedAuth: AuthManager = { ...okAuth(), getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }) };
+    const logger = createLoggerFake();
+    const cli = buildCli({
+      auth: elevatedFailedAuth,
+      graph: graphWithTokenInfo(sampleTokenInfo({ elevated: { available: false, expiresInSeconds: undefined } })),
+      logger,
+      processRunner: createProcessRunnerFake(),
+      fs: createFileSystemFake(),
+    });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
+    const parsed = JSON.parse(out) as { data: { tokens: { elevated: { available: boolean; refresh: string; reason?: string } } } };
+    expect(parsed.data.tokens.elevated.available).toBe(false);
+    expect(parsed.data.tokens.elevated.reason).toBe('sso_timeout');
+    expect(parsed.data.tokens.elevated.refresh).toBe('interactive');
+  });
+
+  it('reports all four tokens even on a cache-hit login (no browser step ran → no elevated reason)', async () => {
+    // okAuth returns null from getLastElevatedOutcome (cache hit, no browser step this run).
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
+    const parsed = JSON.parse(out) as { data: { status: string; tokens: { elevated: { reason?: string } } } };
+    expect(parsed.data.status).toBe('authenticated');
+    expect(parsed.data.tokens.elevated.reason).toBeUndefined();
+  });
+
+  it('login --force forwards the force flag to getAccessToken so a warm session re-captures all tokens', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    const capturingAuth: AuthManager = {
+      ...okAuth(),
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return { ok: true as const, value: accessTokenUnsafe('tok') };
+      },
     };
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: elevatedCapturedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    expect(out).toContain('"status":"authenticated"');
-    expect(out).toContain('"elevated":"captured"');
+    const cli = buildCli({ auth: capturingAuth, graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login', '--force']));
+    expect(calls.some((c) => c?.force === true)).toBe(true);
   });
 
-  it('renders login envelope with elevated=failed AND elevatedReason when elevated capture failed', async () => {
-    const elevatedFailedAuth: AuthManager = {
-      getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
-      getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
-      logout: async () => ({ ok: true, value: undefined }),
-      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getChatsvcaggRegion: async () => 'emea',
-      getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getLastChatsvcaggOutcome: () => null,
-      getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }),
-    };
+  it('surfaces the token-status read failure when getCachedTokenInfo fails after a successful login', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: elevatedFailedAuth, graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    expect(out).toContain('"status":"authenticated"');
-    expect(out).toContain('"elevated":"failed"');
-    expect(out).toContain('"elevatedReason":"sso_timeout"');
-  });
-
-  it('omits the elevated field on login envelope when getAccessToken hit cache (no browser step ran)', async () => {
-    // Default okAuth returns null from getLastElevatedOutcome — old behavior preserved.
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    expect(out).toContain('"status":"authenticated"');
-    expect(out).not.toContain('"elevated"');
+    const cli = buildCli({
+      auth: okAuth(),
+      graph: errGraph({ type: 'auth_failed', message: 'no token cached' }),
+      logger,
+      processRunner: createProcessRunnerFake(),
+      fs: createFileSystemFake(),
+    });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(out).toContain('no token cached');
   });
 
   it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — round 2 — stamps the source even when the hint table did not match)', async () => {
