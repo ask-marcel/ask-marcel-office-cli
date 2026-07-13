@@ -82,14 +82,23 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'login',
     summary:
-      'Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). Run before any Graph command.',
+      'Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). Reports all four cached tokens (basic / elevated / chatsvcagg / ic3) with their time-left and how to refresh each; pass --force to re-capture every token via the browser in one pass. Run before any Graph command.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) browser-OAuth via Teams web client; not a Graph endpoint',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
-    options: [],
-    example: 'ask-marcel-office login',
-    responseShape: '{ status: "authenticated" } on success; envelope error on cancel/failure.',
+    options: [
+      {
+        name: 'force',
+        key: 'force',
+        required: false,
+        description:
+          'Ignore the cache and re-capture every token via the browser. The only way to refresh the elevated (M365) token while the basic token is still valid; the persistent browser profile is reused, so you are usually not re-prompted for credentials.',
+      },
+    ],
+    example: 'ask-marcel-office login --force',
+    responseShape:
+      '{ status: "authenticated", tokens: { basic, elevated, chatsvcagg, ic3 }, hint } on success. Each token is { available: boolean, expiresInSeconds?: number, refresh: "automatic" | "interactive", reason? }: basic/chatsvcagg/ic3 refresh automatically from the cached refresh token, the elevated (M365) token is re-captured only on an interactive login. `expiresInSeconds` is omitted when the token is not cached; a failed elevated capture this run adds `reason`. Envelope error on cancel/failure.',
   },
   {
     name: 'logout',

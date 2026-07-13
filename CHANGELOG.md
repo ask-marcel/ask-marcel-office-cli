@@ -19,10 +19,23 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   archive entry's embedded images (docx/xlsx/pptx OOXML media parts, pdf page
   images), so a screenshot pasted inside a zipped document is reachable in one
   call.
-- **`scopes-check` now reports the elevated (M365ChatClient) token** in an
-  `elevated: { available, expiresInSeconds? }` block, so a fresh process can
-  pre-flight the historical-version download / convert commands instead of
-  discovering a 403 mid-run.
+- **`login` now reports all four cached tokens** (basic, elevated/M365, and the
+  two Teams-chat substrate tokens chatsvcagg / ic3) with each one's time-left and
+  refresh route, so running `login` while already signed in shows the full token
+  picture instead of a bare `{ status: "authenticated" }`. Each token is
+  `{ available, expiresInSeconds?, refresh: "automatic" | "interactive", reason? }`:
+  basic/chatsvcagg/ic3 refresh automatically from the cached refresh token; the
+  elevated token is `interactive` (re-captured only on a browser login).
+- **`login --force`** ignores the cache and re-captures every token via the
+  browser in one pass — the only way to refresh the elevated token while the
+  basic token is still valid. The persistent browser profile is reused, so you
+  are usually not re-prompted for credentials.
+- **`scopes-check` now reports the elevated (M365ChatClient) token** plus the two
+  Teams-chat substrate tokens (`chatsvcagg` / `ic3`), each in an
+  `{ available, expiresInSeconds? }` block, so a fresh process can pre-flight the
+  historical-version download / convert commands instead of discovering a 403
+  mid-run. The two substrate blocks are additive; the existing top-level fields
+  are unchanged.
 - **Machine-readable `errorCode`s on more error paths** — the elevated /
   substrate fail-fast (`secondary_token_unavailable`) and the client-side
   unsupported-input rejections (`unsupported_image` / `unsupported_format` /

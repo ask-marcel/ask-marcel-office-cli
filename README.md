@@ -68,10 +68,11 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
 
-**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600).
+**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). Running `login` again (even when already signed in) reports all four cached tokens — basic, elevated (M365), and the two Teams-chat substrate tokens (chatsvcagg / ic3) — each with its time-left and refresh route: basic/chatsvcagg/ic3 refresh automatically from the cached refresh token, while the elevated token is re-captured only on an interactive login. `login --force` ignores the cache and re-captures every token in one browser pass (the persistent profile is reused, so you are usually not re-prompted for credentials) — the only way to refresh the elevated token while the basic one is still valid. `scopes-check` reports the same four tokens without opening a browser.
 
 ```bash
-ask-marcel-office login
+ask-marcel-office login          # sign in, or show all four tokens' status if already signed in
+ask-marcel-office login --force  # re-capture every token, ignoring the cache
 ```
 
 ### Stable error envelope with actionable hints
