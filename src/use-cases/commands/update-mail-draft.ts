@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { parseRecipients } from './parse-recipients.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),
@@ -13,13 +14,6 @@ const schema = z.object({
   bccRecipients: z.string().optional(),
   importance: z.enum(['Low', 'Normal', 'High']).optional(),
 });
-
-const parseRecipients = (csv: string): Array<{ emailAddress: { address: string } }> =>
-  csv
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((address) => ({ emailAddress: { address } }));
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
