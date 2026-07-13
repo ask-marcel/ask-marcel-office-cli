@@ -23,6 +23,14 @@ export const fakeGraphClient = (overrides: Partial<GraphClient> = {}): GraphClie
   put: async () => ok({}),
   delete: async () => ok({}),
   getCachedTokenInfo: async () =>
-    ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined, elevated: { available: false, expiresInSeconds: undefined } }),
+    ok({
+      scopes: [],
+      audience: undefined,
+      expiresAt: undefined,
+      expiresInSeconds: undefined,
+      elevated: { available: false, expiresInSeconds: undefined },
+      chatsvcagg: { available: false, expiresInSeconds: undefined },
+      ic3: { available: false, expiresInSeconds: undefined },
+    }),
   ...overrides,
 });

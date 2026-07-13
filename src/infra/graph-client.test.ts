@@ -1121,6 +1121,39 @@ describe('graph client', () => {
     if (result.ok) expect(result.value.elevated).toEqual({ available: false, expiresInSeconds: undefined });
   });
 
+  it('getCachedTokenInfo surfaces the chatsvcagg and ic3 substrate blocks when the auth manager can report them (login four-token status)', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"scp":"Files.Read.All","aud":"https://graph.microsoft.com","exp":1893456000}')}.sig`;
+    const substrateAuth: AuthManager = {
+      ...fakeAuth(),
+      getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
+      getCachedChatsvcaggInfo: async () => ({ available: true, expiresInSeconds: 5400 }),
+      getCachedIc3Info: async () => ({ available: false, expiresInSeconds: -10 }),
+    };
+    const client = createGraphClient(substrateAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.chatsvcagg).toEqual({ available: true, expiresInSeconds: 5400 });
+      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: -10 });
+    }
+  });
+
+  it('getCachedTokenInfo defaults the chatsvcagg and ic3 blocks to unavailable when the auth manager omits the capability', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"scp":"Files.Read.All"}')}.sig`;
+    const minimalAuth: AuthManager = { ...fakeAuth(), getAccessToken: async () => ok(accessTokenUnsafe(jwt)) };
+    expect(minimalAuth.getCachedChatsvcaggInfo).toBeUndefined();
+    expect(minimalAuth.getCachedIc3Info).toBeUndefined();
+    const client = createGraphClient(minimalAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.chatsvcagg).toEqual({ available: false, expiresInSeconds: undefined });
+      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: undefined });
+    }
+  });
+
   it('getCachedTokenInfo returns auth_failed when the auth manager has no token', async () => {
     const cancelledAuth: AuthManager = {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),

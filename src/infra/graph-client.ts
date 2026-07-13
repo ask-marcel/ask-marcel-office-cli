@@ -115,6 +115,14 @@ type TokenInfo = {
    * version download into a `403`.
    */
   readonly elevated: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
+  /**
+   * The two Teams-chat substrate tokens (chatsvcagg / ic3), same decode-only
+   * `{ available, expiresInSeconds }` shape as `elevated`. `login` reports all four
+   * tiers so a warm session can see every token's runway; both self-heal from the
+   * shared refresh token, so they are informational rather than a preflight gate.
+   */
+  readonly chatsvcagg: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
+  readonly ic3: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -601,7 +609,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     // Decode-only elevated preflight: the real AuthManager reads its persisted
     // elevated token; a minimal one omits the capability and we report unavailable.
     const elevated = auth.getCachedElevatedInfo ? await auth.getCachedElevatedInfo() : { available: false, expiresInSeconds: undefined };
-    return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated });
+    const chatsvcagg = auth.getCachedChatsvcaggInfo ? await auth.getCachedChatsvcaggInfo() : { available: false, expiresInSeconds: undefined };
+    const ic3 = auth.getCachedIc3Info ? await auth.getCachedIc3Info() : { available: false, expiresInSeconds: undefined };
+    return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated, chatsvcagg, ic3 });
   };
 
   return {
