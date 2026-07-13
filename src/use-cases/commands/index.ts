@@ -88,6 +88,7 @@ import * as listCalendarEventAttachments from './list-calendar-event-attachments
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
+import * as createForwardDraft from './create-forward-draft.ts';
 import * as createMailDraft from './create-mail-draft.ts';
 import * as createReplyDraft from './create-reply-draft.ts';
 import * as updateMailDraft from './update-mail-draft.ts';
@@ -238,6 +239,7 @@ const commands: Record<string, Command> = {
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-to-markdown': convertMailToMarkdown,
+  'create-forward-draft': createForwardDraft,
   'create-mail-draft': createMailDraft,
   'create-reply-draft': createReplyDraft,
   'update-mail-draft': updateMailDraft,

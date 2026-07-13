@@ -40,12 +40,12 @@ describe('command meta — invariants on every registered command', () => {
     expect(flagged).toEqual(expected);
   });
 
-  it('marks EXACTLY the three mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
+  it('marks EXACTLY the four mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
     const mutating = Object.entries(commands)
       .filter(([, cmd]) => cmd.meta.mutates === true)
       .map(([name]) => name)
       .toSorted((a, b) => a.localeCompare(b));
-    expect(mutating).toEqual(['create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+    expect(mutating).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
   });
 
   for (const [name, cmd] of populated) {

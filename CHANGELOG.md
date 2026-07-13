@@ -2,6 +2,26 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.1.0
+
+### Added
+
+- **`create-forward-draft`** creates an UNSENT forward draft of an existing
+  message. `POST /me/messages/{id}/createForward` mints the draft with the
+  `FW:` subject and quoted history, then a `PATCH` places the comment above the
+  quote and sets the recipients (`Mail.ReadWrite`, already on the basic token).
+  `--to-recipients` is required (a forward with no recipient is not actionable);
+  `--cc-recipients` and a `--subject` override are optional. Like the other
+  mail-draft commands, it produces an UNSENT draft only; the CLI can never send.
+  This is the fourth and last write command, closing the "forward to the right
+  owner" gap that `create-reply-draft` (in-thread) could not.
+
+### Changed
+
+- The `parseRecipients` helper shared by the mail-draft write commands moved to
+  `parse-recipients.ts` (one definition, three call sites), with no behaviour
+  change.
+
 ## 2.0.0
 
 Breaking auth simplification, a repo-wide privacy scrub (including a rewrite of

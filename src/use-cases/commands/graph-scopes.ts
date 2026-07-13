@@ -116,6 +116,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'convert-calendar-event-attachment-to-pdf': ['Calendars.Read', 'Files.Read'],
   'extract-mail-attachment-images': ['Mail.Read'],
   'extract-sharepoint-links-in-mail': ['Mail.Read'],
+  'create-forward-draft': ['Mail.ReadWrite'],
   'create-mail-draft': ['Mail.ReadWrite'],
   'create-reply-draft': ['Mail.ReadWrite'],
   'update-mail-draft': ['Mail.ReadWrite'],
