@@ -32,6 +32,7 @@ const schema = z.object({
   path: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
+  includeImages: z.enum(['true', 'false']).optional(),
   maxCells: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
@@ -54,6 +55,7 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   const { path } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const inlineImages = parsed.data.inlineImages === 'true';
+  const includeImages = parsed.data.includeImages === 'true';
   const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
 
   const bytes = await fs.readBytes(path);
@@ -63,7 +65,7 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   }
 
   const name = basename(path);
-  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, includeMetadata);
+  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, includeMetadata, includeImages);
   return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells }, LOCAL_HINTS);
 };
 
@@ -105,6 +107,14 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     {
+      name: 'include-images',
+      key: 'includeImages',
+      required: false,
+      description:
+        'Pass `--include-images true` (a `.zip` only) to also extract each archive entry’s embedded images (docx/xlsx/pptx OOXML media parts, pdf page images) — every entry gains an `images: [{ path, contentType, sizeBytes, base64 }]` array (the same shape `extract-*-images` returns). Best-effort: an entry that carries no extractable images has no `images` key. Default `false`. Lets a caller OCR a secret pasted as a screenshot inside a zipped document.',
+      argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+    },
+    {
       name: 'max-cells',
       key: 'maxCells',
       required: false,
@@ -114,7 +124,7 @@ const meta: CommandMeta = {
   ],
   example: 'ask-marcel-office convert-local-file --path ./report.docx',
   responseShape:
-    '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
+    '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
   producesBytes: true,
 };
 

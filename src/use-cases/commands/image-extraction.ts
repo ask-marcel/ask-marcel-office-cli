@@ -4,6 +4,7 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
 import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
 import { buildMediaResponse } from './media-files.ts';
+import type { MediaEnvelope } from './media-files.ts';
 import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { extensionOf } from './text-passthrough.ts';
 
@@ -22,7 +23,7 @@ const extractorFor = (ext: string): typeof extractPdfImages | undefined => {
  * (`fetchHint`) names the caller's raw-bytes route. Both commands fetch / decode the
  * bytes first, then hand them here, so the dispatch + media envelope live in one place.
  */
-const extractImagesFromBytes = async (bytes: Uint8Array, name: string, fetchHint: string): Promise<Result<unknown, GraphError>> => {
+const extractImagesFromBytes = async (bytes: Uint8Array, name: string, fetchHint: string): Promise<Result<MediaEnvelope, GraphError>> => {
   const ext = extensionOf(name);
   const extractor = extractorFor(ext);
   if (extractor === undefined) {

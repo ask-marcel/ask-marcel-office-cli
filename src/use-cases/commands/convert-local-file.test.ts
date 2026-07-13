@@ -4,7 +4,10 @@ import { buildGbkNameZip, buildPdfNoImages, buildSampleDocx, buildSampleMsg, bui
 import { executeLocal, execute } from './convert-local-file.ts';
 
 type Envelope = { contentType?: string; size?: number; text?: string };
-type ZipResult = { count: number; files: ReadonlyArray<{ path: string; text?: string; note?: string }> };
+type ZipResult = {
+  count: number;
+  files: ReadonlyArray<{ path: string; text?: string; note?: string; images?: ReadonlyArray<{ path: string; contentType: string; sizeBytes: number; base64: string }> }>;
+};
 
 describe('convert-local-file', () => {
   it('converts a local .docx to markdown without any Graph round-trip', async () => {
@@ -129,6 +132,28 @@ describe('convert-local-file', () => {
     expect(v.files.find((f) => f.path === 'report.docx')?.text).toContain('# Sample Heading');
     expect(v.files.find((f) => f.path === 'notes.txt')?.text).toBe('hello from the archive');
     expect(v.files.find((f) => f.path === 'photo.png')?.note).toContain('png is an image');
+  });
+
+  it('extracts each archive entry’s embedded images with --include-images true', async () => {
+    const fs = createFileSystemFake();
+    fs.seedBytes('/work/handover.zip', await buildSampleZipArchive());
+    const result = await executeLocal(fs, { path: '/work/handover.zip', includeImages: 'true' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.value as ZipResult;
+    const docx = v.files.find((f) => f.path === 'report.docx');
+    expect((docx?.images?.length ?? 0) > 0).toBe(true); // the docx entry's embedded image is extracted
+    expect(docx?.images?.[0]?.base64).toBeTruthy();
+    expect(v.files.find((f) => f.path === 'notes.txt')?.images).toBeUndefined(); // a text entry carries no images
+  });
+
+  it('omits archive-entry images by default (no --include-images)', async () => {
+    const fs = createFileSystemFake();
+    fs.seedBytes('/work/handover.zip', await buildSampleZipArchive());
+    const result = await executeLocal(fs, { path: '/work/handover.zip' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.value as ZipResult).files.every((f) => f.images === undefined)).toBe(true);
   });
 
   it('decodes a GBK-named zip entry (Chinese vendor archive) instead of mojibaking it', async () => {

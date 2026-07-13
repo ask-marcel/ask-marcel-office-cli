@@ -129,6 +129,10 @@ describe('command meta — invariants on every registered command', () => {
           // false` is a post-fetch processing knob (skip the per-image bytes
           // fetch + base64 embedding), not a URL placeholder.
           'inline-images',
+          // `convert-local-file --include-images true` (a .zip only) runs the
+          // media extractor on each already-unpacked entry's bytes; a
+          // post-fetch processing toggle, not a URL placeholder.
+          'include-images',
           // v1.4.0 surface-consolidation: `download-drive-item-version
           // --format <original|pdf|markdown>` dispatches to one of three
           // fetch pipelines (replaces the 3 separate -content / -as-pdf /

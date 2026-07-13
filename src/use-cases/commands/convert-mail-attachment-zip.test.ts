@@ -18,8 +18,12 @@ const zipFileAttachment = (bytes: Uint8Array): GraphClient =>
   graphWith(() => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'decks.zip', contentBytes: toBase64(bytes) }));
 
 const params = { messageId: 'm1', attachmentId: 'a1' };
-type ZipResult = { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
-const at = (r: ZipResult, p: string): { contentType?: string; text?: string; note?: string } => r.files.find((f) => f.path === p) ?? {};
+type ZipResult = {
+  count: number;
+  truncated?: boolean;
+  files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string; images?: ReadonlyArray<unknown> }>;
+};
+const at = (r: ZipResult, p: string): { contentType?: string; text?: string; note?: string; images?: ReadonlyArray<unknown> } => r.files.find((f) => f.path === p) ?? {};
 
 describe('convert-mail-attachment-zip', () => {
   it('fetches the attachment at the message/attachment path and converts every contained file (mirror of convert-drive-item-zip)', async () => {
@@ -37,6 +41,7 @@ describe('convert-mail-attachment-zip', () => {
     expect(v.count).toBeGreaterThan(10);
     expect(at(v, 'report.docx').text).toContain('# Sample Heading');
     expect(at(v, 'report.docx').text).not.toContain('## DOCX metadata'); // no metadata block without the flag
+    expect(at(v, 'report.docx').images).toBeUndefined(); // this caller never opts into per-entry images: the archive core defaults them off
     expect(at(v, 'notes.txt').text).toBe('hello from the archive');
     expect(at(v, 'notes.txt').contentType).toBe('text/plain');
     // every MAIL_ZIP_HINTS note: unconvertible entries are listed, not failed
