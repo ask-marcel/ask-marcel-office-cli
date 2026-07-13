@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "2.0.0",
-  "generatedAt": "2026-07-13T03:47:13.304Z",
+  "version": "2.1.0",
+  "generatedAt": "2026-07-13T04:17:57.057Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -310,6 +310,72 @@
       "example": "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).",
       "producesBytes": true
+    },
+    {
+      "name": "create-forward-draft",
+      "summary": "Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted history), then PATCH places the comment above the quote and sets the recipients. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.",
+      "category": "mail",
+      "graphMethod": "POST",
+      "graphPathTemplate": "/me/messages/{forward-message-id}/createForward (then PATCH the returned draft)",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-createforward",
+      "options": [
+        {
+          "name": "forward-message-id",
+          "key": "forwardMessageId",
+          "required": true,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "The message being forwarded. Source from list-mail-folder-messages or search-mail-messages. Accepts `--id` as an alias.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        },
+        {
+          "name": "to-recipients",
+          "key": "toRecipients",
+          "required": true,
+          "description": "Comma-separated list of recipient email addresses to forward to (e.g. \"alice@example.com,bob@example.com\"). Required: a forward without a recipient is not actionable."
+        },
+        {
+          "name": "cc-recipients",
+          "key": "ccRecipients",
+          "required": false,
+          "description": "Comma-separated list of CC recipient email addresses."
+        },
+        {
+          "name": "body-content",
+          "key": "bodyContent",
+          "required": true,
+          "description": "The comment text, placed above the quoted message being forwarded. Plain text by default; pass --body-content-type HTML for rich text."
+        },
+        {
+          "name": "body-content-type",
+          "key": "bodyContentType",
+          "required": false,
+          "description": "Comment body format: Text (default) or HTML.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Text",
+              "HTML"
+            ]
+          }
+        },
+        {
+          "name": "subject",
+          "key": "subject",
+          "required": false,
+          "description": "Optional subject override. Omit to keep the inherited \"FW: ...\" subject."
+        }
+      ],
+      "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
+      "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
+      "bodyTemplate": "POST {} then PATCH { body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+      "mutates": true
     },
     {
       "name": "create-mail-draft",
