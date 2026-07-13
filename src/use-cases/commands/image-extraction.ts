@@ -30,6 +30,7 @@ const extractImagesFromBytes = async (bytes: Uint8Array, name: string, fetchHint
     return err({
       type: 'api_error',
       status: 415,
+      code: 'unsupported_document',
       message: `${ext === '' ? '<no-extension>' : ext} is not a supported document — image extraction supports pdf and docx / xlsx / pptx (and their macro-enabled / template variants). ${fetchHint}`,
     });
   }

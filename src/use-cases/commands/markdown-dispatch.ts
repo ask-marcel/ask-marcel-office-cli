@@ -66,7 +66,7 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   if (ext === 'pdf') return pdfToMarkdown(bytes, hints.pdfNoText);
   if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells }); // legacy Excel — no OOXML side-channel
   if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
-  if (ext === 'ppt') return err({ type: 'api_error', status: 415, message: hints.legacyPpt });
+  if (ext === 'ppt') return err({ type: 'api_error', status: 415, code: 'unsupported_legacy_office', message: hints.legacyPpt });
   if (ext === 'msg') {
     // Outlook .msg: render headers + body and recurse each attachment through this
     // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't
@@ -75,10 +75,10 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
     const depth = opts.depth ?? 0;
     return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
   }
-  if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, message: hints.image(ext) });
+  if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, code: 'unsupported_image', message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);
   if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });
-  return err({ type: 'api_error', status: 415, message: hints.generic(ext === '' ? '<no-extension>' : ext) });
+  return err({ type: 'api_error', status: 415, code: 'unsupported_format', message: hints.generic(ext === '' ? '<no-extension>' : ext) });
 };
 
 export { bytesToMarkdown, IMAGE_EXTENSIONS, NESTED_HINTS };

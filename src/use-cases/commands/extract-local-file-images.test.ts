@@ -55,6 +55,7 @@ describe('extract-local-file-images', () => {
     expect(result.error.status).toBe(415);
     expect(result.error.message).toContain('txt is not a supported document — image extraction supports pdf and docx / xlsx / pptx');
     expect(result.error.message).toContain('convert-local-file');
+    expect(result.error.code).toBe('unsupported_document');
   });
 
   it('surfaces a media-extraction failure when an OOXML-named file is not a valid zip', async () => {

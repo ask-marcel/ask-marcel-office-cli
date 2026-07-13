@@ -172,6 +172,7 @@ describe('convert-local-file', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type === 'api_error' ? result.error.message : '').toContain('png is an image — read the file directly with a vision-capable model');
+    expect(result.error.type === 'api_error' ? result.error.code : undefined).toBe('unsupported_image');
   });
 
   it('explains the missing local pipeline for a legacy .ppt and names both ways out', async () => {
@@ -181,6 +182,7 @@ describe('convert-local-file', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type === 'api_error' ? result.error.message : '').toContain('upload it to OneDrive');
+    expect(result.error.type === 'api_error' ? result.error.code : undefined).toBe('unsupported_legacy_office');
   });
 
   it('rejects a non-convertible binary with the local generic hint', async () => {
@@ -190,6 +192,7 @@ describe('convert-local-file', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type === 'api_error' ? result.error.message : '').toContain('dat is not a convertible Office/text format');
+    expect(result.error.type === 'api_error' ? result.error.code : undefined).toBe('unsupported_format');
   });
 
   it('reports a missing file as a clear 404 carrying the path', async () => {
