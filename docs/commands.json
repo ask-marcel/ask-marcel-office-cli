@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.0.0",
-  "generatedAt": "2026-07-06T05:05:54.457Z",
+  "generatedAt": "2026-07-13T03:47:13.304Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -144,6 +144,19 @@
           }
         },
         {
+          "name": "include-images",
+          "key": "includeImages",
+          "required": false,
+          "description": "Pass `--include-images true` (a `.zip` only) to also extract each archive entry’s embedded images (docx/xlsx/pptx OOXML media parts, pdf page images) — every entry gains an `images: [{ path, contentType, sizeBytes, base64 }]` array (the same shape `extract-*-images` returns). Best-effort: an entry that carries no extractable images has no `images` key. Default `false`. Lets a caller OCR a secret pasted as a screenshot inside a zipped document.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
           "name": "max-cells",
           "key": "maxCells",
           "required": false,
@@ -151,7 +164,7 @@
         }
       ],
       "example": "ask-marcel-office convert-local-file --path ./report.docx",
-      "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
+      "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
       "producesBytes": true
     },
     {
@@ -7386,14 +7399,14 @@
     },
     {
       "name": "scopes-check",
-      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field (added ) lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command.",
+      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command. The `elevated` block reports whether the *separate* M365ChatClient-elevated token (needed by the historical-version download / convert commands) is cached and still usable — so a fresh process can pre-flight `deep-scan`-style workloads instead of discovering a 403 mid-run; `available:false` when it is absent, expired, or within the same 5-minute buffer the download path applies.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "(meta) cached-token introspection — no Graph endpoint",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
       "options": [],
       "example": "ask-marcel-office scopes-check",
-      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`)."
+      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: { available: boolean, expiresInSeconds: number | null } }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`). `elevated.available` is `true` only when the cached M365ChatClient-elevated token (used by the historical-version commands) is present and beyond the 5-minute buffer; `elevated.expiresInSeconds` is its raw remaining seconds (`null` when no elevated token is cached)."
     },
     {
       "name": "search-all-accessible-sites",
