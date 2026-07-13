@@ -67,7 +67,7 @@ type AuthError = { type: 'auth_failed'; message: string; code?: string } | { typ
  */
 type ElevatedOutcome = { captured: true } | { captured: false; reason: ElevatedFailureReason | 'unknown_error' };
 type AuthManager = {
-  getAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  getAccessToken: (options?: { force?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Returns a Graph token issued for an app on Microsoft's ODSP
    * `logicalPermissions` allow-list. Falls through cache → re-capture
@@ -122,6 +122,14 @@ type AuthManager = {
    * and callers treat that as unavailable. Never captures or refreshes.
    */
   getCachedElevatedInfo?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
+  /**
+   * Same decode-only preflight as `getCachedElevatedInfo`, for the chatsvcagg /
+   * ic3 Teams-chat substrate tokens. `login`'s four-token status and
+   * `scopes-check` read these; a minimal fake omits them and callers treat that
+   * as unavailable.
+   */
+  getCachedChatsvcaggInfo?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
+  getCachedIc3Info?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
@@ -384,18 +392,23 @@ const createAuthManagerFromApi = (
     return inFlightBrowserAcquire;
   };
 
-  const getAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
-    const cached = await readCache();
-    if (cached) {
-      const validated = accessToken(cached.access_token);
-      if (validated.ok) {
-        logger.info('auth.ladder.rung', { rung: 'cache' });
-        return ok(validated.value);
+  const getAccessToken = async (options?: { force?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+    // `login --force` skips the cache + refresh rungs so a warm session still
+    // re-captures every token via the browser (elevated carries no refresh_token,
+    // so a cache-hit login would otherwise never refresh it).
+    if (!options?.force) {
+      const cached = await readCache();
+      if (cached) {
+        const validated = accessToken(cached.access_token);
+        if (validated.ok) {
+          logger.info('auth.ladder.rung', { rung: 'cache' });
+          return ok(validated.value);
+        }
       }
-    }
-    if (cached?.refresh_token) {
-      const refreshed = await refreshToken(cached);
-      if (refreshed.ok) return refreshed;
+      if (cached?.refresh_token) {
+        const refreshed = await refreshToken(cached);
+        if (refreshed.ok) return refreshed;
+      }
     }
     return acquireViaBrowserShared();
   };
@@ -498,6 +511,15 @@ const createAuthManagerFromApi = (
     return cached.chatsvcagg_access_token;
   };
 
+  // Decode-only preflight (mirrors getCachedElevatedInfo) so login's four-token
+  // status reports the chatsvcagg substrate token without capturing or refreshing.
+  const getCachedChatsvcaggInfo = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+    const cached = await readCache();
+    const exp = cached?.chatsvcagg_expires_on;
+    const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
+    return { available: freshChatsvcaggToken(cached) !== undefined, expiresInSeconds };
+  };
+
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
     if (reason === 'launch_timeout') {
       return 'chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run `ask-marcel-office logout && ask-marcel-office login` to wipe the profile and retry. (Commands that need this token: list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user.)';
@@ -582,6 +604,14 @@ const createAuthManagerFromApi = (
     if (!cached?.ic3_access_token || !cached.ic3_expires_on) return undefined;
     if (Date.now() / 1000 >= cached.ic3_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
     return cached.ic3_access_token;
+  };
+
+  // Decode-only preflight (mirrors getCachedElevatedInfo) for the ic3 substrate token.
+  const getCachedIc3Info = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+    const cached = await readCache();
+    const exp = cached?.ic3_expires_on;
+    const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
+    return { available: freshIc3Token(cached) !== undefined, expiresInSeconds };
   };
 
   const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
@@ -680,6 +710,8 @@ const createAuthManagerFromApi = (
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,
     getCachedElevatedInfo,
+    getCachedChatsvcaggInfo,
+    getCachedIc3Info,
   };
 };
 

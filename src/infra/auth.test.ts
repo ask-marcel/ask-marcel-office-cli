@@ -17,6 +17,20 @@ const cachedElevatedInfo = async (m: AuthManager): Promise<{ available: boolean;
   return read ? read() : { available: false, expiresInSeconds: undefined };
 };
 
+// The chatsvcagg / ic3 substrate tokens share the same decode-only preflight
+// contract as elevated; `login`'s four-token status and `scopes-check` read them.
+const cachedChatsvcaggInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const read = m.getCachedChatsvcaggInfo;
+  expect(read).toBeDefined();
+  return read ? read() : { available: false, expiresInSeconds: undefined };
+};
+
+const cachedIc3Info = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const read = m.getCachedIc3Info;
+  expect(read).toBeDefined();
+  return read ? read() : { available: false, expiresInSeconds: undefined };
+};
+
 const CACHE_PATH = '/virtual/token-cache.json';
 const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
 
@@ -554,6 +568,105 @@ describe('auth manager cached elevated info (decode-only preflight for deep-scan
     const info = await cachedElevatedInfo(auth);
     expect(info.available).toBe(false);
     expect(info.expiresInSeconds).toBeUndefined();
+  });
+});
+
+describe('auth manager cached substrate info (chatsvcagg / ic3 preflight for login status)', () => {
+  it('reports the chatsvcagg token available with its seconds-to-expiry when a fresh one is cached', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', chatsvcagg_access_token: 'eyJ.csa.sig', chatsvcagg_expires_on: future })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedChatsvcaggInfo(auth);
+    expect(info.available).toBe(true);
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(3590);
+    expect(info.expiresInSeconds ?? 0).toBeLessThan(3610);
+  });
+
+  it('reports the chatsvcagg token unavailable once inside the 5-minute buffer, but still surfaces the positive raw runway', async () => {
+    const soon = Math.floor(Date.now() / 1000) + 120;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: soon, refresh_token: 'r', chatsvcagg_access_token: 'eyJ.csa.sig', chatsvcagg_expires_on: soon }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedChatsvcaggInfo(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(0);
+    expect(info.expiresInSeconds ?? 999).toBeLessThan(300);
+  });
+
+  it('reports the chatsvcagg token unavailable with no runway when the cache carries none', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedChatsvcaggInfo(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds).toBeUndefined();
+  });
+
+  it('reports the ic3 token available with its seconds-to-expiry when a fresh one is cached', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', ic3_access_token: 'eyJ.ic3.sig', ic3_expires_on: future }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedIc3Info(auth);
+    expect(info.available).toBe(true);
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(3590);
+    expect(info.expiresInSeconds ?? 0).toBeLessThan(3610);
+  });
+
+  it('reports the ic3 token unavailable once inside the 5-minute buffer, but still surfaces the positive raw runway', async () => {
+    const soon = Math.floor(Date.now() / 1000) + 120;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: soon, refresh_token: 'r', ic3_access_token: 'eyJ.ic3.sig', ic3_expires_on: soon }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedIc3Info(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(0);
+    expect(info.expiresInSeconds ?? 999).toBeLessThan(300);
+  });
+
+  it('reports the ic3 token unavailable with no runway when the cache carries none', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedIc3Info(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds).toBeUndefined();
+  });
+});
+
+describe('auth manager forced re-capture (login --force)', () => {
+  it('ignores a valid cached token and re-acquires via the browser when forced', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
+    const browserToken = futureToken();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+    const result = await auth.getAccessToken({ force: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(browserToken.accessToken);
+  });
+
+  it('ignores a still-valid refresh token and re-acquires via the browser when forced (never calls the refresh endpoint)', async () => {
+    const mock = installFetchMock([{ match: () => true, respond: () => new Response(JSON.stringify({ access_token: 'refreshed', expires_in: 3600, refresh_token: 'rotated' })) }]);
+    afterEach(() => mock.restore());
+    const past = Math.floor(Date.now() / 1000) - 100;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired-token', expires_on: past, refresh_token: 'old-refresh' }));
+    const browserToken = futureToken();
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+    const result = await auth.getAccessToken({ force: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(browserToken.accessToken);
   });
 });
 
