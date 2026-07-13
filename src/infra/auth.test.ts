@@ -648,7 +648,14 @@ describe('auth manager forced re-capture (login --force)', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    // chatsvcagg/ic3 captured by the dance too, so the forced login has no missed substrate token to redeem here.
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserToken, chatsvcaggResult: futureElevated(), ic3Result: futureElevated() }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs
+    );
 
     const result = await auth.getAccessToken({ force: true });
     expect(result.ok).toBe(true);
@@ -662,7 +669,13 @@ describe('auth manager forced re-capture (login --force)', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired-token', expires_on: past, refresh_token: 'old-refresh' }));
     const browserToken = futureToken();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserToken }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ acquireResult: browserToken, chatsvcaggResult: futureElevated(), ic3Result: futureElevated() }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs
+    );
 
     const result = await auth.getAccessToken({ force: true });
     expect(result.ok).toBe(true);
@@ -671,7 +684,7 @@ describe('auth manager forced re-capture (login --force)', () => {
 
   it('tells the browser to skip its cache probe when forced, so the fresh-cache short-circuit cannot defeat --force', async () => {
     let capturedOpts: { skipCacheProbe?: boolean } | undefined;
-    const base = fakeBrowserAuth({ acquireResult: futureToken() });
+    const base = fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggResult: futureElevated(), ic3Result: futureElevated() });
     const browser: BrowserAuth = {
       ...base,
       acquireBothTokens: async (url, opts) => {
@@ -683,6 +696,33 @@ describe('auth manager forced re-capture (login --force)', () => {
     const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     await auth.getAccessToken({ force: true });
     expect(capturedOpts).toEqual({ skipCacheProbe: true });
+  });
+
+  it('headless-redeems a missed ic3 token from the fresh refresh token, leaving the captured chatsvcagg alone (no second browser)', async () => {
+    // The browser dance captures Teams + chatsvcagg but MISSES ic3 (its bearer only
+    // fires when Teams loads chat-message history, which need not happen in the settle
+    // window). --force promises all four, so ic3 is redeemed from the fresh RT headlessly.
+    const csaToken = futureElevated();
+    const mock = installFetchMock([
+      {
+        match: (url, init) => {
+          const raw = init?.body;
+          const b = raw instanceof URLSearchParams ? raw.toString() : String(raw ?? '');
+          return url.includes('/token') && b.includes('ic3.teams.office.com');
+        },
+        respond: () => new Response(JSON.stringify({ access_token: 'eyJ.ic3-redeemed.sig', expires_in: 3600 })),
+      },
+    ]);
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ acquireResult: futureToken(), chatsvcaggResult: csaToken });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+    const result = await auth.getAccessToken({ force: true });
+    expect(result.ok).toBe(true);
+    const cached = await fs.readJson<{ ic3_access_token?: string; chatsvcagg_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.ic3_access_token).toBe('eyJ.ic3-redeemed.sig'); // ic3 redeemed from the RT
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(String(csaToken)); // chatsvcagg untouched (browser-captured)
   });
 });
 

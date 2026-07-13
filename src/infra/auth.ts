@@ -315,7 +315,20 @@ const createAuthManagerFromApi = (
   let lastElevatedOutcome: ElevatedOutcome | null = null;
   let lastChatsvcaggOutcome: ElevatedOutcome | null = null;
 
-  const acquireViaBrowser = async (skipCacheProbe = false): Promise<Result<AccessToken, AuthError>> => {
+  // A forced login promises to refresh all four tokens, but the browser captures the
+  // chatsvcagg / ic3 substrate bearers only opportunistically (they fire from Teams
+  // traffic that may not occur in the settle window — ic3 needs a chat-history load).
+  // Redeem any the dance missed from the freshly-minted refresh token, headlessly —
+  // the same path the on-demand getters use, so no second browser is needed.
+  const redeemMissedSubstrateAtLogin = async (chatsvcaggCaptured: boolean, ic3Captured: boolean): Promise<void> => {
+    if (chatsvcaggCaptured && ic3Captured) return;
+    const fresh = await readCache();
+    if (!fresh?.refresh_token) return;
+    if (!chatsvcaggCaptured) await refreshSubstrateToken(fresh, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem');
+    if (!ic3Captured) await refreshSubstrateToken(fresh, IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem');
+  };
+
+  const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
     try {
       // Single-session capture: one Playwright-driven browser window does
       // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
@@ -332,7 +345,7 @@ const createAuthManagerFromApi = (
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, { skipCacheProbe });
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, { skipCacheProbe: force });
       if (!result) return err({ type: 'auth_cancelled' });
       // The poll short-circuited because a concurrent process landed a
       // fresh token in the cache. Do NOT persist (refreshToken is null here —
@@ -365,6 +378,7 @@ const createAuthManagerFromApi = (
       } else {
         logger.info('auth.ic3.skipped_at_login', { reason: ic3.reason });
       }
+      if (force) await redeemMissedSubstrateAtLogin(chatsvcagg.ok, ic3.ok);
       logger.info('auth.ladder.rung', { rung: 'browser' });
       return ok(result.accessToken);
     } catch (e) {
@@ -380,12 +394,12 @@ const createAuthManagerFromApi = (
   // login attempt. Cleared on settle (success or failure) so the next call
   // re-checks the cache instead of returning a stale failure.
   let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
-  const acquireViaBrowserShared = (skipCacheProbe = false): Promise<Result<AccessToken, AuthError>> => {
+  const acquireViaBrowserShared = (force = false): Promise<Result<AccessToken, AuthError>> => {
     if (inFlightBrowserAcquire !== null) {
       logger.info('auth.ladder.rung', { rung: 'browser_shared_in_flight' });
       return inFlightBrowserAcquire;
     }
-    const launched = acquireViaBrowser(skipCacheProbe);
+    const launched = acquireViaBrowser(force);
     inFlightBrowserAcquire = launched.finally(() => {
       inFlightBrowserAcquire = null;
     });
