@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.1.0",
-  "generatedAt": "2026-07-13T04:17:57.057Z",
+  "generatedAt": "2026-07-13T06:01:07.323Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7472,7 +7472,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
       "options": [],
       "example": "ask-marcel-office scopes-check",
-      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: { available: boolean, expiresInSeconds: number | null } }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`). `elevated.available` is `true` only when the cached M365ChatClient-elevated token (used by the historical-version commands) is present and beyond the 5-minute buffer; `elevated.expiresInSeconds` is its raw remaining seconds (`null` when no elevated token is cached)."
+      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: { available: boolean, expiresInSeconds?: number } }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`). `elevated.available` is `true` only when the cached M365ChatClient-elevated token (used by the historical-version commands) is present and beyond the 5-minute buffer; `elevated.expiresInSeconds` is its raw remaining seconds and is omitted (the key is absent) when no elevated token is cached."
     },
     {
       "name": "search-all-accessible-sites",
