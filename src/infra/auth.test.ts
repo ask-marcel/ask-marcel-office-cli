@@ -668,6 +668,22 @@ describe('auth manager forced re-capture (login --force)', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe(browserToken.accessToken);
   });
+
+  it('tells the browser to skip its cache probe when forced, so the fresh-cache short-circuit cannot defeat --force', async () => {
+    let capturedOpts: { skipCacheProbe?: boolean } | undefined;
+    const base = fakeBrowserAuth({ acquireResult: futureToken() });
+    const browser: BrowserAuth = {
+      ...base,
+      acquireBothTokens: async (url, opts) => {
+        capturedOpts = opts;
+        return base.acquireBothTokens(url);
+      },
+    };
+    const fs = createFileSystemFake();
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    await auth.getAccessToken({ force: true });
+    expect(capturedOpts).toEqual({ skipCacheProbe: true });
+  });
 });
 
 describe('auth manager elevated token', () => {

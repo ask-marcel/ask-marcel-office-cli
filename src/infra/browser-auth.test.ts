@@ -694,6 +694,27 @@ describe('browser auth — single-session acquireBothTokens', () => {
     expect(probeCalls).toBeGreaterThan(0);
   });
 
+  it('with skipCacheProbe (login --force), a fresh cached token does NOT short-circuit — the probe is never consulted, so the full capture runs', async () => {
+    // The regression login --force hit live: without skipCacheProbe, the still-valid
+    // cached basic token would short-circuit the poll and skip the elevated/ic3 legs.
+    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: ['https://login.microsoftonline.com/...'] } });
+    const concurrentToken = graphTokenJwt();
+    let probeCalls = 0;
+    const browser = createBrowserAuthFromApi(
+      api,
+      fastConfig({
+        pollDeadlineMs: 30, // with the probe skipped and no page token, the poll just times out
+        freshCachedToken: async () => {
+          probeCalls += 1;
+          return concurrentToken; // would short-circuit if the probe were consulted
+        },
+      })
+    );
+    const result = await browser.acquireBothTokens('https://teams.microsoft.com', { skipCacheProbe: true });
+    expect(result.fromCache).toBeUndefined(); // the fresh cache token was NOT allowed to end the dance
+    expect(probeCalls).toBe(0); // under --force the probe is not even called
+  });
+
   it('emits user-visible progress lines while the browser capture runs (sign-in guidance + capture phases)', async () => {
     const progress: string[] = [];
     const { api } = makeFakeApi({

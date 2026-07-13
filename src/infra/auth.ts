@@ -315,7 +315,7 @@ const createAuthManagerFromApi = (
   let lastElevatedOutcome: ElevatedOutcome | null = null;
   let lastChatsvcaggOutcome: ElevatedOutcome | null = null;
 
-  const acquireViaBrowser = async (): Promise<Result<AccessToken, AuthError>> => {
+  const acquireViaBrowser = async (skipCacheProbe = false): Promise<Result<AccessToken, AuthError>> => {
     try {
       // Single-session capture: one Playwright-driven browser window does
       // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
@@ -332,7 +332,7 @@ const createAuthManagerFromApi = (
       // emits the chatsvcagg-audience bearer on its initial chat-list
       // load, so the third capture leg piggy-backs on the existing
       // browser run — zero additional UI prompts.
-      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL);
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, { skipCacheProbe });
       if (!result) return err({ type: 'auth_cancelled' });
       // The poll short-circuited because a concurrent process landed a
       // fresh token in the cache. Do NOT persist (refreshToken is null here —
@@ -380,12 +380,12 @@ const createAuthManagerFromApi = (
   // login attempt. Cleared on settle (success or failure) so the next call
   // re-checks the cache instead of returning a stale failure.
   let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
-  const acquireViaBrowserShared = (): Promise<Result<AccessToken, AuthError>> => {
+  const acquireViaBrowserShared = (skipCacheProbe = false): Promise<Result<AccessToken, AuthError>> => {
     if (inFlightBrowserAcquire !== null) {
       logger.info('auth.ladder.rung', { rung: 'browser_shared_in_flight' });
       return inFlightBrowserAcquire;
     }
-    const launched = acquireViaBrowser();
+    const launched = acquireViaBrowser(skipCacheProbe);
     inFlightBrowserAcquire = launched.finally(() => {
       inFlightBrowserAcquire = null;
     });
@@ -410,7 +410,9 @@ const createAuthManagerFromApi = (
         if (refreshed.ok) return refreshed;
       }
     }
-    return acquireViaBrowserShared();
+    // Under --force, tell the browser layer to skip its concurrent-refresh probe
+    // so the still-valid cached token cannot short-circuit the full re-capture.
+    return acquireViaBrowserShared(options?.force ?? false);
   };
 
   const ELEVATED_BUFFER_SECONDS = 300;

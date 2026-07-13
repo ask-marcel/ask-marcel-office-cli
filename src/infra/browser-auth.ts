@@ -137,7 +137,7 @@ type BrowserAuth = {
    * failed inside the same session — caller decides whether to surface
    * the partial success.
    */
-  acquireBothTokens: (teamsUrl: string) => Promise<BothTokensResult>;
+  acquireBothTokens: (teamsUrl: string, options?: { skipCacheProbe?: boolean }) => Promise<BothTokensResult>;
   close: () => Promise<void>;
 };
 
@@ -587,7 +587,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * prompt. With this method, the elevated step runs on the same
    * already-authenticated page.
    */
-  const acquireBothTokens = async (teamsUrl: string): Promise<BothTokensResult> => {
+  const acquireBothTokens = async (teamsUrl: string, options?: { skipCacheProbe?: boolean }): Promise<BothTokensResult> => {
     const elevatedUrl = M365_CLOUD_URL;
     trace('[DEBUG] acquireBothTokens: ENTER\n');
     await cleanupSingletonLocks(profileDir, fs);
@@ -791,7 +791,10 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     const teamsDeadline = Date.now() + pollDeadlineMs;
     let pollCount = 0;
     while (Date.now() < teamsDeadline && !capturedAccess) {
-      const concurrent = await freshCachedToken();
+      // `login --force` (skipCacheProbe) wants a full re-capture, so the
+      // concurrent-refresh short-circuit must NOT fire — otherwise the still-valid
+      // cached basic token closes the browser before the elevated/ic3 legs run.
+      const concurrent = options?.skipCacheProbe === true ? null : await freshCachedToken();
       if (concurrent !== null) {
         const validated = accessToken(concurrent);
         if (validated.ok) {
