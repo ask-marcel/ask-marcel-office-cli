@@ -106,6 +106,15 @@ type TokenInfo = {
    * worth doing under ~5 minutes) without parsing the ISO string itself.
    */
   readonly expiresInSeconds: number | undefined;
+  /**
+   * Whether the *persisted* elevated (M365ChatClient) token — the one the
+   * historical-version download / convert commands need — is present and still
+   * usable, plus its raw seconds-to-expiry (`undefined` when absent). `available`
+   * is `false` when the auth manager cannot introspect it. Lets `deep-scan`
+   * preflight elevated access in a fresh process instead of turning every
+   * version download into a `403`.
+   */
+  readonly elevated: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -589,7 +598,10 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const expRaw = claims['exp'];
     const expiresAt = typeof expRaw === 'number' ? new Date(expRaw * 1000).toISOString() : undefined;
     const expiresInSeconds = typeof expRaw === 'number' ? Math.floor(expRaw - Date.now() / 1000) : undefined;
-    return ok({ scopes, audience, expiresAt, expiresInSeconds });
+    // Decode-only elevated preflight: the real AuthManager reads its persisted
+    // elevated token; a minimal one omits the capability and we report unavailable.
+    const elevated = auth.getCachedElevatedInfo ? await auth.getCachedElevatedInfo() : { available: false, expiresInSeconds: undefined };
+    return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated });
   };
 
   return {

@@ -22,6 +22,7 @@ export const fakeGraphClient = (overrides: Partial<GraphClient> = {}): GraphClie
   fetchUrl: async () => ok({}),
   put: async () => ok({}),
   delete: async () => ok({}),
-  getCachedTokenInfo: async () => ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined }),
+  getCachedTokenInfo: async () =>
+    ok({ scopes: [], audience: undefined, expiresAt: undefined, expiresInSeconds: undefined, elevated: { available: false, expiresInSeconds: undefined } }),
   ...overrides,
 });

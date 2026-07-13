@@ -1093,6 +1093,34 @@ describe('graph client', () => {
     }
   });
 
+  it('getCachedTokenInfo surfaces the elevated availability block alongside the base-token fields when the auth manager can report it (deep-scan preflight)', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"scp":"Files.Read.All","aud":"https://graph.microsoft.com","exp":1893456000}')}.sig`;
+    const elevatedAuth: AuthManager = {
+      ...fakeAuth(),
+      getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
+      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 1800 }),
+    };
+    const client = createGraphClient(elevatedAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.elevated).toEqual({ available: true, expiresInSeconds: 1800 });
+      expect(result.value.scopes).toEqual(['Files.Read.All']); // base-token fields still populate alongside
+    }
+  });
+
+  it('getCachedTokenInfo defaults the elevated block to unavailable when the auth manager cannot report it (minimal manager omits the optional capability)', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"scp":"Files.Read.All"}')}.sig`;
+    const noElevatedInfoAuth: AuthManager = { ...fakeAuth(), getAccessToken: async () => ok(accessTokenUnsafe(jwt)) };
+    expect(noElevatedInfoAuth.getCachedElevatedInfo).toBeUndefined(); // this fake genuinely omits the capability
+    const client = createGraphClient(noElevatedInfoAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.elevated).toEqual({ available: false, expiresInSeconds: undefined });
+  });
+
   it('getCachedTokenInfo returns auth_failed when the auth manager has no token', async () => {
     const cancelledAuth: AuthManager = {
       getAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),

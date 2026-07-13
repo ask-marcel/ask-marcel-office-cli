@@ -5,8 +5,17 @@ import { ok } from '../domain/result.ts';
 import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import type { AuthManager } from './auth.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
+
+// `getCachedElevatedInfo` is an optional AuthManager capability (only the real
+// manager reads the persisted elevated token); assert it's wired, then call it.
+const cachedElevatedInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const read = m.getCachedElevatedInfo;
+  expect(read).toBeDefined();
+  return read ? read() : { available: false, expiresInSeconds: undefined };
+};
 
 const CACHE_PATH = '/virtual/token-cache.json';
 const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
@@ -500,6 +509,51 @@ describe('auth manager recovery ladder', () => {
     if (!result.ok && result.error.type === 'auth_failed') {
       expect(result.error.message).toBe('tcp_reset');
     }
+  });
+});
+
+describe('auth manager cached elevated info (decode-only preflight for deep-scan)', () => {
+  it('reports the elevated token available with its seconds-to-expiry when a fresh one is cached, without touching the browser', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: 'eyJ.elevated.sig', elevated_expires_on: future })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.available).toBe(true);
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(3590);
+    expect(info.expiresInSeconds ?? 0).toBeLessThan(3610);
+  });
+
+  it('reports the elevated token unavailable when the cache carries none (a fresh deep-scan process that never logged in this run)', async () => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds).toBeUndefined();
+  });
+
+  it('reports unavailable once the elevated token is inside the 5-minute expiry buffer, but still surfaces the positive raw runway', async () => {
+    const soon = Math.floor(Date.now() / 1000) + 120; // 2 min out: inside the 300s buffer the version-download's own freshness gate applies
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: soon, refresh_token: 'r', elevated_access_token: 'eyJ.elevated.sig', elevated_expires_on: soon }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.available).toBe(false); // matches getElevatedAccessToken: it would trigger a doomed headless recapture
+    expect(info.expiresInSeconds ?? 0).toBeGreaterThan(0);
+    expect(info.expiresInSeconds ?? 999).toBeLessThan(300);
+  });
+
+  it('reports unavailable with no runway when the token cache does not exist at all (never logged in on this machine)', async () => {
+    const fs = createFileSystemFake(); // nothing seeded: readCache yields null
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.available).toBe(false);
+    expect(info.expiresInSeconds).toBeUndefined();
   });
 });
 

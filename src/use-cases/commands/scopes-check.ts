@@ -13,7 +13,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field (added ) lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command.",
+    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command. The `elevated` block reports whether the *separate* M365ChatClient-elevated token (needed by the historical-version download / convert commands) is cached and still usable — so a fresh process can pre-flight `deep-scan`-style workloads instead of discovering a 403 mid-run; `available:false` when it is absent, expired, or within the same 5-minute buffer the download path applies.",
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '(meta) cached-token introspection — no Graph endpoint',
@@ -21,7 +21,7 @@ const meta: CommandMeta = {
   options: [],
   example: 'ask-marcel-office scopes-check',
   responseShape:
-    '`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`).',
+    '`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: { available: boolean, expiresInSeconds: number | null } }`. `expiresInSeconds` is negative when the cached token has already expired (run `login`); `audience` is the JWT `aud` claim (typically `https://graph.microsoft.com`). `elevated.available` is `true` only when the cached M365ChatClient-elevated token (used by the historical-version commands) is present and beyond the 5-minute buffer; `elevated.expiresInSeconds` is its raw remaining seconds (`null` when no elevated token is cached).',
 };
 
 export { execute, meta, schema };

@@ -111,6 +111,17 @@ type AuthManager = {
    * as `getLastElevatedOutcome`.
    */
   getLastChatsvcaggOutcome: () => ElevatedOutcome | null;
+  /**
+   * Decode-only preflight for whether the *persisted* elevated
+   * (M365ChatClient) token is present and still usable — the token the
+   * historical-version download / convert commands need. Unlike
+   * `getLastElevatedOutcome` (per-process, null in a fresh CLI invocation),
+   * this reads the on-disk cache, so a separate `deep-scan` run can tell
+   * "elevated available" from "run `login` first" without provoking a 403.
+   * Optional: only the real manager implements it; a minimal fake omits it
+   * and callers treat that as unavailable. Never captures or refreshes.
+   */
+  getCachedElevatedInfo?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
@@ -403,6 +414,19 @@ const createAuthManagerFromApi = (
     return cached.elevated_access_token;
   };
 
+  // Decode-only preflight: does the persisted cache hold an elevated token the
+  // historical-version commands could use right now? Reuses `freshElevatedToken`
+  // (same 300s buffer the download path applies), so `available` never disagrees
+  // with what `getElevatedAccessToken` would decide — but it never captures or
+  // refreshes. `expiresInSeconds` is the raw exp − now (negative once past), so a
+  // caller sees the runway even when the token is inside the buffer.
+  const getCachedElevatedInfo = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+    const cached = await readCache();
+    const exp = cached?.elevated_expires_on;
+    const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
+    return { available: freshElevatedToken(cached) !== undefined, expiresInSeconds };
+  };
+
   // Distinct error messages per failure mode (launch-hang, navigation
   // failure, silent-SSO timeout) so an LLM gets actionable remediation
   // rather than a one-size-fits-all message.
@@ -655,6 +679,7 @@ const createAuthManagerFromApi = (
     logout,
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,
+    getCachedElevatedInfo,
   };
 };
 
