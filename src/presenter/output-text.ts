@@ -1,3 +1,5 @@
+import { canonicalizeGraphCursor } from './graph-cursor.ts';
+
 type Cursors = {
   readonly nextLink?: string;
   readonly deltaLink?: string;
@@ -70,8 +72,8 @@ const extractCursors = (record: Record<string, unknown>): { readonly stripped: R
   return {
     stripped,
     cursors: {
-      ...(typeof nextLink === 'string' ? { nextLink } : {}),
-      ...(typeof deltaLink === 'string' ? { deltaLink } : {}),
+      ...(typeof nextLink === 'string' ? { nextLink: canonicalizeGraphCursor(nextLink) } : {}),
+      ...(typeof deltaLink === 'string' ? { deltaLink: canonicalizeGraphCursor(deltaLink) } : {}),
       ...(typeof count === 'number' ? { count } : {}),
     },
   };

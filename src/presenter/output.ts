@@ -1,6 +1,7 @@
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ErrorSource } from './error-hints.ts';
 import { findErrorHint } from './error-hints.ts';
+import { canonicalizeGraphCursor } from './graph-cursor.ts';
 import { renderTextOutput } from './output-text.ts';
 
 type OutputFormat = 'text' | 'json';
@@ -93,8 +94,8 @@ const wrap = (data: unknown): SuccessEnvelope => {
   return {
     ok: true,
     data: cleaned,
-    ...(typeof nextLink === 'string' ? { nextLink } : {}),
-    ...(typeof deltaLink === 'string' ? { deltaLink } : {}),
+    ...(typeof nextLink === 'string' ? { nextLink: canonicalizeGraphCursor(nextLink) } : {}),
+    ...(typeof deltaLink === 'string' ? { deltaLink: canonicalizeGraphCursor(deltaLink) } : {}),
     ...(typeof count === 'number' ? { count } : {}),
   };
 };

@@ -60,6 +60,30 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(parsed.data).toEqual({ value: [{ id: 'e1', subject: 'standup' }] });
   });
 
+  it('canonicalises a %24-encoded $ in the hoisted nextLink so `/me/people?%24top=2&%24skip=2` surfaces as `$top`/`$skip` (Graph encodes the operator; re-encoding it would break next-page)', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'p1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/people?%24top=2&%24skip=2' };
+    const out = await captureStream('stdout', () => render(data, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { nextLink?: string };
+    expect(parsed.nextLink).toBe('https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2');
+  });
+
+  it('canonicalises a %24-encoded $ in the hoisted deltaLink the same way as nextLink', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'e1' }], '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/me/events/delta()?%24deltatoken=ABC' };
+    const out = await captureStream('stdout', () => render(data, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { deltaLink?: string };
+    expect(parsed.deltaLink).toBe('https://graph.microsoft.com/v1.0/me/events/delta()?$deltatoken=ABC');
+  });
+
+  it('leaves non-$ percent-escapes inside an opaque skiptoken VALUE untouched (only %24 is decoded — %2B/%2F/%3D encode literal token bytes that must survive a round-trip)', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'm1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?%24skiptoken=aB%2Bc%2Fd%3D' };
+    const out = await captureStream('stdout', () => render(data, logger, 'json'));
+    const parsed = JSON.parse(out.trim()) as { nextLink?: string };
+    expect(parsed.nextLink).toBe('https://graph.microsoft.com/v1.0/me/messages?$skiptoken=aB%2Bc%2Fd%3D');
+  });
+
   it('omits nextLink and count when neither @odata field is present', async () => {
     const logger = createLoggerFake();
     const out = await captureStream('stdout', () => render({ id: 'me' }, logger, 'json'));
@@ -371,6 +395,13 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
     expect(out).toBe('id: e1\n\n--- next: https://graph.microsoft.com/v1.0/me/events?$skip=10 · delta: https://graph.microsoft.com/v1.0/me/events/delta?$dt=X · count: 47\n');
+  });
+
+  it('canonicalises a %24-encoded $ in the text footer cursor so the copy-pasteable `next:` value matches the `next-page` $-form', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'p1', displayName: 'Robin Chen' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/people?%24top=2&%24skip=2' };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toBe('id: p1\ndisplayName: Robin Chen\n\n--- next: https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2\n');
   });
 
   it('emits no footer line when a listing carries no pagination cursors and no count', async () => {
