@@ -1099,13 +1099,14 @@ describe('graph client', () => {
     const elevatedAuth: AuthManager = {
       ...fakeAuth(),
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
-      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 1800 }),
+      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic', 'Files.ReadWrite.All'] }),
     };
     const client = createGraphClient(elevatedAuth);
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.elevated).toEqual({ available: true, expiresInSeconds: 1800 });
+      // the block carries the elevated token's OWN scopes + the fixed interactive refresh route
+      expect(result.value.elevated).toEqual({ available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic', 'Files.ReadWrite.All'], refresh: 'interactive' });
       expect(result.value.scopes).toEqual(['Files.Read.All']); // base-token fields still populate alongside
     }
   });
@@ -1118,7 +1119,7 @@ describe('graph client', () => {
     const client = createGraphClient(noElevatedInfoAuth);
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.elevated).toEqual({ available: false, expiresInSeconds: undefined });
+    if (result.ok) expect(result.value.elevated).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' });
   });
 
   it('getCachedTokenInfo surfaces the chatsvcagg and ic3 substrate blocks when the auth manager can report them (login four-token status)', async () => {
@@ -1127,15 +1128,15 @@ describe('graph client', () => {
     const substrateAuth: AuthManager = {
       ...fakeAuth(),
       getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
-      getCachedChatsvcaggInfo: async () => ({ available: true, expiresInSeconds: 5400 }),
-      getCachedIc3Info: async () => ({ available: false, expiresInSeconds: -10 }),
+      getCachedChatsvcaggInfo: async () => ({ available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'] }),
+      getCachedIc3Info: async () => ({ available: false, expiresInSeconds: -10, scopes: ['Teams.AccessAsUser.All'] }),
     };
     const client = createGraphClient(substrateAuth);
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.chatsvcagg).toEqual({ available: true, expiresInSeconds: 5400 });
-      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: -10 });
+      expect(result.value.chatsvcagg).toEqual({ available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' });
+      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: -10, scopes: ['Teams.AccessAsUser.All'], refresh: 'automatic' });
     }
   });
 
@@ -1149,8 +1150,8 @@ describe('graph client', () => {
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.chatsvcagg).toEqual({ available: false, expiresInSeconds: undefined });
-      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: undefined });
+      expect(result.value.chatsvcagg).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' });
+      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' });
     }
   });
 

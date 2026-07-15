@@ -28,9 +28,9 @@ export const fakeGraphClient = (overrides: Partial<GraphClient> = {}): GraphClie
       audience: undefined,
       expiresAt: undefined,
       expiresInSeconds: undefined,
-      elevated: { available: false, expiresInSeconds: undefined },
-      chatsvcagg: { available: false, expiresInSeconds: undefined },
-      ic3: { available: false, expiresInSeconds: undefined },
+      elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+      chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
     }),
   ...overrides,
 });

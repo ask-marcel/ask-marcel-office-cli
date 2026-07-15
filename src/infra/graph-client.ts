@@ -94,6 +94,18 @@ type GraphClient = {
   getCachedTokenInfo: () => Promise<Result<TokenInfo, GraphError>>;
 };
 
+/**
+ * Decode-only status for one non-basic token tier: availability, remaining runway,
+ * the scopes granted to that token (decoded from its `scp`), and how it refreshes
+ * (`automatic` = rides the shared refresh token; `interactive` = elevated, needs a login).
+ */
+type TokenTierInfo = {
+  readonly available: boolean;
+  readonly expiresInSeconds: number | undefined;
+  readonly scopes: ReadonlyArray<string>;
+  readonly refresh: 'automatic' | 'interactive';
+};
+
 type TokenInfo = {
   readonly scopes: ReadonlyArray<string>;
   readonly audience: string | undefined;
@@ -114,15 +126,14 @@ type TokenInfo = {
    * preflight elevated access in a fresh process instead of turning every
    * version download into a `403`.
    */
-  readonly elevated: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
+  readonly elevated: TokenTierInfo;
   /**
-   * The two Teams-chat substrate tokens (chatsvcagg / ic3), same decode-only
-   * `{ available, expiresInSeconds }` shape as `elevated`. `login` reports all four
-   * tiers so a warm session can see every token's runway; both self-heal from the
-   * shared refresh token, so they are informational rather than a preflight gate.
+   * The two Teams-chat substrate tokens (chatsvcagg / ic3), same `TokenTierInfo`
+   * shape as `elevated`. Both self-heal from the shared refresh token (refresh:
+   * automatic), so they are informational rather than a preflight gate.
    */
-  readonly chatsvcagg: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
-  readonly ic3: { readonly available: boolean; readonly expiresInSeconds: number | undefined };
+  readonly chatsvcagg: TokenTierInfo;
+  readonly ic3: TokenTierInfo;
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -608,9 +619,16 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const expiresInSeconds = typeof expRaw === 'number' ? Math.floor(expRaw - Date.now() / 1000) : undefined;
     // Decode-only elevated preflight: the real AuthManager reads its persisted
     // elevated token; a minimal one omits the capability and we report unavailable.
-    const elevated = auth.getCachedElevatedInfo ? await auth.getCachedElevatedInfo() : { available: false, expiresInSeconds: undefined };
-    const chatsvcagg = auth.getCachedChatsvcaggInfo ? await auth.getCachedChatsvcaggInfo() : { available: false, expiresInSeconds: undefined };
-    const ic3 = auth.getCachedIc3Info ? await auth.getCachedIc3Info() : { available: false, expiresInSeconds: undefined };
+    const noTier = { available: false, expiresInSeconds: undefined, scopes: [] };
+    const elevatedInfo = auth.getCachedElevatedInfo ? await auth.getCachedElevatedInfo() : noTier;
+    const chatsvcaggInfo = auth.getCachedChatsvcaggInfo ? await auth.getCachedChatsvcaggInfo() : noTier;
+    const ic3Info = auth.getCachedIc3Info ? await auth.getCachedIc3Info() : noTier;
+    // The refresh route is a fixed per-tier property: the substrate + elevated tokens
+    // that self-heal from the shared RT are `automatic`; the elevated (M365) token has
+    // no refresh token of its own, so it is `interactive` (a browser login re-captures it).
+    const elevated: TokenTierInfo = { ...elevatedInfo, refresh: 'interactive' };
+    const chatsvcagg: TokenTierInfo = { ...chatsvcaggInfo, refresh: 'automatic' };
+    const ic3: TokenTierInfo = { ...ic3Info, refresh: 'automatic' };
     return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated, chatsvcagg, ic3 });
   };
 
