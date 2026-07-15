@@ -29,9 +29,27 @@ type NoSkipParams = Omit<ODataQueryParams, 'skip'>;
  */
 type SelectDefaults = { readonly defaultSelect?: string };
 
+/**
+ * `defaultTop`, when set and the user did NOT pass `--top`, injects a `$top`
+ * into the OData query string. Its purpose is NOT payload-slimming (that is
+ * `defaultSelect`) but cursor correctness: a handful of `$skip`-offset-paged
+ * Graph endpoints (`/me/people` is the canonical one) only emit a
+ * self-advancing `@odata.nextLink` when `$top` is present. Without it Graph
+ * echoes back the SAME `$skip` on every page (`?$skip=0` → `?$skip=0` → …), so
+ * following the cursor loops forever on page 1. Forcing a default `$top` makes
+ * Graph increment `$skip` by the page size. Only meaningful on list builders
+ * whose OData shape carries `top`. User-supplied `--top` always wins.
+ */
+type ListDefaults = SelectDefaults & { readonly defaultTop?: string };
+
 const withDefaultSelect = <T extends { readonly select?: string }>(data: T, defaultSelect: string | undefined): T => {
   if (defaultSelect === undefined || data.select !== undefined) return data;
   return { ...data, select: defaultSelect };
+};
+
+const withDefaultTop = <T extends { readonly top?: string }>(data: T, defaultTop: string | undefined): T => {
+  if (defaultTop === undefined || data.top !== undefined) return data;
+  return { ...data, top: defaultTop };
 };
 
 const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
@@ -57,13 +75,14 @@ const buildElevatedCommand = (pathFn: (params: Record<string, string>) => string
 const buildListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
-  options?: SelectDefaults
+  options?: ListDefaults
 ): Pick<Command, 'schema' | 'execute'> => {
   const merged = schema.extend(odataQuerySchema.shape);
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
+    const selected = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
+    const data = withDefaultTop(selected, options?.defaultTop);
     const path = appendOData(pathFn(data), data);
     return graph.get(path);
   };

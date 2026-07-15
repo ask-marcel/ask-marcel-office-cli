@@ -5401,7 +5401,10 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-my-memberships', params: {}, expectedPath: '/me/memberOf' },
   { name: 'get-my-manager', params: {}, expectedPath: '/me/manager' },
   { name: 'get-user-manager', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice%40contoso.com/manager' },
-  { name: 'list-relevant-people', params: {}, expectedPath: '/me/people' },
+  // `/me/people` needs a default $top or Graph emits a `?$skip=0` cursor that
+  // loops forever (see list-relevant-people.ts). Default 10; explicit --top wins.
+  { name: 'list-relevant-people', params: {}, expectedPath: '/me/people?$top=10' },
+  { name: 'list-relevant-people', params: { top: '5' }, expectedPath: '/me/people?$top=5' },
   { name: 'list-groups', params: {}, expectedPath: '/groups' },
   { name: 'get-group', params: { groupId: 'g1' }, expectedPath: '/groups/g1' },
   { name: 'list-group-members', params: { groupId: 'g1' }, expectedPath: '/groups/g1/members' },

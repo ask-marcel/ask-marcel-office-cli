@@ -73,6 +73,32 @@ describe('buildListCommand', () => {
     expect(captured).toBe('/me/messages?$top=5');
   });
 
+  it('injects the defaultTop into $top when the user omits --top (fixes the /me/people $skip=0 dead-cursor)', async () => {
+    let captured = '';
+    const graph: GraphClient = fakeGraphClient({
+      get: async (path: string) => {
+        captured = path;
+        return ok({});
+      },
+    });
+    const cmd = buildListCommand(() => '/me/people', z.object({}), { defaultTop: '10' });
+    await cmd.execute(graph, {});
+    expect(captured).toBe('/me/people?$top=10');
+  });
+
+  it('lets an explicit --top override the defaultTop', async () => {
+    let captured = '';
+    const graph: GraphClient = fakeGraphClient({
+      get: async (path: string) => {
+        captured = path;
+        return ok({});
+      },
+    });
+    const cmd = buildListCommand(() => '/me/people', z.object({}), { defaultTop: '10' });
+    await cmd.execute(graph, { top: '25' });
+    expect(captured).toBe('/me/people?$top=25');
+  });
+
   it('rejects a non-numeric --top via Zod before reaching graph', async () => {
     let called = false;
     const graph: GraphClient = fakeGraphClient({
