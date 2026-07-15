@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-15T10:03:02.430Z",
+  "generatedAt": "2026-07-15T11:58:42.477Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7509,6 +7509,25 @@
       "example": "ask-marcel-office search-all-accessible-sites --output json",
       "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, size?, estimatedFileCount?, … }>], count, fileEstimate?, archivedExcluded?, nonNavigableExcluded?, notFoundExcluded?, archiveProbeErrors?, truncated?: true, archiveProbeTruncated?: true }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each site, omitted past the 200-site count cap or when the per-site query fails. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `size` (when present) is the site's DEFAULT document library's total bytes used (`drive.quota.used`, recursive) — folded onto the same per-site probe for free, omitted for sites past the probe ceiling or without a default drive; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe; `nonNavigableExcluded` counts sites dropped by URL shape (add-in app domains, `/contentstorage/` SharePoint Embedded containers, `/_layouts/` system pages); `notFoundExcluded` counts sites whose probe returned 404. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
       "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
+    },
+    {
+      "name": "search-all-files",
+      "summary": "Search EVERY file the signed-in user can access — their personal OneDrive, files shared with them, and every SharePoint and Teams (channel) document library they can open — for a free-text query. Unlike `search-my-documents` (personal OneDrive only) or `search-onedrive-files` (one drive by id), this reaches across all accessible drives via the security-trimmed Microsoft Search index; unlike `microsoft-search-query` it returns FILES ONLY (`entityTypes: [\"driveItem\"]`), not mail/calendar/people/sites. It deep-pages `POST /search/query` with `from`/`size` (200 per page) following the index's `moreResultsAvailable` flag until exhausted, or the ceiling of 25×200 = 5000 files is reached (`truncated: true` — narrow with `--query` to see the rest). Hits are deduped by `hitId`. Each returned `driveItem` carries `id` + `parentReference.driveId`, the pair `download-drive-item-content` / `download-drive-item-as-markdown` need to open it.",
+      "category": "drive",
+      "graphMethod": "POST",
+      "graphPathTemplate": "/search/query",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/search-query",
+      "options": [
+        {
+          "name": "query",
+          "key": "query",
+          "required": true,
+          "description": "KQL / free-text search query. Matches filename, content, and metadata across every drive the user can access. Add `filetype:` to narrow (e.g. `q1 budget filetype:xlsx`), or field operators like `filename:`. Free text works everywhere."
+        }
+      ],
+      "example": "ask-marcel-office search-all-files --query 'q1 budget filetype:xlsx'",
+      "responseShape": "`{ value: [<Microsoft Graph driveItem resource: { id, name, webUrl, parentReference: { driveId }, size, … }>], count, truncated?: true }`. `value[]` is deduped by `hitId` across pages; `count` is the number of distinct files returned. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
+      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit"
     },
     {
       "name": "search-mail-messages",

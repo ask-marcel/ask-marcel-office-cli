@@ -79,6 +79,7 @@ import * as searchMyDocuments from './search-my-documents.ts';
 import * as searchOnedriveFiles from './search-onedrive-files.ts';
 import * as searchOnenotePages from './search-onenote-pages.ts';
 import * as searchAllAccessibleSites from './search-all-accessible-sites.ts';
+import * as searchAllFiles from './search-all-files.ts';
 import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as readMailAttachment from './read-mail-attachment.ts';
@@ -205,6 +206,7 @@ const commands: Record<string, Command> = {
   'get-drive-delta': getDriveDelta,
   'search-sharepoint-sites-by-name': searchSharepointSitesByName,
   'search-all-accessible-sites': searchAllAccessibleSites,
+  'search-all-files': searchAllFiles,
   'get-sharepoint-site': getSharepointSite,
   'list-sharepoint-site-drives': listSharepointSiteDrives,
   'get-sharepoint-site-drive-by-id': getSharepointSiteDriveById,
