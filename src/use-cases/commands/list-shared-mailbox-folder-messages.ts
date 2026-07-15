@@ -4,7 +4,8 @@ import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1), mailFolderId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/users/${p.userId}/mailFolders/${p.mailFolderId}/messages`, baseSchema);
+// encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.
+const { execute, schema } = buildListCommand((p) => `/users/${encodeURIComponent(p.userId)}/mailFolders/${p.mailFolderId}/messages`, baseSchema);
 
 const meta: CommandMeta = {
   summary: 'List messages in a single folder of a shared / delegated mailbox.',

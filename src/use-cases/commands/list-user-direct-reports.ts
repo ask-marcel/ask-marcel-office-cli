@@ -4,7 +4,8 @@ import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/users/${p.userId}/directReports`, baseSchema);
+// encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.
+const { execute, schema } = buildListCommand((p) => `/users/${encodeURIComponent(p.userId)}/directReports`, baseSchema);
 
 const meta: CommandMeta = {
   summary: "List a specific user's direct reports.",

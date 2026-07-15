@@ -9,7 +9,9 @@ const schema = z.object({ userId: z.string().min(1) }).extend(selectExpandSchema
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const path = appendOData(`/users/${parsed.data.userId}/manager`, parsed.data);
+  // encodeURIComponent so a guest UPN (`alice_x.com#EXT#@tenant...`) is not truncated
+  // at the raw `#` URL-fragment delimiter and resolves to the right user.
+  const path = appendOData(`/users/${encodeURIComponent(parsed.data.userId)}/manager`, parsed.data);
   const result = await graph.get(path);
   if (result.ok) return result;
   // Disambiguate two distinct 404 cases — both are `Request_ResourceNotFound`

@@ -42,7 +42,19 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   it shipped a single release earlier and the same detail is fully available via
   `scopes-check`.)
 
-## 2.1.0
+### Fixed
+
+- **Guest / external-user (B2B) lookups by UPN now resolve.** A guest UPN is
+  `alice_contoso.com#EXT#@fabrikam.onmicrosoft.com`, and the `#` is the URL
+  fragment delimiter — the seven commands that put a caller-supplied `userId`
+  in a `/users/{id}` path (`get-user-manager`, `get-shared-mailbox-message`,
+  `list-shared-mailbox-messages`, `list-shared-mailbox-folder-messages`,
+  `list-shared-calendar-events`, `list-user-direct-reports`,
+  `list-shared-calendar-view`) interpolated it raw, so `fetch` dropped everything
+  from the `#` onward and queried the wrong user. The `userId` segment is now
+  percent-encoded (`#`→`%23`, `@`→`%40`; GUIDs unchanged), which Microsoft Graph
+  requires for B2B UPNs and which is verified live against the directory. `get-user`
+  (new this release) already encodes its path.
 
 ### Added
 

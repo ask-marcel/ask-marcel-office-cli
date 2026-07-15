@@ -4,7 +4,8 @@ import type { CommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/users/${p.userId}/calendar/events`, baseSchema);
+// encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.
+const { execute, schema } = buildListCommand((p) => `/users/${encodeURIComponent(p.userId)}/calendar/events`, baseSchema);
 
 const meta: CommandMeta = {
   summary: "List events from another user's primary calendar (shared / delegated access). 403 without `Calendars.Read.Shared`.",

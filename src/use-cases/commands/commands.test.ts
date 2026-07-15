@@ -5397,10 +5397,10 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'get-chat', params: { chatId: 'ch1' }, expectedPath: '/chats/ch1?$select=id%2Ctopic%2CchatType%2CcreatedDateTime%2ClastUpdatedDateTime' },
   { name: 'get-chat', params: { chatId: 'ch1', select: 'id,topic' }, expectedPath: '/chats/ch1?$select=id%2Ctopic' },
   { name: 'list-my-direct-reports', params: {}, expectedPath: '/me/directReports' },
-  { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice@contoso.com/directReports' },
+  { name: 'list-user-direct-reports', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice%40contoso.com/directReports' },
   { name: 'list-my-memberships', params: {}, expectedPath: '/me/memberOf' },
   { name: 'get-my-manager', params: {}, expectedPath: '/me/manager' },
-  { name: 'get-user-manager', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice@contoso.com/manager' },
+  { name: 'get-user-manager', params: { userId: 'alice@contoso.com' }, expectedPath: '/users/alice%40contoso.com/manager' },
   { name: 'list-relevant-people', params: {}, expectedPath: '/me/people' },
   { name: 'list-groups', params: {}, expectedPath: '/groups' },
   { name: 'get-group', params: { groupId: 'g1' }, expectedPath: '/groups/g1' },
@@ -5416,13 +5416,13 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-group-threads', params: { groupId: 'g1' }, expectedPath: '/groups/g1/threads' },
   { name: 'get-mail-message-mime', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1/$value' },
   { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' }, expectedPath: '/me/mailFolders/inbox/messages/delta()' },
-  { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' }, expectedPath: '/users/shared@contoso.com/messages' },
+  { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' }, expectedPath: '/users/shared%40contoso.com/messages' },
   {
     name: 'list-shared-mailbox-folder-messages',
     params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' },
-    expectedPath: '/users/shared@contoso.com/mailFolders/inbox/messages',
+    expectedPath: '/users/shared%40contoso.com/mailFolders/inbox/messages',
   },
-  { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' }, expectedPath: '/users/shared@contoso.com/messages/m1' },
+  { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' }, expectedPath: '/users/shared%40contoso.com/messages/m1' },
   {
     name: 'list-conversation-messages',
     params: { conversationId: 'AAQkAD-conv-1' },
@@ -5435,11 +5435,11 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   },
   { name: 'list-focused-inbox-overrides', params: {}, expectedPath: '/me/inferenceClassification/overrides' },
   { name: 'list-outlook-categories', params: {}, expectedPath: '/me/outlook/masterCategories' },
-  { name: 'list-shared-calendar-events', params: { userId: 'colleague@contoso.com' }, expectedPath: '/users/colleague@contoso.com/calendar/events' },
+  { name: 'list-shared-calendar-events', params: { userId: 'colleague@contoso.com' }, expectedPath: '/users/colleague%40contoso.com/calendar/events' },
   {
     name: 'list-shared-calendar-view',
     params: { userId: 'colleague@contoso.com', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' },
-    expectedPath: '/users/colleague@contoso.com/calendarView?startDateTime=2026-04-01T00%3A00%3A00Z&endDateTime=2026-05-01T00%3A00%3A00Z',
+    expectedPath: '/users/colleague%40contoso.com/calendarView?startDateTime=2026-04-01T00%3A00%3A00Z&endDateTime=2026-05-01T00%3A00%3A00Z',
   },
   { name: 'list-sharepoint-list-columns', params: { siteId: 's1', listId: 'l1' }, expectedPath: '/sites/s1/lists/l1/columns' },
   { name: 'get-sharepoint-list-column', params: { siteId: 's1', listId: 'l1', columnId: 'Title' }, expectedPath: '/sites/s1/lists/l1/columns/Title' },
@@ -5508,6 +5508,32 @@ describe('all commands build correct Graph URL', () => {
   it.each(pathFixtures)('$name calls $expectedPath', async ({ name, params, expectedPath }) => {
     const url = await capturedUrl(name, params);
     expect(url).toBe(`https://graph.microsoft.com/v1.0${expectedPath}`);
+  });
+});
+
+// A guest / external user's UPN is `alice_contoso.com#EXT#@fabrikam.onmicrosoft.com`.
+// The `#` is the URL fragment delimiter, so a raw interpolation into `/users/{id}`
+// makes fetch drop everything from the `#` onward and query the WRONG user. Every
+// command that puts a caller-supplied userId (which may be a UPN) in the path must
+// percent-encode it (`#`→`%23`, `@`→`%40`; GUIDs pass through unchanged). Mutation
+// guard on each encodeURIComponent(userId) call.
+const GUEST_UPN = 'alice_contoso.com#EXT#@fabrikam.onmicrosoft.com';
+const GUEST_UPN_ENCODED = 'alice_contoso.com%23EXT%23%40fabrikam.onmicrosoft.com';
+const guestUpnFixtures: Array<{ name: string; params: Record<string, string> }> = [
+  { name: 'get-user-manager', params: { userId: GUEST_UPN } },
+  { name: 'get-shared-mailbox-message', params: { userId: GUEST_UPN, messageId: 'm1' } },
+  { name: 'list-shared-mailbox-messages', params: { userId: GUEST_UPN } },
+  { name: 'list-shared-mailbox-folder-messages', params: { userId: GUEST_UPN, mailFolderId: 'inbox' } },
+  { name: 'list-shared-calendar-events', params: { userId: GUEST_UPN } },
+  { name: 'list-user-direct-reports', params: { userId: GUEST_UPN } },
+  { name: 'list-shared-calendar-view', params: { userId: GUEST_UPN, startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
+];
+
+describe('/users/{id} commands percent-encode a guest UPN so the #EXT# marker is not lost', () => {
+  it.each(guestUpnFixtures)('$name encodes the guest UPN in the path', async ({ name, params }) => {
+    const url = await capturedUrl(name, params);
+    expect(url).toContain(`/users/${GUEST_UPN_ENCODED}`);
+    expect(url).not.toContain('#EXT#'); // a raw # would truncate the path at the fragment boundary
   });
 });
 

@@ -6,7 +6,8 @@ import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1), startDateTime: isoDateTimeField, endDateTime: isoDateTimeField });
 const { execute, schema } = buildListCommand(
-  (p) => `/users/${p.userId}/calendarView?startDateTime=${encodeURIComponent(p.startDateTime)}&endDateTime=${encodeURIComponent(p.endDateTime)}`,
+  // encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.
+  (p) => `/users/${encodeURIComponent(p.userId)}/calendarView?startDateTime=${encodeURIComponent(p.startDateTime)}&endDateTime=${encodeURIComponent(p.endDateTime)}`,
   baseSchema
 );
 

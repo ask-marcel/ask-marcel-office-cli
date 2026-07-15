@@ -67,6 +67,6 @@ describe('get-user-manager', () => {
       },
     };
     await execute(captureGraph, { userId: 'bob@contoso.com', select: 'id,displayName,mail' });
-    expect(captured).toBe('/users/bob@contoso.com/manager?$select=id%2CdisplayName%2Cmail');
+    expect(captured).toBe('/users/bob%40contoso.com/manager?$select=id%2CdisplayName%2Cmail'); // @ is percent-encoded into the path
   });
 });

@@ -4,7 +4,8 @@ import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1), messageId: z.string().min(1) });
-const { execute, schema } = buildSelectableCommand((p) => `/users/${p.userId}/messages/${p.messageId}`, baseSchema);
+// encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.
+const { execute, schema } = buildSelectableCommand((p) => `/users/${encodeURIComponent(p.userId)}/messages/${p.messageId}`, baseSchema);
 
 const meta: CommandMeta = {
   summary:
