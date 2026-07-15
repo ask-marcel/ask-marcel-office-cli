@@ -8,23 +8,25 @@ import { execute } from './scopes-check.ts';
 const fakeGraphWithTokenInfo = (tokenResult: Result<TokenInfo, GraphError>): GraphClient => fakeGraphClient({ getCachedTokenInfo: async () => tokenResult });
 
 describe('scopes-check', () => {
-  it('forwards the cached token info ({ scopes, audience, expiresAt, expiresInSeconds, elevated, chatsvcagg, ic3 }) when getCachedTokenInfo succeeds', async () => {
+  it('surfaces each token tier with its own scopes + refresh route, plus the refresh action hint', async () => {
     const tokenInfo: TokenInfo = {
       scopes: ['Mail.Read', 'Files.Read.All', 'User.Read'],
       audience: 'https://graph.microsoft.com',
       expiresAt: '2026-12-31T00:00:00.000Z',
       expiresInSeconds: 18_300,
-      elevated: { available: true, expiresInSeconds: 1800 },
-      chatsvcagg: { available: true, expiresInSeconds: 5400 },
-      ic3: { available: false, expiresInSeconds: undefined },
+      elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic', 'Files.ReadWrite.All'], refresh: 'interactive' },
+      chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
     };
     const result = await execute(fakeGraphWithTokenInfo(ok(tokenInfo)), {});
-    expect(result).toEqual(ok(tokenInfo));
+    expect(result.ok).toBe(true);
     if (result.ok) {
-      const v = result.value as TokenInfo;
-      expect(v.elevated).toEqual({ available: true, expiresInSeconds: 1800 }); // the deep-scan preflight signal rides along
-      expect(v.chatsvcagg).toEqual({ available: true, expiresInSeconds: 5400 }); // substrate tiers surface additively
-      expect(v.ic3).toEqual({ available: false, expiresInSeconds: undefined });
+      const v = result.value as TokenInfo & { hint: string };
+      expect(v.scopes).toEqual(['Mail.Read', 'Files.Read.All', 'User.Read']); // basic scopes stay top-level (back-compat)
+      expect(v.elevated).toEqual({ available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic', 'Files.ReadWrite.All'], refresh: 'interactive' });
+      expect(v.chatsvcagg.scopes).toEqual(['user_impersonation']);
+      expect(v.ic3.refresh).toBe('automatic');
+      expect(v.hint).toContain('login --force'); // the single refresh action line
     }
   });
 
@@ -34,9 +36,9 @@ describe('scopes-check', () => {
       audience: 'https://graph.microsoft.com',
       expiresAt: '2025-01-01T00:00:00.000Z',
       expiresInSeconds: -3600,
-      elevated: { available: false, expiresInSeconds: undefined },
-      chatsvcagg: { available: false, expiresInSeconds: undefined },
-      ic3: { available: false, expiresInSeconds: undefined },
+      elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+      chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
     };
     const result = await execute(fakeGraphWithTokenInfo(ok(tokenInfo)), {});
     expect(result.ok).toBe(true);
@@ -60,9 +62,9 @@ describe('scopes-check', () => {
           audience: undefined,
           expiresAt: undefined,
           expiresInSeconds: undefined,
-          elevated: { available: false, expiresInSeconds: undefined },
-          chatsvcagg: { available: false, expiresInSeconds: undefined },
-          ic3: { available: false, expiresInSeconds: undefined },
+          elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+          chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+          ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
         })
       ),
       { unexpected: 'flag' }
