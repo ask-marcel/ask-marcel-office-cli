@@ -68,11 +68,14 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
 
-**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). Running `login` again (even when already signed in) reports all four cached tokens — basic, elevated (M365), and the two Teams-chat substrate tokens (chatsvcagg / ic3) — each with its time-left and refresh route: basic/chatsvcagg/ic3 refresh automatically from the cached refresh token, while the elevated token is re-captured only on an interactive login. `login --force` ignores the cache and re-captures every token in one browser pass (the persistent profile is reused, so you are usually not re-prompted for credentials) — the only way to refresh the elevated token while the basic one is still valid. `scopes-check` reports the same four tokens without opening a browser.
+**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). `login` prints a slim confirmation — which of the four tokens are available (basic, elevated/M365, and the two Teams-chat substrate tokens chatsvcagg / ic3) — and points you to `scopes-check` for detail. `login --force` ignores the cache and re-captures every token in one browser pass (the persistent profile is reused, so you are usually not re-prompted for credentials) — the only way to refresh the elevated token while the basic one is still valid.
+
+**`scopes-check`** is the side-effect-free status view (no Graph call, no browser): it decodes each cached token and reports, **per token**, its `available` flag, seconds-to-expiry, `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, needs a browser login), and its **own granted scopes** — the four tokens carry *distinct* scope sets (basic ~31 Graph scopes, elevated ~20, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`). Use it to pre-flight a command's `scopesRequired` without risking an auth side-effect.
 
 ```bash
-ask-marcel-office login          # sign in, or show all four tokens' status if already signed in
+ask-marcel-office login          # sign in (or confirm which tokens are available)
 ask-marcel-office login --force  # re-capture every token, ignoring the cache
+ask-marcel-office scopes-check   # per-token scopes + expiry + refresh route (safe, no browser)
 ```
 
 ### Stable error envelope with actionable hints

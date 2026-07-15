@@ -2,6 +2,30 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.2.0
+
+### Changed
+
+- **`scopes-check` is now the single detailed token-status view.** Per token
+  (basic / elevated / chatsvcagg / ic3) it reports the `available` flag,
+  seconds-to-expiry, `refresh` route (`automatic` = self-heals from the shared
+  refresh token; `interactive` = the elevated token, needs a browser login), and
+  — new — that token's OWN granted scopes, decoded from its `scp` claim. The four
+  tokens carry distinct scope sets (basic ~31 Graph scopes, elevated ~20,
+  chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`), so an agent can
+  intersect each tier against a command's `scopesRequired`. Additive and
+  non-breaking: the flat top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds`
+  (the basic token) are unchanged. A `hint` field names a forced re-login as the
+  single refresh action.
+- **`login` slimmed to an auth confirmation.** It now prints
+  `{ status: "authenticated", available: [...], hint }` — which token tiers are
+  available, plus a pointer to `scopes-check` (per-token detail) and `login --force`
+  (refresh) — instead of the four-token detail block from 2.1.0, and the confusing
+  refresh-mechanism hint is gone. The detailed per-token status now lives only in
+  `scopes-check`. (Dropping login's `tokens` block is the one breaking-ish change;
+  it shipped a single release earlier and the same detail is fully available via
+  `scopes-check`.)
+
 ## 2.1.0
 
 ### Added

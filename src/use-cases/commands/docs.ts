@@ -82,7 +82,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'login',
     summary:
-      'Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). Reports all four cached tokens (basic / elevated / chatsvcagg / ic3) with their time-left and how to refresh each; pass --force to re-capture every token via the browser in one pass. Run before any Graph command.',
+      "Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). On success reports which of the four tokens are currently available and points to `scopes-check` for each token's scopes + expiry; pass --force to re-capture every token via the browser in one pass. Run before any Graph command.",
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) browser-OAuth via Teams web client; not a Graph endpoint',
@@ -98,7 +98,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     ],
     example: 'ask-marcel-office login --force',
     responseShape:
-      '{ status: "authenticated", tokens: { basic, elevated, chatsvcagg, ic3 }, hint } on success. Each token is { available: boolean, expiresInSeconds?: number, refresh: "automatic" | "interactive", reason? }: basic/chatsvcagg/ic3 refresh automatically from the cached refresh token, the elevated (M365) token is re-captured only on an interactive login. `expiresInSeconds` is omitted when the token is not cached; a failed elevated capture this run adds `reason`. Envelope error on cancel/failure.',
+      '{ status: "authenticated", available: string[], hint } on success. `available` lists the token tiers currently cached and fresh — always "basic", plus "elevated" / "chatsvcagg" / "ic3" when present. `hint` points to `scopes-check` (each token\'s scopes + expiry) and `login --force` (refresh). The detailed per-token status lives in `scopes-check`, not here. Envelope error on cancel/failure.',
   },
   {
     name: 'logout',
