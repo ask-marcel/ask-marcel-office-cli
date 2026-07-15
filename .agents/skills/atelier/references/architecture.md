@@ -314,6 +314,33 @@ Three rules this archetype leans on:
 
 No router until the third route (Rule of Three) — a `switch (new URL(req.url).pathname)` covers one or two endpoints. No framework; that choice stays out of scope.
 
+### API shape and the three model boundaries
+
+Four rules keep the layers separable when the app exposes or consumes an API. They are the same idea applied at three boundaries: each side of a boundary owns its model, and one mapping function translates.
+
+**The backend is a client-agnostic API (resource-shaped, never screen-shaped).** One resource-shaped API that every client (web, iOS, Android, a third-party integration) consumes the same way. A screen-shaped endpoint (`GET /mobile-home-screen` returning banner + greeting + widgets) recouples the backend to one interface and changes every time that screen does; resource endpoints (`/orders`, `/promotions`) let a new client compose what it needs from what already exists.
+
+**The domain model is not the database model.** The two serve different purposes, so they get different shapes: the domain record carries behaviour and invariants; the row carries storage concerns (nullable columns, foreign keys). The repository adapter is the one mapping point (`row -> toDomain(row)`), and the DB shape stops there. The business drives the schema, never the schema the business (Red flags, below).
+
+**The internal model is not the wire model.** Wire DTOs (request bodies, API responses) never cross into use-cases in either direction: the inbound adapter parses the body through the branded checkpoint into a domain type (rule 12), and the outbound edge maps domain to a response record shaped for the API. Serialising a persistence entity straight to JSON welds all three models together; then every rename breaks clients.
+
+**The frontend depends on a contract it controls (the gateway).** Agree the API contract first (the schema that also generates the docs, `references/governance.md`), then reach data only through a gateway port with two implementations, the real client and a fake returning canned data in the same shape, chosen at one wiring point. The gateway returns `Result`, so a failure is a state the UI renders rather than a throw that blanks the screen (rule 16), and it maps the wire DTO into the frontend's own model, so an API rename is absorbed in one `toOrder(dto)` function instead of rippling through components.
+
+```ts
+// the frontend gateway: same port discipline as any backend adapter
+export type OrderGateway = { readonly list: () => Promise<Result<Order[], LoadError>> };
+const toOrder = (d: ApiOrder): Order => ({ id: d.order_id, total: money(d.total_cents, 'EUR'), customerName: d.customer.first_name ?? 'Guest' });
+export const httpOrders = (api: Api): OrderGateway => ({
+  list: async () => {
+    const dto = await api.get<ApiOrder[]>('/orders');
+    return dto.ok ? ok(dto.value.map(toOrder)) : dto;
+  },
+});
+export const fakeOrders: OrderGateway = { list: async () => ok([{ id: '1', total: money(8000, 'EUR'), customerName: 'Ada' }]) };
+```
+
+The UI is then built, demoed, and tested in parallel with the backend, and the flip from fake to real is one wiring line. (In the Next.js static variant, build-time data loading plays this role; the gateway applies to the server-app sub-variant and any client fetching at runtime: `references/nextjs-monorepo.md`.)
+
 ### Framework vs configuration
 
 Domain-specific data — brand lists, tenant slugs, feature flags, tier-discount rates, per-environment API endpoints — is **configuration**, not framework code. It lives in env vars, JSON files, or an external source loaded at runtime. The framework code never contains string-literal unions of brand slugs, hardcoded record maps of brands, or `if (brand === 'acme') ...` branches.
@@ -394,6 +421,7 @@ Test by layer, most tests at the bottom of the pyramid:
 - **Application** | integration tests with faked infrastructure.
 - **Infrastructure** | integration tests with real dependencies.
 - **E2E** | critical paths only.
+- **Performance** | load-test gates on routes with a latency budget (`references/reliability.md`).
 
 See `references/testing.md` for the full strategy.
 
@@ -401,7 +429,7 @@ See `references/testing.md` for the full strategy.
 
 ## Recording architectural decisions
 
-This standard does not keep a separate `docs/adr/` tree. Significant decisions are captured as `[decision]` entries in `.claude/LESSONS.md` — append-only, one line, superseded by a newer `[decision]` when they change (see `references/lessons.md`). For decisions worth pressure-testing *before* they are made, the atelier-grill-me companion skill walks the decision tree and writes the decision record.
+Two tiers (see `references/governance.md`, Decision records). Every significant decision is a `[decision]` entry in `.claude/LESSONS.md`: append-only, one line, superseded by a newer `[decision]` when it changes (see `references/lessons.md`). Decisions whose rejected alternatives and reversal path are worth keeping (a vendor, a storage engine, a deliberate lock-in) additionally get a full ADR under `docs/adr/`, committed in the same change as the code it explains. For decisions worth pressure-testing *before* they are made, the atelier-grill-me companion skill walks the decision tree and its output is the natural ADR draft.
 
 ---
 
@@ -414,3 +442,6 @@ This standard does not keep a separate `docs/adr/` tree. Significant decisions a
 - Shared mutable state across modules.
 - "utils" or "common" packages that grow forever.
 - Database schema driving the domain model (domain should drive the schema, not the other way).
+- A screen-shaped endpoint (`/mobile-home-screen`) instead of resource endpoints clients compose.
+- A wire DTO or persistence entity crossing into use-cases, or serialised straight to the client.
+- A frontend component calling `fetch` directly instead of going through its gateway port.

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+#
+# atelier pre-commit hook (Java/Quarkus variant): 6 gates
+#
+# Order matters: cheap fast-fail gates first, expensive gates last so a slow
+# mutation run is only paid when everything else is clean.
+#
+#   1. commit size       : <=10 files AND <=300 lines (insertions + deletions)
+#   2. pom sanity        : no version ranges, no -SNAPSHOT dependencies
+#   3. secret scan       : gitleaks protect --staged (degrades gracefully)
+#   4. format            : ./mvnw spotless:check
+#   5. verify            : ./mvnw verify (compile -Werror, tests, JaCoCo tier check)
+#   6. mutation testing  : PIT with history, only when staged files touch
+#                          the mutation scope (domain/usecases)
+#
+# Install once per clone (alongside the shared commit-msg validator):
+#
+#   cp <skill>/assets/pre-commit-java  .githooks/pre-commit
+#   cp <skill>/assets/commit-msg       .githooks/commit-msg
+#   cp <skill>/assets/check-commit-size.sh scripts/check-commit-size.sh
+#   cp <skill>/assets/check-pom.sh         scripts/check-pom.sh
+#   chmod +x .githooks/* scripts/*.sh
+#   git config core.hooksPath .githooks
+#
+# Bypass with `git commit --no-verify` is reserved for genuine big-bang
+# changes (initial scaffolds, mass-renames, generated-file updates). Justify
+# every bypass in the commit body. Do not normalise bypassing.
+
+set -euo pipefail
+
+if [ ! -x ./mvnw ]; then
+  echo "pre-commit: './mvnw' not found or not executable. Commit the Maven wrapper (rule 5, Java variant)." >&2
+  exit 1
+fi
+
+echo "pre-commit: running 6 gates..."
+
+echo "[1/6] commit size"
+bash scripts/check-commit-size.sh
+
+echo "[2/6] pom sanity (no ranges / -SNAPSHOT deps)"
+bash scripts/check-pom.sh
+
+echo "[3/6] gitleaks protect --staged"
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --verbose --no-banner
+else
+  echo "  warning: 'gitleaks' not on PATH, skipping secret scan." >&2
+  echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
+fi
+
+echo "[4/6] ./mvnw spotless:check"
+./mvnw -q spotless:check
+
+echo "[5/6] ./mvnw verify"
+./mvnw -q verify
+
+echo "[6/6] PIT mutation (staged domain/usecases files)"
+staged_scope=$(git diff --cached --name-only --diff-filter=ACMR | grep -E 'src/main/java/.*/(domain|usecases)/.*\.java$' || true)
+if [ -z "$staged_scope" ]; then
+  echo "  no staged files in the mutation scope, skipping."
+else
+  # The threshold lives in the pom (pitest-maven mutationThreshold=90 scoped
+  # to domain/usecases packages, run with parallel threads). PIT's incremental
+  # history needs Arcmutate's commercial +arcmutate_history plugin in current
+  # PIT, so the free speed levers are the narrow scope, threads, and this trigger.
+  ./mvnw -q test-compile org.pitest:pitest-maven:mutationCoverage
+fi
+
+echo "pre-commit: all gates passed"

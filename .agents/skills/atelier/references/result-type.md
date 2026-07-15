@@ -221,7 +221,7 @@ The pre-Result `withRetry(() => port.call())` retried on thrown exceptions. Afte
 
 ```ts
 // src/domain/utilities/retry-on-err.ts
-export type RetryOpts = { readonly maxAttempts: number; readonly baseDelayMs: number };
+export type RetryOpts = { readonly maxAttempts: number; readonly baseDelayMs: number; readonly jitter?: boolean };
 
 export const retryOnErr = async <T, E>(
   fn: () => Promise<Result<T, E>>,
@@ -231,7 +231,8 @@ export const retryOnErr = async <T, E>(
   let last: Result<T, E> = await fn();
   for (let attempt = 1; attempt < opts.maxAttempts; attempt += 1) {
     if (last.ok || !shouldRetry(last.error)) return last;
-    await sleep(opts.baseDelayMs * 2 ** (attempt - 1));
+    const backoff = opts.baseDelayMs * 2 ** (attempt - 1);
+    await sleep(opts.jitter === false ? backoff : backoff * (0.5 + Math.random())); // jittered by default: synchronized retries stampede a struggling dependency
     last = await fn();
   }
   return last;
@@ -246,6 +247,11 @@ const refreshed = await retryOnErr(
 ```
 
 Never use `withRetry` from the pre-Result era on a port call. It will silently never retry.
+
+Retry is one third of hard rule 29; the other two live in the adapter, not here:
+
+- **The deadline.** Every outbound call the adapter makes carries an explicit timeout (`AbortSignal.timeout(ms)` on `fetch`, the SDK's timeout option), translated to an `Err` kind like any other failure. `retryOnErr` bounds the attempts; the deadline bounds each attempt. Without it, one hung dependency parks the process.
+- **The idempotency key.** When the operation is not naturally safe to repeat (a payment, a send), the adapter attaches an idempotency key so a retried attempt can never double-execute. See `references/reliability.md` for the full pattern, including the transactional outbox for side effects that must survive a crash.
 
 ## Testing Result-returning code
 

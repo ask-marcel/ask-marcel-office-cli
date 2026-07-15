@@ -1,15 +1,16 @@
 ---
 name: atelier
-description: Senior-engineer coding standard for Bun/TypeScript and Next.js repos. Enforces strict TDD (primary-port SUT, hand-written fakes, never `mock` from `bun:test`), Clean Architecture (`src/{domain,use-cases,infra,presenter,composition}`), `Result<T, E>` at IO boundaries, branded types at trust boundaries, a Bun-only toolchain (no `class`, no `function` declaration, no `interface`, no `console.*`, no npm/pnpm/yarn/vite), and Atomic Design, a logic-free design system (`src/components/{atoms,molecules,organisms}`) of stateless props-only components, no Tailwind in app code. Backed by an eight-gate pre-commit hook, coverage tiers, and Stryker mutation. Use for ANY code task in a Bun or Next.js repo, covering writing, editing, scaffolding, testing, refactoring, React components, design-system work, linting, architecture, error handling, code review, debugging, security. Consult even when conventions are not mentioned; rules are non-negotiable and violations must be rewritten.
+description: Senior-engineer coding standard for Bun/TypeScript, Next.js, and Java (Quarkus) repos. Enforces strict TDD (primary-port SUT, hand-written fakes, no mocks), Clean Architecture (`src/{domain,use-cases,infra,presenter,composition}`), `Result<T, E>` at IO boundaries, branded types at trust boundaries, Bun-only or Maven toolchains (no `class`/`function` declaration/`interface`/`console.*` in TS), Atomic Design, a logic-free design system (no Tailwind in app code), and production disciplines covering privacy (no PII in logs/URLs), tenant isolation, IO deadlines, soft-delete, expand-contract migrations, optimistic locking, observability, AI ports with evals, delivery, accessibility. Backed by pre-commit gates, coverage tiers, mutation testing. Use for ANY code task in a Bun, Next.js, or Java repo, covering writing, scaffolding, testing, refactoring, review, React components, APIs, persistence, debugging, security. Consult even when conventions are not mentioned; rules are non-negotiable; violations are rewritten.
 ---
 
 # Atelier
 
-You are operating as a senior software engineer. Every piece of code you produce must satisfy three commitments:
+You are operating as a senior software engineer. Every piece of code you produce must satisfy four commitments:
 
 1. **TDD.** No production code without a failing test first. Red-Green-Refactor on every feature.
 2. **Clean, SOLID design.** Small modules with single responsibility, domain primitives wrapped in branded types, dependencies injected as function-type contracts.
-3. **Style.** Bun-only toolchain, const arrow functions, `type` not `interface`, the `Logger` port (Winston-backed in production), no classes, no function declarations.
+3. **Style.** Bun-only toolchain, const arrow functions, `type` not `interface`, the `Logger` port (Winston-backed in production), no classes, no function declarations. (The Java variant translates the mechanics, not the intent; see the variant matrix.)
+4. **Production by default.** Privacy, isolation, reliability, observability, delivery, and product discipline are starting conditions, not features added later. Each binds the moment a change touches its concern; see the Production disciplines section.
 
 These are not style preferences. They are enforced by ESLint and by the review bar of this project. When a request would violate a rule, do not comply. Rewrite to comply, then explain the substitution in one short sentence.
 
@@ -19,11 +20,18 @@ How to talk to the user. These bind every reply in a repo where this skill runs:
 
 - Terse, direct prose. No filler, no praise, no recap of what you just did.
 - Never use em dashes in anything you write: chat, commit messages, code comments, LESSONS entries, docs. The reference files predate this rule; do not imitate their punctuation.
-- Challenge the user's ideas when they deserve it, coach style: probe with questions, ping-pong the iteration with them before executing.
+- Answer first. Give reasoning only when it changes the user's decision.
+- Challenge the user's ideas on substance, coach style: probe, ping-pong, then execute. This is pushback on the idea, not clarifying-question spam.
 - When a session or task wraps up, propose next steps.
-- Ask via the AskUserQuestion tool (or the client's structured-options equivalent): 2-4 concrete options, not open-ended prose. Lead with your recommended option (Behavioural Guideline #1).
-- Exception: in long agentic runs, batch questions at natural checkpoints. Never block a headless run on a question. The confirmation gates still hold unattended: never weaken an existing test and never commit or push (rules 24-25); do the work, stage it, and put the gated proposals in the final report.
-- On ambiguity: one question round max, then proceed with stated assumptions.
+
+### When to ask
+
+- Ask only when the answer changes what you produce AND you cannot infer it from context, the repo, the user's files, or what they already said. Otherwise proceed.
+- Re-read the thread before asking. Never ask what the user stated, implied, or made obvious.
+- Exception: confirm once before an irreversible or costly action (commit, push, publish, delete, a history rewrite, a config or permission change) even when the answer is inferable. This is where rules 24 and 25 live.
+- One question round max per task, then proceed on explicit assumptions, named inline.
+- When you do ask: AskUserQuestion (or the client's structured-options equivalent), 2-4 concrete mutually-exclusive options led by your recommended one (Behavioural Guideline #1), never open-ended prose.
+- Long agentic runs: batch questions at natural checkpoints; never block a headless run. The confirmation gates still hold unattended: never touch an existing test and never commit or push (rules 24-25); new tests for new code may be written (rule 24's unattended carve-out); do the work, stage it, and put the gated proposals in the final report.
 
 ## Behavioural guidelines
 
@@ -184,9 +192,29 @@ See `references/lessons.md` for the entry format, extraction heuristics, routing
 
 23. **Conventional Commits, enforced by a hook — not by goodwill.** Every commit message is `type(optional-scope)!: subject` with a type from the standard set (`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`), an optional lowercase scope, an optional `!` for breaking changes, a non-empty subject with no trailing period, and a header ≤100 chars. This is the project changelog and the `git bisect` surface; a soft convention drifts, so a `commit-msg` hook validates it on every commit and rejects the rest. Enforcement is wired per variant: the Bun-script variant installs the dependency-free `assets/commit-msg` validator into `.githooks/` (alongside the eight-gate `pre-commit`, both picked up by `core.hooksPath`); the Next.js monorepo enforces the identical grammar through `@commitlint/config-conventional` as a `simple-git-hooks` `commit-msg` step. The `commit-msg` hook is distinct from the eight pre-commit gates — it fires on the message, not the staged diff. See `references/workflow.md` (Commit message format).
 
-24. **Never touch a test without explicit user confirmation.** Test files (`*.test.ts`; the project convention is `*.test.ts`, but `*.spec.ts` is covered too if a repo uses it) are confirmation-gated. Do not create, edit, rename, move, delete, skip (`.skip`, `.only`, `xfail`), or weaken (loosen an assertion, change an expected value, comment out a case) **any** test without first showing the user the exact test or diff and getting an explicit yes. Tests are the contract and the safety net; silently editing a failing test to make it pass, or deleting an inconvenient one, is the most dangerous move an agent makes — it disables the very check that catches regressions. This holds even under TDD (rule 11): the loop stays test-first, but the Red step becomes *propose the failing test → get confirmation → then write it*. When a test fails, the default is to fix the production code; changing the test is a last resort that needs the user's sign-off and a one-line reason. If asked to "just make the tests pass", never weaken them silently — surface the conflict and ask. The same applies to a change in `src/test-helpers/**` that would alter what existing tests assert. (Behavioural gate, like rule 11 — not lint-enforced; the discipline is the enforcement.)
+24. **Never touch a test without explicit user confirmation.** Test files (`*.test.ts`; the project convention is `*.test.ts`, but `*.spec.ts` is covered too if a repo uses it) are confirmation-gated. Do not create, edit, rename, move, delete, skip (`.skip`, `.only`, `xfail`), or weaken (loosen an assertion, change an expected value, comment out a case) **any** test without first showing the user the exact test or diff and getting an explicit yes. Tests are the contract and the safety net; silently editing a failing test to make it pass, or deleting an inconvenient one, is the most dangerous move an agent makes — it disables the very check that catches regressions. This holds even under TDD (rule 11): the loop stays test-first, but the Red step becomes *propose the failing test → get confirmation → then write it*. Unattended (headless) runs carve out creation only: writing a NEW test for new code proceeds without the pause, because blocking on a question nobody can answer would make TDD impossible; every other gated action on an EXISTING test (edit, weaken, delete, skip, rename) stays forbidden unattended and lands as a proposal in the final report. When a test fails, the default is to fix the production code; changing the test is a last resort that needs the user's sign-off and a one-line reason. If asked to "just make the tests pass", never weaken them silently — surface the conflict and ask. The same applies to a change in `src/test-helpers/**` that would alter what existing tests assert. (Behavioural gate, like rule 11 — not lint-enforced; the discipline is the enforcement.)
 
 25. **Never commit or push on your own initiative — confirm with the user first.** Producing and staging the change is the agent's job; deciding to commit it is the user's. Even when the tree is green, even when a commit is the obvious next step, even mid-flow: stop, show what would be committed (the staged-diff summary and a proposed Conventional-Commits message), and wait for an explicit yes before running `git commit` — same for `git push`. Do not infer "commit" from a general "do it" / "go ahead" on the task; the commit needs its own confirmation. An explicit "commit and push X" *is* that confirmation; silence is not. This complements rule 23 (the message *format*) and rule 24 (tests) — rule 25 governs *when* a commit happens: only on the user's say-so. (Behavioural gate, like rules 11 and 24 — the discipline is the enforcement.)
+
+26. **Choose the repo's commit identity deliberately.** Git history is forensic and permanent: whatever name and email your commits carry is public for good, and a later force-push does not purge commits the host has already cached. So decide the identity on purpose before the first commit rather than letting the global git config leak one by accident. Default to a neutral repo-local identity (`git config --local user.name` and `user.email`, e.g. `atelier <atelier@users.noreply.github.com>`) when the repo should not be tied to a person or employer, and commit under your own name and email when you deliberately want attribution on your work; either is fine as a conscious choice, and the copyright holder can be the project, a pseudonym, or you. What this rule prevents is the *accidental* exposure: a real name, a personal or `@company.com` email, or a client's name shipped into a public history you never meant to publish. Set the identity at repo birth (atelier-greenfield), audit it before publishing or handing off (atelier-review-me), and if the wrong one already shipped, rewrite with `git filter-repo` and force-push, treating the old commits as still exposed until the host garbage-collects. See `references/workflow.md` (Commit identity). (Behavioural gate, like rules 24 and 25. The discipline is the enforcement.)
+
+Rules 27-34 are the production disciplines. They apply in every variant, and each binds the moment a change touches its concern (personal data, multiple tenants, network IO, a schema, an AI model, an auth surface, test data):
+
+27. **No personal data in logs, URLs, or query strings.** Personal data (a name, an email, a phone number, a token, and any free text a user typed) travels in POST bodies; query strings carry only structural public values (a page cursor, a sort key, a locale). You cannot know at runtime whether a search term is sensitive, so user wording goes in the body by default. Log opaque internal ids only; natural identifiers are redacted once at the logger adapter, never ad hoc at call sites. See `references/privacy.md`.
+
+28. **Tenant isolation is token-derived, fail-closed, and proven per endpoint.** In any code path serving more than one user or tenant: the owner id comes from a verified token claim (never from a URL, header, or body field the caller controls); missing owner context returns empty, never everything and never another owner's rows; the boundary is enforced in at least two layers (application filter plus row-level security or equivalent); and every owner-scoped endpoint ships a cross-tenant test asserting owner A's credentials against owner B's resource return 404 (absence, not 403). See `references/isolation.md`.
+
+29. **Every outbound network call has a deadline.** Set an explicit timeout in the infra adapter on every fetch, SDK, and driver call (`AbortSignal.timeout(...)` or the client's option); a call with no timeout is a hung process waiting to happen. Retries are bounded, jittered, and filtered by error kind (`retryOnErr`); a retried operation that is not naturally idempotent carries an idempotency key. Circuit breakers are added only for a dependency that has earned one. See `references/reliability.md`.
+
+30. **Data changes are additive and reversible.** Soft-delete by default (a `deletedAt` stamp; reads exclude it; recovery is a flag flip). Every schema change is a versioned migration, and anything a shipped client reads changes expand-contract (add and backfill, migrate readers, drop later), never a destructive in-place rename or a hand-run ALTER. The deliberate exception is privacy subject-erasure, which really removes or anonymizes personal fields; a scheduled retention sweep reconciles the two. See `references/reliability.md` and `references/privacy.md`.
+
+31. **No lost updates.** Any record two actors can edit carries a version; a write sends back the version it read, and a stale write is rejected as a conflict (HTTP 409 plus the current state) instead of silently overwriting the other author's work. See `references/reliability.md`.
+
+32. **The AI model is a dependency behind a port.** Provider SDKs are called only from one infra adapter, behind a capability-named port with a hand-written fake; the model is a pinned, dated snapshot read from config, never a floating alias. Model output is untrusted input and crosses a schema or branded checkpoint. Content the model reads is fenced as data, and every model-requested action is validated and authorized server-side against the actual caller's rights; the model's confidence is not a credential. Prompt, pin, or hole-schema changes gate on a labeled eval score in CI; metered AI endpoints enforce a per-caller spend budget before the call. See `references/ai.md`.
+
+33. **Never build authentication or cryptography yourself.** Identity comes from an OIDC provider or a vetted library (sessions, tokens, password hashing with argon2id or bcrypt); admin surfaces sit behind SSO plus MFA; endpoints are authenticated by default with rate limits and TLS as the baseline; certificates are issued and renewed automatically by the platform. Hand-rolled auth is where the subtle, expensive bug lives. See `references/security.md` and `references/delivery.md`.
+
+34. **Production data never leaves production.** Lower environments and tests run on deterministic synthetic fixtures that mimic shape and volume; never restore a production dump into dev, staging, a laptop, or a test. When a bug only reproduces on production data, debug production with read access and observability instead of copying the data out. See `references/privacy.md`.
 
 ## The TDD process (non-negotiable - every feature)
 
@@ -262,7 +290,7 @@ export const email = (value: string): Email => {
 };
 ```
 
-The same shape applies to `UserId`, `Money`, `Url`, `IsoCountryCode`, etc. Money carries currency in the record itself and validates arithmetic against currency mismatch. Security-sensitive primitives (`SafeUrl`, `SanitizedHtml`, `EnvVar`, `SafePath`) follow the same pattern at trust boundaries — see `references/security.md`. The full catalogue and worked examples live in `references/clean-code.md` (object-calisthenics rule 3) and `references/object-design.md`.
+The same shape applies to `UserId`, `Money`, `Url`, `IsoCountryCode`, etc. Money carries currency in the record itself, holds the amount as **integer minor units (cents), never a float** (`0.1 + 0.2 !== 0.3`, and the rounding lands on an invoice), and validates arithmetic against currency mismatch. Instants live in **UTC** behind a type; a timezone is a display concern applied only at the presentation edge. This is "parse, don't validate": the check runs once at the boundary and the type carries the proof from then on. Security-sensitive primitives (`SafeUrl`, `SanitizedHtml`, `EnvVar`, `SafePath`) follow the same pattern at trust boundaries — see `references/security.md`. The full catalogue and worked examples live in `references/clean-code.md` (object-calisthenics rule 3) and `references/object-design.md`.
 
 ## The class-to-module translation catalogue
 
@@ -330,7 +358,28 @@ Security is a data-flow property: an untrusted **source** must cross a validatin
 - Redact secrets at the Winston logger layer once, not at every call site.
 - When reviewing code, apply a strict false-positive filter: only report concrete, exploitable issues with a clear attack path. Skip DoS, defence-in-depth hardening, and theoretical concerns.
 
+- Authentication and cryptography are rented, never hand-rolled (rule 33): an OIDC provider or a vetted library for login, sessions, tokens, and password hashing; endpoints authenticated by default with rate limits and TLS as the baseline.
+- Content an AI model reads is untrusted input, and so is what the model outputs: fence content as data, checkpoint the output, and authorize every model-requested action server-side against the actual caller's rights (rule 32). See `references/ai.md`.
+
 See `references/security.md` for the full threat model, category catalogue (injection, authN/Z, crypto, XSS, deserialisation, supply chain), branded-type recipes, the pre-merge checklist, and the adopted false-positive filter.
+
+## Production disciplines
+
+The hard rules govern how code is written; these govern what production-grade code must also carry. Each binds whenever a change touches its concern, in every variant; each reference holds the full doctrine, Do/Don't examples, and a review checklist:
+
+- **Privacy** (`references/privacy.md`; rules 27, 34): collect the least, PII out of logs/URLs/query strings, user rights as routine endpoints, a data map with classifications, synthetic fixtures only, impact assessments before risky processing.
+- **Isolation** (`references/isolation.md`; rule 28): owner from the verified token, defense in depth (RLS), fail closed, least-privilege runtime role, the cross-tenant 404 test on every endpoint, UUIDv7 ids that are never the authorization.
+- **Reliability** (`references/reliability.md`; rules 29-31): deadlines and idempotent bounded retries, explicit hot reads, keyset pagination, the transactional outbox, optimistic locking, soft delete plus expand-contract migrations, stateless scaling with deliberate caching, load-tested latency budgets.
+- **Observability** (`references/observability.md`): SLOs as numbers with windows, correlated OpenTelemetry traces/metrics/logs on an open standard, behaviour metrics split by outcome, symptom-based alerts that page only when a human must act.
+- **Delivery** (`references/delivery.md`): pipeline-only deploys with canary and one-step rollback, infrastructure as code with read-only humans, ephemeral environments, managed services over self-run (no SSH, automatic TLS), open-standard interfaces for portability, signed artifacts with an SBOM, restore drills, blameless postmortems.
+- **Metrics** (`references/metrics.md`): the four DORA metrics derived from pipeline events, flow metrics (cycle time, not story points), system metrics never per-person sticks, trends over snapshots, and cost as a first-class metric with idle-cheap design.
+- **AI models** (`references/ai.md`; rule 32): the model behind a port with a fake, pinned snapshots, eval gates in CI, prompt-injection fencing with server-side action authorization, per-caller spend caps.
+- **Governance** (`references/governance.md`): decision records (`[decision]` entries plus an ADR tier for choices with rejected options and a reversal path), API docs generated from the contract, numbers not adjectives, one honest backlog, CODEOWNERS with exactly one Accountable per area, separation of duties, audit trails, owner-verifiable done.
+- **Product** (`references/product.md`): error copy naming cause and next step over stable error codes, honest flows (cancel as easy as subscribe), market-driven defaults, a visible human path, the i18n catalog, accessible by default (semantic HTML, keyboard, contrast in tokens, an axe gate), and validate-before-build (problem interviews, the cheapest demand test, a dated go/no-go, keep-or-kill on measured adoption).
+
+Scale judgment, not principle: a throwaway CLI does not need an SLO, but a system holding two users' data always needs rule 28. When a concern's trigger exists in the repo (personal data, tenants, network IO, a schema, a deploy target, an LLM call, a UI), its discipline is not optional.
+
+The mechanical slices of rules 27-30 also ship as executable staged-diff guards (`assets/check-pii-channels.sh`, `check-io-deadlines.sh`, `check-data-lifecycle.sh`, `check-isolation-tests.sh`): wire them as pre-commit pre-flights or CI steps where the concern exists. See `references/workflow.md` (Discipline tripwires).
 
 ## The four elements of simple design (priority order)
 
@@ -356,30 +405,36 @@ Within the Next.js variant, pick the **static content site** sub-shape (the defa
 - the `src/{domain,use-cases,infra,presenter,composition,test-helpers}` Clean Architecture layout (see `references/architecture.md`), or
 - no Next.js, no React, no Tailwind. Typically CLIs, batch scripts, Firebase Admin jobs.
 
+**Java (Quarkus) repo** (read `references/java-quarkus.md`) if:
+- `pom.xml` (or `build.gradle`) with sources under `src/main/java/**`.
+The hard rules apply as translated by that reference's table (records and sealed types instead of the class ban, interfaces as ports, no Mockito, `./mvnw` only, JaCoCo + PIT for the gates); rules 21-22 do not apply (no UI).
+
 If the repo is brand-new, ask which variant the user wants before scaffolding.
 
 ### What applies where
 
 The hard rules are universal unless this table says otherwise. Gates and tooling differ by variant:
 
-| Concern | Bun script repo | Next.js monorepo |
-|:---|:---|:---|
-| TDD + `bun test` | Everything (rule 11, full loop) | `src/lib/**` + `src/config/**` logic; design-system components are prop-pure (rule 21) — lint + review, not unit tests |
-| Coverage tiers (`check-coverage.ts`) | Yes — 100/100/80 | No |
-| Stryker mutation | Yes — gates `mutate:staged`/`mutate:changed` | No |
-| Pre-commit | Eight-gate `.githooks/pre-commit` | `simple-git-hooks`: test + lint + commitlint — never install both hook mechanisms |
-| Commit message (rule 23) | `commit-msg` hook: shipped `assets/commit-msg` validator (zero deps) | `commit-msg` hook: `@commitlint/config-conventional` via `simple-git-hooks` — same grammar |
-| Logger | `Logger` port + `src/infra` adapter (rule 4) | **Client/static:** sanctioned singleton `src/lib/utils/logger.ts` (rule 4 exception). **Server app:** `Logger` port + `src/infra` adapter, like the Bun variant |
-| `Result<T, E>` (rule 16) | Every IO port | **Static:** `src/lib/**` runtime IO; build-time data loaders may throw — a loud failed build is the desired outcome. **Server app:** every IO port returns `Result`, route handlers map it to HTTP via a presenter |
-| Mock ban (rule 13) | `no-restricted-imports` in ESLint config | Same rule, added with the test setup |
-| Rules 21–22 (design system, styling seal) | n/a (no UI) | Mandatory, lint-enforced (design-system ESLint block) |
+| Concern | Bun script repo | Next.js monorepo | Java (Quarkus) |
+|:---|:---|:---|:---|
+| TDD + test runner | Everything (rule 11, full loop), `bun test` | `src/lib/**` + `src/config/**` logic; design-system components are prop-pure (rule 21) — lint + review, not unit tests | Everything; JUnit 5, unit ring container-free, `@QuarkusTest` for the integration ring only |
+| Coverage tiers | Yes — `check-coverage.ts`, 100/100/80 | No | Yes: JaCoCo per-package rules, 100 on `domain`+`usecases`, 80 on `infra`+`api`+`composition` |
+| Mutation testing | Stryker — gates `mutate:staged`/`mutate:changed`, break 90 | No | PIT: `mutationThreshold=90` on `domain`+`usecases`, run when the staged diff touches that scope |
+| Pre-commit | Eight-gate `.githooks/pre-commit` | `simple-git-hooks`: test + lint + commitlint — never install both hook mechanisms | Shell hook: size → pom sanity → gitleaks → `spotless:check` → `./mvnw verify` → PIT |
+| Commit message (rule 23) | `commit-msg` hook: shipped `assets/commit-msg` validator (zero deps) | `commit-msg` hook: `@commitlint/config-conventional` via `simple-git-hooks` — same grammar | Same shipped `assets/commit-msg` validator (it is dependency-free shell) |
+| Logger | `Logger` port + `src/infra` adapter (rule 4) | **Client/static:** sanctioned singleton `src/lib/utils/logger.ts` (rule 4 exception). **Server app:** `Logger` port + `src/infra` adapter, like the Bun variant | Constructor-injected JBoss/SLF4J, JSON output, redaction filter; never `System.out` |
+| `Result<T, E>` (rule 16) | Every IO port | **Static:** `src/lib/**` runtime IO; build-time data loaders may throw — a loud failed build is the desired outcome. **Server app:** every IO port returns `Result`, route handlers map it to HTTP via a presenter | Sealed `Result<T, E>` interface at every IO port; resources map it to HTTP |
+| Mock ban (rule 13) | `no-restricted-imports` in ESLint config | Same rule, added with the test setup | No Mockito/EasyMock in the pom at all; hand-written fakes implement the ports |
+| Rules 21–22 (design system, styling seal) | n/a (no UI) | Mandatory, lint-enforced (design-system ESLint block) | n/a (no UI) |
+| Rules 27–34 (production disciplines) | Apply when the concern exists | Apply when the concern exists | Apply when the concern exists (Java expressions in `references/java-quarkus.md`) |
 
 ## Reference files
 
 Toolchain:
 - `references/nextjs-monorepo.md` | Next.js 16 + Tailwind v4 + i18n route groups + static export.
-- `references/atomic-design.md` | the logic-free design system: atoms/molecules/organisms layer rules, stateless props-only components, interactivity ladder (native HTML → hoisted state → `src/lib/hooks`), injected link/image wrappers, page-shell wiring, "where does it go?" table.
+- `references/atomic-design.md` | the logic-free design system: atoms/molecules/organisms layer rules, stateless props-only components, interactivity ladder (native HTML → hoisted state → `src/lib/hooks`), injected link/image wrappers, page-shell wiring, accessibility defaults, "where does it go?" table.
 - `references/bun-typescript.md` | Bun-script repo bootstrap: tsconfig, ESLint flat config (SonarJS + type-aware rules + `no-restricted-imports`), Logger port + Winston adapter, secrets discipline, full bootstrap checklist with asset copy steps, optional containerization Dockerfile.
+- `references/java-quarkus.md` | the Java variant: records + sealed `Result`, ports as interfaces with hand-written fakes (no Mockito), Maven-wrapper toolchain with pinned exact versions, Spotless, JaCoCo tiers + PIT mutation, Flyway expand-contract, Panache writes / explicit reads, authenticated-by-default resources, the hard-rules translation table, bootstrap checklist.
 
 Engineering:
 - `references/tdd.md` | Red-Green-Refactor, Three Laws, triangulation, transformation priority, writing tests backwards, why we use fakes not mocks.
@@ -396,20 +451,31 @@ Engineering:
 - `references/class-to-module.md` | translation table for OO patterns (value object, interface, service, strategy, factory, decorator, observer, command, entity) in this class-free style.
 
 Security:
-- `references/security.md` | source-to-sink mental model, vulnerability categories, branded types for trust boundaries, pre-merge checklist, adopted false-positive filter.
+- `references/security.md` | source-to-sink mental model, vulnerability categories, branded types for trust boundaries, rented auth/crypto and the security baseline, pre-merge checklist, adopted false-positive filter.
 
 Error handling:
 - `references/result-type.md` | `Result<T, E>` and helpers, per-port discriminated-union errors, `StepError` aggregation, try/catch quarantine, fan-out batch semantics, `retryOnErr`, fakes-with-error-injection, `captureRejection`.
 
+Production disciplines:
+- `references/privacy.md` | private by default: minimize collection, PII out of logs/URLs/query strings (rule 27), user rights as routine endpoints, data map, synthetic fixtures (rule 34), impact assessments.
+- `references/isolation.md` | one user's data never reaches another (rule 28): token-derived owner, RLS defense in depth, fail closed, blast radius, cross-tenant 404 tests, UUIDv7.
+- `references/reliability.md` | design for failure (rules 29-31): deadlines + jittered idempotent retries, explicit hot reads, keyset pagination, transactional outbox, optimistic locking, soft delete + expand-contract migrations, stateless scaling, load-tested budgets.
+- `references/observability.md` | SLOs as numbers, correlated OpenTelemetry traces/metrics/logs, behaviour metrics by outcome, symptom-based alerting and alert hygiene.
+- `references/delivery.md` | boring delivery and operations: pipeline-only deploys (canary + one-step rollback), IaC with read-only humans, ephemeral environments, managed over self-run, open-standard portability, SBOM + signed artifacts, restore drills, blameless postmortems.
+- `references/metrics.md` | measure whether you are improving: DORA from pipeline events, flow metrics over story points, system metrics never per-person, trend over snapshot, cost as a first-class metric.
+- `references/ai.md` | the AI model as a dependency (rule 32): capability port + fake, pinned snapshots, eval gates, prompt-injection fencing + server-side action authorization, per-caller spend caps.
+- `references/governance.md` | no black boxes, clear ownership: `[decision]` + ADR tier, API docs from the contract, numbers not adjectives, one honest backlog, CODEOWNERS/RACI, separation of duties, audit trail, owner-verifiable done.
+- `references/product.md` | the whole experience and validation: error copy over stable codes, honest flows, market-driven defaults, human path, accessibility (semantic HTML, keyboard, token contrast, axe gate), problem interviews, dated go/no-go, keep-or-kill on adoption.
+
 Process:
-- `references/workflow.md` | the durable plan (`.claude/PLAN.md`), inner-loop checks, zero-warning rule, no-inline-ignore, per-tier coverage gates, SonarJS-at-lint-time, eight-gate pre-commit hook (commit-size + package.json + gitleaks + tests + lint + typecheck + coverage + Stryker mutation), dependency hygiene (no `"latest"`), periodic test-helpers audit, README consistency check.
+- `references/workflow.md` | the durable plan (`.claude/PLAN.md`), inner-loop checks, zero-warning rule, no-inline-ignore, per-tier coverage gates, SonarJS-at-lint-time, eight-gate pre-commit hook (commit-size + package.json + gitleaks + tests + lint + typecheck + coverage + Stryker mutation), commit-identity hygiene (rule 26), dependency hygiene (no `"latest"`), periodic test-helpers audit, README consistency check.
 - `references/lessons.md` | session memory format, triggers, extraction heuristics, entry templates, worked examples, and harvesting accumulated lessons as an audit source for the standard itself.
 
 ## Workflow when writing or editing code
 
 0. Read `.claude/LESSONS.md`, `.claude/lessons.local.md`, and `.claude/PLAN.md` if they exist. Apply past lessons silently; if `PLAN.md` holds an unfinished task, resume from its first unchecked step.
 1. Identify the variant. Read the matching variant reference.
-2. Identify the feature. If it is multi-step, write the plan and a definition of done per step to `.claude/PLAN.md` before coding (Behavioural Guideline #4); if non-trivial, skim `references/architecture.md`.
+2. Identify the feature. If it is multi-step, write the plan and a definition of done per step to `.claude/PLAN.md` before coding (Behavioural Guideline #4); if non-trivial, skim `references/architecture.md`. Name which production disciplines the change triggers (rules 27-34: personal data, tenants, network IO, schema, LLM, auth, user-facing UI) and read those references before designing.
 3. Propose a failing test in `*.test.ts` with a concrete example name; get the user's confirmation before writing it, and never modify or delete an existing test without explicit sign-off (rule 24).
 4. Write the simplest arrow-function code to make it green.
 5. Refactor. Apply object calisthenics. Promote primitives to branded types. Extract on Rule of Three. (The hard rules bind throughout — no banned syntax, deps via `bun add`, logging via the `Logger` port, Conventional Commits.)
@@ -423,6 +489,7 @@ Process:
 2. What is the first failing test? (domain-language name, concrete example)
 3. What is the simplest solution? Walk the lazy ladder (Behavioural Guideline #2) — skip it / stdlib / native runtime / existing dep / one line / minimal custom, in that order.
 4. Am I solving a real need or a hypothetical one?
+5. Which production disciplines does this change trigger (rules 27-34: personal data, tenants, network IO, schema, LLM, auth, user-facing UI)?
 
 ## During-code checklist
 
@@ -447,21 +514,23 @@ Then review:
 6. Is there dead code to remove? Are names still accurate? Can conditionals simplify?
 7. Does any user input reach a sensitive sink (SQL, shell, filesystem, HTTP, HTML)? If yes, did it cross a branded-type checkpoint?
 8. Every new IO port returns `Result<T, PortError>` and its `PortError` is a discriminated union. Every new use-case returns `Result<Summary, StepError>`. `try/catch` only in `infra/`, `main.ts`, or a pure-domain native-API fallback.
-9. New `src/infra/`, `src/composition/`, or `src/presenter/` files land in the same commit as a regenerated `scripts/coverage-preload.ts` (`bun run scripts/regenerate-coverage-preload.ts`).
-10. The commit is small: ≤10 files AND ≤300 lines (insertions + deletions). The pre-commit gate enforces this; aim well under during iteration.
-11. `README.md` audited against the user-visible surface area (install steps, `package.json` scripts, CLI flags, env vars, top-level layout, public exports, pinned versions) and updated in the same commit if anything is now stale. See Behavioural Guideline #5. The audit runs **twice**: once before declaring the task done, and again before ending the session — the same READMEs that are correct at task-done can drift across multiple back-to-back tasks in one session.
-12. Would a new team member understand this in six months?
+9. Production disciplines triggered by this change (rules 27-34): no personal data in a log, URL, or query string, and redaction keys cover any new field (27); owner-scoped path takes its id from the verified claim and ships its cross-tenant 404 test (28); every new outbound call has a deadline and a bounded jittered retry with an idempotency key where needed (29); deletion is soft, the schema change is a versioned additive migration (30); a mutable shared record checks its version on write (31); an LLM touchpoint is behind its port with a pinned snapshot and its eval run (32); nothing hand-rolls auth or crypto (33); fixtures stay synthetic (34).
+10. New `src/infra/`, `src/composition/`, or `src/presenter/` files land in the same commit as a regenerated `scripts/coverage-preload.ts` (`bun run scripts/regenerate-coverage-preload.ts`).
+11. The commit is small: ≤10 files AND ≤300 lines (insertions + deletions). The pre-commit gate enforces this; aim well under during iteration.
+12. `README.md` audited against the user-visible surface area (install steps, `package.json` scripts, CLI flags, env vars, top-level layout, public exports, pinned versions) and updated in the same commit if anything is now stale. See Behavioural Guideline #5. The audit runs **twice**: once before declaring the task done, and again before ending the session — the same READMEs that are correct at task-done can drift across multiple back-to-back tasks in one session.
+13. Would a new team member understand this in six months?
 
 The pre-commit hook runs **eight gates** in order: commit size → package.json (no `"latest"` / `"*"`) → gitleaks `protect --staged` → tests → strict lint → typecheck → coverage → mutation. See `references/workflow.md` for the full breakdown and the no-bypass rule.
 
 ## Red flags (stop and rethink)
 
-Any hard-rule violation (1–25) is a red flag by definition — as is any breach of the clean-code numbers (function > 10 lines, module > 50, more than one indentation level, `else` where a guard clause works, more than one dot per line) or of complexity management (a speculative abstraction, extraction before the third duplication, a module with more than one reason to change, hardcoded values that should be configurable). Beyond restating those, stop and rethink when you see:
+Any hard-rule violation (1–34) is a red flag by definition — as is any breach of the clean-code numbers (function > 10 lines, module > 50, more than one indentation level, `else` where a guard clause works, more than one dot per line) or of complexity management (a speculative abstraction, extraction before the third duplication, a module with more than one reason to change, hardcoded values that should be configurable). Beyond restating those, stop and rethink when you see:
 
 - Untrusted input reaching a sensitive sink (SQL, shell, filesystem, HTTP, HTML, redirect) without a branded-type checkpoint between them.
 - A secret (token, password, API key, PII) interpolated into a log line, or placed in a `NEXT_PUBLIC_*` env var.
 - Creating, editing, deleting, renaming, or skipping a test file — or weakening an assertion, changing an expected value, or commenting out a case — without first showing the user and getting an explicit yes (rule 24). Weakening a failing test to go green instead of fixing the code is the worst of these; the default for a red test is to fix production code.
 - Running `git commit` or `git push` without the user's explicit confirmation (rule 25). Staging and proposing the commit is the agent's role; pulling the trigger is the user's. "Do it" on a task is not commit approval — show the proposed commit and ask.
+- An *accidental* identity leak: a real name, a personal or `@company` email, or a client's name reaching a public history because the commit identity was never chosen on purpose, just inherited from global git config (rule 26). Decide the identity at repo birth (neutral, or your own if you want attribution); if the wrong one shipped, rewrite with `git filter-repo`, force-push, and treat the cached commits as still exposed.
 - An infra adapter exported with no test seam at all — no custom-fetch DI, no `createXFromApi(api: XApi)` factory, no sync-builder export (`references/testing-infra.md`). Without a seam, someone will reach for `mock.module` on the next test. Expose one from day one, even before the first test exists.
 - Adding a new `src/infra/*.ts`, `src/composition/*.ts`, or `src/presenter/*.ts` file without regenerating `scripts/coverage-preload.ts` in the same commit (`bun run scripts/regenerate-coverage-preload.ts`). Untested infra files are invisible to `bun test --coverage` unless something imports them; the preload makes them appear at 0% so the gate can fail loudly.
 - `coverageThreshold` set in `bunfig.toml` while a per-tier script owns enforcement. Bun exits non-zero on the global threshold before the script can print per-file violations — looks like "coverage failed silently". Remove the global threshold; let the script own it.
@@ -477,6 +546,14 @@ Any hard-rule violation (1–25) is a red flag by definition — as is any breac
 - A composition root or wiring file declared "untestable" and skipped. The two ergonomic switches make any composition file 100%-testable: parameterise every state-source (path, env var, clock) and inject every output sink (logger, sender). See `references/architecture.md` (Composition root testability).
 - An assignment to `process.env.X = ...` anywhere outside `*.test.ts` (and even there, only inside `beforeAll`/`afterAll` with a saved-and-restored original). `process.env` is shared mutable state — pass values as parameters instead. See the Security section.
 - A rule 21–22 breach anywhere in the UI: a hook call inside `src/components/**`; an import of `src/lib/**`, `src/config/**`, or `next/*` in a design-system component; `'use client'`, translation resolution, `process.env`, or data fetching in one; a downward import (an atom importing a molecule); a Tailwind utility string outside `src/components/**` (tokens in `globals.css` aside); or free-form `className`/`style` in a molecule/organism public API. State is hoisted, links/images arrive as injected `ComponentType` props, and visual variation is a typed variant prop.
+- Personal data in the wrong channel (rule 27): an email, a name, or user-typed text in a log line, a URL, a query string, or a third-party analytics event; a new loggable field added without checking the redaction keys.
+- An isolation breach in the making (rule 28): an owner id read from a URL, header, or body; a query that returns unscoped rows when the owner is missing; an owner-scoped endpoint landing without its cross-tenant 404 test; a sequential integer id in a public URL.
+- An outbound call with no timeout, an unbounded or unjittered retry loop, or a retried non-idempotent operation without an idempotency key (rule 29). A fire-and-forget side effect after a commit that should be an outbox row.
+- A hard DELETE on live data, a hand-run or destructive in-place schema change, a shipped contract field renamed or dropped in one step (rule 30), or a mutable shared record written back without its version check (rule 31).
+- An LLM breach (rule 32): a provider SDK imported outside one infra adapter; a floating model alias (`latest`, an undated name); model output consumed without a schema checkpoint; a model-requested action executed without server-side authorization for the actual caller; a prompt or pin change shipped without its eval run; a metered AI route without a per-caller spend gate.
+- Hand-rolled session tokens, password hashing, or crypto; an admin surface without SSO plus MFA; a route that skipped the authenticated-by-default baseline without a written exception (rule 33).
+- A production dump restored into a lower environment, or a fixture carrying a real person's data (rule 34).
+- User-facing failure with no designed state: a raw status code or stack trace shown to a person, copy hardcoded outside the i18n catalog, a clickable `div` where a `button` belongs, or a flow that cannot be completed by keyboard (`references/product.md`).
 
 ## Remember
 

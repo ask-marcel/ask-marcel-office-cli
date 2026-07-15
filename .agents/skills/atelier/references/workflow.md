@@ -37,6 +37,8 @@ Status: in progress. Started YYYY-MM-DD.
 
 **On resume.** Start of session, read `.claude/PLAN.md` (alongside the lesson files). If it shows an unfinished task, continue from the first unchecked step rather than re-planning. If the user's new request supersedes the open plan, say so in one sentence and overwrite it.
 
+**Within a long run.** The live plan is also your context-budget checkpoint, not only a crash-recovery file: keeping it current means a long agentic run degrades gracefully instead of hitting a context limit blind, because the next step and its DoD are always on disk. When a task is too large to finish in one context window, decompose it into independently-checkpointed steps (or subagents) rather than driving one context past the wall.
+
 ## The four-check loop (after every change)
 
 ```bash
@@ -327,6 +329,47 @@ Practical loop: pull/rebase often to stay close to the trunk; run the four-check
 
 This is the default for this codebase. It overrides any tooling habit of "branch first by default" — branch only when a short-lived branch genuinely helps (e.g. a PR-review gate your team requires), and merge it the same day.
 
+## Commit identity (rule 26)
+
+Every commit carries an author and a committer (each a name plus an email), taken from git config, and whatever they are becomes permanent public history the moment you push. `gitleaks` (gate 3) scans the staged *diff* for secrets, but it is blind to the *identity* on the commit itself: a real name or an `@company.com` email in the author field sails through every gate. Rule 26 covers that gap. It is a behavioural gate, not a tool.
+
+**Decide the identity on purpose, before the first commit.** Do not let the global git config leak whatever it happens to hold. Set a repo-local identity so the choice is explicit and scoped to this repo:
+
+```bash
+# Neutral: the repo is not tied to a person or employer.
+git config --local user.name  "atelier"
+git config --local user.email "atelier@users.noreply.github.com"
+
+# Attributed: you deliberately want credit on your own work.
+git config --local user.name  "Your Name"
+git config --local user.email "you@personal.example"   # or <id>+<user>@users.noreply.github.com
+```
+
+`--local` writes to this repo's `.git/config` only, so it never changes how you commit elsewhere and it wins over the global identity. Neither choice is wrong; the failure mode rule 26 prevents is the *unchosen* one, where a client's name or a work email you never meant to publish rides along by default.
+
+**Audit before publishing or handing off.** The identity is already inside every commit, so grepping files is not enough; check the metadata across all of history:
+
+```bash
+git log --all --format='%an <%ae>  ||  %cn <%ce>' | sort -u   # every identity ever used
+git log --all --format='%an <%ae>' | grep -i '@yourcompany'   # hunt a specific leak
+```
+
+`gitleaks detect` (the history-wide mode, not the pre-commit `protect --staged`) is the secret-scanning complement. Run both before the first push to a public host.
+
+**If the wrong identity already shipped, rewrite history.** A one-time, destructive, gated operation; never run it unprompted (rule 25). Use `git filter-repo` (install: `brew install git-filter-repo`) with a mailmap that maps the leaked identity to the intended one:
+
+```bash
+# mailmap.txt maps any commit with the old email to the new identity:
+#   Intended Name <intended@email>  <leaked@company.com>
+git filter-repo --mailmap mailmap.txt --force
+git remote add origin <url>          # filter-repo strips the remote as a safety measure
+git push --force-with-lease origin main
+```
+
+To scrub a name from *file contents* too (a LICENSE header, a comment), add `--replace-text` with `Old Name==>New Name` lines. `filter-repo` rewrites every commit SHA, so this is a coordinated force-push: anyone holding a clone must re-clone.
+
+**A force-push does not purge the old commits.** The rewritten branch no longer points at them, but the host keeps unreferenced commits reachable by their SHA, through cached views, and via any fork or open PR, until it garbage-collects on its own schedule. Treat a leaked commit as exposed even after the fix: rotate anything that was a live secret, and for a hard guarantee delete-and-recreate the repo or ask the host's support to purge. atelier-greenfield sets the identity at repo birth so the whole procedure is never needed; atelier-review-me's adopt mode scans an existing repo for the leak.
+
 ## Pre-commit hook (eight gates)
 
 The hook is the safety net for the entire workflow. It runs **eight gates** in cost-ascending order — cheap fast-fail gates first, expensive gates last so a slow mutation run only happens when everything else is clean.
@@ -511,6 +554,19 @@ Once per release (or quarterly), temporarily remove the `test-helpers` skip from
 
 Restore the skip after the audit. Schedule it on a calendar; the longer between audits, the more dead code accumulates.
 
+### Discipline tripwires (rules 27-30, optional gates)
+
+Four shipped guards move the mechanical slices of the production disciplines into the machine tier. Each checks the **staged diff** (like `gitleaks protect --staged`), so it blocks a violation entering history without flooding a brownfield tree; each takes `--all` for a tree-wide adopt-mode audit; exceptions ride on path conventions, never inline suppressions (rule 15).
+
+| Guard | Rule | Blocks |
+|:---|:--:|:---|
+| `assets/check-pii-channels.sh` | 27 | a natural identifier in a query string (literal or via `new URLSearchParams`), a logger message interpolation, a Java `@QueryParam` |
+| `assets/check-io-deadlines.sh` | 29 | an infra `fetch` / Java `HttpClient` with no deadline marker in the file |
+| `assets/check-data-lifecycle.sh` | 30 | a hard delete in app code (erasure/retention paths exempt); destructive DDL outside a `*contract*` migration |
+| `assets/check-isolation-tests.sh` | 28 | a new route file with no nearby test mentioning 404 (`*public*`/`*health*` exempt) |
+
+They are not part of the branded eight gates: wire them as pre-commit pre-flight steps or CI checks **in repos where the concern exists** (personal data, network IO, a schema, tenants). They are tripwires, not proofs; the discipline references keep the full review duty. The repo smoke test exercises all four so a regression in a guard fails CI here first.
+
 ### Never bypass with `--no-verify`
 
 `git commit --no-verify` skips every gate. It is reserved for genuine big-bang changes — initial scaffolds, mass-rename refactors, generated-file updates — never for a failing check. **Justify every bypass in the commit body.** Do not normalise bypassing.
@@ -557,7 +613,25 @@ jobs:
 
 `--audit-level=high` fails the job only on high/critical advisories; moderate and low are reported but do not block — run `bun audit` locally to see the full list. The scan covers **all** dependencies, not `--prod` only: dev and build tooling are part of the supply-chain attack surface CI exists to watch.
 
-This is the one piece of CI the standard prescribes today. The broader CI pipeline atelier assumes elsewhere ("quality is owned by the eight gates **and CI**") is deliberately left to the adopter.
+Beyond this scan, CI gains a job whenever the matching concern exists in the repo: an eval gate on any LLM hole (`references/ai.md`), an axe scan on a UI (`references/product.md`), a load-test threshold on a hot route (`references/reliability.md`), the compose portability boot, deployment events, and the scheduled restore drill (`references/delivery.md`). Each is prescribed by its reference; the wiring is per-repo.
+
+## Verification discipline (a control is a hypothesis until tested)
+
+The gates make the standard executable; this section is about not trusting a gate, a guard, or a fix until something has tried to defeat it.
+
+- **Test the bypass, not the happy path.** A guard proves nothing until a test walks the forbidden path and is refused: wrong role 403, missing token 401, cross-tenant 404, forged trust header inert. See `references/testing.md` (Bypass tests) and `references/isolation.md`.
+- **Audit the seams between systems.** The dangerous gap lives where two individually-correct systems meet (proxy to app, edge to service); test the path a real request travels, not each box in isolation.
+- **Fix the class, not the instance.** When a flaw is found, assume it repeats wherever the pattern does: enumerate with `rg` first, fix every hit, then add a CI guard that fails if the pattern returns.
+
+```bash
+rg -n '(db\.query|db\.execute)\(`.*\$\{' -- 'src/**/*.ts'   # enumerate the whole class
+# then a CI step: if rg -q <same pattern>; then echo "interpolated SQL sink" >&2; exit 1; fi
+```
+
+- **Compliance is not proof.** A ticked checklist and a passed audit describe paperwork. The standard is a runnable check: "show me how you verify it, and let me run it myself." Evidence is the exit code of a committed script anyone accountable can execute, never a screenshot of a green run (`references/governance.md`, owner-verifiable done).
+- **Generated code meets the same bar (provenance is not proof).** Code from a scaffolder, a generator, or an AI assistant runs through the identical hooks, gates, suite, and review a human's would; the reviewer reads the diff, not the attribution. No `--no-verify` because "the tool wrote it".
+- **Prefer failing loud.** A gate that stays green for the wrong reason lies: that is why untested files enter coverage at 0% (the preload), why the mutation gate exists at all, and why each new gate should be tried against a known violation once before it is trusted (the smoke tests do exactly this for the shipped configs).
+- **A skill description is a triggering contract; edits to it rerun the trigger eval.** Any change to a `SKILL.md` frontmatter description runs its eval set before landing (`bash scripts/trigger-eval/run.sh <set> <skill-dir>`; the `suite-routing.json` set with `TRIGGER_EVAL_SUITE` when wording could shift which suite skill wins a query). A description tuned by feel regresses silently; the eval is one command.
 
 ## README consistency
 
@@ -641,8 +715,10 @@ After the change, restart the TS server in VS Code (Cmd/Ctrl + Shift + P → "Ty
 - **Coverage gates per-tier:** 100% on `domain` + `use-cases`, 80% on `composition` + `infra` + `presenter`, skip `test-helpers` and `main.ts` only. `build-deps.ts` is now in scope (testable via optional config DI).
 - **SonarLint parity at lint time** via `eslint-plugin-sonarjs` + type-aware `@typescript-eslint` rules.
 - **Pre-commit hook runs eight gates**, in cost-ascending order: commit size → package.json (no `"latest"` / `"*"`) → gitleaks → tests → lint:strict → typecheck → coverage → mutate:staged.
+- **Commit identity is chosen deliberately** (rule 26): a repo-local `user.name` / `user.email`, neutral or attributed, set before commit one. `gitleaks` catches secrets in the diff but not a name or `@company` email in the commit itself; a leaked identity is undone only by a `git filter-repo` rewrite plus a force-push, and even then the host may keep the old commits cached.
 - **Dependency CVE scanning lives in CI, not the gate** (`bun audit --audit-level=high`): a daily scheduled watchdog for new CVEs in untouched deps, plus a PR run scoped to `package.json` / `bun.lock` for deliberately-introduced ones.
 - **Mutation testing on staged files** (Stryker, ≥90% break threshold) makes "tests don't actually pin behaviour" findable in CI.
+- **Verification discipline:** a control is a hypothesis until a test walks the forbidden path; test the bypass, audit the seams, fix the class not the instance, and proof is a runnable check, not a checklist or a screenshot. Generated code meets the identical bar; provenance is not proof.
 - **Commits stay small:** ≤10 files AND ≤300 lines per commit. The hook enforces it.
 - **Periodic audits**: once per release, drop the `test-helpers` skip and run coverage; anything below 100% is dead code or untested defensive code.
 - **README.md is part of the change set.** Re-read it before declaring any task done.

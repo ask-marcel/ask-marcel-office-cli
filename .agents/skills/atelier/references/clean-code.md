@@ -197,6 +197,20 @@ export const age = (value: number): Age => {
 export const createUser = (e: Email, a: Age): User => ({ email: e, age: a });
 ```
 
+Two primitives get a named callout because their failure mode is silent (hard rule 12; `references/reliability.md`, Money and time):
+
+```ts
+// Money holds integer minor units, never a float: 0.1 + 0.2 !== 0.3, and the rounding lands on an invoice
+export type Money = { readonly cents: number; readonly currency: 'EUR' | 'USD' };
+export const money = (cents: number, currency: Money['currency']): Money => {
+  if (!Number.isSafeInteger(cents)) throw new Error('invalid Money.cents');
+  return { cents, currency };
+};
+// arithmetic lives with the type and refuses a currency mismatch; display formatting divides at the presentation edge
+```
+
+Instants are UTC in the domain (epoch milliseconds or a branded ISO instant); a timezone is a display concern applied only at the presentation edge, never stored inside the domain value.
+
 ### 4. First-class collections
 
 Any module that holds a collection with domain meaning should have no other fields. Extract the collection as its own module.

@@ -118,6 +118,22 @@ describe('checkout flow', () => {
 });
 ```
 
+### Performance / load tests
+
+The layer the other three ignore: unit, integration, and E2E all prove correctness at n=1. When a route has a latency budget (`references/reliability.md`, Performance is a budget), a load test proves it under production-like traffic and fails the pipeline when breached, e.g. k6 with `thresholds: { http_req_duration: ['p(99)<300'] }` at the expected peak. Few of these: hot endpoints and known-risky queries, not every route. The pagination and N+1 disciplines in `references/reliability.md` are what make passing them possible as tables grow.
+
+### Regression tests (every fixed bug becomes one)
+
+A bug fix without a test is a bug scheduled to return. The loop for any defect: write the test that reproduces it first (red), name it after the defect in domain language with a `regression:` prefix, then fix production code until green (SKILL.md, Behavioural Guideline #4). The test is permanent; it never gets deleted when the code it pins is refactored.
+
+```ts
+test('regression: empty cart totals to zero, not NaN', () => {
+  expect(total([])).toBe(0);
+});
+```
+
+The same discipline extends to LLM holes: a production miss becomes a labeled eval case (`references/ai.md`).
+
 ---
 
 ## Arrange-Act-Assert
@@ -501,6 +517,24 @@ This catches "I implemented the fake differently from the real one" bugs.
 
 ---
 
+### Bypass tests (assert the refusal, not just the success)
+
+A guard proves nothing until a test walks the forbidden path and is refused. The happy-path test ("admin can purge") would pass even if the role check were missing; the bypass test is the one that fails on the real defect:
+
+```ts
+test('non-admin purge is refused', async () => {
+  const res = await app.request('/v1/admin/purge', authAs(staffUser));
+  expect(res.status).toBe(403);
+});
+
+test('missing token is unauthorized', async () => {
+  const res = await app.request('/v1/admin/purge');
+  expect(res.status).toBe(401);
+});
+```
+
+Three refusals every protected surface ships: the **lower-privilege role** (403), the **missing/invalid token** (401), and the **cross-tenant reach** (404, so existence is not disclosed; `references/isolation.md`). And test the seam a request actually travels: drive the real edge with a forged trust header (`x-org-id` set by the attacker) and assert it is inert, because the gap between two individually-correct systems is where real attacks live. A control nobody has tried to get around protects nothing (SKILL.md red flags; `references/workflow.md`, Verification discipline).
+
 ## Test builders
 
 Create test records easily. A builder is just a factory function with sensible defaults.
@@ -534,6 +568,8 @@ const withItems = buildOrder({ items: [item({ sku: 'ABC', price: money(100, 'EUR
 |:---|:---|:---|
 | Testing implementation | Brittle tests | Test observable behaviour only |
 | Using mocks | Tests prove call sequences instead of outcomes; break on refactor | Never use mocks — write a fake for the contract |
+| Testing only the happy path of a guard | A missing role/tenant check still passes every test | Ship the refusal tests: 403 wrong role, 401 no token, 404 cross-tenant (Bypass tests above) |
+| Fixing a bug without a test | The same defect returns unnoticed | Reproduce red first; keep it as a permanent `regression:` test |
 | Shared state between tests | Flaky tests | Isolate each test (fresh fakes per test) |
 | No assertions | False confidence | Always assert something meaningful |
 | Testing trivial code | Wasted effort | Focus on logic, edge cases, boundaries |

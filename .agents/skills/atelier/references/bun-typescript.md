@@ -54,7 +54,7 @@ Minimal skeleton:
 }
 ```
 
-The version ranges above are sample pins as of writing. **Never use `"latest"` or `"*"`** (atelier hard rule 19, enforced by `scripts/check-package-json.sh` in pre-commit gate 2). To get the actual current latest of every dep on a fresh repo, run `bun install` first (resolving the ranges above), then `bun update` (which rewrites the `^X.Y.Z` ranges to the latest matching version) and commit the lockfile change. After that, every new package goes in via `bun add <pkg>` (runtime) or `bun add -d <pkg>` (dev) — Bun pins it to `^X.Y.Z` automatically. Hand-editing `package.json` to add a dep is a smell.
+The version ranges above are sample pins as of writing, with one that is load-bearing: keep `typescript` on `^5` until eslint-plugin-sonarjs supports TypeScript 7 (sonarjs <= 4.1.0 reads `ts.SyntaxKind` at rule-module load and crashes under TS 7's module shape; found by the repo smoke test 2026-07-12). **Never use `"latest"` or `"*"`** (atelier hard rule 19, enforced by `scripts/check-package-json.sh` in pre-commit gate 2). To get the actual current latest of every dep on a fresh repo, run `bun install` first (resolving the ranges above), then `bun update` (which rewrites the `^X.Y.Z` ranges to the latest matching version) and commit the lockfile change. After that, every new package goes in via `bun add <pkg>` (runtime) or `bun add -d <pkg>` (dev) — Bun pins it to `^X.Y.Z` automatically. Hand-editing `package.json` to add a dep is a smell.
 
 Common runtime deps in this class of repo (install on demand with `bun add <name>`):
 `@google/genai`, `canvas`, `chardet`, `csv-writer`, `firebase-admin`, `iconv-lite`, `jsonwebtoken` (+ `@types/jsonwebtoken`), `papaparse`, `pdf-extract-image`, `pdf-to-png-converter`, `pdfjs-dist`, `winston`, `xlsx`.
@@ -345,7 +345,7 @@ export type Logger = {
 import { createLogger, format, transports } from 'winston';
 import type { Logger } from '../use-cases/ports/logger.ts';
 
-const REDACTED_KEYS = new Set(['password', 'token', 'authorization', 'apikey', 'secret']);
+const REDACTED_KEYS = new Set(['password', 'token', 'authorization', 'apikey', 'secret', 'email', 'phone']); // secrets plus natural identifiers (rule 27); extend with the domain's own
 
 const redactFormat = format((info) => {
   for (const key of Object.keys(info)) {

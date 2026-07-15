@@ -288,6 +288,18 @@ const eslintConfig = defineConfig([
         { selector: 'CallExpression[callee.name=/^use[A-Z]/]', message: 'No hooks inside the design system — hoist state to the page shell via src/lib/hooks (hard rule 21).' },
         { selector: 'Program > ExpressionStatement[directive="use client"]', message: "The 'use client' boundary belongs to page shells, not design-system components (hard rule 21)." },
       ],
+      // Accessible by default (rule 17.6): the design system is where a11y is won or
+      // lost, so the doctrine's structural rules are error-level here. The jsx-a11y plugin
+      // is registered by next/core-web-vitals (spread below), which enables its recommended
+      // subset app-wide but NOT the interaction rules that catch the flagship clickable-div;
+      // these reference that same plugin and make them explicit and unmissable. Contrast is
+      // not lintable (needs layout) — it lives in the design tokens (rule 22) and review.
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/click-events-have-key-events': 'error',
+      'jsx-a11y/interactive-supports-focus': 'error',
+      'jsx-a11y/control-has-associated-label': 'error',
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/anchor-is-valid': 'error',
     },
   },
   {
@@ -547,6 +559,7 @@ This is the Next.js mirror of the Bun-script **Inbound HTTP (server archetype)**
   ```
 - **Vendoring Bun-script domain code** (a `Result` type, branded-id constructors, use-cases) is the normal way to share logic — add `"allowImportingTsExtensions": true` to `tsconfig.json` if that code imports with explicit `.ts` extensions (see the tsconfig note above).
 - **Logger:** server code uses the injected `Logger` **port** + Winston adapter + recording fake from the Bun variant (`references/bun-typescript.md` § Logger), **not** the client singleton. The rule-4 singleton exception is scoped to client components / static code only — a server app has a composition root, so inject the port (this is hard rule 4, not an exception to it).
+- **Client-side data fetching goes through a gateway.** When page shells fetch at runtime (from the app's own route handlers or an external API), components never call `fetch` directly: a gateway port in `src/lib/` with a real client and a canned fake, returning `Result` and mapping the wire DTO into the frontend's own model at that one point (`references/architecture.md` § API shape, the frontend gateway). The static shape needs none of this: build-time loaders play that role.
 
 ### Route handler = inbound adapter
 
@@ -638,6 +651,8 @@ The store adapter is plain infra — `createDossierStoreMemory` returns `{ get, 
 Languages are Next.js route groups: `app/(en)`, `app/(es)`, `app/(fr)`, `app/(de)`, `app/(pt)`, `app/(zh)`, `app/(ja)`.
 
 Translations are JSON files in `data/translations/` loaded by `src/lib/i18n/`. Each language has its own `page.tsx` / `layout.tsx`; shared shells live in `src/page/` and `src/lib/layout/`.
+
+Every user-facing string lives in the catalog, keyed by meaning: error copy included, so a failure names its cause and next step in the user's language over a stable machine-readable code, and no prose is hardcoded in a component (`references/product.md`). Accessibility rides the same rails: semantic components, keyboard operability, and contrast-safe token pairs are design-system duties (`references/atomic-design.md`, Accessible by default).
 
 ## Secrets & config
 

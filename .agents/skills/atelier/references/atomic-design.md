@@ -227,6 +227,17 @@ src/components/organisms → molecules → atoms     stateless, logic-free
 
 The page shell is the composition root of the UI: it is the only `'use client'` boundary, the only consumer of hooks, and the only place design-system props get assembled. `src/config/` may import design-system **prop types** (`FeaturesProps`, `TestimonialsProps`) to stay in sync with the components it feeds — types flow downward, code never does.
 
+## Accessible by default
+
+A user who cannot see, hear, or use a mouse is still a user, and this is law that follows the user (the EU Accessibility Act applies since mid-2025). The design system is where accessibility is won or lost, because every screen inherits what the components do (full product-side doctrine: `references/product.md`):
+
+- **Semantic elements first.** A `<button>`, never a clickable `div`; `<details>`/`<summary>` for disclosure; `<nav>`, `<main>`, real headings in order. The interactivity ladder's "native HTML first" is accessibility by default: focus, keyboard, and roles come free.
+- **Keyboard everywhere.** Every interactive component operable by keyboard alone, focus visible (`focus-visible:` styles in the component), order following the DOM. A pointer-only interaction is a broken component.
+- **Contrast lives in the tokens.** Token pairs in `globals.css` (`--color-primary` with `--color-on-primary`) are chosen once to pass WCAG contrast; components consume pairs, never mix-and-match raw colours, so compliance is inherited (rule 22).
+- **Labels and states are props.** Inputs get labels, icon-only buttons get an `aria-label` prop, images get meaningful `alt` (or explicit `alt=""` when decorative), busy/expanded/selected states surface as `aria-*` driven by the same props that drive the visuals.
+- **Error, empty, and loading are designed states**, not afterthoughts: components expose them as typed variants so a page shell with a failed `Result` renders an explicit state instead of a blank (`references/product.md`, error copy).
+- **The gate is automated.** `eslint-plugin-jsx-a11y` runs error-level on `src/components/**` in the canonical Next config (`references/nextjs-monorepo.md`): it fails the build on a clickable `<div>`, a control with no accessible name, a missing `alt`, or an invalid anchor, and the Next smoke test proves those rules fire. It is AST-based, so it cannot judge contrast (no layout) or focus order; those stay with the design tokens (rule 22) and review, and a runtime axe scan is the optional deeper pass a team adds when it wants dynamic-state and contrast coverage.
+
 ## Where does it go?
 
 | You are about to write… | It belongs in |
@@ -252,6 +263,7 @@ When a component seems to "need" something not in this table — a store, a cont
 - A component that resolves translations, reads `process.env`, or touches `window`.
 - `'use client'` on a design-system component. The directive belongs to page shells; pure components inherit the boundary.
 - A `<div onClick>` where a `<button>` or `<details>` does the job natively.
+- An interactive component a keyboard cannot operate, an icon-only control without an accessible name, or a raw colour pairing that sidesteps the contrast-safe token pairs.
 - Conditional `null` returns to hide content where a `hidden`/responsive class is the honest tool.
 - Index keys in a `.map`.
 - A new component folder without an exported props type, without `displayName`, or holding two components.

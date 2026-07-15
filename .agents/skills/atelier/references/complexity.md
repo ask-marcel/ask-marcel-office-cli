@@ -124,9 +124,18 @@ KISS and YAGNI answer *how simple*; the lazy ladder turns them into a procedure 
 3. **Native runtime capability?** In a Bun repo the runtime replaces whole categories of dependency: `Bun.file`/`Bun.write` for file IO (hard rule 20), `crypto.subtle` and `crypto.randomUUID()` for crypto, the global `fetch`, `URL`/`URLSearchParams`, `Bun.password` for hashing. Prefer the platform before `bun add`.
 4. **A dependency already in `package.json`?** If something installed already does the job, use it — do not add a second library for the same capability (and never `bun add` a near-duplicate; hard rule 19).
 5. **One clear line?** If the whole thing collapses to one readable expression, that is the implementation.
-6. **Only then** write the minimum that works — the absolute smallest correct version, no speculative seams.
+6. **Only then** write the minimum that works — the absolute smallest correct version, no speculative abstractions (what "no speculative seams" does and does not mean: see *Defer the build, not the seam* below).
 
 **Tiebreaker.** When two stdlib approaches are the same size, pick the one that is edge-case-correct and more efficient (e.g. `re.exec` in a loop over `.matchAll` spread only when you need the perf; the *correct* boundary handling always wins over the cute one-liner). Two more reflexes: **delete before adding** (a diff that removes code is usually the better fix), and **boring over clever** (the next reader, possibly you in six months, pays for cleverness).
+
+### Defer the build, not the seam
+
+YAGNI applies to implementations, never to the thin contracts that keep a later swap cheap. When a future need is likely (a heavier mailer, a real cache, a second provider), put the boundary in now and defer the machinery:
+
+- The **port** (one function-type alias) and the **smallest real adapter** ship today. In this standard that seam is structural anyway: every side-effectful dependency sits behind a port with a test seam from day one (hard rule 13), so the interface costs nothing extra.
+- The **heavy implementation** (retries beyond `retryOnErr`, batching, sharding, a circuit breaker, a pooled cache) waits until the need is real. A dependency earns its circuit breaker; it is not born with one (`references/reliability.md`).
+
+So the lazy ladder's "no speculative abstractions" bans inventing *domain* abstractions and heavyweight adapters for imagined futures. It never bans the port itself: deleting the seam to save one type alias buys nothing today and makes the eventual swap a rewrite.
 
 ### Simplicity is not negligence
 
