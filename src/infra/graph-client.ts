@@ -104,6 +104,12 @@ type TokenTierInfo = {
   readonly expiresInSeconds: number | undefined;
   readonly scopes: ReadonlyArray<string>;
   readonly refresh: 'automatic' | 'interactive';
+  /**
+   * Present ONLY when `available` is `false`: a one-line, jargon-free reason the
+   * tier is absent + how to restore it. Stops the empty `scopes: []` on a missing
+   * token from reading as a bug. Omitted entirely when the token is available.
+   */
+  readonly reason?: string;
 };
 
 type TokenInfo = {
@@ -134,6 +140,16 @@ type TokenInfo = {
    */
   readonly chatsvcagg: TokenTierInfo;
   readonly ic3: TokenTierInfo;
+};
+
+// Recovery hints attached to an UNAVAILABLE tier so a bare `scopes: []` on a
+// missing token reads as "not captured yet", not "this token has no scopes".
+const TIER_REASON_INTERACTIVE = 'not cached (absent or expired) — run `ask-marcel-office login --force` to re-capture it; the elevated token carries no refresh token of its own';
+const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `ask-marcel-office login --force`';
+
+const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {
+  if (info.available) return { ...info, refresh };
+  return { ...info, refresh, reason: refresh === 'interactive' ? TIER_REASON_INTERACTIVE : TIER_REASON_AUTOMATIC };
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -626,9 +642,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     // The refresh route is a fixed per-tier property: the substrate + elevated tokens
     // that self-heal from the shared RT are `automatic`; the elevated (M365) token has
     // no refresh token of its own, so it is `interactive` (a browser login re-captures it).
-    const elevated: TokenTierInfo = { ...elevatedInfo, refresh: 'interactive' };
-    const chatsvcagg: TokenTierInfo = { ...chatsvcaggInfo, refresh: 'automatic' };
-    const ic3: TokenTierInfo = { ...ic3Info, refresh: 'automatic' };
+    const elevated = buildTier(elevatedInfo, 'interactive');
+    const chatsvcagg = buildTier(chatsvcaggInfo, 'automatic');
+    const ic3 = buildTier(ic3Info, 'automatic');
     return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated, chatsvcagg, ic3 });
   };
 

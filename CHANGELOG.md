@@ -55,6 +55,20 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   percent-encoded (`#`→`%23`, `@`→`%40`; GUIDs unchanged), which Microsoft Graph
   requires for B2B UPNs and which is verified live against the directory. `get-user`
   (new this release) already encodes its path.
+- **Cached elevated / substrate tokens now survive a basic-token refresh.** The
+  silent basic-token refresh (triggered whenever the Teams token nears expiry)
+  rebuilt the cache from only the three basic fields, wiping the cached `elevated`
+  / `chatsvcagg` / `ic3` tokens on every renewal — so `scopes-check` and `login`
+  then reported them unavailable with empty scopes, and the elevated token (which
+  carries no refresh token of its own) needed a forced re-login to recover. The
+  refresh now merges, preserving all four tokens until they each expire.
+- **`scopes-check` explains an unavailable token.** Every tier block whose
+  `available` is `false` now carries a `reason` — a one-line note on why it is
+  absent and how to restore it (`login --force`; the substrate tiers also self-heal
+  on next use) — so an empty `scopes: []` on a missing token is not misread as "no
+  scopes". Additive and non-breaking; omitted when the token is available.
+
+## 2.1.0
 
 ### Added
 

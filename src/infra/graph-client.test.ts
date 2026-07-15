@@ -1119,7 +1119,36 @@ describe('graph client', () => {
     const client = createGraphClient(noElevatedInfoAuth);
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.elevated).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' });
+    if (result.ok)
+      expect(result.value.elevated).toEqual({
+        available: false,
+        expiresInSeconds: undefined,
+        scopes: [],
+        refresh: 'interactive',
+        reason: expect.stringContaining('login --force'),
+      });
+  });
+
+  it('attaches a restore `reason` to an unavailable token tier (so empty scopes never read as a bug) and omits it when available', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const jwt = `${segment('{"alg":"none"}')}.${segment('{"scp":"Files.Read.All","aud":"https://graph.microsoft.com","exp":1893456000}')}.sig`;
+    const mixedAuth: AuthManager = {
+      ...fakeAuth(),
+      getAccessToken: async () => ok(accessTokenUnsafe(jwt)),
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      getCachedChatsvcaggInfo: async () => ({ available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'] }),
+      getCachedIc3Info: async () => ({ available: false, expiresInSeconds: -10, scopes: ['Teams.AccessAsUser.All'] }),
+    };
+    const client = createGraphClient(mixedAuth);
+    const result = await client.getCachedTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.elevated.reason).toContain('login --force'); // interactive: how to re-capture
+      expect(result.value.elevated.reason).toContain('no refresh token of its own'); // phrase UNIQUE to the interactive text — proves the tier picked its own branch
+      expect(result.value.ic3.reason).toContain('self-heals'); // phrase UNIQUE to the automatic text (the interactive text never says this)
+      expect(result.value.ic3.reason).toContain('login --force'); // automatic tiers still name the force fallback
+      expect(result.value.chatsvcagg.reason).toBeUndefined(); // available → no reason noise
+    }
   });
 
   it('getCachedTokenInfo surfaces the chatsvcagg and ic3 substrate blocks when the auth manager can report them (login four-token status)', async () => {
@@ -1136,7 +1165,13 @@ describe('graph client', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.chatsvcagg).toEqual({ available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' });
-      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: -10, scopes: ['Teams.AccessAsUser.All'], refresh: 'automatic' });
+      expect(result.value.ic3).toEqual({
+        available: false,
+        expiresInSeconds: -10,
+        scopes: ['Teams.AccessAsUser.All'],
+        refresh: 'automatic',
+        reason: expect.stringContaining('login --force'),
+      });
     }
   });
 
@@ -1150,8 +1185,14 @@ describe('graph client', () => {
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.chatsvcagg).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' });
-      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' });
+      expect(result.value.chatsvcagg).toEqual({
+        available: false,
+        expiresInSeconds: undefined,
+        scopes: [],
+        refresh: 'automatic',
+        reason: expect.stringContaining('login --force'),
+      });
+      expect(result.value.ic3).toEqual({ available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic', reason: expect.stringContaining('login --force') });
     }
   });
 

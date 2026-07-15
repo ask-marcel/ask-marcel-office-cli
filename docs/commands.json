@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-15T04:36:41.663Z",
+  "generatedAt": "2026-07-15T07:11:33.311Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7483,7 +7483,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
       "options": [],
       "example": "ask-marcel-office scopes-check",
-      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }` where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: \"automatic\" | \"interactive\" }`. Top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds` describe the basic Teams token (back-compat). Each tier block also carries that token's OWN `scopes` (decoded from its `scp` claim: elevated ~20 Graph scopes, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, re-captured only by a browser login). `available` is `true` only when the token is present and beyond the 5-minute buffer; `expiresInSeconds` is the raw remaining seconds (negative when expired) and is omitted when the token is absent. `hint` names `login --force` as the single refresh action."
+      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }` where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: \"automatic\" | \"interactive\", reason?: string }`. Top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds` describe the basic Teams token (back-compat). Each tier block also carries that token's OWN `scopes` (decoded from its `scp` claim: elevated ~20 Graph scopes, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, re-captured only by a browser login). `available` is `true` only when the token is present and beyond the 5-minute buffer; `expiresInSeconds` is the raw remaining seconds (negative when expired) and is omitted when the token is absent. `reason` is present ONLY when `available` is `false` — a plain-language note on why the tier is missing and how to restore it (so an empty `scopes: []` on an absent token is not mistaken for \"no scopes\"); it is omitted when the token is available. `hint` names `login --force` as the single refresh action."
     },
     {
       "name": "search-all-accessible-sites",

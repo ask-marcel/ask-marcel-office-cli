@@ -215,6 +215,68 @@ describe('auth manager recovery ladder', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('preserves the cached elevated / chatsvcagg / ic3 tokens when the basic token is refreshed', async () => {
+    const mock = installFetchMock([
+      {
+        match: (url, init) => {
+          let bodyStr = '';
+          if (typeof init?.body === 'string') bodyStr = init.body;
+          else if (init?.body instanceof URLSearchParams) bodyStr = init.body.toString();
+          return url.includes('/token') && bodyStr.includes('refresh_token=old-refresh');
+        },
+        respond: () => {
+          const future = Math.floor(Date.now() / 1000) + 3600;
+          const header = btoa(JSON.stringify({ alg: 'RS256' }));
+          const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+          return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600, refresh_token: 'new-refresh' }));
+        },
+      },
+    ]);
+    afterEach(() => mock.restore());
+
+    const past = Math.floor(Date.now() / 1000) - 100;
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    // A cache with all four tokens (as `login --force` would leave it), basic expired.
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({
+        access_token: 'expired-token',
+        expires_on: past,
+        refresh_token: 'old-refresh',
+        elevated_access_token: 'elev-tok',
+        elevated_expires_on: future,
+        chatsvcagg_access_token: 'csa-tok',
+        chatsvcagg_expires_on: future,
+        chatsvcagg_region: 'emea',
+        ic3_access_token: 'ic3-tok',
+        ic3_expires_on: future,
+      })
+    );
+
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getAccessToken(); // basic token expired → silent refresh rung
+    expect(result.ok).toBe(true);
+
+    // The refresh must NOT clobber the other three tokens (elevated has no refresh
+    // token of its own, so losing it here means a forced re-login is the only recovery).
+    const cached = await fs.readJson<{
+      elevated_access_token?: string;
+      chatsvcagg_access_token?: string;
+      chatsvcagg_region?: string;
+      ic3_access_token?: string;
+      refresh_token?: string;
+    }>(CACHE_PATH);
+    expect(cached.ok).toBe(true);
+    if (cached.ok) {
+      expect(cached.value.elevated_access_token).toBe('elev-tok');
+      expect(cached.value.chatsvcagg_access_token).toBe('csa-tok');
+      expect(cached.value.chatsvcagg_region).toBe('emea');
+      expect(cached.value.ic3_access_token).toBe('ic3-tok');
+      expect(cached.value.refresh_token).toBe('new-refresh'); // basic fields still updated
+    }
+  });
+
   it('falls to browser when refresh fails', async () => {
     const mock = installFetchMock([
       {

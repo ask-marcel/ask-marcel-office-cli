@@ -271,6 +271,11 @@ const createAuthManagerFromApi = (
     const validated = accessToken(json.access_token ?? '');
     if (!validated.ok) return err({ type: 'auth_failed', message: 'invalid token from refresh' });
     const token: CachedToken = {
+      // Spread the existing cache FIRST so a basic-token refresh preserves the
+      // elevated / chatsvcagg / ic3 tokens (and chatsvcagg_region). Without this,
+      // every silent refresh wiped them — and elevated, carrying no refresh token
+      // of its own, could then only be recovered by a forced browser re-login.
+      ...cached,
       access_token: validated.value,
       expires_on: Math.floor(Date.now() / 1000) + json.expires_in,
       refresh_token: json.refresh_token ?? cached.refresh_token,
