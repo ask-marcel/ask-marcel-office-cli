@@ -66,6 +66,11 @@ type AuthError = { type: 'auth_failed'; message: string; code?: string } | { typ
  * downloads) will work without invoking them.
  */
 type ElevatedOutcome = { captured: true } | { captured: false; reason: ElevatedFailureReason | 'unknown_error' };
+// Decode-only preflight info for one token tier: availability, remaining runway,
+// and the scopes granted to that token (decoded from its `scp` claim; empty when
+// the token or the claim is absent).
+type CachedTierInfo = { readonly available: boolean; readonly expiresInSeconds: number | undefined; readonly scopes: ReadonlyArray<string> };
+
 type AuthManager = {
   getAccessToken: (options?: { force?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   /**
@@ -121,15 +126,15 @@ type AuthManager = {
    * Optional: only the real manager implements it; a minimal fake omits it
    * and callers treat that as unavailable. Never captures or refreshes.
    */
-  getCachedElevatedInfo?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
+  getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
   /**
    * Same decode-only preflight as `getCachedElevatedInfo`, for the chatsvcagg /
    * ic3 Teams-chat substrate tokens. `login`'s four-token status and
    * `scopes-check` read these; a minimal fake omits them and callers treat that
    * as unavailable.
    */
-  getCachedChatsvcaggInfo?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
-  getCachedIc3Info?: () => Promise<{ available: boolean; expiresInSeconds: number | undefined }>;
+  getCachedChatsvcaggInfo?: () => Promise<CachedTierInfo>;
+  getCachedIc3Info?: () => Promise<CachedTierInfo>;
 };
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
@@ -151,6 +156,16 @@ const DEFAULT_CHATSVCAGG_REGION = 'emea';
 // redeems for each by requesting `${resource}/.default` at the token endpoint.
 const CHATSVCAGG_RESOURCE = 'https://chatsvcagg.teams.microsoft.com';
 const IC3_RESOURCE = 'https://ic3.teams.office.com';
+
+// Decode the scopes granted to a cached token from its `scp` claim (space-separated).
+// Empty when the token is absent or carries no `scp` (decodeJwtPayload returns {} on
+// any malformed input). Used by the per-tier preflight getters so scopes-check can
+// list what each token can actually do.
+const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
+  if (!token) return [];
+  const scp = decodeJwtPayload(token)['scp'];
+  return typeof scp === 'string' ? scp.split(' ').filter((s) => s.length > 0) : [];
+};
 
 // Fail-fast (no browser) message for the secondary-token getters, used on the
 // command path only AFTER the headless refresh (`refreshSubstrateToken`) has
@@ -449,11 +464,11 @@ const createAuthManagerFromApi = (
   // with what `getElevatedAccessToken` would decide — but it never captures or
   // refreshes. `expiresInSeconds` is the raw exp − now (negative once past), so a
   // caller sees the runway even when the token is inside the buffer.
-  const getCachedElevatedInfo = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const getCachedElevatedInfo = async (): Promise<CachedTierInfo> => {
     const cached = await readCache();
     const exp = cached?.elevated_expires_on;
     const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
-    return { available: freshElevatedToken(cached) !== undefined, expiresInSeconds };
+    return { available: freshElevatedToken(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.elevated_access_token) };
   };
 
   // Distinct error messages per failure mode (launch-hang, navigation
@@ -529,11 +544,11 @@ const createAuthManagerFromApi = (
 
   // Decode-only preflight (mirrors getCachedElevatedInfo) so login's four-token
   // status reports the chatsvcagg substrate token without capturing or refreshing.
-  const getCachedChatsvcaggInfo = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const getCachedChatsvcaggInfo = async (): Promise<CachedTierInfo> => {
     const cached = await readCache();
     const exp = cached?.chatsvcagg_expires_on;
     const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
-    return { available: freshChatsvcaggToken(cached) !== undefined, expiresInSeconds };
+    return { available: freshChatsvcaggToken(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.chatsvcagg_access_token) };
   };
 
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
@@ -623,11 +638,11 @@ const createAuthManagerFromApi = (
   };
 
   // Decode-only preflight (mirrors getCachedElevatedInfo) for the ic3 substrate token.
-  const getCachedIc3Info = async (): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+  const getCachedIc3Info = async (): Promise<CachedTierInfo> => {
     const cached = await readCache();
     const exp = cached?.ic3_expires_on;
     const expiresInSeconds = typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined;
-    return { available: freshIc3Token(cached) !== undefined, expiresInSeconds };
+    return { available: freshIc3Token(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.ic3_access_token) };
   };
 
   const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
@@ -778,4 +793,4 @@ const createAuthManager = (deps: { cachePath: string; logger: Logger; fs?: FileS
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };
-export type { AuthError, AuthManager, ElevatedOutcome };
+export type { AuthError, AuthManager, CachedTierInfo, ElevatedOutcome };

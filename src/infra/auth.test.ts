@@ -11,24 +11,24 @@ import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './b
 
 // `getCachedElevatedInfo` is an optional AuthManager capability (only the real
 // manager reads the persisted elevated token); assert it's wired, then call it.
-const cachedElevatedInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+const cachedElevatedInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined; scopes: ReadonlyArray<string> }> => {
   const read = m.getCachedElevatedInfo;
   expect(read).toBeDefined();
-  return read ? read() : { available: false, expiresInSeconds: undefined };
+  return read ? read() : { available: false, expiresInSeconds: undefined, scopes: [] };
 };
 
 // The chatsvcagg / ic3 substrate tokens share the same decode-only preflight
 // contract as elevated; `login`'s four-token status and `scopes-check` read them.
-const cachedChatsvcaggInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+const cachedChatsvcaggInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined; scopes: ReadonlyArray<string> }> => {
   const read = m.getCachedChatsvcaggInfo;
   expect(read).toBeDefined();
-  return read ? read() : { available: false, expiresInSeconds: undefined };
+  return read ? read() : { available: false, expiresInSeconds: undefined, scopes: [] };
 };
 
-const cachedIc3Info = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined }> => {
+const cachedIc3Info = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined; scopes: ReadonlyArray<string> }> => {
   const read = m.getCachedIc3Info;
   expect(read).toBeDefined();
-  return read ? read() : { available: false, expiresInSeconds: undefined };
+  return read ? read() : { available: false, expiresInSeconds: undefined, scopes: [] };
 };
 
 const CACHE_PATH = '/virtual/token-cache.json';
@@ -139,6 +139,14 @@ const futureElevated = (): AccessToken => {
   const header = btoa(JSON.stringify({ alg: 'RS256' }));
   const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1' }));
   return accessTokenUnsafe(`${header}.${payload}.sig`);
+};
+
+// A JWT carrying a `scp` claim, for the per-tier scope-decoding tests.
+const jwtWithScopes = (scopes: ReadonlyArray<string>): string => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const header = btoa(JSON.stringify({ alg: 'RS256' }));
+  const payload = btoa(JSON.stringify({ exp: future, scp: scopes.join(' ') }));
+  return `${header}.${payload}.sig`;
 };
 
 describe('auth manager recovery ladder', () => {
@@ -637,6 +645,59 @@ describe('auth manager cached substrate info (chatsvcagg / ic3 preflight for log
     const info = await cachedIc3Info(auth);
     expect(info.available).toBe(false);
     expect(info.expiresInSeconds).toBeUndefined();
+  });
+});
+
+describe('auth manager cached tier scopes (decoded from each token scp claim)', () => {
+  it('decodes the elevated token granted scopes from its scp claim', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({
+        access_token: 'teams-tok',
+        expires_on: exp,
+        refresh_token: 'r',
+        elevated_access_token: jwtWithScopes(['Chat.ReadBasic', 'Files.ReadWrite.All']),
+        elevated_expires_on: exp,
+      })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.scopes).toEqual(['Chat.ReadBasic', 'Files.ReadWrite.All']);
+  });
+
+  it('decodes the chatsvcagg token scope (user_impersonation)', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'teams-tok', expires_on: exp, refresh_token: 'r', chatsvcagg_access_token: jwtWithScopes(['user_impersonation']), chatsvcagg_expires_on: exp })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedChatsvcaggInfo(auth);
+    expect(info.scopes).toEqual(['user_impersonation']);
+  });
+
+  it('decodes the ic3 token scope (Teams.AccessAsUser.All)', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'teams-tok', expires_on: exp, refresh_token: 'r', ic3_access_token: jwtWithScopes(['Teams.AccessAsUser.All']), ic3_expires_on: exp })
+    );
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedIc3Info(auth);
+    expect(info.scopes).toEqual(['Teams.AccessAsUser.All']);
+  });
+
+  it('reports empty scopes when the token carries no scp claim', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: exp, refresh_token: 'r', elevated_access_token: 'eyJ.no-scp.sig', elevated_expires_on: exp }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const info = await cachedElevatedInfo(auth);
+    expect(info.scopes).toEqual([]);
   });
 });
 
