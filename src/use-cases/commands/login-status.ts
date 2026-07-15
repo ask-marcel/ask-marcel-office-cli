@@ -1,48 +1,24 @@
-// Pure shaping for `login`'s four-token dashboard. The three self-healing tiers
-// (basic / chatsvcagg / ic3) ride the cached refresh token; the elevated (M365)
-// token has no refresh token, so it is re-captured only on an interactive login.
-// `login --force` re-captures all four in one browser pass.
+// Slim shaper for `login`'s output: a confirmation that authentication succeeded,
+// which tokens are currently available, and where to go next. The full per-token
+// detail (scopes, expiry, refresh route) lives in `scopes-check`, so login does not
+// duplicate it; it just points there and to `login --force` for a refresh.
 
-type RefreshRoute = 'automatic' | 'interactive';
+type LoginSummary = { status: 'authenticated'; available: ReadonlyArray<string>; hint: string };
 
-type TokenTier = { readonly available: boolean; readonly expiresInSeconds: number | undefined };
-
-type TokenView = { available: boolean; expiresInSeconds?: number; refresh: RefreshRoute; reason?: string };
-
-type LoginStatus = {
-  status: 'authenticated';
-  tokens: { basic: TokenView; elevated: TokenView; chatsvcagg: TokenView; ic3: TokenView };
-  hint: string;
+type LoginSummaryInput = {
+  readonly elevatedAvailable: boolean;
+  readonly chatsvcaggAvailable: boolean;
+  readonly ic3Available: boolean;
 };
 
-type LoginStatusInput = {
-  readonly basicExpiresInSeconds: number | undefined;
-  readonly elevated: TokenTier;
-  readonly chatsvcagg: TokenTier;
-  readonly ic3: TokenTier;
-  readonly elevatedFailureReason?: string;
-};
+const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office scopes-check`. To re-capture every token, run `ask-marcel-office login --force`.";
 
-const HINT =
-  'basic/chatsvcagg/ic3 refresh automatically from the cached refresh token; the elevated (M365) token is re-captured only on an interactive login. Run `ask-marcel-office login --force` to refresh all four now.';
-
-const toView = (tier: TokenTier, refresh: RefreshRoute, reason?: string): TokenView => {
-  const view: TokenView = { available: tier.available, refresh };
-  if (tier.expiresInSeconds !== undefined) view.expiresInSeconds = tier.expiresInSeconds;
-  if (reason !== undefined) view.reason = reason;
-  return view;
-};
-
-const buildLoginStatus = (input: LoginStatusInput): LoginStatus => ({
+const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => ({
   status: 'authenticated',
-  tokens: {
-    basic: toView({ available: true, expiresInSeconds: input.basicExpiresInSeconds }, 'automatic'),
-    elevated: toView(input.elevated, 'interactive', input.elevatedFailureReason),
-    chatsvcagg: toView(input.chatsvcagg, 'automatic'),
-    ic3: toView(input.ic3, 'automatic'),
-  },
-  hint: HINT,
+  // basic is always present once authenticated; the other tiers appear only when cached + fresh.
+  available: ['basic', ...(input.elevatedAvailable ? ['elevated'] : []), ...(input.chatsvcaggAvailable ? ['chatsvcagg'] : []), ...(input.ic3Available ? ['ic3'] : [])],
+  hint: LOGIN_HINT,
 });
 
-export { buildLoginStatus };
-export type { LoginStatus, LoginStatusInput };
+export { buildLoginSummary };
+export type { LoginSummary, LoginSummaryInput };

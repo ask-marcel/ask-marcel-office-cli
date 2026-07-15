@@ -9,7 +9,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
-import { buildLoginStatus } from '../use-cases/commands/login-status.ts';
+import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
 import { persistIfRequested, persistMediaIfRequested } from '../use-cases/commands/output-path.ts';
@@ -353,24 +353,19 @@ const buildCli = (deps: BuildCliDeps): Command => {
         fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
         return;
       }
-      // Report all four cached tokens (basic / elevated / chatsvcagg / ic3) with
-      // their runway and refresh route, so a warm re-login shows the full picture
-      // instead of a bare "authenticated". The decode-only read never opens a browser;
-      // a failed elevated capture this run surfaces its reason on the elevated token.
+      // Slim confirmation: which tokens are available now, and where to look next.
+      // The decode-only read never opens a browser. Full per-token scopes + expiry
+      // live in `scopes-check`; login just points there (and to `login --force`).
       const info = await graph.getCachedTokenInfo();
       if (!info.ok) {
         fail(info.error.message);
         return;
       }
-      const outcome = loginAuth.getLastElevatedOutcome();
-      const elevatedFailureReason = outcome && !outcome.captured ? outcome.reason : undefined;
       renderOut(
-        buildLoginStatus({
-          basicExpiresInSeconds: info.value.expiresInSeconds,
-          elevated: info.value.elevated,
-          chatsvcagg: info.value.chatsvcagg,
-          ic3: info.value.ic3,
-          elevatedFailureReason,
+        buildLoginSummary({
+          elevatedAvailable: info.value.elevated.available,
+          chatsvcaggAvailable: info.value.chatsvcagg.available,
+          ic3Available: info.value.ic3.available,
         })
       );
     });

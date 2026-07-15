@@ -87,22 +87,23 @@ const sampleTokenInfo = (over: Partial<TokenInfo> = {}): TokenInfo => ({
   audience: 'https://graph.microsoft.com',
   expiresAt: '2026-12-31T00:00:00.000Z',
   expiresInSeconds: 8938,
-  elevated: { available: false, expiresInSeconds: undefined },
-  chatsvcagg: { available: true, expiresInSeconds: 5400 },
-  ic3: { available: true, expiresInSeconds: 5400 },
+  elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+  chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' },
+  ic3: { available: true, expiresInSeconds: 5400, scopes: ['Teams.AccessAsUser.All'], refresh: 'automatic' },
   ...over,
 });
 
 const graphWithTokenInfo = (info: TokenInfo): GraphClient => fakeGraphClient({ getCachedTokenInfo: async () => ({ ok: true, value: info }) });
 
 describe('buildCli command surface', () => {
-  it('renders the four-token status envelope (basic/elevated/chatsvcagg/ic3 + hint) when login succeeds (under --output json)', async () => {
+  it('renders the slim availability summary + two-pointer hint when login succeeds (under --output json)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { status: string; tokens: Record<string, unknown>; hint: string } };
+    const parsed = JSON.parse(out) as { data: { status: string; available: string[]; hint: string } };
     expect(parsed.data.status).toBe('authenticated');
-    expect(Object.keys(parsed.data.tokens)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3']);
+    expect(parsed.data.available).toEqual(['basic', 'chatsvcagg', 'ic3']); // sampleTokenInfo has elevated unavailable → omitted
+    expect(parsed.data.hint).toContain('scopes-check');
     expect(parsed.data.hint).toContain('login --force');
   });
 
@@ -128,54 +129,27 @@ describe('buildCli command surface', () => {
     expect(description).not.toContain('searches, not mutations');
   });
 
-  it('renders the four-token status in text format with the refresh hint', async () => {
+  it('renders the slim summary in text format with the two-pointer hint', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toContain('status: authenticated');
-    expect(out).toContain('refresh: interactive'); // the elevated token's route
+    expect(out).toContain('scopes-check');
     expect(out).toContain('login --force');
   });
 
-  it('reports the elevated token as available with the interactive refresh route when it is cached', async () => {
+  it('includes a token in login available only when getCachedTokenInfo reports it available (elevated)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
       auth: okAuth(),
-      graph: graphWithTokenInfo(sampleTokenInfo({ elevated: { available: true, expiresInSeconds: 1800 } })),
+      graph: graphWithTokenInfo(sampleTokenInfo({ elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive' } })),
       logger,
       processRunner: createProcessRunnerFake(),
       fs: createFileSystemFake(),
     });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { tokens: { elevated: unknown } } };
-    expect(parsed.data.tokens.elevated).toEqual({ available: true, expiresInSeconds: 1800, refresh: 'interactive' });
-  });
-
-  it('surfaces the elevated capture reason on the elevated token when the browser step failed this run', async () => {
-    const elevatedFailedAuth: AuthManager = { ...okAuth(), getLastElevatedOutcome: () => ({ captured: false, reason: 'sso_timeout' }) };
-    const logger = createLoggerFake();
-    const cli = buildCli({
-      auth: elevatedFailedAuth,
-      graph: graphWithTokenInfo(sampleTokenInfo({ elevated: { available: false, expiresInSeconds: undefined } })),
-      logger,
-      processRunner: createProcessRunnerFake(),
-      fs: createFileSystemFake(),
-    });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { tokens: { elevated: { available: boolean; refresh: string; reason?: string } } } };
-    expect(parsed.data.tokens.elevated.available).toBe(false);
-    expect(parsed.data.tokens.elevated.reason).toBe('sso_timeout');
-    expect(parsed.data.tokens.elevated.refresh).toBe('interactive');
-  });
-
-  it('reports all four tokens even on a cache-hit login (no browser step ran → no elevated reason)', async () => {
-    // okAuth returns null from getLastElevatedOutcome (cache hit, no browser step this run).
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: graphWithTokenInfo(sampleTokenInfo()), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { status: string; tokens: { elevated: { reason?: string } } } };
-    expect(parsed.data.status).toBe('authenticated');
-    expect(parsed.data.tokens.elevated.reason).toBeUndefined();
+    const parsed = JSON.parse(out) as { data: { available: string[] } };
+    expect(parsed.data.available).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3']); // elevated now available → listed
   });
 
   it('login --force forwards the force flag to getAccessToken so a warm session re-captures all tokens', async () => {
