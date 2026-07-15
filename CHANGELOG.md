@@ -41,6 +41,14 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   `scopes-check`. (Dropping login's `tokens` block is the one breaking-ish change;
   it shipped a single release earlier and the same detail is fully available via
   `scopes-check`.)
+- **The mail read commands now include `conversationId` in their default
+  projection.** `list-mail-messages`, `search-mail-messages`, and
+  `get-mail-message` add `conversationId` to their slim default `--select`, so a
+  caller can group results into a thread — or hand the id straight to
+  `list-conversation-messages` — without a second round-trip. The three
+  previously-duplicated default-select strings are now one shared constant
+  (`mail-message-select.ts`) so they cannot drift apart again. Additive
+  (~76 bytes/message); a user-supplied `--select` still overrides entirely.
 
 ### Fixed
 

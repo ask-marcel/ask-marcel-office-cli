@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-15T07:11:33.311Z",
+  "generatedAt": "2026-07-15T10:03:02.430Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1509,7 +1509,7 @@
     },
     {
       "name": "get-mail-message",
-      "summary": "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
+      "summary": "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (`conversationId` gives you the thread, e.g. for `list-conversation-messages`) so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -4921,7 +4921,7 @@
     },
     {
       "name": "list-mail-messages",
-      "summary": "List the most recent messages from across the signed-in user's entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` so a page of 25 messages stays ~30-60 KB instead of ~1 MB. Pass `--select id,subject,body` (or any other comma-separated field list) to override. Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
+      "summary": "List the most recent messages from across the signed-in user's entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (`conversationId` groups messages into a thread and can be handed to `list-conversation-messages`) so a page of 25 messages stays ~30-60 KB instead of ~1 MB. Pass `--select id,subject,body` (or any other comma-separated field list) to override. Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages",
@@ -7345,7 +7345,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode that is the `next: <url>` value in the `---` footer; in JSON mode it is the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url '<url>'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",
@@ -7512,7 +7512,7 @@
     },
     {
       "name": "search-mail-messages",
-      "summary": "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` (same as `list-mail-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query 'subject:invoice from:alice'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `\"...\"` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `\"...\"` on the wire.",
+      "summary": "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (same as `list-mail-messages`; `conversationId` is included so you can group hits into a thread or feed one to `list-conversation-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query 'subject:invoice from:alice'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `\"...\"` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `\"...\"` on the wire.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages?$search=\"{query}\"",

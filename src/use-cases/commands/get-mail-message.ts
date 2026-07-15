@@ -1,22 +1,18 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
-// a full Graph `message` resource is 41+ KB by default
-// (huge `body.content`, full `internetMessageHeaders`, `uniqueBody`, etc.). LLM
-// callers almost always want subject + sender + preview; the body itself is
-// usually re-fetched via `convert-mail-to-markdown` only when the preview is
-// not enough. Ship a slim default `--select` so the unflagged invocation
-// returns ~2-3 KB instead of 41 KB. User `--select foo,bar` always wins.
-const DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview';
-
 const baseSchema = z.object({ messageId: z.string().min(1) });
-const { execute, schema } = buildSelectableCommand((p) => `/me/messages/${p.messageId}`, baseSchema, { defaultSelect: DEFAULT_SELECT });
+// Slim default projection shared with list-mail-messages / search-mail-messages
+// (see mail-message-select.ts): a full `message` is 41+ KB (body.content,
+// internetMessageHeaders, uniqueBody); the slim set is ~2-3 KB. `--select` wins.
+const { execute, schema } = buildSelectableCommand((p) => `/me/messages/${p.messageId}`, baseSchema, { defaultSelect: MAIL_MESSAGE_DEFAULT_SELECT });
 
 const meta: CommandMeta = {
   summary:
-    "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview` so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
+    "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (`conversationId` gives you the thread, e.g. for `list-conversation-messages`) so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}',
