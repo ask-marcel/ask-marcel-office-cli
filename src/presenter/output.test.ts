@@ -375,17 +375,17 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     expect(out).toBe('id: m1\nsubject: Re: Q2 planning\nfrom: alice@example.com\n\nid: m2\nsubject: Lunch?\nfrom: bob@example.com\n');
   });
 
-  it('appends a footer line carrying the next-page cursor when a listing has @odata.nextLink', async () => {
+  it('renders the next-page cursor as a whole ready-to-run command with a SINGLE-quoted URL (so $ / & survive a shell paste), not a bare URL', async () => {
     const logger = createLoggerFake();
     const data = {
       value: [{ id: 'm1', subject: 'hi' }],
       '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10',
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe('id: m1\nsubject: hi\n\n--- next: https://graph.microsoft.com/v1.0/me/messages?$skip=10\n');
+    expect(out).toBe("id: m1\nsubject: hi\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
   });
 
-  it('packs nextLink, deltaLink, and count side-by-side into a single footer separated by middle dots', async () => {
+  it('packs the nextLink + deltaLink run-commands and the raw count side-by-side into a single footer separated by middle dots', async () => {
     const logger = createLoggerFake();
     const data = {
       value: [{ id: 'e1' }],
@@ -394,14 +394,16 @@ describe('presenter output — text format (default for LLM consumers)', () => {
       '@odata.count': 47,
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe('id: e1\n\n--- next: https://graph.microsoft.com/v1.0/me/events?$skip=10 · delta: https://graph.microsoft.com/v1.0/me/events/delta?$dt=X · count: 47\n');
+    expect(out).toBe(
+      "id: e1\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/events?$skip=10' · delta: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/events/delta?$dt=X' · count: 47\n"
+    );
   });
 
   it('canonicalises a %24-encoded $ in the text footer cursor so the copy-pasteable `next:` value matches the `next-page` $-form', async () => {
     const logger = createLoggerFake();
     const data = { value: [{ id: 'p1', displayName: 'Robin Chen' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/people?%24top=2&%24skip=2' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe('id: p1\ndisplayName: Robin Chen\n\n--- next: https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2\n');
+    expect(out).toBe("id: p1\ndisplayName: Robin Chen\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2'\n");
   });
 
   it('emits no footer line when a listing carries no pagination cursors and no count', async () => {
@@ -421,7 +423,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const logger = createLoggerFake();
     const data = { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe('(no items)\n\n--- next: https://graph.microsoft.com/v1.0/me/messages?$skip=10\n');
+    expect(out).toBe("(no items)\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
   });
 
   it('prints the markdown body raw with no envelope when the command returns a text/markdown payload (convert-mail-to-markdown family)', async () => {

@@ -79,10 +79,20 @@ const extractCursors = (record: Record<string, unknown>): { readonly stripped: R
   };
 };
 
+// Render a cursor as a ready-to-run command instead of a bare URL, so both a
+// human and an LLM can copy the whole line and paste it — no need to remember
+// the `next-page --url` incantation. The URL is SINGLE-quoted: it carries `$`
+// (in `$top`/`$skip`/`$skiptoken`) and `&`, both of which a shell would
+// otherwise expand/background under double quotes or no quotes. Pagination
+// cursors are skiptoken/skip/deltatoken URLs that never contain a `'`, so
+// single-quoting is safe without escaping. Both nextLink and deltaLink resume
+// through the same `next-page` command.
+const asFollowCommand = (url: string): string => `ask-marcel-office next-page --url '${url}'`;
+
 const renderFooter = (cursors: Cursors): string => {
   const parts: string[] = [];
-  if (cursors.nextLink !== undefined) parts.push(`next: ${cursors.nextLink}`);
-  if (cursors.deltaLink !== undefined) parts.push(`delta: ${cursors.deltaLink}`);
+  if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink)}`);
+  if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink)}`);
   if (cursors.count !== undefined) parts.push(`count: ${cursors.count}`);
   return parts.length === 0 ? '' : `--- ${parts.join(' · ')}`;
 };
