@@ -148,6 +148,7 @@ import * as getTeamPrimaryChannel from './get-team-primary-channel.ts';
 import * as listTodoTasksDelta from './list-todo-tasks-delta.ts';
 import * as listMyMemberships from './list-my-memberships.ts';
 import * as getMyManager from './get-my-manager.ts';
+import * as getUser from './get-user.ts';
 import * as getUserManager from './get-user-manager.ts';
 import * as listRelevantPeople from './list-relevant-people.ts';
 import * as listGroups from './list-groups.ts';
@@ -294,6 +295,7 @@ const commands: Record<string, Command> = {
   'list-user-direct-reports': listUserDirectReports,
   'list-my-memberships': listMyMemberships,
   'get-my-manager': getMyManager,
+  'get-user': getUser,
   'get-user-manager': getUserManager,
   'list-relevant-people': listRelevantPeople,
   'list-groups': listGroups,

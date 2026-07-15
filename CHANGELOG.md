@@ -4,6 +4,22 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## 2.2.0
 
+### Added
+
+- **`get-user`** looks up a directory user by id, UPN/email, or name — one
+  command, two routes. An **Azure AD id, UPN, or email** returns that user's FULL
+  profile via `GET /users/{id}` on the elevated M365 token (`User.Read.All`, so
+  `jobTitle` / `department` / `officeLocation` / phones are populated); it honours
+  `--select` / `--expand` and fail-fasts with `secondary_token_unavailable` when
+  the elevated token is cold (run `login --force`). A bare **name** instead
+  searches the signed-in user's relevant-people graph
+  (`GET /me/people?$search="name"`) on the basic token — so it works even when the
+  elevated token is cold — and returns candidate matches
+  (`{ id, displayName, mail, jobTitle, department }`) so the caller can
+  disambiguate and re-query by the chosen `id` for the full card. Name search
+  covers your people graph, not the whole tenant; `microsoft-search-query` remains
+  the broad tenant-wide person search. (181st command.)
+
 ### Changed
 
 - **`scopes-check` is now the single detailed token-status view.** Per token

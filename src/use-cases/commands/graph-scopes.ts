@@ -187,6 +187,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   // — User / People / Org —
   'get-current-user': ['User.Read'],
   'get-my-manager': ['User.Read.All'],
+  'get-user': ['User.Read.All'],
   'get-user-manager': ['User.Read.All'],
   'get-my-profile-photo': ['User.Read'],
   'list-my-direct-reports': ['User.Read.All'],
