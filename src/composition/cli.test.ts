@@ -277,7 +277,7 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
-  it('convert-local-file reads the file through the CLI-wired filesystem and never touches Graph', async () => {
+  it('convert-local-file-to-markdown reads the file through the CLI-wired filesystem and never touches Graph', async () => {
     let graphCalled = false;
     const tripwireGraph: GraphClient = fakeGraphClient({
       get: async () => {
@@ -288,17 +288,31 @@ describe('buildCli command surface', () => {
     const fs = createFileSystemFake();
     fs.seed('/work/data.csv', 'name,age\nAlice,30');
     const cli = buildCli({ auth: okAuth(), graph: tripwireGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file-to-markdown', '--path', '/work/data.csv'])
+    );
     const parsed = JSON.parse(out.trim()) as { ok: boolean; data: { text: string } };
     expect(parsed.ok).toBe(true);
     expect(parsed.data.text).toContain('| Alice | 30 |');
     expect(graphCalled).toBe(false);
   });
 
+  it('resolves a deprecated command name via meta.commandAliases — `convert-local-file` still runs after the v2.3 rename to convert-local-file-to-markdown', async () => {
+    const fs = createFileSystemFake();
+    fs.seed('/work/data.csv', 'name,age\nAlice,30');
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; data: { text: string } };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.data.text).toContain('| Alice | 30 |');
+  });
+
   it('stamps a failed local-only command with source `cli`, not `graph` — it never touched Graph (F-02)', async () => {
     const fs = createFileSystemFake(); // nothing seeded → readBytes returns a not-found error
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/missing.csv']));
+    const out = await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file-to-markdown', '--path', '/work/missing.csv'])
+    );
     const parsed = JSON.parse(out.trim()) as { ok: boolean; source?: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.source).toBe('cli');
@@ -428,13 +442,13 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
     const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
-    // First-sentence truncation keeps the listing well under 20 KB. The pre-
-    // compaction full-summary form ran ~60 KB; if compaction silently
-    // regresses (e.g. compactSummary cuts wrong), this guard fires.
-    // 35 KB ceiling: current compact listing is ~28 KB; this guard fires if
-    // a future change accidentally restores the pre-compaction full-summary
-    // form (~60 KB). It leaves ~7 KB of headroom for new commands.
-    expect(compact.length).toBeLessThan(35 * 1024);
+    // First-sentence truncation keeps the listing compact. The pre-compaction
+    // full-summary form ran ~60 KB; if compaction silently regresses (e.g.
+    // compactSummary cuts wrong), this guard fires. 45 KB ceiling: the
+    // listing is ~37 KB as of v2.3 (the -to-markdown renames widened the
+    // name|alias column commander pads every row to), leaving headroom for
+    // new commands while still firing well before the ~60 KB regression form.
+    expect(compact.length).toBeLessThan(45 * 1024);
   });
 
   it('--verbose is no longer a recognised top-level option (v1.4.0 surface-consolidation drop)', async () => {

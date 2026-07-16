@@ -49,7 +49,7 @@ const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<un
 /**
  * The single extension→converter dispatch for every markdown command, operating on
  * bytes already in hand: download-drive-item-as-markdown fetches them, convert-mail
- * decodes the attachment, convert-drive-item-zip unpacks the entry. Loop/Fluid/
+ * decodes the attachment, convert-drive-item-zip-to-markdown unpacks the entry. Loop/Fluid/
  * Whiteboard (`?format=html`) need a Graph round-trip and are handled by the drive
  * caller BEFORE this — they never reach here. An Outlook `.msg` is rendered to markdown
  * (headers + body) with each of its own attachments recursed through this dispatch.

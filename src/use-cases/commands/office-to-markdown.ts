@@ -13,7 +13,7 @@ import { extensionOf } from './text-passthrough.ts';
  * conversion accepts) and are handled here; everything else is fetched once and
  * routed through the shared `bytesToMarkdown` core (docx/xlsx/pptx/odf/csv/pdf/
  * legacy .xls/.doc, content-sniff fallback) — the same core convert-mail and
- * convert-drive-item-zip use, so all three agree on every extension.
+ * convert-drive-item-zip-to-markdown use, so all three agree on every extension.
  */
 
 const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx', 'whiteboard']);

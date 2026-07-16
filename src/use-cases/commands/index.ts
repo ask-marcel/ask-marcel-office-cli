@@ -93,10 +93,10 @@ import * as createForwardDraft from './create-forward-draft.ts';
 import * as createMailDraft from './create-mail-draft.ts';
 import * as createReplyDraft from './create-reply-draft.ts';
 import * as updateMailDraft from './update-mail-draft.ts';
-import * as convertDriveItemZip from './convert-drive-item-zip.ts';
-import * as convertLocalFile from './convert-local-file.ts';
+import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
+import * as convertLocalFile from './convert-local-file-to-markdown.ts';
 import * as extractLocalFileImages from './extract-local-file-images.ts';
-import * as convertMailAttachmentZip from './convert-mail-attachment-zip.ts';
+import * as convertMailAttachmentZip from './convert-mail-attachment-zip-to-markdown.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as listChats from './list-chats.ts';
@@ -246,10 +246,10 @@ const commands: Record<string, Command> = {
   'create-mail-draft': createMailDraft,
   'create-reply-draft': createReplyDraft,
   'update-mail-draft': updateMailDraft,
-  'convert-drive-item-zip': convertDriveItemZip,
-  'convert-local-file': convertLocalFile,
+  'convert-drive-item-zip-to-markdown': convertDriveItemZip,
+  'convert-local-file-to-markdown': convertLocalFile,
   'extract-local-file-images': extractLocalFileImages,
-  'convert-mail-attachment-zip': convertMailAttachmentZip,
+  'convert-mail-attachment-zip-to-markdown': convertMailAttachmentZip,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'read-mail-attachment': readMailAttachment,

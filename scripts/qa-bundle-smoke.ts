@@ -48,8 +48,8 @@ const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: stri
 
 let fails = 0;
 for (const rt of ['node', 'bun']) {
-  console.log(`\n=== convert-local-file @ ${rt} ===`);
-  for (const [fmt, path] of Object.entries(F)) { const r = probe(rt, 'convert-local-file', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
+  console.log(`\n=== convert-local-file-to-markdown @ ${rt} ===`);
+  for (const [fmt, path] of Object.entries(F)) { const r = probe(rt, 'convert-local-file-to-markdown', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
   console.log(`=== extract-local-file-images @ ${rt} ===`);
   for (const [fmt, path] of [['docx', F.docx], ['xlsx', F.xlsx], ['pptx', F.pptx], ['pdf', pdfImg]]) { const r = probe(rt, 'extract-local-file-images', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
 }

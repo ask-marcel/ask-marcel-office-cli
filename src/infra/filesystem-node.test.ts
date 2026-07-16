@@ -56,7 +56,7 @@ describe('Node filesystem adapter', () => {
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 
-  it('reads a binary file as raw bytes (a local .docx handed to convert-local-file)', async () => {
+  it('reads a binary file as raw bytes (a local .docx handed to convert-local-file-to-markdown)', async () => {
     const path = join(tmp, 'report.docx');
     writeFileSync(path, Buffer.from([0x50, 0x4b, 0x03, 0x04])); // PK zip magic
     const fs = createNodeFileSystem();

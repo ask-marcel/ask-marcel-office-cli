@@ -4,7 +4,7 @@ import type { Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { buildGbkNameZip, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
-import { execute } from './convert-mail-attachment-zip.ts';
+import { execute } from './convert-mail-attachment-zip-to-markdown.ts';
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
@@ -25,8 +25,8 @@ type ZipResult = {
 };
 const at = (r: ZipResult, p: string): { contentType?: string; text?: string; note?: string; images?: ReadonlyArray<unknown> } => r.files.find((f) => f.path === p) ?? {};
 
-describe('convert-mail-attachment-zip', () => {
-  it('fetches the attachment at the message/attachment path and converts every contained file (mirror of convert-drive-item-zip)', async () => {
+describe('convert-mail-attachment-zip-to-markdown', () => {
+  it('fetches the attachment at the message/attachment path and converts every contained file (mirror of convert-drive-item-zip-to-markdown)', async () => {
     const archive = await buildSampleZipArchive();
     let capturedUrl = '';
     const graph = graphWith((url) => {

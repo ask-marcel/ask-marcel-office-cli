@@ -73,13 +73,14 @@ const execute = async (_graph: GraphClient, _params: Record<string, string>): Pr
   err({
     type: 'api_error',
     status: 400,
-    message: 'convert-local-file reads the local filesystem, not Graph — call executeLocal(fs, params) with a FileSystem (the CLI wires this automatically).',
+    message: 'convert-local-file-to-markdown reads the local filesystem, not Graph — call executeLocal(fs, params) with a FileSystem (the CLI wires this automatically).',
   });
 
 const meta: CommandMeta = {
   summary:
     'Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.',
   category: 'meta',
+  commandAliases: ['convert-local-file'],
   graphMethod: 'GET',
   graphPathTemplate: '(local) reads {path} from the local filesystem; not a Graph endpoint',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
@@ -122,7 +123,7 @@ const meta: CommandMeta = {
         'Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources.',
     },
   ],
-  example: 'ask-marcel-office convert-local-file --path ./report.docx',
+  example: 'ask-marcel-office convert-local-file-to-markdown --path ./report.docx',
   responseShape:
     '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
   producesBytes: true,

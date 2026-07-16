@@ -54,7 +54,7 @@ describe('extract-local-file-images', () => {
     if (result.error.type !== 'api_error') return;
     expect(result.error.status).toBe(415);
     expect(result.error.message).toContain('txt is not a supported document — image extraction supports pdf and docx / xlsx / pptx');
-    expect(result.error.message).toContain('convert-local-file');
+    expect(result.error.message).toContain('convert-local-file-to-markdown');
     expect(result.error.code).toBe('unsupported_document');
   });
 

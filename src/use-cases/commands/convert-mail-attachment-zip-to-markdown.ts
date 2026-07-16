@@ -9,7 +9,7 @@ import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
  * Unzips a `.zip` Outlook mail attachment and converts every contained file in one
- * call — the mail-side mirror of `convert-drive-item-zip`. Without it, reading a
+ * call — the mail-side mirror of `convert-drive-item-zip-to-markdown`. Without it, reading a
  * zipped vendor deck meant: `get-mail-attachment --output-path x.zip` → manual
  * `unzip` (with `-O GBK` for Chinese names) → convert each file. This collapses all
  * of that into one command: it pulls the fileAttachment bytes, unzips them (legacy
@@ -38,7 +38,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     return err({
       type: 'api_error',
       status: 400,
-      message: `convert-mail-attachment-zip needs a fileAttachment whose bytes are a .zip (got ${typeof odataType === 'string' ? odataType : 'an attachment with no @odata.type'}). itemAttachment / referenceAttachment have no inline zip payload to unpack.`,
+      message: `convert-mail-attachment-zip-to-markdown needs a fileAttachment whose bytes are a .zip (got ${typeof odataType === 'string' ? odataType : 'an attachment with no @odata.type'}). itemAttachment / referenceAttachment have no inline zip payload to unpack.`,
     });
   }
   const contentBytes = attachment['contentBytes'];
@@ -50,8 +50,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
+    "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip-to-markdown`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
   category: 'mail',
+  commandAliases: ['convert-mail-attachment-zip'],
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/attachment-get',
@@ -67,7 +68,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel-office convert-mail-attachment-zip --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path; non-mojibake names). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }`. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted. A non-fileAttachment (itemAttachment / referenceAttachment) or a non-zip payload returns an api_error.',
 };

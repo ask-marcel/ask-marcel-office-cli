@@ -46,6 +46,7 @@ const meta: CommandMeta = {
   summary:
     'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) are extracted; an Outlook .msg entry is rendered to markdown (headers + body, with its own attachments converted recursively); PDFs have their text layer extracted (text/plain); images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
   category: 'drive',
+  commandAliases: ['convert-drive-item-zip'],
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-get-content',
@@ -67,7 +68,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel-office convert-drive-item-zip --drive-id 'b!1234' --item-id '01ABC'",
+  example: "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted.',
 };

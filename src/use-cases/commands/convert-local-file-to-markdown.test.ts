@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '../../test-helpers/filesystem-fake.ts';
 import { buildGbkNameZip, buildPdfNoImages, buildSampleDocx, buildSampleMsg, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
-import { executeLocal, execute } from './convert-local-file.ts';
+import { executeLocal, execute } from './convert-local-file-to-markdown.ts';
 
 type Envelope = { contentType?: string; size?: number; text?: string };
 type ZipResult = {
@@ -9,7 +9,7 @@ type ZipResult = {
   files: ReadonlyArray<{ path: string; text?: string; note?: string; images?: ReadonlyArray<{ path: string; contentType: string; sizeBytes: number; base64: string }> }>;
 };
 
-describe('convert-local-file', () => {
+describe('convert-local-file-to-markdown', () => {
   it('converts a local .docx to markdown without any Graph round-trip', async () => {
     const fs = createFileSystemFake();
     fs.seedBytes('/work/report.docx', await buildSampleDocx());

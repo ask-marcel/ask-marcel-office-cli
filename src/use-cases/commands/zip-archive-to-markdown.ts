@@ -9,9 +9,9 @@ import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 
 /**
  * Shared "unzip + convert every contained file" core behind
- * `convert-drive-item-zip` (a OneDrive / SharePoint .zip),
- * `convert-mail-attachment-zip` (an Outlook .zip attachment), and
- * `convert-local-file` (a .zip on disk). Each entry is run through the same
+ * `convert-drive-item-zip-to-markdown` (a OneDrive / SharePoint .zip),
+ * `convert-mail-attachment-zip-to-markdown` (an Outlook .zip attachment), and
+ * `convert-local-file-to-markdown` (a .zip on disk). Each entry is run through the same
  * `bytesToMarkdown` dispatch the markdown commands use; an entry the dispatch
  * can't convert (image, binary, nested archive, scanned PDF) is LISTED with a
  * note instead of failing the whole archive. Notes use the container-neutral

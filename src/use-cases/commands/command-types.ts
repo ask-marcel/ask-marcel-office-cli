@@ -190,7 +190,7 @@ type Command = {
   readonly meta: CommandMeta;
   /**
    * Present on the rare command whose input is the LOCAL filesystem instead of
-   * Graph (`convert-local-file`). The CLI routes execution here, passing its
+   * Graph (`convert-local-file-to-markdown`). The CLI routes execution here, passing its
    * composition-selected FileSystem; `execute` stays as the registry-typed
    * fallback that redirects library consumers to this variant.
    */

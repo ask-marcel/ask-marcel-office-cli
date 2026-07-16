@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T12:59:07.093Z",
+  "generatedAt": "2026-07-16T13:03:31.113Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -67,9 +67,12 @@
       "producesBytes": true
     },
     {
-      "name": "convert-drive-item-zip",
+      "name": "convert-drive-item-zip-to-markdown",
       "summary": "Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so \"read the handover archive\" doesn't need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) are extracted; an Outlook .msg entry is rendered to markdown (headers + body, with its own attachments converted recursively); PDFs have their text layer extracted (text/plain); images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.",
       "category": "drive",
+      "commandAliases": [
+        "convert-drive-item-zip"
+      ],
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content",
@@ -106,13 +109,16 @@
           }
         }
       ],
-      "example": "ask-marcel-office convert-drive-item-zip --drive-id 'b!1234' --item-id '01ABC'",
+      "example": "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
     },
     {
-      "name": "convert-local-file",
+      "name": "convert-local-file-to-markdown",
       "summary": "Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.",
       "category": "meta",
+      "commandAliases": [
+        "convert-local-file"
+      ],
       "graphMethod": "GET",
       "graphPathTemplate": "(local) reads {path} from the local filesystem; not a Graph endpoint",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/",
@@ -169,7 +175,7 @@
           "description": "Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources."
         }
       ],
-      "example": "ask-marcel-office convert-local-file --path ./report.docx",
+      "example": "ask-marcel-office convert-local-file-to-markdown --path ./report.docx",
       "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
       "producesBytes": true
     },
@@ -237,9 +243,12 @@
       "producesBytes": true
     },
     {
-      "name": "convert-mail-attachment-zip",
-      "summary": "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
+      "name": "convert-mail-attachment-zip-to-markdown",
+      "summary": "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip-to-markdown`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
       "category": "mail",
+      "commandAliases": [
+        "convert-mail-attachment-zip"
+      ],
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/attachment-get",
@@ -270,7 +279,7 @@
           }
         }
       ],
-      "example": "ask-marcel-office convert-mail-attachment-zip --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+      "example": "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path; non-mojibake names). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }`. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted. A non-fileAttachment (itemAttachment / referenceAttachment) or a non-zip payload returns an api_error."
     },
     {
@@ -711,7 +720,7 @@
     },
     {
       "name": "extract-local-file-images",
-      "summary": "Extract the embedded images from a file ON DISK — the local sibling of `extract-drive-item-images`, and like `convert-local-file` it never calls Microsoft Graph (works offline, no login). Same per-extension dispatch: docx / xlsx / pptx (and their macro-enabled / template variants) have their OOXML media parts read directly (png/jpg/gif/bmp/tiff/webp/svg — full-resolution originals, including images on hidden slides); a pdf is walked page by page via unpdf with each painted image re-encoded as PNG. Two flows only this command completes: a Graph-rendered PDF saved locally (legacy `.ppt` → `download-drive-item-as-pdf` with the global output-path flag → this command pulls the slide images for OCR), and Office files unpacked from a local archive. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Any other extension returns a 415 naming the local ways out.",
+      "summary": "Extract the embedded images from a file ON DISK — the local sibling of `extract-drive-item-images`, and like `convert-local-file-to-markdown` it never calls Microsoft Graph (works offline, no login). Same per-extension dispatch: docx / xlsx / pptx (and their macro-enabled / template variants) have their OOXML media parts read directly (png/jpg/gif/bmp/tiff/webp/svg — full-resolution originals, including images on hidden slides); a pdf is walked page by page via unpdf with each painted image re-encoded as PNG. Two flows only this command completes: a Graph-rendered PDF saved locally (legacy `.ppt` → `download-drive-item-as-pdf` with the global output-path flag → this command pulls the slide images for OCR), and Office files unpacked from a local archive. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Any other extension returns a 415 naming the local ways out.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "(local) reads {path} from the local filesystem; not a Graph endpoint",
@@ -7432,7 +7441,7 @@
     },
     {
       "name": "read-mail-attachment",
-      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.",
+      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -7465,7 +7474,7 @@
         }
       ],
       "example": "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
-      "responseShape": "Polymorphic by attachment content-type. A zip → `{ count, files: [{ path, contentType, size, text } | { path, note }], truncated? }` (the convert-mail-attachment-zip shape). Everything else → `{ contentType: \"text/markdown\" | \"text/plain\", size, text, pageCount? }` (the convert-mail-attachment-to-markdown shape; `pageCount` present for PDF sources). Unsupported types (image / scanned PDF / legacy .ppt) return an api_error (415/400) naming the right next command.",
+      "responseShape": "Polymorphic by attachment content-type. A zip → `{ count, files: [{ path, contentType, size, text } | { path, note }], truncated? }` (the convert-mail-attachment-zip-to-markdown shape). Everything else → `{ contentType: \"text/markdown\" | \"text/plain\", size, text, pageCount? }` (the convert-mail-attachment-to-markdown shape; `pageCount` present for PDF sources). Unsupported types (image / scanned PDF / legacy .ppt) return an api_error (415/400) naming the right next command.",
       "producesBytes": true
     },
     {

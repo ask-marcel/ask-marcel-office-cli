@@ -194,11 +194,11 @@ const graph = createGraphClient({
 const me = await commands['get-current-user'].execute(graph, {});
 ```
 
-One special case: `convert-local-file` and `extract-local-file-images` read the **local filesystem**, not Graph — their registry-typed `execute` returns a redirect error, and the real entry point is the optional `executeLocal(fs, params)` on the same command object (the CLI wires this automatically; library consumers pass their own `FileSystem`):
+One special case: `convert-local-file-to-markdown` and `extract-local-file-images` read the **local filesystem**, not Graph — their registry-typed `execute` returns a redirect error, and the real entry point is the optional `executeLocal(fs, params)` on the same command object (the CLI wires this automatically; library consumers pass their own `FileSystem`):
 
 ```ts
 import { commands, createNodeFileSystem } from 'ask-marcel-office-cli';
-const md = await commands['convert-local-file'].executeLocal?.(createNodeFileSystem(), { path: './report.docx' });
+const md = await commands['convert-local-file-to-markdown'].executeLocal?.(createNodeFileSystem(), { path: './report.docx' });
 const images = await commands['extract-local-file-images'].executeLocal?.(createNodeFileSystem(), { path: './deck.pdf' });
 ```
 

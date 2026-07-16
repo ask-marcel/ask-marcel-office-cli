@@ -5,7 +5,7 @@ export type FileSystemError = { type: 'not_found' } | { type: 'parse_failed'; me
 export type FileSystem = {
   readonly readJson: <T>(path: string) => Promise<Result<T, FileSystemError>>;
   /**
-   * Read a file's raw bytes. Used by `convert-local-file` to feed a local
+   * Read a file's raw bytes. Used by `convert-local-file-to-markdown` to feed a local
    * document into the same conversion dispatch the Graph-backed commands use.
    */
   readonly readBytes: (path: string) => Promise<Result<Uint8Array, FileSystemError>>;

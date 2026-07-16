@@ -518,7 +518,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
             }
           }
         }
-        // `convert-local-file` is the one command whose input is the local
+        // `convert-local-file-to-markdown` is the one command whose input is the local
         // filesystem, not Graph — route it to executeLocal with the
         // composition-selected FileSystem (the same instance --output-path uses).
         const isLocalCommand = cmd.executeLocal !== undefined;
@@ -529,7 +529,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
             message = message.replaceAll(`--${canonical}`, `--${alias}`);
           }
           const retryAfterSeconds = result.error.type === 'api_error' ? result.error.retryAfterSeconds : undefined;
-          // 2026-06-15 (F-02): a local-filesystem command (convert-local-file,
+          // 2026-06-15 (F-02): a local-filesystem command (convert-local-file-to-markdown,
           // extract-local-file-images) never touches Graph, so its runtime
           // failures must not be stamped `source: graph` (misleading — an LLM
           // might treat a missing local file as a transient Graph error and

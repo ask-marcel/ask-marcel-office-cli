@@ -112,7 +112,7 @@ import * as listCalendarEventAttachments from './list-calendar-event-attachments
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
-import * as convertDriveItemZip from './convert-drive-item-zip.ts';
+import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
 import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
@@ -256,7 +256,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'search-mail-messages': searchMailMessages,
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'convert-mail-to-markdown': convertMailToMarkdown,
-  'convert-drive-item-zip': convertDriveItemZip,
+  'convert-drive-item-zip-to-markdown': convertDriveItemZip,
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
@@ -4274,7 +4274,7 @@ describe('calendar event attachments', () => {
   });
 });
 
-describe('convert-drive-item-zip', () => {
+describe('convert-drive-item-zip-to-markdown', () => {
   const zipResponse =
     (bytes: Uint8Array): FetchFn =>
     async () =>
@@ -4282,7 +4282,7 @@ describe('convert-drive-item-zip', () => {
 
   it('converts every Office/text entry, notes a malformed entry, and skips non-convertible ones', async () => {
     const archive = await buildSampleZipArchive();
-    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
@@ -4333,7 +4333,11 @@ describe('convert-drive-item-zip', () => {
 
   it('appends each Office file’s metadata block when --include-metadata true (and accepts an explicit false)', async () => {
     const archive = await buildSampleZipArchive();
-    const withMeta = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1', includeMetadata: 'true' });
+    const withMeta = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), {
+      driveId: 'd1',
+      itemId: 'i1',
+      includeMetadata: 'true',
+    });
     expect(withMeta?.ok).toBe(true);
     if (!withMeta?.ok) return;
     const files = (withMeta.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files;
@@ -4342,7 +4346,7 @@ describe('convert-drive-item-zip', () => {
     expect(files.find((f) => f.path === 'deck.pptx')?.text).toContain('## PPTX metadata');
     expect(files.find((f) => f.path === 'plan.odt')?.text).toContain('## OpenDocument metadata');
     // `false` is an accepted enum value and must omit the metadata blocks
-    const explicitFalse = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(await buildSampleZipArchive())), {
+    const explicitFalse = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(await buildSampleZipArchive())), {
       driveId: 'd1',
       itemId: 'i1',
       includeMetadata: 'false',
@@ -4356,7 +4360,7 @@ describe('convert-drive-item-zip', () => {
 
   it('caps at 100 entries and flags truncation', async () => {
     const archive = await buildOversizedZipArchive();
-    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; totalEntries?: number };
@@ -4366,7 +4370,10 @@ describe('convert-drive-item-zip', () => {
   });
 
   it('propagates a zip-parse error for non-zip bytes', async () => {
-    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), zipResponse(new Uint8Array([1, 2, 3]))), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(new Uint8Array([1, 2, 3]))), {
+      driveId: 'd1',
+      itemId: 'i1',
+    });
     expect(result?.ok).toBe(false);
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
@@ -4377,7 +4384,7 @@ describe('convert-drive-item-zip', () => {
   it('propagates the content-fetch error', async () => {
     const fetchFn: FetchFn = async () =>
       new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } });
-    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(false);
     if (result && !result.ok) {
       expect(result.error.type).toBe('api_error');
@@ -4387,7 +4394,7 @@ describe('convert-drive-item-zip', () => {
   });
 
   it('returns a validation_error when itemId is missing', async () => {
-    const result = await cmdMap['convert-drive-item-zip']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { driveId: 'd1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { driveId: 'd1' });
     expect(result?.ok).toBe(false);
     if (result && !result.ok) expect(result.error.type).toBe('validation_error');
   });
@@ -5583,7 +5590,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   },
   { name: 'convert-calendar-event-attachment-to-markdown', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
   { name: 'convert-calendar-event-attachment-to-pdf', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
-  { name: 'convert-drive-item-zip', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
+  { name: 'convert-drive-item-zip-to-markdown', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'extract-sharepoint-links-in-documents', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
   { name: 'get-drive-root-delta', params: {}, expectedPath: '/me/drive/root/delta()' },

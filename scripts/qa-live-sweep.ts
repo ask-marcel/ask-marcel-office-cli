@@ -139,7 +139,7 @@ if (browserOpens > 0) { console.log(`!! browserOpens=${browserOpens} during harv
 
 // ---------------- ARG RESOLUTION (command-aware) ----------------
 const DS = '2026-06-01T00:00:00Z', DE = '2026-07-05T23:59:59Z';
-const LOCAL = new Set(['convert-local-file', 'extract-local-file-images']);
+const LOCAL = new Set(['convert-local-file-to-markdown', 'extract-local-file-images']);
 const EXCEL = /excel|used-range|worksheet|(^get-excel)/;
 const pickPair = (cmd: string): any => (/zip/.test(cmd) ? undefined : EXCEL.test(cmd) ? pairs.xlsx : cmd === 'list-folder-files' ? pairs.folder : pairs.file);
 

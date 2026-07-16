@@ -14,7 +14,7 @@ import { extractImagesFromBytes } from './image-extraction.ts';
  * (OOXML media parts / unpdf page walk). It completes two flows the drive
  * command cannot reach: a Graph-rendered PDF saved with the global
  * output-path flag (the legacy-.ppt route), and Office files unpacked from a
- * local archive. Like `convert-local-file`, it never touches Graph and is
+ * local archive. Like `convert-local-file-to-markdown`, it never touches Graph and is
  * executed via `executeLocal(fs, params)`.
  */
 
@@ -22,7 +22,7 @@ const schema = z.object({ path: z.string().min(1) });
 
 // Local context: the file is already on the caller's disk, so the 415 tail
 // points at local routes, not the Graph raw-bytes command.
-const FETCH_HINT = 'The file is already on disk — read it directly with a vision-capable model, or convert its body with `convert-local-file`.';
+const FETCH_HINT = 'The file is already on disk — read it directly with a vision-capable model, or convert its body with `convert-local-file-to-markdown`.';
 
 const executeLocal = async (fs: FileSystem, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
@@ -47,7 +47,7 @@ const execute = async (_graph: GraphClient, _params: Record<string, string>): Pr
 
 const meta: CommandMeta = {
   summary:
-    'Extract the embedded images from a file ON DISK — the local sibling of `extract-drive-item-images`, and like `convert-local-file` it never calls Microsoft Graph (works offline, no login). Same per-extension dispatch: docx / xlsx / pptx (and their macro-enabled / template variants) have their OOXML media parts read directly (png/jpg/gif/bmp/tiff/webp/svg — full-resolution originals, including images on hidden slides); a pdf is walked page by page via unpdf with each painted image re-encoded as PNG. Two flows only this command completes: a Graph-rendered PDF saved locally (legacy `.ppt` → `download-drive-item-as-pdf` with the global output-path flag → this command pulls the slide images for OCR), and Office files unpacked from a local archive. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Any other extension returns a 415 naming the local ways out.',
+    'Extract the embedded images from a file ON DISK — the local sibling of `extract-drive-item-images`, and like `convert-local-file-to-markdown` it never calls Microsoft Graph (works offline, no login). Same per-extension dispatch: docx / xlsx / pptx (and their macro-enabled / template variants) have their OOXML media parts read directly (png/jpg/gif/bmp/tiff/webp/svg — full-resolution originals, including images on hidden slides); a pdf is walked page by page via unpdf with each painted image re-encoded as PNG. Two flows only this command completes: a Graph-rendered PDF saved locally (legacy `.ppt` → `download-drive-item-as-pdf` with the global output-path flag → this command pulls the slide images for OCR), and Office files unpacked from a local archive. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Any other extension returns a 415 naming the local ways out.',
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '(local) reads {path} from the local filesystem; not a Graph endpoint',

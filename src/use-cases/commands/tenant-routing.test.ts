@@ -3,7 +3,7 @@ import { ok } from '../../domain/result.ts';
 import { tenantIdUnsafe } from '../../domain/tenant-id.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { execute as convertZip } from './convert-drive-item-zip.ts';
+import { execute as convertZip } from './convert-drive-item-zip-to-markdown.ts';
 import { execute as asMarkdown } from './download-drive-item-as-markdown.ts';
 import { execute as asPdf } from './download-drive-item-as-pdf.ts';
 import { execute as downloadContent } from './download-drive-item-content.ts';

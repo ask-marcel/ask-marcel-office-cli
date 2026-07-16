@@ -57,7 +57,7 @@ const openZipEntries = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<Z
       type: 'api_error',
       status: 400,
       message:
-        'not a valid zip archive — these bytes are not a readable ZIP container. If the source is a single document rather than an archive, convert it directly (e.g. convert-mail-attachment-to-markdown, download-drive-item-as-markdown, or convert-local-file).',
+        'not a valid zip archive — these bytes are not a readable ZIP container. If the source is a single document rather than an archive, convert it directly (e.g. convert-mail-attachment-to-markdown, download-drive-item-as-markdown, or convert-local-file-to-markdown).',
     });
   }
 };
