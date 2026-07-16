@@ -28,6 +28,7 @@
 const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> = {
   // — Drive / Files —
   'list-drives': ['Files.Read'],
+  'resolve-drive-share-link': ['Files.Read.All'], // fetches /shares/{token}/driveItem — a shared link may point outside the user's own drive, so the .All variant
   'get-drive-root-item': ['Files.Read'],
   'get-drive-special-folder': ['Files.Read'],
   'list-folder-files': ['Files.Read'],

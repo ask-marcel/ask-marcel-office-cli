@@ -53,6 +53,16 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   previously-duplicated default-select strings are now one shared constant
   (`mail-message-select.ts`) so they cannot drift apart again. Additive
   (~76 bytes/message); a user-supplied `--select` still overrides entirely.
+- **`resolve-drive-share-link` now resolves a sharing URL to the driveItem in one
+  call.** It previously only encoded the URL into the `u!` share token (offline,
+  no Graph call), forcing a second `/shares/{token}/driveItem` fetch plus
+  hand-parsing `parentReference.driveId`. It now encodes AND fetches, returning
+  `{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken }` — the
+  two ids every `*-drive-item` command needs, in one shot (basic token,
+  `Files.Read.All`). Shape + behavior change: it now makes a Graph call and no
+  longer returns `graphPath`/`originalUrl`; a cross-tenant or no-access link
+  surfaces the Graph `accessDenied` / `itemNotFound` instead of a share token that
+  would only fail on the follow-up call.
 
 ### Fixed
 

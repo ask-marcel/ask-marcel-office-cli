@@ -17,10 +17,11 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
   'list-teams-chat-messages',
   'list-teams-chat-history',
   'get-teams-chat-message',
-  // resolve-*-link commands are pure URL parsers / encoders — no Graph call.
+  // resolve-mail-link / resolve-calendar-link / resolve-teams-link are pure URL
+  // parsers — no Graph call. (resolve-drive-share-link is NOT here: it now fetches
+  // /shares/{token}/driveItem, so it carries a real Files.Read.All scope entry.)
   'resolve-teams-link',
   'resolve-mail-link',
-  'resolve-drive-share-link',
   'resolve-calendar-link',
   // find-chats-with-user iterates the chatsvcagg substrate (paginated /chats endpoint).
   'find-chats-with-user',

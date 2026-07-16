@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T04:34:02.801Z",
+  "generatedAt": "2026-07-16T05:07:24.717Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7422,10 +7422,10 @@
     },
     {
       "name": "resolve-drive-share-link",
-      "summary": "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-drive-item-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
+      "summary": "Resolve a OneDrive / SharePoint sharing URL (a \"Copy link\" address someone sent you) to the file it points at, returning `driveId` + `itemId` ready to feed `get-drive-item`, `download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, and the rest of the `*-drive-item` family. It encodes the URL to the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)) and fetches `/shares/{token}/driveItem` in ONE call (basic token, `Files.Read.All`) — a raw sharing URL carries no ids, so this is the entry point into the drive-item family from a shared link. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
       "category": "drive",
       "graphMethod": "GET",
-      "graphPathTemplate": "{url}",
+      "graphPathTemplate": "/shares/(u!<base64url> of {url})/driveItem",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/shares-get",
       "options": [
         {
@@ -7436,7 +7436,7 @@
         }
       ],
       "example": "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
-      "responseShape": "`{ shareToken: string, graphPath: string, originalUrl: string }`. `shareToken` is the `u!<base64url>` form. `graphPath` is the ready-to-use `/shares/{token}/driveItem` URL — pass it to `ask-marcel-office next-page --url <link>` for a one-shot driveItem fetch, or feed the `shareToken` into any future `/shares/{token}/...` endpoint. `originalUrl` is echoed back for round-trip confirmation."
+      "responseShape": "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. Any field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder)."
     },
     {
       "name": "resolve-mail-link",

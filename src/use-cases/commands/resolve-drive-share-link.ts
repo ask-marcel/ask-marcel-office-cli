@@ -5,13 +5,14 @@ import { formatZodError } from './format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 
-// Encoder for Microsoft Graph's `/shares/{token}` resolver. Takes any
-// OneDrive / SharePoint sharing URL and emits the `u!<base64url>` share
-// token that Graph's [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)
-// endpoint accepts. Pure encoding — no HTTP — the actual `/shares/{token}/driveItem`
-// fetch is left to a follow-up call (the LLM may want different downstream
-// commands depending on the resolved driveItem: `download-drive-item-content`,
-// `convert-mail-attachment-to-markdown`, etc.).
+// Resolver for Microsoft Graph's `/shares/{token}` endpoint. Takes any OneDrive /
+// SharePoint sharing URL, encodes it to the `u!<base64url>` share token that
+// [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get) accepts, and
+// fetches `/shares/{token}/driveItem` so the caller gets the file's driveId + itemId
+// in ONE call — the two ids every downstream `*-drive-item` command
+// (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`,
+// `get-drive-item`) needs. A raw sharing URL carries no ids, so this is the only
+// entry point into the drive-item family from a "Copy link" URL.
 //
 // Accepted host shapes:
 //   - `*.sharepoint.com`           — tenant SharePoint share URLs (`:b:/s/site/...`)
@@ -53,7 +54,36 @@ const parse = (raw: string): Resolved | null => {
   };
 };
 
-const execute: Command['execute'] = async (_graph, params) => {
+type DriveItemHit = {
+  readonly id?: unknown;
+  readonly name?: unknown;
+  readonly webUrl?: unknown;
+  readonly size?: unknown;
+  readonly lastModifiedDateTime?: unknown;
+  readonly parentReference?: { readonly driveId?: unknown };
+};
+
+const str = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+const num = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined);
+
+// Hoist the two ids every downstream `*-drive-item` command needs — driveId from
+// `parentReference`, itemId from the driveItem's own `id` — to the top level, plus a
+// few confirmation fields and the reusable share token. Reads are `unknown`-typed
+// because the Graph response shape is not trusted at this boundary.
+const toResolvedItem = (raw: unknown, shareToken: string): Record<string, unknown> => {
+  const item = raw as DriveItemHit;
+  return {
+    driveId: str(item.parentReference?.driveId),
+    itemId: str(item.id),
+    name: str(item.name),
+    webUrl: str(item.webUrl),
+    size: num(item.size),
+    lastModifiedDateTime: str(item.lastModifiedDateTime),
+    shareToken,
+  };
+};
+
+const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // v1.4.0 re-audit Nit 1 (outlook + teams gaps): an Outlook web URL or
@@ -91,15 +121,19 @@ const execute: Command['execute'] = async (_graph, params) => {
         '--url: not a recognised OneDrive / SharePoint sharing URL. Accepted hosts: `*.sharepoint.com` (tenant + personal OneDrive — `*-my.sharepoint.com` is a subdomain that matches), `1drv.ms` (Microsoft short link).',
     });
   }
-  return ok(resolved);
+  // Resolve the token to the actual driveItem so the caller gets driveId + itemId in
+  // one call (basic token, Files.Read.All) instead of a manual second /shares fetch.
+  const item = await graph.get(resolved.graphPath);
+  if (!item.ok) return item;
+  return ok(toResolvedItem(item.value, resolved.shareToken));
 };
 
 const meta: CommandMeta = {
   summary:
-    "Encode a OneDrive / SharePoint sharing URL into the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)). Pure transformation — no Graph call. Pipe the returned `graphPath` (`/shares/{token}/driveItem`) into a sibling lookup (`get-drive-item`, `download-drive-item-content`, `convert-mail-attachment-to-pdf`, etc.) once the file has been resolved to a `driveItem`. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`.",
+    'Resolve a OneDrive / SharePoint sharing URL (a "Copy link" address someone sent you) to the file it points at, returning `driveId` + `itemId` ready to feed `get-drive-item`, `download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, and the rest of the `*-drive-item` family. It encodes the URL to the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)) and fetches `/shares/{token}/driveItem` in ONE call (basic token, `Files.Read.All`) — a raw sharing URL carries no ids, so this is the entry point into the drive-item family from a shared link. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft\'s short-link host `1drv.ms`.',
   category: 'drive',
   graphMethod: 'GET',
-  graphPathTemplate: '{url}',
+  graphPathTemplate: '/shares/(u!<base64url> of {url})/driveItem',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/shares-get',
   options: [
     {
@@ -112,7 +146,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
   responseShape:
-    '`{ shareToken: string, graphPath: string, originalUrl: string }`. `shareToken` is the `u!<base64url>` form. `graphPath` is the ready-to-use `/shares/{token}/driveItem` URL — pass it to `ask-marcel-office next-page --url <link>` for a one-shot driveItem fetch, or feed the `shareToken` into any future `/shares/{token}/...` endpoint. `originalUrl` is echoed back for round-trip confirmation.',
+    "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. Any field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder).",
 };
 
 export { execute, meta, schema };

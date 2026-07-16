@@ -6458,41 +6458,62 @@ describe('resolve-mail-link parses Outlook web mail URLs into messageId', () => 
 // SharePoint / OneDrive sharing URLs → Graph share token (`u!<base64url>`).
 // Pure encoding via the existing `buildShareToken` helper; the test only
 // needs to verify the round-trip + the accepted-host gate.
-describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{token}', () => {
-  const exec = async (url: string): Promise<{ ok: boolean; value?: { shareToken: string; graphPath: string; originalUrl: string }; error?: GraphError }> => {
+describe('resolve-drive-share-link resolves a sharing URL to its driveItem (driveId + itemId)', () => {
+  const DRIVE_ITEM = {
+    id: '01ITEM',
+    name: 'report.pdf',
+    webUrl: 'https://contoso.sharepoint.com/x/report.pdf',
+    size: 4096,
+    lastModifiedDateTime: '2026-07-01T00:00:00Z',
+    parentReference: { driveId: 'b!DRIVEID' },
+  };
+  type Resolved = { driveId?: string; itemId?: string; name?: string; webUrl?: string; size?: number; lastModifiedDateTime?: string; shareToken?: string };
+  const exec = async (url: string, body: unknown = DRIVE_ITEM): Promise<{ ok: boolean; value?: Resolved; error?: GraphError; fetchedUrl: string }> => {
     const cmd = cmdMap['resolve-drive-share-link'];
     if (!cmd) throw new Error('command not found');
-    const r = await cmd.execute(createGraphClient(fakeAuth(), fakeFetch({})), { url });
-    return r.ok ? { ok: true, value: r.value as { shareToken: string; graphPath: string; originalUrl: string } } : { ok: false, error: r.error };
+    const fetchFn = fakeFetch(body);
+    const r = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { url });
+    return r.ok ? { ok: true, value: r.value as Resolved, fetchedUrl: fetchFn.lastUrl ?? '' } : { ok: false, error: r.error, fetchedUrl: fetchFn.lastUrl ?? '' };
   };
 
-  it('encodes a tenant SharePoint share URL as `u!<base64url>` and emits the `/shares/{token}/driveItem` Graph path ready for the next call', async () => {
-    const url = 'https://contoso.sharepoint.com/:b:/s/team/EaBcDef123_xyz';
-    const r = await exec(url);
+  it('encodes the URL to a `u!` token, fetches /shares/{token}/driveItem, and returns driveId + itemId hoisted', async () => {
+    const r = await exec('https://contoso.sharepoint.com/:b:/s/team/EaBcDef123_xyz');
     expect(r.ok).toBe(true);
-    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
-    expect(r.value?.graphPath).toBe(`/shares/${r.value?.shareToken}/driveItem`);
-    expect(r.value?.originalUrl).toBe(url);
+    expect(r.fetchedUrl).toContain('/shares/u!');
+    expect(r.fetchedUrl).toContain('/driveItem');
+    expect(r.value?.driveId).toBe('b!DRIVEID'); // hoisted from parentReference.driveId
+    expect(r.value?.itemId).toBe('01ITEM'); // the driveItem id
+    expect(r.value?.name).toBe('report.pdf');
+    expect(r.value?.size).toBe(4096); // a numeric size passes through untouched
+    expect(r.value?.shareToken?.startsWith('u!')).toBe(true); // token still surfaced for reuse
   });
 
-  it('accepts a personal OneDrive (-my.sharepoint.com subdomain) URL via the .sharepoint.com suffix match', async () => {
-    const url = 'https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/report.pdf';
-    const r = await exec(url);
+  it('coerces non-string / non-number driveItem fields to undefined (the Graph shape is untrusted here)', async () => {
+    const weird = { id: 'ok', name: 'fine', size: 'not-a-number', parentReference: { driveId: 42 } };
+    const r = await exec('https://contoso.sharepoint.com/:b:/s/team/EaBcDef123', weird);
     expect(r.ok).toBe(true);
-    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
+    expect(r.value?.driveId).toBeUndefined(); // 42 is not a string → dropped
+    expect(r.value?.size).toBeUndefined(); // 'not-a-number' is not a number → dropped
+    expect(r.value?.itemId).toBe('ok'); // a string id still passes through
+  });
+
+  it('accepts a personal OneDrive (-my.sharepoint.com subdomain) URL and resolves it', async () => {
+    const r = await exec('https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/report.pdf');
+    expect(r.ok).toBe(true);
+    expect(r.value?.itemId).toBe('01ITEM');
   });
 
   it('accepts a 1drv.ms short-link URL', async () => {
-    const url = 'https://1drv.ms/b/s!AbCdEfGh_xyz';
-    const r = await exec(url);
+    const r = await exec('https://1drv.ms/b/s!AbCdEfGh_xyz');
     expect(r.ok).toBe(true);
-    expect(r.value?.shareToken.startsWith('u!')).toBe(true);
+    expect(r.value?.driveId).toBe('b!DRIVEID');
   });
 
-  it('rejects an unrelated host (graph.microsoft.com) with a clear validation_error', async () => {
+  it('rejects an unrelated host (graph.microsoft.com) with a clear validation_error before any Graph call', async () => {
     const r = await exec('https://graph.microsoft.com/v1.0/me/drive');
     expect(r.ok).toBe(false);
     expect(r.error?.message).toContain('not a recognised OneDrive / SharePoint sharing URL');
+    expect(r.fetchedUrl).toBe(''); // rejected before the /shares fetch
   });
 
   it('rejects a non-URL string at the Zod layer', async () => {
@@ -6502,14 +6523,22 @@ describe('resolve-drive-share-link encodes sharing URLs into Graph /shares/{toke
   });
 
   it('the encoded shareToken is base64url (no `+`, `/`, or `=` padding) per the Graph /shares/{token} contract', async () => {
-    const url = 'https://contoso.sharepoint.com/:b:/s/team/with+plus/and/slash?e=stuff';
-    const r = await exec(url);
+    const r = await exec('https://contoso.sharepoint.com/:b:/s/team/with+plus/and/slash?e=stuff');
     expect(r.ok).toBe(true);
     const token = r.value?.shareToken ?? '';
     expect(token.startsWith('u!')).toBe(true);
     expect(token.slice(2)).not.toContain('+');
     expect(token.slice(2)).not.toContain('/');
     expect(token.slice(2)).not.toContain('=');
+  });
+
+  it('propagates a Graph error when the /shares fetch fails (a revoked or inaccessible link)', async () => {
+    const cmd = cmdMap['resolve-drive-share-link'];
+    if (!cmd) throw new Error('command not found');
+    const failing: FetchFn = async () =>
+      new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'The sharing link no longer exists.' } }), { status: 404, statusText: 'Not Found' });
+    const r = await cmd.execute(createGraphClient(fakeAuth(), failing), { url: 'https://contoso.sharepoint.com/:b:/s/team/EaBcDef123' });
+    expect(r.ok).toBe(false);
   });
 
   // v1.4.0 re-audit Nit 1 — three cross-resolver pointers for the
