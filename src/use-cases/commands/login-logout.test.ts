@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
+import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { execute as login } from './login.ts';
 import { execute as logout } from './logout.ts';
 
@@ -11,16 +12,9 @@ describe('login command', () => {
   });
 
   it('propagates auth errors', async () => {
-    const fakeAuth = {
+    const fakeAuth = fakeAuthManager({
       getAccessToken: async () => err({ type: 'auth_cancelled' as const }),
-      getElevatedAccessToken: async () => err({ type: 'auth_cancelled' as const }),
-      logout: async () => ok(undefined),
-      getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getChatsvcaggRegion: async () => 'emea',
-      getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-      getLastChatsvcaggOutcome: () => null,
-      getLastElevatedOutcome: () => null,
-    };
+    });
     const result = await login(fakeAuth);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('auth_cancelled');

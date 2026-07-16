@@ -7,6 +7,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
+import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
@@ -28,38 +29,19 @@ const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Prom
   return captured;
 };
 
-const okAuth = (): AuthManager => ({
-  getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
-  getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
-  logout: async () => ({ ok: true, value: undefined }),
-  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getChatsvcaggRegion: async () => 'emea',
-  getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getLastChatsvcaggOutcome: () => null,
-  getLastElevatedOutcome: () => null,
-});
+const okAuth = (): AuthManager => fakeAuthManager();
 
-const cancelledAuth = (): AuthManager => ({
-  getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
-  getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
-  logout: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
-  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getChatsvcaggRegion: async () => 'emea',
-  getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getLastChatsvcaggOutcome: () => null,
-  getLastElevatedOutcome: () => null,
-});
+const cancelledAuth = (): AuthManager =>
+  fakeAuthManager({
+    getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
+    logout: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
+  });
 
-const failedAuth = (): AuthManager => ({
-  getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'browser launch failed' } as AuthError }),
-  getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' as const } }),
-  logout: async () => ({ ok: false, error: { type: 'auth_failed', message: 'rm denied' } as AuthError }),
-  getChatsvcaggAccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getChatsvcaggRegion: async () => 'emea',
-  getIc3AccessToken: async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } }),
-  getLastChatsvcaggOutcome: () => null,
-  getLastElevatedOutcome: () => null,
-});
+const failedAuth = (): AuthManager =>
+  fakeAuthManager({
+    getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'browser launch failed' } as AuthError }),
+    logout: async () => ({ ok: false, error: { type: 'auth_failed', message: 'rm denied' } as AuthError }),
+  });
 
 const okGraph = (value: unknown): GraphClient =>
   fakeGraphClient({

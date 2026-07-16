@@ -20,6 +20,7 @@ import {
   buildSampleXlsx,
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
+import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
@@ -369,16 +370,13 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'next-page': nextPage,
 };
 
-const fakeAuth = (): AuthManager => ({
-  getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
-  getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
-  logout: async () => ok(undefined),
-  getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
-  getChatsvcaggRegion: async () => 'emea',
-  getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
-  getLastChatsvcaggOutcome: () => null,
-  getLastElevatedOutcome: () => null,
-});
+const fakeAuth = (): AuthManager =>
+  fakeAuthManager({
+    getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
+    getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+    getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
+    getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
+  });
 
 type FakeFetch = ((url: string, init?: RequestInit) => Promise<Response>) & { lastUrl: string | null; lastBody: string | null };
 
