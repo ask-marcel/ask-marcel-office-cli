@@ -7,8 +7,9 @@ import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { extractImagesFromBytes } from './image-extraction.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
 const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-drive-item-content` and process locally.';
 
@@ -16,8 +17,15 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
+  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
+  if (tenant !== undefined && !tenant.ok) return tenant;
+  const tenantId = tenant?.ok === true ? tenant.value : undefined;
 
-  const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
+  // Route the metadata read too, not just the bytes below: for a partner-tenant
+  // file this is the FIRST call, so leaving it on the home token fails before the
+  // extraction is ever attempted.
+  const metaPath = `/drives/${driveId}/items/${itemId}`;
+  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
   if (!meta.ok) return meta;
   const item = meta.value as { name?: string; folder?: unknown };
   // A folder has no document to extract from — point at list-folder-files (mirrors download-drive-item-as-pdf).
@@ -29,7 +37,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     });
   }
 
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
+  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!bytes.ok) return bytes;
   return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT);
 };
@@ -54,6 +62,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID of the pdf / docx / xlsx / pptx file. Returned by `list-folder-files` or `search-onedrive-files`.',
     },
+    TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
   responseShape:

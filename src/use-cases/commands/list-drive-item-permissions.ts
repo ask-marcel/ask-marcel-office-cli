@@ -3,8 +3,9 @@ import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 
-const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/permissions`, baseSchema);
 
 const meta: CommandMeta = {
@@ -27,6 +28,7 @@ const meta: CommandMeta = {
       description: 'driveItem ID of the file or folder. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-item`.',
     },
     ...noSkipOptions,
+    TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `permission` resources under `value[]`',

@@ -7,13 +7,17 @@ import { fetchRawBytes, inlineBinary, tagPdfPassthrough } from './fetch-raw-byte
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
+  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
+  if (tenant !== undefined && !tenant.ok) return tenant;
+  const tenantId = tenant?.ok === true ? tenant.value : undefined;
 
   // Pre-fetch the driveItem metadata to read its filename.
   //
@@ -27,7 +31,11 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // needed. -4: tag the short-circuit case with
   // `passthrough: true` + `note` so the caller can tell whether
   // conversion actually ran.
-  const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
+  // Route the metadata read too, not just the bytes below: for a partner-tenant
+  // file this is the FIRST call, so leaving it on the home token fails before the
+  // download is ever attempted.
+  const metaPath = `/drives/${driveId}/items/${itemId}`;
+  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
   if (!meta.ok) return meta;
   const item = meta.value as { name?: string; folder?: unknown };
   const name = item.name ?? '';
@@ -48,7 +56,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // size, text}` instead of base64 — sibling commands now share the same
   // envelope shape for the same input.
   if (isPlainTextFilename(name)) {
-    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
+    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
     if (!bytes.ok) return bytes;
     const text = new TextDecoder().decode(bytes.value);
     return ok({
@@ -60,7 +68,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     });
   }
   if (isPdfSource(name)) {
-    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
     if (!raw.ok) return raw;
     const payload = raw.value as { contentType: string; size: number; base64: string };
     return ok({
@@ -69,7 +77,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
       note: `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`,
     });
   }
-  return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
+  return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`, { tenantId }), name);
 };
 
 const meta: CommandMeta = {
@@ -87,6 +95,7 @@ const meta: CommandMeta = {
       description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`.' },
+    TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:

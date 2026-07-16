@@ -3,8 +3,9 @@ import { buildSelectableCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 
-const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}`, baseSchema);
 
 const meta: CommandMeta = {
@@ -22,6 +23,7 @@ const meta: CommandMeta = {
       description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-root-item`.' },
+    TENANT_ID_OPTION,
     ...selectExpandOptions,
   ],
   example: "ask-marcel-office get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",

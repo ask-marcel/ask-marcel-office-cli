@@ -7,6 +7,7 @@ import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -24,15 +25,19 @@ const schema = z.object({
   driveId: z.string().min(1),
   itemId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  ...tenantIdShape,
 });
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
+  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
+  if (tenant !== undefined && !tenant.ok) return tenant;
+  const tenantId = tenant?.ok === true ? tenant.value : undefined;
   const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
+  const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!bytes.ok) return bytes;
   return convertZipArchive(bytes.value, includeMetadata);
 };
@@ -52,6 +57,7 @@ const meta: CommandMeta = {
       description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .zip file. Returned by `list-folder-files` or `search-onedrive-files`.' },
+    TENANT_ID_OPTION,
     {
       name: 'include-metadata',
       key: 'includeMetadata',

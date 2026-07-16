@@ -6,6 +6,42 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ### Added
 
+- **Files in a partner tenant you are a guest in are now readable.** Previously
+  every such read died at `401 invalidAudienceUri: Invalid audience Uri
+  '00000003-0000-0ff1-ce00-000000000000'` (SharePoint Online's app id): your
+  home-tenant Graph cannot mint a SharePoint token for a foreign tenant, so no
+  home-tier token could reach the file — which is exactly the case when a partner
+  sends you a "Copy link" URL.
+
+  **`resolve-drive-share-link` crosses the boundary by itself.** It tries your
+  home token and, only on that specific error, identifies the owning tenant from
+  the URL host (`contoso.sharepoint.com` → `contoso.onmicrosoft.com` → the
+  tenant's public OIDC discovery document) and retries with a guest token minted
+  by redeeming your existing refresh token against that tenant's authority. No
+  new sign-in, no browser, no Azure app. It returns the tenant as **`tenantId`**;
+  the field's PRESENCE is the signal — absent means the file is in your own
+  tenant and nothing changes.
+
+  **`--tenant-id` carries it to the rest of the family.** `driveId` and `itemId`
+  carry no tenant, so the commands that consume them cannot recover on their own;
+  pass the `tenantId` that `resolve-drive-share-link` returned and they sign with
+  the guest token instead. Available on `get-drive-item`,
+  `download-drive-item-content`, `download-drive-item-as-markdown`,
+  `download-drive-item-as-pdf`, `extract-drive-item-images`,
+  `convert-drive-item-zip`, `get-drive-item-list-item`, `list-folder-files`,
+  `list-drive-item-versions`, `list-drive-item-permissions`, and
+  `list-drive-item-thumbnails`. Optional everywhere; omit it for your own tenant.
+
+  Boundaries worth knowing: a link you simply may not read still fails with
+  `accessDenied` (a guest token would not help, so one is never requested); a
+  tenant that has not consented to this client, or where you are not actually a
+  guest, fails with a message naming that tenant; a SharePoint host whose sign-in
+  domain differs from its name cannot be resolved and says so (`--tenant-id`
+  passed by hand still works there); and `1drv.ms` belongs to no tenant at all,
+  so it is unaffected. Elevated commands do not take the flag — the elevated
+  token is a home-tenant identity, so "elevated in a partner tenant" does not
+  exist. Verified end to end against a real partner tenant.
+
 - **`get-user`** looks up a directory user by id, UPN/email, or name — one
   command, two routes. An **Azure AD id, UPN, or email** returns that user's FULL
   profile via `GET /users/{id}` on the elevated M365 token (`User.Read.All`, so
@@ -65,6 +101,28 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   would only fail on the follow-up call.
 
 ### Fixed
+
+- **`login` no longer sends you round a loop it cannot break.** A command needing
+  the elevated (M365) token failed with "run `ask-marcel-office login`"; `login`
+  answered `authenticated` and changed nothing; the command failed identically.
+  Forever. The elevated token carries no refresh token of its own, so a plain
+  `login` that found a valid cached basic token returned on the cache rung
+  without ever re-capturing it — `--force` was the only escape, and the error
+  message never said so.
+
+  `login` now re-captures the elevated token whenever it is missing, and does
+  nothing when it is already present (no gratuitous browser). The fail-fast
+  message now names the right remedy per tier and explains why: `--force` for
+  elevated, plain `login` for the chatsvcagg / ic3 substrate tokens, which
+  self-heal from the shared refresh token and never needed a browser at all.
+  `scopes-check`'s hint and the README carried the same false "only way" claim and
+  are corrected too. `--force` still works and still re-captures every tier.
+
+- **The library's documented `AuthManager` example did not compile.** The README's
+  "bring your own token" snippet passed `{getAccessToken, logout}` to
+  `createGraphClient` and called `AuthManager` "two async methods"; it has ten.
+  The snippet now compiles, and declines the tiers a custom token source cannot
+  mint rather than omitting them.
 
 - **Guest / external-user (B2B) lookups by UPN now resolve.** A guest UPN is
   `alice_contoso.com#EXT#@fabrikam.onmicrosoft.com`, and the `#` is the URL

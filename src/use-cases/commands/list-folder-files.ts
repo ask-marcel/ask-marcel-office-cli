@@ -3,8 +3,9 @@ import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 
-const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/children`, baseSchema);
 
 const meta: CommandMeta = {
@@ -29,6 +30,7 @@ const meta: CommandMeta = {
       aliases: [{ name: 'folder-id', key: 'folderId' }],
     },
     ...noSkipOptions,
+    TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',

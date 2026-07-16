@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T09:54:07.458Z",
+  "generatedAt": "2026-07-16T10:22:55.795Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -85,6 +85,12 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID of the .zip file. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         },
         {
           "name": "include-metadata",
@@ -506,6 +512,12 @@
           "description": "driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`."
         },
         {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
+        },
+        {
           "name": "include-metadata",
           "key": "includeMetadata",
           "required": false,
@@ -561,6 +573,12 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
@@ -589,6 +607,12 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID of the file to download. Returned by `ask-marcel-office list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
@@ -673,6 +697,12 @@
           "key": "itemId",
           "required": true,
           "description": "driveItem ID of the pdf / docx / xlsx / pptx file. Returned by `list-folder-files` or `search-onedrive-files`."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
@@ -1018,6 +1048,12 @@
           "description": "driveItem ID. Returned by `list-folder-files`, `search-onedrive-files`, or `get-drive-root-item`."
         },
         {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
+        },
+        {
           "name": "select",
           "key": "select",
           "required": false,
@@ -1160,6 +1196,12 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
@@ -3324,6 +3366,12 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
@@ -3379,6 +3427,12 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
@@ -3434,6 +3488,12 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
@@ -4002,6 +4062,12 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in, when the file does not live in your own tenant. Get it from `resolve-drive-share-link`, which returns `tenantId` on any sharing URL whose file belongs to another tenant — that is the only place the tenant is knowable, because `--drive-id` and `--item-id` carry no tenant at all. Omit it for files in your own tenant (the normal case). Pass it and the request is signed with a guest token minted for that tenant instead of your home token; without it, a partner-tenant file fails with `invalidAudienceUri` no matter which of your tokens is used."
         }
       ],
       "example": "ask-marcel-office list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",

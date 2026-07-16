@@ -7,18 +7,25 @@ import { base64ToBytes, inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { decodeUtf8Text } from './text-passthrough.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
+const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
+  // Brand once, up front: a bad `--tenant-id` must fail before any Graph call,
+  // not after the metadata round-trip.
+  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
+  if (tenant !== undefined && !tenant.ok) return tenant;
+  const tenantId = tenant?.ok === true ? tenant.value : undefined;
 
   // Pre-fetch metadata only to detect a folder target (the /content endpoint
   // returns 200 + empty bytes for a folder); the name is NOT used to decide
   // text-vs-binary — that's content-sniffed below.
-  const metaResult = await graph.get(`/drives/${driveId}/items/${itemId}`);
+  const metaPath = `/drives/${driveId}/items/${itemId}`;
+  const metaResult = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
   if (!metaResult.ok) return metaResult;
   const item = metaResult.value as { name?: string; folder?: unknown };
   const name = item.name ?? '';
@@ -38,7 +45,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // Content-sniff (not the extension): fetch the bytes once, return them as text
   // when they decode as valid UTF-8, otherwise as faithful base64. A binary file
   // named `.txt` therefore comes back intact instead of mangled into `�`.
-  const blob = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`);
+  const blob = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!blob.ok) return blob;
   const text = decodeUtf8Text(base64ToBytes(blob.value.base64));
   return ok(text !== undefined ? { contentType: 'text/plain', size: blob.value.size, text } : blob.value);
@@ -65,6 +72,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID of the file to download. Returned by `ask-marcel-office list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.',
     },
+    TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:

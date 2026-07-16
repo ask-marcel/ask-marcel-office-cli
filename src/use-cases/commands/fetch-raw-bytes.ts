@@ -1,5 +1,6 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
+import type { TenantId } from '../../domain/tenant-id.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 
 /**
@@ -29,7 +30,18 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
  * by Teams web client identity and rejected by SharePoint with 403.
  */
 
-export type FetchOptions = { readonly elevated?: boolean };
+/**
+ * `elevated` picks the ODSP-allow-listed home identity (M365ChatClient).
+ * `tenantId` picks a PARTNER tenant's guest identity — for a file in a tenant the
+ * user is only a guest in, which no home-tier token can read (Graph answers `401
+ * invalidAudienceUri`).
+ *
+ * They are mutually exclusive by nature: elevated is a home-tenant identity, so
+ * "elevated in a partner tenant" does not exist. `tenantId` wins if both arrive,
+ * because a partner-tenant file is unreadable on ANY home token — including the
+ * elevated one — so honouring `elevated` there would guarantee failure.
+ */
+export type FetchOptions = { readonly elevated?: boolean; readonly tenantId?: TenantId };
 
 export type InlineBinary = {
   readonly contentType: string;
@@ -60,8 +72,14 @@ const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, Grap
   return err({ type: 'api_error', status: 500, message: 'unexpected envelope: response had no @microsoft.graph.downloadUrl, no base64 bytes, and no text body' });
 };
 
-const callBinary = (graph: GraphClient, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> =>
-  opts.elevated ? graph.getBinaryElevated(contentPath) : graph.getBinary(contentPath);
+// The one place the byte-fetch identity is chosen — both `fetchRawBytes` and
+// `inlineBinary` come through here. `tenantId` is checked FIRST: a partner-tenant
+// file is unreadable on every home token, elevated included, so a caller that
+// passed both would otherwise get a guaranteed 401 instead of its file.
+const callBinary = (graph: GraphClient, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> => {
+  if (opts.tenantId !== undefined) return graph.getBinaryGuest(contentPath, opts.tenantId);
+  return opts.elevated ? graph.getBinaryElevated(contentPath) : graph.getBinary(contentPath);
+};
 
 export const fetchRawBytes = async (graph: GraphClient, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
   const initial = await callBinary(graph, contentPath, opts);

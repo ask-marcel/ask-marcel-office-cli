@@ -6,10 +6,12 @@ import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
   itemId: z.string().min(1),
+  ...tenantIdShape,
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
   maxCells: z
@@ -25,12 +27,18 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const inlineImages = parsed.data.inlineImages === 'true';
   const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
+  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
+  if (tenant !== undefined && !tenant.ok) return tenant;
+  const tenantId = tenant?.ok === true ? tenant.value : undefined;
 
-  const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
+  const metaPath = `/drives/${driveId}/items/${itemId}`;
+  const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
 
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells });
+  // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
+  // byte fetch through the whole conversion pipeline with nothing else to change.
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, tenantId });
 };
 
 const meta: CommandMeta = {
@@ -48,6 +56,7 @@ const meta: CommandMeta = {
       description: DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the file to convert. Returned by `list-folder-files` or `search-onedrive-files`.' },
+    TENANT_ID_OPTION,
     {
       name: 'include-metadata',
       key: 'includeMetadata',
