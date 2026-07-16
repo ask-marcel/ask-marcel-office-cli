@@ -90,10 +90,15 @@ Repo history was rewritten once to purge exactly this class of string.
        DoD: tests 4548/0, typecheck clean, `lint:strict` exit 0, coverage `auth.ts` 100.00/100.00
        gate exit 0. Mutation N/A (scope is `^src/(domain|use-cases)/`; infra is out).
 
-3. [ ] **infra: `graph.getGuest` / `graph.getBinaryGuest` + shared fake**
-       Mirror the existing `getElevated` / `getBinaryElevated` pair. Update
-       `src/test-helpers/graph-client-fake.ts` in the SAME commit.
-       DoD: all existing tests green (the fake builder is why this stays a 1-file fake change).
+3. [x] **infra: `graph.getGuest` / `getBinaryGuest` / `discoverTenantId` + shared fake** (71c0209)
+       Mirrors the `getElevated` / `getBinaryElevated` pair; guest is the first PARAMETERISED
+       auth-header binding (closes over the tenant). `discoverTenantId(spoHost)` is an
+       UNAUTHENTICATED OIDC lookup — "who owns this host?", not "what may I read?".
+       `src/domain/utilities/spo-tenant.ts` landed here (pure host -> onmicrosoft domain), with
+       NO test file: exercised through the port per rule 14, like `archive-status.ts`.
+       9 tests incl. both failure paths (vanity domain -> `tenant_discovery_failed` naming the
+       domain tried; stalled discovery -> network_error).
+       DoD: 4564/0, typecheck 0, `lint:strict` 0, coverage 0, bunfig/stryker restored clean.
 
 4. [ ] **use-case: `resolve-drive-share-link` returns `tenantId`**
        Also lands `src/domain/utilities/spo-tenant.ts` (`spoHostToTenantDomain`, pure, null for
