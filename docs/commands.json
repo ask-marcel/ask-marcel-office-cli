@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-15T11:58:42.477Z",
+  "generatedAt": "2026-07-16T04:05:50.094Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2494,10 +2494,10 @@
     },
     {
       "name": "get-user",
-      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the elevated M365 token — run a forced login first if it is cold. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query by their id. Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search.",
+      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the elevated M365 token — run a forced login first if it is cold. An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query by their id. Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search.",
       "category": "user",
       "graphMethod": "GET",
-      "graphPathTemplate": "/users/{user-id}  (id / UPN / email) OR /me/people?$search=\"{user-id}\"  (a bare name)",
+      "graphPathTemplate": "/users/{user-id}  (id / UPN; an email that misses falls back to /users?$filter=mail eq)  OR /me/people?$search=\"{user-id}\"  (a bare name)",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
       "options": [
         {
@@ -2526,7 +2526,7 @@
         }
       ],
       "example": "ask-marcel-office get-user --user-id 'alice@contoso.com' --select 'id,displayName,mail,jobTitle,department'",
-      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource (full profile; honours `--select` / `--expand`). For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen `id` for the full card). The id path needs the elevated M365 token and fail-fasts with `secondary_token_unavailable` when it is cold — run `ask-marcel-office login --force`.",
+      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource (full profile; honours `--select` / `--expand`). An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen `id` for the full card). The id path needs the elevated M365 token and fail-fasts with `secondary_token_unavailable` when it is cold — run `ask-marcel-office login --force`.",
       "needsElevatedToken": true
     },
     {

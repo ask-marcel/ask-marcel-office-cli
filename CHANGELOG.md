@@ -11,7 +11,11 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   profile via `GET /users/{id}` on the elevated M365 token (`User.Read.All`, so
   `jobTitle` / `department` / `officeLocation` / phones are populated); it honours
   `--select` / `--expand` and fail-fasts with `secondary_token_unavailable` when
-  the elevated token is cold (run `login --force`). A bare **name** instead
+  the elevated token is cold (run `login --force`). An email that is the user's
+  `mail` but not their sign-in UPN — every **guest / B2B** user, whose UPN is the
+  `alias_homeorg#EXT#@tenant` form — still resolves: when the direct
+  `GET /users/{id}` 404s, the command falls back to
+  `GET /users?$filter=mail eq '<email>'` and returns the single match. A bare **name** instead
   searches the signed-in user's relevant-people graph
   (`GET /me/people?$search="name"`) on the basic token — so it works even when the
   elevated token is cold — and returns candidate matches

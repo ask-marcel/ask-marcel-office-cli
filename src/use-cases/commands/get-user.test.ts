@@ -153,4 +153,109 @@ describe('get-user', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect((result.value as { matches: unknown[] }).matches).toEqual([]);
   });
+
+  const notFound = { ok: false as const, error: { type: 'api_error' as const, status: 404, code: 'Request_ResourceNotFound', message: 'Resource does not exist' } };
+
+  it('falls back to a mail-eq filter when an email 404s on the direct path (a guest whose mail differs from their UPN)', async () => {
+    const paths: string[] = [];
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        paths.push(p);
+        if (p.includes('$filter=mail eq')) return ok({ value: [{ id: 'g1', displayName: 'Robin Chen', mail: 'robin.chen@fabrikam.com' }] });
+        return notFound; // the direct /users/{email} lookup misses (email is the mail, not the UPN)
+      },
+    });
+    const result = await execute(graph, { userId: 'robin.chen@fabrikam.com' });
+    expect(paths[0]).toContain('/users/robin.chen%40fabrikam.com'); // direct path, @ percent-encoded
+    expect(paths[1]).toContain("/users?$filter=mail eq 'robin.chen@fabrikam.com'"); // fallback filter
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { id: string }).id).toBe('g1'); // the matched user's full profile
+  });
+
+  it('carries --select through to the mail-eq fallback query', async () => {
+    let filterPath = '';
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        if (p.includes('$filter=mail eq')) {
+          filterPath = p;
+          return ok({ value: [{ id: 'g1' }] });
+        }
+        return notFound;
+      },
+    });
+    await execute(graph, { userId: 'guest@home.com', select: 'id,displayName,mail' });
+    expect(filterPath).toContain('$select=id%2CdisplayName%2Cmail'); // appended alongside the filter
+  });
+
+  it('surfaces the original 404 when the mail-eq fallback finds nobody', async () => {
+    const graph = fakeGraphClient({
+      getElevated: async (p) => (p.includes('$filter=mail eq') ? ok({ value: [] }) : notFound),
+    });
+    const result = await execute(graph, { userId: 'ghost@nowhere.com' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(404);
+  });
+
+  it('does not fall back when the direct path already resolves the email (mail == UPN)', async () => {
+    let calls = 0;
+    const graph = fakeGraphClient({
+      getElevated: async () => {
+        calls += 1;
+        return ok({ id: 'u1', userPrincipalName: 'alice@contoso.com' });
+      },
+    });
+    const result = await execute(graph, { userId: 'alice@contoso.com' });
+    expect(calls).toBe(1); // no mail-filter round-trip when the direct GET succeeds
+    expect(result.ok).toBe(true);
+  });
+
+  it('does not fall back for a GUID that 404s (a GUID is never an email)', async () => {
+    let calls = 0;
+    const graph = fakeGraphClient({
+      getElevated: async () => {
+        calls += 1;
+        return notFound;
+      },
+    });
+    const result = await execute(graph, { userId: 'aaaaaaaa-1111-2222-3333-444444444444' });
+    expect(calls).toBe(1); // no `@`, so no mail fallback
+    expect(result.ok).toBe(false);
+  });
+
+  it('does not fall back when an email fails with a non-404 (e.g. the cold-elevated fail-fast)', async () => {
+    let calls = 0;
+    const graph = fakeGraphClient({
+      getElevated: async () => {
+        calls += 1;
+        return { ok: false as const, error: { type: 'api_error' as const, status: 401, code: 'secondary_token_unavailable', message: 'run `ask-marcel-office login --force`' } };
+      },
+    });
+    const result = await execute(graph, { userId: 'alice@contoso.com' });
+    expect(calls).toBe(1); // fallback only on a genuine 404, not on auth failures
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.code).toBe('secondary_token_unavailable');
+  });
+
+  it('surfaces the original 404 when the mail-eq fallback query itself errors', async () => {
+    const graph = fakeGraphClient({
+      getElevated: async (p) => (p.includes('$filter=mail eq') ? { ok: false as const, error: { type: 'api_error' as const, status: 500, message: 'filter boom' } } : notFound),
+    });
+    const result = await execute(graph, { userId: 'guest@home.com' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(404); // the direct 404, not the fallback's 500
+  });
+
+  it('doubles a single quote in the mail-eq filter (OData string-literal escaping)', async () => {
+    let filterPath = '';
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        if (p.includes('$filter=mail eq')) {
+          filterPath = p;
+          return ok({ value: [{ id: 'q1' }] });
+        }
+        return notFound;
+      },
+    });
+    await execute(graph, { userId: "o'brien@x.com" });
+    expect(filterPath).toContain("mail eq 'o''brien@x.com'"); // the ' is doubled, not left raw (prevents breaking the literal)
+  });
 });
