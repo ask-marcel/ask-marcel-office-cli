@@ -248,3 +248,156 @@ describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, 
     }
   });
 });
+
+describe('htmlToMarkdown — headerless (Outlook/Excel MSO) table degradation to pipe tables', () => {
+  it('converts a pasted-from-Excel MsoNormalTable (all <td>, inline styles) to a pipe table instead of leaking raw HTML markup', () => {
+    const html =
+      '<table class="MsoNormalTable" border="0" cellspacing="0" style="border-collapse:collapse;mso-yfti-tbllook:1184">' +
+      '<tr style="mso-yfti-irow:0"><td width="200" style="border:solid windowtext 1.0pt;padding:0cm 5.4pt"><p class="MsoNormal">Name</p></td>' +
+      '<td style="padding:0cm 5.4pt"><p class="MsoNormal">Amount</p></td></tr>' +
+      '<tr><td style="padding:0cm 5.4pt"><p class="MsoNormal">Contoso A2</p></td>' +
+      '<td style="padding:0cm 5.4pt"><p class="MsoNormal">1 200 <b>EUR</b></p></td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| Name | Amount |');
+      expect(result.value).toContain('| --- | --- |');
+      expect(result.value).toContain('| Contoso A2 | 1 200 **EUR** |');
+      expect(result.value).not.toContain('<table');
+      expect(result.value).not.toContain('MsoNormalTable');
+    }
+  });
+
+  it('leaves a table with a proper <th> heading row on the GFM plugin path (unchanged behaviour)', () => {
+    const html = '<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td>a</td><td>b</td></tr></tbody></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| H1 | H2 |');
+      expect(result.value).toContain('| a | b |');
+      expect(result.value).not.toContain('<table');
+    }
+  });
+
+  it('unwraps a single-cell Outlook layout table and converts the inner data grid it wraps (the layout-outer / data-inner pattern)', () => {
+    const inner = '<table><tr><td>k1</td><td>v1</td></tr><tr><td>k2</td><td>v2</td></tr></table>';
+    const html = `<table width="600"><tr><td><p>Intro para</p>${inner}</td></tr></table>`;
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('Intro para\n\n| k1 | v1 |');
+      expect(result.value).toContain('| k2 | v2 |');
+      expect(result.value).not.toContain('<table');
+    }
+  });
+
+  it('unwraps a single-column scaffold table into free-standing blocks instead of a one-column pipe table', () => {
+    const html = '<table><tr><td><p>First block</p></td></tr><tr><td><p>Second block</p></td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('First block\n\nSecond block');
+      expect(result.value).not.toContain('|');
+    }
+  });
+
+  it('pads a colspan cell so later full-width rows still align', () => {
+    const html = '<table><tr><td colspan="2">span</td></tr><tr><td>a</td><td>b</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| span |  |');
+      expect(result.value).toContain('| a | b |');
+    }
+  });
+
+  it('escapes pipe characters inside cell text so the pipe table stays parseable', () => {
+    const html = '<table><tr><td>a|b</td><td>c</td></tr><tr><td>d</td><td>e</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toContain('| a\\|b | c |');
+  });
+
+  it('collapses a multi-paragraph cell onto one pipe-table line (pipe cells cannot hold newlines)', () => {
+    const html = '<table><tr><td><p>line one</p><p>line two</p></td><td>x</td></tr><tr><td>a</td><td>b</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| line one line two | x |');
+      expect(result.value).toContain('| a | b |');
+    }
+  });
+
+  it('flattens a nested table inside a data-grid cell to its text (a pipe table cannot nest another pipe table)', () => {
+    const html = '<table><tr><td><table><tr><td>in1</td></tr><tr><td>in2</td></tr></table></td><td>x</td></tr><tr><td>a</td><td>b</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| in1 in2 | x |');
+      expect(result.value).not.toContain('<table');
+    }
+  });
+
+  it('drops an empty <table></table> instead of crashing the GFM pass into tier-2 degradation', () => {
+    const result = htmlToMarkdown('<p>x</p><table></table><p>y</p>');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('x');
+      expect(result.value).toContain('y');
+      expect(result.value).not.toContain('GFM table conversion failed');
+      expect(result.value).not.toContain('<table');
+    }
+  });
+
+  it('handles rows wrapped in an explicit <tbody> section (Outlook emits both bare and sectioned rows)', () => {
+    const html = '<table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| a | b |');
+      expect(result.value).toContain('| c | d |');
+      expect(result.value).not.toContain('<table');
+    }
+  });
+
+  it('treats a non-numeric colspan attribute as a single column instead of throwing or padding', () => {
+    const html = '<table><tr><td colspan="abc">a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| a | b |');
+      expect(result.value).toContain('| c | d |');
+    }
+  });
+
+  it('pads a ragged short row (fewer cells than the widest row) to the full column count', () => {
+    const html = '<table><tr><td>a</td><td>b</td></tr><tr><td>only</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| a | b |');
+      expect(result.value).toContain('| only |  |');
+    }
+  });
+
+  it('skips non-row table children (<caption>, <colgroup>) when building the degraded grid', () => {
+    const html = '<table><caption>Budget</caption><colgroup><col><col></colgroup><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>';
+    const result = htmlToMarkdown(html);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('| a | b |');
+      expect(result.value).toContain('| c | d |');
+      expect(result.value).not.toContain('<caption');
+    }
+  });
+
+  it('drops a layout table whose only cell is empty (no blocks to unwrap)', () => {
+    const result = htmlToMarkdown('<p>x</p><table><tr><td></td></tr></table><p>y</p>');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('x');
+      expect(result.value).toContain('y');
+      expect(result.value).not.toContain('|');
+    }
+  });
+});

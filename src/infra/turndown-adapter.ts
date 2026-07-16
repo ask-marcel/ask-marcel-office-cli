@@ -42,7 +42,113 @@ import type { GraphError } from './graph-client.ts';
  * fires when even the core walker chokes. Each downgrade prepends a
  * markdown blockquote note naming the underlying error so observability
  * survives the degradation.
+ *
+ * Headerless tables are a second, silent failure mode of the GFM plugin:
+ * its `keep()` rule passes any table without a proper `<th>` heading row
+ * through as RAW `outerHTML` (a pasted-from-Excel MsoNormalTable emitted
+ * 140 KB of styled markup for ~3 KB of cell text). The `headerlessTable`
+ * rule below intercepts exactly those tables (addRule'd rules are checked
+ * before keep rules) and degrades them to a pipe table, or unwraps them
+ * when they are single-column Outlook layout scaffolding. It also absorbs
+ * the empty `<table></table>` case whose `rows[0]` dereference used to
+ * throw inside the keep filter and drag the whole document to tier 2.
  */
+type DomNode = {
+  readonly nodeName: string;
+  readonly childNodes: ArrayLike<DomNode>;
+  readonly parentNode: DomNode | null;
+  readonly firstChild: DomNode | null;
+  readonly previousSibling: DomNode | null;
+  readonly textContent: string;
+  readonly rows: ArrayLike<DomNode>;
+  readonly getAttribute: (name: string) => string | null;
+};
+
+// Replicas of turndown-plugin-gfm's isFirstTbody/isHeadingRow, so the rule
+// filter below is the exact complement of the plugin's own `table` rule:
+// properly-headed tables keep flowing to the plugin, everything else is ours.
+const isFirstTbodyLike = (el: DomNode): boolean =>
+  el.nodeName === 'TBODY' && (el.previousSibling === null || (el.previousSibling.nodeName === 'THEAD' && /^\s*$/.test(el.previousSibling.textContent)));
+
+const isHeadingRowLike = (tr: DomNode): boolean => {
+  const parent = tr.parentNode;
+  if (parent === null) return false;
+  if (parent.nodeName === 'THEAD') return true;
+  return parent.firstChild === tr && (parent.nodeName === 'TABLE' || isFirstTbodyLike(parent)) && Array.from(tr.childNodes).every((n) => n.nodeName === 'TH');
+};
+
+const hasProperHeader = (table: DomNode): boolean => table.rows.length > 0 && isHeadingRowLike(table.rows[0] as DomNode);
+
+// Turndown's DOM (domino) implements `.rows` / `.cells` as DEEP
+// getElementsByTagName walks that include rows of tables nested inside
+// cells, so the serializer walks childNodes shallowly instead.
+const SECTION_TAGS: ReadonlySet<string> = new Set(['THEAD', 'TBODY', 'TFOOT']);
+
+const childrenOf = (node: DomNode): ReadonlyArray<DomNode> => Array.from(node.childNodes);
+
+const shallowRows = (table: DomNode): ReadonlyArray<DomNode> =>
+  childrenOf(table).flatMap((child) => {
+    if (child.nodeName === 'TR') return [child];
+    if (SECTION_TAGS.has(child.nodeName)) return childrenOf(child).filter((n) => n.nodeName === 'TR');
+    return [];
+  });
+
+const shallowCells = (tr: DomNode): ReadonlyArray<DomNode> => childrenOf(tr).filter((n) => n.nodeName === 'TD' || n.nodeName === 'TH');
+
+// Bounds best-effort colspan padding on hostile input (colspan="9999").
+const COLSPAN_CAP = 20;
+
+const spanOf = (cell: DomNode): number => {
+  const parsed = Number.parseInt(cell.getAttribute('colspan') ?? '1', 10);
+  return Math.min(Math.max(Number.isNaN(parsed) ? 1 : parsed, 1), COLSPAN_CAP);
+};
+
+const addHeaderlessTableRule = (td: TurndownService): void => {
+  // Reentrant `td.turndown(cell)` keeps inline formatting (bold, links,
+  // entities) exactly like the plugin's own cell handling; turndown clones
+  // element inputs and holds no per-run instance state, and each reentrant
+  // call converts a strict subtree, so the recursion terminates. Pipe cells
+  // are single-line, and turndown never escapes `|` itself.
+  const convertCell = (cell: DomNode): string =>
+    td
+      .turndown(cell as unknown as HTMLElement)
+      .replaceAll(/\s+/g, ' ')
+      .replaceAll('|', '\\|')
+      .trim();
+  td.addRule('headerlessTable', {
+    filter: (node) => node.nodeName === 'TABLE' && !hasProperHeader(node as unknown as DomNode),
+    replacement: (_content, node) => {
+      const rows = shallowRows(node as unknown as DomNode);
+      if (rows.length === 0) return '';
+      const cellsPerRow = rows.map(shallowCells);
+      const width = Math.max(...cellsPerRow.map((cells) => cells.reduce((n, c) => n + spanOf(c), 0)));
+      if (width <= 1) {
+        // Single-cell / single-column tables are Outlook layout scaffolding,
+        // not data: unwrap each cell as free-standing blocks. Nested tables
+        // recurse back through this rule.
+        const blocks = cellsPerRow
+          .flat()
+          .map((cell) => td.turndown(cell as unknown as HTMLElement).trim())
+          .filter((s) => s.length > 0);
+        return blocks.length === 0 ? '' : `\n\n${blocks.join('\n\n')}\n\n`;
+      }
+      const grid = cellsPerRow.map((cells) => {
+        const out: string[] = [];
+        for (const cell of cells) {
+          out.push(convertCell(cell));
+          for (let i = 1; i < spanOf(cell); i += 1) out.push('');
+        }
+        while (out.length < width) out.push('');
+        return out;
+      });
+      const line = (cells: ReadonlyArray<string>): string => `| ${cells.join(' | ')} |`;
+      const [head, ...body] = grid;
+      const separator = line(Array.from({ length: width }, () => '---'));
+      return `\n\n${[line(head ?? []), separator, ...body.map(line)].join('\n')}\n\n`;
+    },
+  });
+};
+
 const buildService = (options: { readonly gfm: boolean }): TurndownService => {
   const td = new TurndownService({
     headingStyle: 'atx',
@@ -51,7 +157,10 @@ const buildService = (options: { readonly gfm: boolean }): TurndownService => {
     emDelimiter: '_',
     strongDelimiter: '**',
   });
-  if (options.gfm) td.use(gfm);
+  if (options.gfm) {
+    td.use(gfm);
+    addHeaderlessTableRule(td);
+  }
   td.remove(['script', 'style']);
   return td;
 };
