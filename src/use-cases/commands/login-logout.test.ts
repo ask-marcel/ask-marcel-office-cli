@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { accessTokenUnsafe } from '../../domain/access-token.ts';
 import { err, ok } from '../../domain/result.ts';
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { execute as login } from './login.ts';
@@ -32,6 +33,63 @@ describe('login command', () => {
     const result = await login(fakeAuth as never, { force: true });
     expect(result).toEqual(ok('forced-token'));
     expect(captured).toEqual({ force: true });
+  });
+
+  // The elevated token carries no refresh token of its own, so neither the cache
+  // rung nor the silent-refresh rung can ever renew it — only the browser dance.
+  // A plain `login` that found a valid basic token used to return "authenticated"
+  // with elevated still missing, which put the user in a loop: the command that
+  // needs elevated says "run login", login says authenticated, the command fails
+  // again, forever. Escalating through the SAME `{force:true}` path the dance
+  // already uses is what breaks the loop (a hand-rolled re-capture would trip the
+  // browser's freshCachedToken short-circuit — LESSONS 2026-07-13).
+  it('re-captures the elevated token when a login finds it missing, instead of reporting success without it', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return ok(accessTokenUnsafe('tok'));
+      },
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+    });
+
+    const result = await login(fakeAuth);
+
+    expect(result.ok).toBe(true);
+    expect(calls.length).toBe(2);
+    expect(calls[1]).toEqual({ force: true });
+  });
+
+  it('does not open the browser when every token is already available', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return ok(accessTokenUnsafe('tok'));
+      },
+      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 3600, scopes: [] }),
+    });
+
+    await login(fakeAuth);
+
+    expect(calls.length).toBe(1);
+  });
+
+  it('does not dance twice when --force was passed explicitly', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return ok(accessTokenUnsafe('tok'));
+      },
+      // Still missing after the forced dance (a federated tenant whose elevated
+      // capture failed) — escalating again would open a second browser for nothing.
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+    });
+
+    await login(fakeAuth, { force: true });
+
+    expect(calls.length).toBe(1);
   });
 });
 

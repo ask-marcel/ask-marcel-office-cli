@@ -171,6 +171,36 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
+  // The three secondary tiers do NOT share a remedy, though they shared a message.
+  // chatsvcagg / ic3 ride the shared refresh token and self-heal headlessly, so
+  // they only reach the fail-fast once the RT itself is gone — which a plain
+  // `login` fixes. Elevated has no refresh token at all, so a plain `login` that
+  // finds a valid basic token returns without re-capturing it, and telling the
+  // user to run `login` sends them round a loop that never terminates.
+  it('sends you to login --force for the elevated token, and plain login for the substrate tiers', async () => {
+    const fs = createFileSystemFake();
+    const tok = futureElevated();
+    const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+
+    const elevated = await auth.getElevatedAccessToken();
+    expect(elevated.ok).toBe(false);
+    if (elevated.ok) return;
+    expect(elevated.error.type).toBe('auth_failed');
+    if (elevated.error.type !== 'auth_failed') return;
+    expect(elevated.error.message).toContain('login --force');
+
+    for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
+      const result = await getToken();
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.type).toBe('auth_failed');
+      if (result.error.type !== 'auth_failed') return;
+      expect(result.error.message).toContain('login');
+      expect(result.error.message).not.toContain('--force');
+    }
+  });
+
   it('returns cached token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     const header = btoa(JSON.stringify({ alg: 'RS256' }));

@@ -202,13 +202,32 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
 // process per command and the recaptures open a visible window — so the remedy
 // is an interactive `login`. (The elevated token has no HTTP-refresh path at
 // all — different appid — so it always lands here on the command path.)
-const failFastSecondaryMessage = (token: string, commands: string): string =>
-  `${token} token is expired or was not captured at login. Run \`ask-marcel-office login\` to (re)capture it — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+/**
+ * The remedy is NOT identical across the three secondary tiers, though this
+ * message used to claim it was.
+ *
+ * chatsvcagg / ic3 ride the shared refresh token and self-heal headlessly, so
+ * they only reach this fail-fast once the RT itself is gone — and a plain
+ * `login` genuinely fixes that.
+ *
+ * Elevated carries NO refresh token of its own: it exists only via the browser
+ * dance. A plain `login` that finds a valid basic token returns on the cache
+ * rung without re-capturing it, so telling the user to run `login` sent them
+ * round a loop with no exit — the command says "run login", login says
+ * "authenticated", the command fails again. `--force` is the only rung that
+ * re-captures it, and the message now says so AND says why.
+ */
+const failFastSecondaryMessage = (token: string, commands: string, remedy: string): string =>
+  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+
+const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
+const RECAPTURE_VIA_FORCED_LOGIN =
+  'It carries no refresh token of its own, so a plain `ask-marcel-office login` that finds a valid cached token returns without re-capturing it — run `ask-marcel-office login --force`';
 
 // Stable machine-readable code for the secondary-token fail-fast (elevated /
-// chatsvcagg / ic3). The remedy is identical across the three tiers — run
-// `login` — so an agent can branch on `errorCode` instead of substring-matching
-// the human message. The message still names which token and which commands.
+// chatsvcagg / ic3), so an agent can branch on `errorCode` instead of
+// substring-matching the human message. The message names which token, which
+// commands, and the tier-specific remedy.
 const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
 
 const createAuthManagerFromApi = (
@@ -645,7 +664,7 @@ const createAuthManagerFromApi = (
     if (!recaptureSecondaryViaBrowser)
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, download-drive-item-version'),
+        message: failFastSecondaryMessage('Elevated (M365)', 'list-chats, get-chat, download-drive-item-version', RECAPTURE_VIA_FORCED_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     // The persistent profile cookies do the silent SSO, no UI prompt.
@@ -730,7 +749,11 @@ const createAuthManagerFromApi = (
       }
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('chatsvcagg (Teams chat)', 'list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user'),
+        message: failFastSecondaryMessage(
+          'chatsvcagg (Teams chat)',
+          'list-teams-chats-with-messages, list-teams-chat-messages, get-teams-chat-message, find-chats-with-user',
+          RECAPTURE_VIA_LOGIN
+        ),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }
@@ -820,7 +843,11 @@ const createAuthManagerFromApi = (
         const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
         if (refreshed.ok) return refreshed;
       }
-      return err({ type: 'auth_failed', message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history'), code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
+      return err({
+        type: 'auth_failed',
+        message: failFastSecondaryMessage('ic3 (Teams chat history)', 'list-teams-chat-history', RECAPTURE_VIA_LOGIN),
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+      });
     }
     return recaptureIc3Shared();
   };

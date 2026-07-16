@@ -339,7 +339,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     )
     .option(
       '--force',
-      'Ignore the cache and re-capture every token via the browser. The only way to refresh the elevated (M365) token while the basic token is still valid; the persistent browser profile is reused, so you are usually not re-prompted for credentials.'
+      'Ignore the cache and re-capture every token via the browser. Rarely needed now: a plain `login` already re-captures the elevated (M365) token by itself when it is missing. Use this to refresh every tier unconditionally. The persistent browser profile is reused, so you are usually not re-prompted for credentials.'
     )
     .action(async () => {
       const force = loginCmd.opts<{ force?: boolean }>().force ?? false;
