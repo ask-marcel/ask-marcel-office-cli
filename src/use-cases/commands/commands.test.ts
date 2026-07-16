@@ -2122,7 +2122,7 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm2' });
+    const result = await cmd.execute(graph, { messageId: 'm2', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -2153,12 +2153,15 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm3' });
+    const result = await cmd.execute(graph, { messageId: 'm3', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
       expect(v.text).not.toContain('PHNjcmlwdD4=');
       expect(v.text).not.toContain('data:text/html');
+      // The never-embedded cid ref degrades to a readable placeholder.
+      expect(v.text).toContain('inline image: evil.html');
+      expect(v.text).not.toContain('cid:evil');
     }
   });
 
@@ -2178,7 +2181,7 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'mHuge' });
+    const result = await cmd.execute(graph, { messageId: 'mHuge', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -2314,7 +2317,7 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'mBoundary' });
+    const result = await cmd.execute(graph, { messageId: 'mBoundary', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -2323,7 +2326,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-to-markdown fetches multiple inline images in parallel and leaves the cid: ref in place when an individual per-attachment fetch fails (failure isolation per-image)', async () => {
+  it('convert-mail-to-markdown fetches multiple inline images in parallel and degrades the cid: ref to a readable placeholder when an individual per-attachment fetch fails (failure isolation per-image)', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mMulti',
@@ -2366,13 +2369,15 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'mMulti' });
+    const result = await cmd.execute(graph, { messageId: 'mMulti', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
       expect(v.text).toContain('data:image/png;base64,BBBB');
-      expect(v.text).toContain('cid:b');
-      expect(v.text).toContain('cid:c');
+      expect(v.text).toContain('inline image: b.jpg');
+      expect(v.text).toContain('inline image: c.png');
+      expect(v.text).not.toContain('cid:b');
+      expect(v.text).not.toContain('cid:c');
     }
   });
 
@@ -2406,7 +2411,7 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'mPred' });
+    const result = await cmd.execute(graph, { messageId: 'mPred', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
@@ -2556,7 +2561,7 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-to-markdown skips the per-attachment bytes-fetch when an inline image lacks an id field (Graph metadata anomaly: contentId present but id missing) — cid ref stays in place, no Graph call is made for it', async () => {
+  it('convert-mail-to-markdown skips the per-attachment bytes-fetch when an inline image lacks an id field (Graph metadata anomaly: contentId present but id missing) — cid ref degrades to a placeholder, no Graph call is made for it', async () => {
     const fetchFn = stagedFetch([
       {
         urlPrefix: 'https://graph.microsoft.com/v1.0/me/messages/mNoId',
@@ -2572,11 +2577,12 @@ describe('commands', () => {
     const cmd = cmdMap['convert-mail-to-markdown'];
     if (!cmd) throw new Error('convert-mail-to-markdown not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'mNoId' });
+    const result = await cmd.execute(graph, { messageId: 'mNoId', inlineImages: 'true' });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { text: string };
-      expect(v.text).toContain('cid:lost');
+      expect(v.text).toContain('inline image: lost.png');
+      expect(v.text).not.toContain('cid:lost');
       expect(v.text).not.toContain('data:image/png');
     }
   });
@@ -2767,12 +2773,14 @@ describe('commands', () => {
     // hidden because they were silently embedded).
     expect(v.text).toContain('logo.png');
     expect(v.text).toContain('banner.jpg');
-    // Body keeps the raw cid: references (no data: URI substitution).
-    expect(v.text).toContain('cid:logo@cid');
+    // Body swaps the unfetched cid: references for readable placeholders
+    // instead of leaving broken cid: links.
+    expect(v.text).toContain('inline image: logo.png');
+    expect(v.text).not.toContain('cid:logo@cid');
     expect(v.text).not.toContain('data:image/png;base64,');
   });
 
-  it('convert-mail-to-markdown default (omitted flag) preserves the historical embedding behaviour — per-image bytes are fetched and data: URIs replace cid: refs', async () => {
+  it('convert-mail-to-markdown default (omitted flag) skips embedding entirely (LLM-first): no per-image bytes fetch, placeholders replace cid: refs, and --inline-images true restores the base64 embedding', async () => {
     const urls: string[] = [];
     const fetchFn: FetchFn = async (url) => {
       urls.push(url);
@@ -2791,9 +2799,14 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const v = result.value as { text: string };
-    // Per-image fetch happened — backward compat preserved.
-    expect(urls.some((u) => u.endsWith('/attachments/img1'))).toBe(true);
-    expect(v.text).toContain('data:image/png;base64,');
+    // No per-image bytes fetch on the default path.
+    expect(urls.some((u) => u.endsWith('/attachments/img1'))).toBe(false);
+    expect(v.text).not.toContain('data:image/png;base64,');
+    expect(v.text).toContain('inline image: logo.png');
+    // Explicit opt-in restores the embedding behaviour.
+    const embedded = await cmd.execute(graph, { messageId: 'mInlineDefault', inlineImages: 'true' });
+    expect(embedded.ok).toBe(true);
+    if (embedded.ok) expect((embedded.value as { text: string }).text).toContain('data:image/png;base64,');
   });
 
   it('convert-mail-to-markdown rejects --inline-images values other than true/false as a validation_error', async () => {

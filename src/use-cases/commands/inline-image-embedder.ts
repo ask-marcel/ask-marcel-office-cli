@@ -31,5 +31,28 @@ const embedInlineImages = (html: string, attachments: ReadonlyArray<InlineAttach
   return out;
 };
 
-export { embedInlineImages };
+const IMG_TAG = /<img\b[^>]*>/gi;
+const SRC_ATTR = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+const ALT_ATTR = /\balt\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+// A `cid:` ref that survives the embed pass (embedding disabled, an
+// individual fetch failed, a non-image inline attachment, or a cid with no
+// matching attachment) would render as a broken `![…](cid:…)` markdown link.
+// Swap the whole <img> tag for a readable placeholder instead, labelled by
+// the attachment name when known, else the img alt text, else the cid's
+// filename-ish prefix before the `@`.
+const replaceUnresolvedCidImages = (html: string, labelByContentId: ReadonlyMap<string, string>): string =>
+  html.replace(IMG_TAG, (tag) => {
+    const src = SRC_ATTR.exec(tag);
+    const srcValue = src?.[1] ?? src?.[2];
+    if (srcValue === undefined || !srcValue.startsWith('cid:')) return tag;
+    const cid = srcValue.slice('cid:'.length);
+    const alt = ALT_ATTR.exec(tag);
+    const altText = alt?.[1] ?? alt?.[2];
+    const cidPrefix = cid.split('@')[0];
+    const label = labelByContentId.get(cid) ?? (altText !== undefined && altText !== '' ? altText : undefined) ?? (cidPrefix !== undefined && cidPrefix !== '' ? cidPrefix : cid);
+    return `[inline image: ${label}]`;
+  });
+
+export { embedInlineImages, replaceUnresolvedCidImages };
 export type { InlineAttachment };

@@ -1,5 +1,41 @@
 import { describe, expect, it } from 'bun:test';
-import { embedInlineImages } from './inline-image-embedder.ts';
+import { embedInlineImages, replaceUnresolvedCidImages } from './inline-image-embedder.ts';
+
+describe('replaceUnresolvedCidImages — swap leftover cid: img tags for readable placeholders', () => {
+  it('replaces a cid img with the attachment name from the label map', () => {
+    const out = replaceUnresolvedCidImages('<p>x</p><img src="cid:logo@01" alt="logo">', new Map([['logo@01', 'logo.png']]));
+    expect(out).toBe('<p>x</p>[inline image: logo.png]');
+  });
+
+  it('falls back to the img alt text when the cid has no matching attachment', () => {
+    const out = replaceUnresolvedCidImages('<img src="cid:ghost@x" alt="chart screenshot">', new Map());
+    expect(out).toBe('[inline image: chart screenshot]');
+  });
+
+  it('falls back to the cid prefix before the @ when there is no attachment match and no alt text', () => {
+    const out = replaceUnresolvedCidImages('<img src="cid:image001.png@01DD1445.ABC">', new Map());
+    expect(out).toBe('[inline image: image001.png]');
+  });
+
+  it('uses the whole cid when the prefix before the @ is empty', () => {
+    const out = replaceUnresolvedCidImages('<img src="cid:@weird">', new Map());
+    expect(out).toBe('[inline image: @weird]');
+  });
+
+  it('supports single-quoted src and alt attributes', () => {
+    expect(replaceUnresolvedCidImages("<img src='cid:a@b'>", new Map([['a@b', 'a.png']]))).toBe('[inline image: a.png]');
+    expect(replaceUnresolvedCidImages("<img src='cid:z@z' alt='zed'>", new Map())).toBe('[inline image: zed]');
+  });
+
+  it('leaves data: URI and https images untouched (only cid: sources are placeholders)', () => {
+    const html = '<img src="data:image/png;base64,AAA="><img src="https://contoso.example/y.png">';
+    expect(replaceUnresolvedCidImages(html, new Map())).toBe(html);
+  });
+
+  it('leaves an img with no src attribute untouched', () => {
+    expect(replaceUnresolvedCidImages('<img alt="no src">', new Map())).toBe('<img alt="no src">');
+  });
+});
 
 describe('embedInlineImages — replace cid: refs in mail body HTML with self-contained data: URIs', () => {
   it('replaces a single cid: ref with a base64 data URI built from the matching attachment', () => {

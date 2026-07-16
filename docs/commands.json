@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T12:33:02.044Z",
+  "generatedAt": "2026-07-16T12:41:54.893Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -275,7 +275,7 @@
     },
     {
       "name": "convert-mail-to-markdown",
-      "summary": "Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default, inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) are embedded as base64 `data:` URIs so the output is self-contained (non-image inline attachments are NOT embedded; oversize inline images are replaced with a placeholder note). For LLM callers that only want the text body, pass `--inline-images false` to skip the per-image bytes fetch entirely — the body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list so you can decide whether to fetch them separately via `get-mail-attachment`. File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.",
+      "summary": "Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default NO image bytes are fetched: every inline `cid:` image renders as a readable `[inline image: <name>]` placeholder and the images surface in the file-attachments list, so the output stays close to the text size (an email whose 6 KB body carried 30 KB of signature-image base64 now ships at ~6 KB). Pass `--inline-images true` to embed inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) as base64 `data:` URIs for self-contained output (non-image inline attachments are never embedded; oversize inline images keep a placeholder note; a cid whose per-image fetch fails degrades to the placeholder too). File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and with `--inline-images true` one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -297,7 +297,7 @@
           "name": "inline-images",
           "key": "inlineImages",
           "required": false,
-          "description": "Pass `--inline-images false` to skip the per-image bytes fetch + base64 embedding. Default is `true` (embed). Disabling cuts the response size dramatically on emails with several inline images (a 6 KB body with 6 inline images shipped at ~36 KB by default; with `--inline-images false` it stays close to 6 KB). The body keeps raw `cid:<contentId>` references and the inline images surface in the file-attachments list instead, so the LLM caller can still see what is there and fetch any specific image via `get-mail-attachment` on demand."
+          "description": "Pass `--inline-images true` to fetch small inline images (≤ 2 MB, `image/*` only) and embed them as base64 `data:` URIs. Default is `false` (text-first, changed in v2.3): no per-image bytes fetch, and every inline `cid:` image renders as a `[inline image: <name>]` placeholder while still appearing in the file-attachments list, so the LLM caller sees what exists and can fetch any specific image via `get-mail-attachment` on demand. Embedding a 6-inline-image email inflated a 6 KB body to ~36 KB; the default keeps it near 6 KB."
         },
         {
           "name": "keep-quoted",
