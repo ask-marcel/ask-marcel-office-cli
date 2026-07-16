@@ -247,7 +247,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'ErrorInvalidUser' || c === 'Request_ResourceNotFound',
-    hint: 'User principal name or object ID not found in this tenant. Source a real one via `ask-marcel-office list-relevant-people --select id,userPrincipalName,displayName`, `ask-marcel-office get-current-user` (for the signed-in user), or `ask-marcel-office list-groups --select id,displayName` (when you wanted a group, not a user). Guest UPNs use the `_` form: `alice_contoso.com#EXT#@yourtenant.onmicrosoft.com`, not `alice@contoso.com`.',
+    hint: "User principal name or object ID not found in this tenant. Source a real one via `ask-marcel-office list-relevant-people --select id,userPrincipalName,displayName`, `ask-marcel-office get-current-user` (for the signed-in user), or `ask-marcel-office list-groups --select id,displayName` (when you wanted a group, not a user). Guest UPNs use the `_` form: `alice_contoso.com#EXT#@yourtenant.onmicrosoft.com`, not `alice@contoso.com`. A cross-tenant / home identity has no path here: a foreign-tenant object ID (e.g. a Teams `8:orgid:<home-id>` participant, whose id lives in THEIR tenant) or an email that is not the user's `mail`/UPN in this tenant is unresolvable by design — your directory holds only its own members and the LOCAL guest projection of an external person, which you reach by name (`get-user --user-id '<name>'`) or by their real `mail`, never by their home id.",
   },
   // ─── Graph: ErrorInvalidParameter (Excel & calendar-view families) ───────
   // two rules — the specific calendar
