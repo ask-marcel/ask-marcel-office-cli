@@ -112,7 +112,7 @@ Repo history was rewritten once to purge exactly this class of string.
        for the drive-item commands, which hold only a `driveId` and cannot recover on their own.
        DoD: LIVE-verified against a real foreign share link (lesson 2026-06-23).
 
-5. [ ] **builders route on `tenantId`**
+5. [x] **builders route on `tenantId`** (46a0201)
        `tenantIdSchema` (optional) + `tenantIdOption` meta mirroring `odataQueryOptions`; the 6
        non-elevated builders route via a shared helper. Elevated builders do NOT get it
        (elevated is a home-tenant ODSP identity; cross-tenant elevated is not a thing).
@@ -120,13 +120,13 @@ Repo history was rewritten once to purge exactly this class of string.
        EXISTING TEST -> rule 24, needs explicit user sign-off first.
        DoD: `meta.test.ts` invariants green; builder-based drive commands accept `--tenant-id`.
 
-6. [ ] **hand-written executes thread `tenantId`**
+6. [x] **hand-written executes thread `tenantId`** (9b125b0)
        `FetchOptions` in `fetch-raw-bytes.ts` gains `tenantId?`; `inlineBinary` / `fetchRawBytes` /
        `officeToMarkdown` route. Covers download-drive-item-{content,as-markdown,as-pdf},
        extract-drive-item-images, convert-drive-item-zip, get-drive-item.
        DoD: LIVE end-to-end — the real foreign pptx converts via `--tenant-id`.
 
-7. [ ] **docs + CHANGELOG + LESSONS**
+7. [x] **docs + CHANGELOG + LESSONS**
        Regen `docs/commands.json` + `COMMANDS.md`; CHANGELOG entry; README audit (guideline #5);
        propose LESSONS entries.
        DoD: generated docs match source; README audited; entries proposed, not appended.
@@ -160,3 +160,33 @@ Repo history was rewritten once to purge exactly this class of string.
   temp+rename) and there is no locking anywhere, so concurrent commands already race the
   single-use RT. Flag; do not fix in a feature commit (LESSONS 2026-07-15: a scoped change is
   not the venue to harden an unrelated pre-existing branch).
+
+
+---
+
+## DONE 2026-07-16 — all 7 slices landed, verified live
+
+Nine commits, `191754a`..`<this>`. The capability is proven end to end through the shipped CLI
+against a real partner tenant: a sharing URL that answered `invalidAudienceUri` this morning now
+resolves AND converts (5.3 MB pptx -> per-slide markdown).
+
+The five LESSONS entries this session earned are appended to `.claude/LESSONS.md`. The two
+`mutate:changed` gotchas recorded above are now in that file too, so this plan can be deleted
+once the branch is pushed.
+
+### Not done, deliberately
+
+- **`v2.2.0` is tagged 22 commits behind HEAD** while `package.json` says 2.2.0 and npm has 2.1.0.
+  The `## 2.2.0` CHANGELOG section already described post-tag work before this session, so the
+  cross-tenant entry went there too. The stale tag is a maintainer call, untouched.
+- **No release cut.** `prepublishOnly` gates a publish behind the full chain, but this is an
+  auth-touching change verified against exactly ONE partner tenant.
+- **`fetch-raw-bytes.ts` sits at 89.90% mutation alone** (aggregate 92.51% passes). All 10
+  survivors are pre-existing (base64ToBytes, the error envelopes, tagPdfPassthrough); none on a
+  line this work touched.
+- **Pre-existing, still true:** `writeCache` is a bare `fs.writeText` (no temp+rename) and there
+  is no locking, so concurrent commands already race the single-use RT. Cross-tenant adds ~1
+  redemption per tenant per hour, which does not materially change it.
+- **Tenant discovery is proven on n=1.** A tenant whose sign-in domain differs from its
+  SharePoint name fails discovery (surfaced honestly, and `--tenant-id` by hand still works).
+  A `WWW-Authenticate`-realm fallback is the candidate if it ever bites.
