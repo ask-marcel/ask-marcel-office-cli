@@ -5419,10 +5419,22 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     name: 'search-mail-messages',
     params: { query: 'invoice' },
     expectedPath:
-      '/me/messages?$search="invoice"&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId',
+      '/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId',
   },
   // Explicit --select wins over the slim default.
-  { name: 'search-mail-messages', params: { query: 'invoice', select: 'id,subject' }, expectedPath: '/me/messages?$search="invoice"&$select=id%2Csubject' },
+  { name: 'search-mail-messages', params: { query: 'invoice', select: 'id,subject' }, expectedPath: '/me/messages?$search=%22invoice%22&$select=id%2Csubject' },
+  // The $search value is percent-encoded: a raw ` & ` used to truncate the
+  // KQL mid-phrase on the wire, and embedded double quotes escape into KQL
+  // phrase syntax instead of a BadRequest.
+  {
+    name: 'search-mail-messages',
+    params: { query: 'Contoso A2 & B7 timeline', select: 'id' },
+    expectedPath: '/me/messages?$search=%22Contoso%20R2%20%26%20B27%20timeline%22&$select=id',
+  },
+  { name: 'search-mail-messages', params: { query: '"budget allocation"', select: 'id' }, expectedPath: '/me/messages?$search=%22%5C%22budget%20allocation%5C%22%22&$select=id' },
+  // The OData search(q='…') form doubles single quotes and percent-encodes.
+  { name: 'search-my-documents', params: { query: "john's plan & co" }, expectedPath: "/me/drive/search(q='john''s%20plan%20%26%20co')" },
+  { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'q1 budget' }, expectedPath: "/drives/d1/search(q='q1%20budget')" },
   { name: 'extract-sharepoint-links-in-mail', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1?$select=subject,body' },
   { name: 'convert-mail-to-markdown', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
   { name: 'list-onenote-notebooks', params: {}, expectedPath: '/me/onenote/notebooks' },
@@ -7247,7 +7259,7 @@ describe('search-mail-messages rejects --filter client-side', () => {
   it('still works when only --query is supplied (no regression on the happy path) — URL carries the slim default $select alongside $search', async () => {
     const url = await capturedUrl('search-mail-messages', { query: 'invoice' });
     expect(url).toBe(
-      'https://graph.microsoft.com/v1.0/me/messages?$search="invoice"&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId'
+      'https://graph.microsoft.com/v1.0/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId'
     );
   });
 

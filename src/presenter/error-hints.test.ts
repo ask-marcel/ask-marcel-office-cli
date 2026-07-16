@@ -197,10 +197,18 @@ describe('findErrorHint — Graph error translation', () => {
     expect(result?.hint).toContain('Retry-After');
   });
 
-  it('catches the canonical KQL quoting trap ("An identifier was expected at position 0") and tells the LLM not to double-quote --query', () => {
+  it('catches the KQL parse error ("An identifier was expected at position 0") and explains how phrase quoting works now', () => {
     const result = findErrorHint('BadRequest: An identifier was expected at position 0.', 'BadRequest');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('extra double-quotes');
+    expect(result?.hint).toContain('KQL parse error');
+    expect(result?.hint).toContain('"multi word"');
+  });
+
+  it('catches the generic KQL syntax-error shape ("Syntax error: character X is not valid at position N") with the same KQL guidance', () => {
+    const result = findErrorHint("BadRequest: Syntax error: character '2' is not valid at position 17 in '\"subject:\"Contoso A2'.", 'BadRequest');
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('KQL');
+    expect(result?.hint).toContain('subject:"multi word"');
   });
 
   it('catches the `$skip is not supported` family and points at next-page', () => {

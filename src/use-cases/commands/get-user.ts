@@ -4,6 +4,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
+import { kqlSearchClause } from './search-escape.ts';
 
 const schema = z.object({ userId: z.string().min(1) }).extend(selectExpandSchema.shape);
 
@@ -62,7 +63,9 @@ const execute: Command['execute'] = async (graph, params) => {
   // A bare name → search the signed-in user's relevant-people graph (People API, basic
   // token, so it works even when the elevated token is cold). Returns candidates with
   // AAD ids so the caller disambiguates and re-queries by id for the full profile.
-  const result = await graph.get(`/me/people?$search="${userId.replaceAll('"', '')}"`);
+  // Embedded quotes are stripped (the People API has no phrase syntax); the clause
+  // builder percent-encodes so names with `&` survive the wire.
+  const result = await graph.get(`/me/people?${kqlSearchClause(userId.replaceAll('"', ''))}`);
   if (!result.ok) return result;
   const value = (result.value as { readonly value?: ReadonlyArray<PersonHit> }).value;
   return ok({ query: userId, matches: (Array.isArray(value) ? value : []).map(toCandidate) });

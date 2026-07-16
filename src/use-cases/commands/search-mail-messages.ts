@@ -4,11 +4,12 @@ import { buildListCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
 import { odataQueryOptions } from './odata-query.ts';
+import { kqlSearchClause } from './search-escape.ts';
 
 const baseSchema = z.object({ query: z.string().min(1) });
 // Slim default projection shared with list-mail-messages / get-mail-message
 // (see mail-message-select.ts); a user-supplied `--select` always wins.
-const inner = buildListCommand((p) => `/me/messages?$search="${p.query}"`, baseSchema, { defaultSelect: MAIL_MESSAGE_DEFAULT_SELECT });
+const inner = buildListCommand((p) => `/me/messages?${kqlSearchClause(p.query)}`, baseSchema, { defaultSelect: MAIL_MESSAGE_DEFAULT_SELECT });
 
 // Graph rejects `$search` + `$filter` together with
 // `SearchWithFilter` (not the previously documented `InvalidRestriction`).
@@ -34,7 +35,7 @@ const { schema } = inner;
 
 const meta: CommandMeta = {
   summary:
-    'Search the signed-in user\'s entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (same as `list-mail-messages`; `conversationId` is included so you can group hits into a thread or feed one to `list-conversation-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **KQL quoting gotcha**: pass the raw KQL expression, e.g. `--query \'subject:invoice from:alice\'`; do NOT wrap your terms in extra double-quotes (Graph then rejects with `BadRequest: An identifier was expected at position 0` because it sees `"..."` after the `$search=` interpolation). The CLI already wraps the entire `--query` value in `"..."` on the wire.',
+    "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (same as `list-mail-messages`; `conversationId` is included so you can group hits into a thread or feed one to `list-conversation-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **Exact-phrase search works**: `--query '\"budget allocation\"'` and embedded field phrases like `--query 'subject:\"Contoso A2 & B7 timeline\"'` are supported — the CLI escapes your double quotes into KQL phrase quotes, wraps the whole expression in the `\"…\"` Graph requires, and percent-encodes the value so `&`, `#`, and `+` are wire-safe. Pass raw KQL otherwise, e.g. `--query 'subject:invoice from:alice'`.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages?$search="{query}"',

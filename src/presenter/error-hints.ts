@@ -288,11 +288,11 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     hint: 'Throttled by Graph. Wait the `retryAfterSeconds` interval on this envelope (Graph’s `Retry-After`, in seconds) before retrying; for paginated walks, lower `--top` or add a delay between pages. Microsoft applies per-app and per-user limits separately.',
   },
   // ═══ MESSAGE-PATTERN FALLBACKS (run only when no code-based rule matched) ═
-  // ─── Graph: $search KQL quoting trap ─────────────────────────────────────
+  // ─── Graph: $search KQL parse errors ─────────────────────────────────────
   {
     source: 'graph',
-    matchMessage: (m) => /An identifier was expected at position 0/i.test(m),
-    hint: 'KQL parse error — usually means `--query` was wrapped in extra double-quotes. The CLI already wraps the value in `"..."` on the wire; pass the raw KQL (`subject:invoice from:alice`), not `"subject:invoice"`.',
+    matchMessage: (m) => /An identifier was expected at position 0|Syntax error: character .* is not valid at position/i.test(m),
+    hint: 'KQL parse error — the `--query` expression is malformed KQL. Property queries look like `subject:invoice from:alice`; phrase search IS supported: `--query \'"multi word"\'` and embedded `subject:"multi word"` both work (the CLI escapes your quotes into KQL phrase quotes and percent-encodes the value on the wire). Check for unbalanced quotes or parentheses and stray operators (`AND`/`OR` must sit between terms).',
   },
   // ─── Graph: invalid $orderby column ──────────────────────────────────────
   // covers `Invalid orderby property 'foo' for resource 'message'`

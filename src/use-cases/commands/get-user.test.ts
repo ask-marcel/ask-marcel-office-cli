@@ -55,8 +55,9 @@ describe('get-user', () => {
       },
     });
     const result = await execute(graph, { userId: 'Weilai Wang' });
-    expect(getPath).toContain('/me/people?$search=');
-    expect(getPath).toContain('Weilai Wang');
+    // Exact wire pin: quoted + percent-encoded (a raw space or & would
+    // corrupt the query string; graph-client concatenates paths verbatim).
+    expect(getPath).toBe('/me/people?$search=%22Weilai%20Wang%22');
     expect(result.ok).toBe(true);
     if (result.ok) {
       const v = result.value as { query: string; matches: ReadonlyArray<Record<string, string | undefined>> };
@@ -122,7 +123,7 @@ describe('get-user', () => {
       },
     });
     await execute(graph, { userId: 'Ali"ce' });
-    expect(getPath).toContain('$search="Alice"'); // the inner quote is removed, not left in or replaced
+    expect(getPath).toBe('/me/people?$search=%22Alice%22'); // the inner quote is removed, not left in or replaced
     expect(getPath).not.toContain('Ali"ce');
   });
 
