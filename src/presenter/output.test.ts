@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { renderTextOutput } from './output-text.ts';
 import { render, renderError } from './output.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<void>): Promise<string> => {
@@ -424,6 +425,65 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const data = { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
     expect(out).toBe("(no items)\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+  });
+
+  it('renders a 20,000-item aggregated collection with a plain count sibling (search-all-files shape) as flat blocks with the >50KB sizeHint prepended', async () => {
+    const logger = createLoggerFake();
+    const items = Array.from({ length: 20_000 }, (_, i) => ({ id: `item-${i}`, name: `File ${i}.docx`, webUrl: `https://contoso.sharepoint.com/f/${i}` }));
+    const data = { value: items, count: 20_000 };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    // The sizeHint was previously unreachable in text mode for payloads this
+    // large: the renderer crashed before the size check ever ran.
+    expect(out.startsWith('sizeHint: ')).toBe(true);
+    expect(out).toContain('\nid: item-0\nname: File 0.docx\n');
+    expect(out.endsWith('id: item-19999\nname: File 19999.docx\nwebUrl: https://contoso.sharepoint.com/f/19999\n\n--- count: 20000\n')).toBe(true);
+  });
+
+  it('renders a 600,000-record array under a record key without a JavaScriptCore spread-argument stack overflow (search-all-files-scale payloads)', () => {
+    // Sized above the measured JSC failure point for `arr.push(...big)`
+    // (~400K-1M spread arguments depending on stack depth, Bun 1.3.x): the
+    // old spread-push rendering threw `Maximum call stack size exceeded`
+    // here. renderTextOutput is used directly so the 7 MB body skips the
+    // captureStream indirection.
+    const hits = Array.from({ length: 600_000 }, (_, i) => ({ id: `x${i}` }));
+    const out = renderTextOutput({ hits });
+    // 1 `hits:` header + 600,000 item lines + 599,999 blank separators + trailing newline
+    expect(out.split('\n').length).toBe(1_200_001);
+    expect(out.startsWith('hits:\n  id: x0\n')).toBe(true);
+  });
+
+  it('hoists a scalar sibling into the footer next to a hoisted @odata.count cursor (both land in the same `---` line)', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'm1' }], '@odata.count': 47, truncated: true };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toBe('id: m1\n\n--- count: 47 · truncated: true\n');
+  });
+
+  it('renders an empty collection that carries scalar siblings as "(no items)" plus the hoisted footer', async () => {
+    const logger = createLoggerFake();
+    const out = await captureStream('stdout', () => render({ value: [], count: 0 }, logger, 'text'));
+    expect(out).toBe('(no items)\n\n--- count: 0\n');
+  });
+
+  it('hoists plain scalar siblings of a value[] collection (count, truncated) into the footer instead of nesting the items under a `value:` tree', async () => {
+    const logger = createLoggerFake();
+    const data = {
+      value: [
+        { id: 'f1', name: 'a.docx' },
+        { id: 'f2', name: 'b.pptx' },
+      ],
+      count: 2,
+      truncated: true,
+    };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toBe('id: f1\nname: a.docx\n\nid: f2\nname: b.pptx\n\n--- count: 2 · truncated: true\n');
+  });
+
+  it('keeps the record-tree rendering when a value[] envelope carries a non-scalar sibling (nothing to hoist safely)', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'f1' }], stats: { pages: 3 } };
+    const out = await captureStream('stdout', () => render(data, logger, 'text'));
+    expect(out).toBe('value:\n  id: f1\nstats:\n  pages: 3\n');
   });
 
   it('prints the markdown body raw with no envelope when the command returns a text/markdown payload (convert-mail-to-markdown family)', async () => {

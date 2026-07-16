@@ -35,6 +35,17 @@ const encodeScalar = (value: unknown): string => {
 
 const inlineArray = (arr: ReadonlyArray<unknown>): string => `[${arr.map(encodeScalar).join(', ')}]`;
 
+// Loop-push instead of `target.push(...lines)`: a spread passes every element
+// as a call argument on the stack, and JavaScriptCore throws `Maximum call
+// stack size exceeded` above a stack-depth-dependent argument count (~400K
+// under the real CLI stack on Bun 1.3.x). A 3,589-item search-all-files
+// response rendered to enough lines to cross it, so text mode crashed with
+// exit 1 while JSON mode worked. Payload size must never be the renderer's
+// problem; loop-append has no argument-count ceiling.
+const appendLines = (target: string[], lines: ReadonlyArray<string>): void => {
+  for (const line of lines) target.push(line);
+};
+
 const renderArrayField = (key: string, arr: ReadonlyArray<unknown>, indent: string): ReadonlyArray<string> => {
   if (arr.length === 0) return [`${indent}${key}: []`];
   if (arr.every((v) => !isRecord(v))) return [`${indent}${key}: ${inlineArray(arr)}`];
@@ -42,7 +53,7 @@ const renderArrayField = (key: string, arr: ReadonlyArray<unknown>, indent: stri
   const blocks: string[] = [`${indent}${key}:`];
   arr.forEach((item, idx) => {
     if (idx > 0) blocks.push('');
-    blocks.push(...renderRecordLines(item as Record<string, unknown>, childIndent));
+    appendLines(blocks, renderRecordLines(item as Record<string, unknown>, childIndent));
   });
   return blocks;
 };
@@ -53,9 +64,9 @@ const renderRecordLines = (record: Record<string, unknown>, indent: string): Rea
     if (value === undefined) continue;
     if (isRecord(value)) {
       lines.push(`${indent}${key}:`);
-      lines.push(...renderRecordLines(value, `${indent}  `));
+      appendLines(lines, renderRecordLines(value, `${indent}  `));
     } else if (Array.isArray(value)) {
-      lines.push(...renderArrayField(key, value, indent));
+      appendLines(lines, renderArrayField(key, value, indent));
     } else {
       lines.push(`${indent}${key}: ${encodeScalar(value)}`);
     }
@@ -89,11 +100,12 @@ const extractCursors = (record: Record<string, unknown>): { readonly stripped: R
 // through the same `next-page` command.
 const asFollowCommand = (url: string): string => `ask-marcel-office next-page --url '${url}'`;
 
-const renderFooter = (cursors: Cursors): string => {
+const renderFooter = (cursors: Cursors, extraParts: ReadonlyArray<string> = []): string => {
   const parts: string[] = [];
   if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink)}`);
   if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink)}`);
   if (cursors.count !== undefined) parts.push(`count: ${cursors.count}`);
+  appendLines(parts, extraParts);
   return parts.length === 0 ? '' : `--- ${parts.join(' · ')}`;
 };
 
@@ -105,14 +117,26 @@ const renderCollection = (items: ReadonlyArray<unknown>, footer: string): string
   return appendFooter(blocks.join('\n\n'), footer);
 };
 
+const isScalar = (value: unknown): boolean => value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+
 const renderEnveloped = (data: Record<string, unknown>): string => {
   if (isTextPayload(data)) return `${data.text as string}\n`;
   if (isBinaryPayload(data)) return `binary: ${data.contentType as string}, ${data.size as number} bytes — use --output-path to save\n`;
   if (isUnsavedMediaPayload(data)) return mediaHintLine(data.media as ReadonlyArray<unknown>);
   const { stripped, cursors } = extractCursors(data);
-  const footer = renderFooter(cursors);
-  if (Array.isArray(stripped.value) && Object.keys(stripped).length === 1) return renderCollection(stripped.value, footer);
-  return appendFooter(renderRecordLines(stripped, '').join('\n'), footer);
+  // A `value: []` envelope whose only other keys are scalars (`count`,
+  // `truncated`, …) is a collection: render the items as top-level blocks and
+  // hoist the scalar siblings into the footer next to the cursors. Rendering
+  // such envelopes through the record path nested every item under a
+  // `value:` tree, unreadable for the 3,000-item aggregated-search shapes.
+  if (Array.isArray(stripped.value)) {
+    const siblings = Object.entries(stripped).filter(([key, value]) => key !== 'value' && value !== undefined);
+    if (siblings.every(([, value]) => isScalar(value))) {
+      const siblingParts = siblings.map(([key, value]) => `${key}: ${encodeScalar(value)}`);
+      return renderCollection(stripped.value, renderFooter(cursors, siblingParts));
+    }
+  }
+  return appendFooter(renderRecordLines(stripped, '').join('\n'), renderFooter(cursors));
 };
 
 const renderTextOutput = (data: unknown): string => {
