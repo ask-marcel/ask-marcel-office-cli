@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import type { AccessToken } from '../domain/access-token.ts';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
 import { ok } from '../domain/result.ts';
+import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
@@ -1907,5 +1908,212 @@ describe('token-cache permissions', () => {
       mock.restore();
     }
     expect(fs.snapshotMode(CACHE_PATH)).toBe(0o600);
+  });
+});
+
+// A signed-in user who is a GUEST in a partner tenant cannot read that tenant's
+// SharePoint on their home token: Graph answers `401 invalidAudienceUri: Invalid
+// audience Uri '00000003-0000-0ff1-ce00-000000000000'` (SharePoint Online's app
+// id), because home-tenant Graph cannot mint an SPO token for a foreign tenant.
+// The fix is a guest token: redeem the shared (FOCI) refresh token against the
+// PARTNER tenant's authority. Live-probed 2026-07-16 — see .claude/PLAN.md.
+describe('guest access tokens for a partner tenant', () => {
+  const CONTOSO = tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
+  const FABRIKAM = tenantIdUnsafe('2c8d4f10-9a3b-4e6c-8d15-7f2a9b4c6e38');
+
+  const guestTokenResponse = (refreshToken = 'rotated-refresh'): Response => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', tid: CONTOSO }));
+    return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600, refresh_token: refreshToken }));
+  };
+
+  const tokenEndpointMock = (respond: () => Response = () => guestTokenResponse()): ReturnType<typeof installFetchMock> =>
+    installFetchMock([{ match: (url) => url.includes('/oauth2/v2.0/token'), respond }]);
+
+  const seedCache = (fs: ReturnType<typeof createFileSystemFake>, extra: Record<string, unknown> = {}): void => {
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh', ...extra }));
+  };
+
+  const managerFor = (fs: ReturnType<typeof createFileSystemFake>): AuthManager =>
+    createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+  it('mints a guest token for a partner tenant from the shared refresh token', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    seedCache(fs);
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    expect(result.ok).toBe(true);
+    // The partner tenant's authority, not `/common` — `/common` resolves to the
+    // user's HOME tenant and reproduces the invalidAudienceUri failure.
+    expect(mock.calls[0]?.url).toContain(`/${CONTOSO}/oauth2/v2.0/token`);
+  });
+
+  // Without this header Entra answers `AADSTS9002327: Tokens issued for the
+  // 'Single-Page Application' client-type may only be redeemed via cross-origin
+  // requests` — and never even evaluates the guest grant. This exact omission
+  // made the first live probe report "cross-tenant is impossible".
+  it('signs the guest redemption with the SPA origin, which Entra requires for this client type', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    seedCache(fs);
+
+    await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    const headers = mock.calls[0]?.init?.headers as Record<string, string> | undefined;
+    expect(headers?.['Origin']).toBe('https://teams.microsoft.com');
+  });
+
+  it('reuses a cached guest token instead of redeeming a second time', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const fs = createFileSystemFake();
+    seedCache(fs, { guest_tokens: { [CONTOSO]: { access_token: `${header}.${payload}.sig`, expires_on: future } } });
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    expect(result.ok).toBe(true);
+    expect(mock.calls.length).toBe(0);
+  });
+
+  it('re-mints a guest token that is within the expiry buffer', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    // Inside the 300s freshness buffer the other tiers use: still unexpired, but
+    // too close to hand out — a long download would die mid-flight.
+    const nearlyExpired = Math.floor(Date.now() / 1000) + 100;
+    const fs = createFileSystemFake();
+    seedCache(fs, { guest_tokens: { [CONTOSO]: { access_token: 'stale-guest-token', expires_on: nearlyExpired } } });
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    expect(result.ok).toBe(true);
+    expect(mock.calls.length).toBe(1);
+  });
+
+  it("serves each partner tenant its own guest token, never another tenant's", async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    seedCache(fs, { guest_tokens: { [CONTOSO]: { access_token: 'contoso-guest-token', expires_on: future } } });
+
+    const result = await managerFor(fs).getGuestAccessToken(FABRIKAM);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).not.toBe('contoso-guest-token');
+    expect(mock.calls[0]?.url).toContain(`/${FABRIKAM}/oauth2/v2.0/token`);
+  });
+
+  // The 2026-07-15 clobber, in guest form: every cache write must MERGE. Read the
+  // cache BACK off disk — asserting the return value proves nothing about what landed.
+  it('preserves the basic, elevated, chatsvcagg and ic3 tokens when caching a guest token', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    const fs = createFileSystemFake();
+    seedCache(fs, {
+      elevated_access_token: 'elev-tok',
+      elevated_expires_on: future,
+      chatsvcagg_access_token: 'csa-tok',
+      chatsvcagg_expires_on: future,
+      chatsvcagg_region: 'emea',
+      ic3_access_token: 'ic3-tok',
+      ic3_expires_on: future,
+    });
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+    expect(result.ok).toBe(true);
+
+    const cached = await fs.readJson<{
+      elevated_access_token?: string;
+      chatsvcagg_access_token?: string;
+      chatsvcagg_region?: string;
+      ic3_access_token?: string;
+      guest_tokens?: Record<string, { access_token: string }>;
+    }>(CACHE_PATH);
+    expect(cached.ok).toBe(true);
+    if (!cached.ok) return;
+    expect(cached.value.elevated_access_token).toBe('elev-tok');
+    expect(cached.value.chatsvcagg_access_token).toBe('csa-tok');
+    expect(cached.value.chatsvcagg_region).toBe('emea');
+    expect(cached.value.ic3_access_token).toBe('ic3-tok');
+    expect(cached.value.guest_tokens?.[CONTOSO]?.access_token).toBeDefined();
+  });
+
+  // Entra single-uses and rotates the SPA refresh token. Dropping the rotated one
+  // leaves the cache holding a spent RT: the next command dead-ends in a forced
+  // browser re-login.
+  it('persists the rotated refresh token so the next redemption still works', async () => {
+    const mock = tokenEndpointMock(() => guestTokenResponse('rotated-by-guest'));
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    seedCache(fs);
+
+    await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    const cached = await fs.readJson<{ refresh_token?: string }>(CACHE_PATH);
+    expect(cached.ok).toBe(true);
+    if (!cached.ok) return;
+    expect(cached.value.refresh_token).toBe('rotated-by-guest');
+  });
+
+  // Not every partner tenant will hand out a token: the Teams client may not be
+  // consented there, or the user may not actually be a guest. That must read as a
+  // clear boundary, not a mystery 400.
+  it('surfaces an actionable error when the partner tenant refuses the token', async () => {
+    const mock = tokenEndpointMock(
+      () =>
+        new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'AADSTS65001: The user or administrator has not consented to use the application.' }), {
+          status: 400,
+        })
+    );
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    seedCache(fs);
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // Assert the discriminant, then narrow — never `if (error.type === x) expect(...)`,
+    // which lets a mutant that rewrites the type skip the assertions entirely
+    // (LESSONS 2026-05-29).
+    expect(result.error.type).toBe('auth_failed');
+    if (result.error.type !== 'auth_failed') return;
+    expect(result.error.message).toContain(CONTOSO);
+  });
+
+  // A guest token is minted from the shared refresh token, so a cache with no RT
+  // cannot produce one. Fail with the same machine-readable code the other
+  // secondary tiers use, so an agent branches on "warm up auth" rather than
+  // substring-matching. Never open a browser here: the command path must not
+  // launch a popup per command (LESSONS 2026-06-16).
+  it('asks for a login when there are no cached credentials to mint a guest token from', async () => {
+    const mock = tokenEndpointMock();
+    afterEach(() => mock.restore());
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'tok', expires_on: Math.floor(Date.now() / 1000) + 3600, refresh_token: '' }));
+
+    const result = await managerFor(fs).getGuestAccessToken(CONTOSO);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('auth_failed');
+    if (result.error.type !== 'auth_failed') return;
+    expect(result.error.code).toBe('secondary_token_unavailable');
+    expect(result.error.message).toContain('login');
+    expect(mock.calls.length).toBe(0);
   });
 });

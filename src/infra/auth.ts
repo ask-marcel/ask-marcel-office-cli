@@ -3,12 +3,14 @@ import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
+import type { TenantId } from '../domain/tenant-id.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
+import { REQUEST_TIMEOUT_MS } from './network-error.ts';
 
 type CachedToken = {
   access_token: string;
@@ -55,6 +57,24 @@ type CachedToken = {
    */
   ic3_access_token?: string;
   ic3_expires_on?: number;
+  /**
+   * Graph tokens issued by a PARTNER tenant's authority, keyed by that
+   * tenant's GUID. A signed-in user who is a guest in another tenant cannot
+   * read its SharePoint on the home token — Graph answers `401
+   * invalidAudienceUri: Invalid audience Uri '00000003-0000-0ff1-ce00-000000000000'`
+   * (SharePoint Online's app id), because home-tenant Graph cannot mint an
+   * SPO token for a foreign tenant. Redeeming the shared (FOCI) refresh token
+   * against `login.microsoftonline.com/{tenantId}` yields a token that can.
+   *
+   * Keyed rather than flat because one session legitimately touches several
+   * partner tenants. `Partial<Record<...>>` (not `Record<...>`) so the type
+   * admits the missing key; read with `Object.hasOwn`, never `in`.
+   *
+   * Refresh model: same shared refresh_token as basic/chatsvcagg/ic3 (verified
+   * 2026-07-16 — a guest-rotated RT still refreshes the HOME tenant, so ONE
+   * shared RT slot is correct and per-tenant RT chains are not needed).
+   */
+  guest_tokens?: Partial<Record<string, { access_token: string; expires_on: number }>>;
 };
 type AuthError = { type: 'auth_failed'; message: string; code?: string } | { type: 'auth_cancelled' };
 /**
@@ -79,6 +99,14 @@ type AuthManager = {
    * via headless Playwright. Used by the 3 historical-version commands.
    */
   getElevatedAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  /**
+   * Returns a Graph token issued by a PARTNER tenant's authority, for a user
+   * who is a guest there. Without it, every call against that tenant's
+   * SharePoint dies at `401 invalidAudienceUri` — home-tenant Graph cannot mint
+   * an SPO token for a foreign tenant. Cache -> headless redemption of the
+   * shared refresh token; never a browser.
+   */
+  getGuestAccessToken: (tenantId: TenantId) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Returns a chatsvcagg-audience token (same Teams web client identity
    * as `getAccessToken`, but issued for the chatsvcagg resource). Falls
@@ -253,21 +281,50 @@ const createAuthManagerFromApi = (
     await writeCache(next);
   };
 
-  const refreshToken = async (cached: CachedToken): Promise<Result<AccessToken, AuthError>> => {
-    const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: cached.refresh_token, scope: SCOPES });
+  /**
+   * The one place this process redeems a refresh token. Three callers need the
+   * identical dance against different authorities and scopes — the basic Graph
+   * refresh (`/common`), the substrate tiers (`/common`, non-Graph audience),
+   * and a partner tenant's guest token (`/{tenantId}`) — so the POST lives here
+   * once (Rule of Three) rather than a fourth time at the next tier.
+   *
+   * `Origin` is NOT optional. The Teams client is registered as a Single-Page
+   * Application, and Entra refuses SPA refresh-token redemption that does not
+   * arrive as a cross-origin request: `AADSTS9002327`. It fails BEFORE the grant
+   * is evaluated, so a missing Origin looks like "the tenant refused you" rather
+   * than "the header is absent".
+   *
+   * The deadline is new to all three callers: `auth.ts` previously set none, so a
+   * hung token endpoint hung the CLI with no upper bound (rule 29). Extracting
+   * these into a single fetch made a per-caller exception arbitrary.
+   */
+  const redeemRefreshToken = async (
+    refreshTokenValue: string,
+    authority: string,
+    scope: string
+  ): Promise<Result<{ readonly accessToken: string; readonly expiresIn: number; readonly refreshToken: string | undefined }, AuthError>> => {
+    const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: refreshTokenValue, scope });
     let res: Response;
     try {
-      res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      res = await fetch(`https://login.microsoftonline.com/${authority}/oauth2/v2.0/token`, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded', Origin: SPA_ORIGIN },
         body,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return err({ type: 'auth_failed', message: msg });
     }
     if (!res.ok) return err({ type: 'auth_failed', message: `refresh failed (${res.status})` });
-    const json = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+    const json = (await res.json()) as { access_token?: string; expires_in?: number; refresh_token?: string };
+    return ok({ accessToken: json.access_token ?? '', expiresIn: json.expires_in ?? 0, refreshToken: json.refresh_token });
+  };
+
+  const refreshToken = async (cached: CachedToken): Promise<Result<AccessToken, AuthError>> => {
+    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', SCOPES);
+    if (!redeemed.ok) return redeemed;
+    const json = { access_token: redeemed.value.accessToken, expires_in: redeemed.value.expiresIn, refresh_token: redeemed.value.refreshToken };
     const validated = accessToken(json.access_token ?? '');
     if (!validated.ok) return err({ type: 'auth_failed', message: 'invalid token from refresh' });
     const token: CachedToken = {
@@ -300,20 +357,9 @@ const createAuthManagerFromApi = (
     persist: (token: AccessToken, region: string) => Promise<void>,
     rung: string
   ): Promise<Result<AccessToken, AuthError>> => {
-    const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: cached.refresh_token, scope: `${resource}/.default offline_access` });
-    let res: Response;
-    try {
-      res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', Origin: SPA_ORIGIN },
-        body,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return err({ type: 'auth_failed', message: `${rung}: ${msg}` });
-    }
-    if (!res.ok) return err({ type: 'auth_failed', message: `${rung} failed (${res.status})` });
-    const json = (await res.json()) as { access_token?: string; refresh_token?: string };
+    const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`);
+    if (!redeemed.ok) return err({ type: 'auth_failed', message: `${rung}: ${redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled'}` });
+    const json = { access_token: redeemed.value.accessToken, refresh_token: redeemed.value.refreshToken };
     const raw = json.access_token ?? '';
     // Substrate tokens carry a non-Graph audience, so `accessToken()` (the Graph
     // validator) would reject them — accept any well-formed JWT AAD just minted.
@@ -450,6 +496,75 @@ const createAuthManagerFromApi = (
   };
 
   const ELEVATED_BUFFER_SECONDS = 300;
+
+  const freshGuestToken = (cached: CachedToken | null, tenant: TenantId): string | undefined => {
+    const slot = cached?.guest_tokens;
+    // `Object.hasOwn`, never `in` — the key is a tenant GUID from outside this
+    // process and `in` would match inherited prototype keys.
+    if (!slot || !Object.hasOwn(slot, tenant)) return undefined;
+    const entry = slot[tenant];
+    if (!entry?.access_token || !entry.expires_on) return undefined;
+    if (Date.now() / 1000 >= entry.expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
+    return entry.access_token;
+  };
+
+  /**
+   * A Graph token issued by a PARTNER tenant's authority, for a user who is a
+   * guest there. Cache -> headless redemption of the shared refresh token; never
+   * a browser (the RT already proves the identity; the partner tenant only has to
+   * agree the user is a guest).
+   *
+   * Live-probed 2026-07-16: the guest token reads the partner tenant's whole
+   * `/drives` surface (metadata 200, `/content` 302, `?format=pdf` 302), not just
+   * `/shares` — which is why the drive-item family takes `--tenant-id` rather
+   * than this shipping as a one-shot share-URL download command.
+   */
+  const getGuestAccessToken = async (tenant: TenantId): Promise<Result<AccessToken, AuthError>> => {
+    const cached = await readCache();
+    const fresh = freshGuestToken(cached, tenant);
+    if (fresh !== undefined) {
+      logger.info('auth.guest.cache_hit', { tenant });
+      return ok(accessTokenUnsafe(fresh));
+    }
+    if (!cached?.refresh_token) {
+      return err({
+        type: 'auth_failed',
+        message: `no cached credentials to obtain a guest token for tenant ${tenant} — run \`ask-marcel-office login\``,
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+      });
+    }
+    const redeemed = await redeemRefreshToken(cached.refresh_token, tenant, SCOPES);
+    if (!redeemed.ok) {
+      // Naming the tenant matters: the caller passed a `--tenant-id` (or resolved
+      // one from a sharing URL) and needs to know WHICH tenant refused, not that
+      // "a refresh failed". A partner tenant refuses when the user is not a guest
+      // there, or when the Teams client is not consented in it (AADSTS65001).
+      const detail = redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled';
+      return err({
+        type: 'auth_failed',
+        message: `tenant ${tenant} refused a guest token (${detail}) — you may not be a guest in that tenant, or its administrator has not consented to this client`,
+        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+      });
+    }
+    const validated = accessToken(redeemed.value.accessToken);
+    if (!validated.ok) return err({ type: 'auth_failed', message: `tenant ${tenant} returned an unusable guest token` });
+
+    // Re-read before writing: this function awaited a network call, so the cache
+    // on disk may have moved under us (another tier's refresh). Merge into the
+    // LATEST, never into the `cached` snapshot taken before the await — that is
+    // the 2026-07-15 clobber, which silently dropped sibling tokens.
+    const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
+    await writeCache({
+      ...latest,
+      guest_tokens: { ...latest.guest_tokens, [tenant]: { access_token: validated.value, expires_on: Math.floor(Date.now() / 1000) + redeemed.value.expiresIn } },
+      // Entra single-uses and rotates the SPA refresh token. Dropping the rotated
+      // one leaves a spent RT on disk and the next command dead-ends in a login.
+      refresh_token: redeemed.value.refreshToken ?? latest.refresh_token,
+    });
+    logger.info('auth.ladder.rung', { rung: 'guest', tenant });
+    return ok(validated.value);
+  };
+
   /**
    * Narrowing helper: returns the cached elevated token if it exists,
    * has an expiry, and is at least 5 minutes from expiring; otherwise
@@ -739,6 +854,7 @@ const createAuthManagerFromApi = (
   return {
     getAccessToken,
     getElevatedAccessToken,
+    getGuestAccessToken,
     getChatsvcaggAccessToken,
     getChatsvcaggRegion,
     getIc3AccessToken,

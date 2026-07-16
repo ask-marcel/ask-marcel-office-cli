@@ -19,6 +19,7 @@ import type { AuthManager } from '../infra/auth.ts';
 export const fakeAuthManager = (overrides: Partial<AuthManager> = {}): AuthManager => ({
   getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }),
+  getGuestAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }),
   getChatsvcaggAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }),
   getChatsvcaggRegion: async () => 'emea',
   getIc3AccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }),

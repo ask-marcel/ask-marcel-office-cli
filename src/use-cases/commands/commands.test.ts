@@ -374,6 +374,7 @@ const fakeAuth = (): AuthManager =>
   fakeAuthManager({
     getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
     getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
+    getGuestAccessToken: async () => ok(accessTokenUnsafe('test-guest-token')),
     getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
     getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
   });
