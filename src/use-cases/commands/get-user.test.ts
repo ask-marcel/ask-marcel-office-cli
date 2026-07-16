@@ -92,7 +92,10 @@ describe('get-user', () => {
       expect(result.error.type).toBe('validation_error');
       expect(result.error.message).toContain('People-API contact id');
       expect(result.error.message).toContain('mail');
-      expect(result.error.message).toContain('get-user --user-id');
+      // Exact backticked form `ask-marcel-office get-user --user-id` — the presenter's
+      // hasActionableAdvice detector keys on it to suppress the generic
+      // "re-read the help" hint under this already-actionable message.
+      expect(result.error.message).toContain('`ask-marcel-office get-user --user-id`');
     }
   });
 

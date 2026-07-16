@@ -48,7 +48,7 @@ Run it with the `/qa-audit` skill, or hand this document to a fresh session and 
 | A4 | Coverage | `bun run coverage`; check the **real exit code**, not a piped grep's | exit 0, "all files meet their tier gate". If a file shows >99% with no line numbers, switch bunfig to lcov and grep `DA:N,0` |
 | A5 | Mutation | `rm -f reports/stryker-incremental.json && ./node_modules/.bin/stryker run stryker.conf.json` (node shebang — NOT `bun --bun x`, which breaks @babel/generator; delete the incremental file or it serves stale verdicts) | ≥90 overall; investigate any file <90 |
 | A6 | Build (both tsconfigs) | `bun run build` | bundle + declaration emit clean. The dev typecheck does NOT run the build's declaration emit — dual-tsconfig CJS-interop errors only appear here |
-| A7 | **Bundle execution smoke** | Run `dist/cli.js` under **both** `bun` and `node` on every vendored fixture: `convert-local-file --path` × {`src/test-helpers/assets/sample.msg`, `src/test-helpers/assets/legacy-sample.doc`, a temp `.csv`, a temp `.zip`, a missing path}, AND `extract-local-file-images --path src/test-helpers/assets/image-sample.docx` (the `producesMedia` family uses JSZip+unpdf — a separate bundler-interop surface; the image-bearing `.docx` is now **vendored** at `src/test-helpers/assets/image-sample.docx` → expect `ok`, `media=1`, `image/png`). The unpdf PDF-image branch is exercised live in D2 (mail-attachment re-probe). **Vendored driver: `bun run build && bun scripts/qa-bundle-smoke.ts`** — generates an on-disk fixture for EVERY format (docx/xlsx/pptx/odt/ods/odp/pdf/doc/xls/msg/zip/csv) from the repo's own `office-fixtures` builders and smokes `convert-local-file` + `extract-local-file-images` on each under node AND bun, so every converter library's bundler-interop surface is gated, not just the four hand-listed above. | Correct output under both runtimes. **`bun test` runs from source and can NEVER catch bundler-interop breakage** — the `.msg` "Object is not a constructor" bug shipped green through every gate and only this check finds its class |
+| A7 | **Bundle execution smoke** | Run `dist/cli.js` under **both** `bun` and `node` on every vendored fixture: `convert-local-file-to-markdown --path` × {`src/test-helpers/assets/sample.msg`, `src/test-helpers/assets/legacy-sample.doc`, a temp `.csv`, a temp `.zip`, a missing path}, AND `extract-local-file-images --path src/test-helpers/assets/image-sample.docx` (the `producesMedia` family uses JSZip+unpdf — a separate bundler-interop surface; the image-bearing `.docx` is now **vendored** at `src/test-helpers/assets/image-sample.docx` → expect `ok`, `media=1`, `image/png`). The unpdf PDF-image branch is exercised live in D2 (mail-attachment re-probe). **Vendored driver: `bun run build && bun scripts/qa-bundle-smoke.ts`** — generates an on-disk fixture for EVERY format (docx/xlsx/pptx/odt/ods/odp/pdf/doc/xls/msg/zip/csv) from the repo's own `office-fixtures` builders and smokes `convert-local-file-to-markdown` + `extract-local-file-images` on each under node AND bun, so every converter library's bundler-interop surface is gated, not just the four hand-listed above. | Correct output under both runtimes. **`bun test` runs from source and can NEVER catch bundler-interop breakage** — the `.msg` "Object is not a constructor" bug shipped green through every gate and only this check finds its class |
 | A8 | Deploy parity | `cmp "$(npm root -g)/ask-marcel-office-cli/dist/cli.js" dist/cli.js`; `ask-marcel-office --version` vs `package.json` | byte-identical, versions match |
 | A9 | Dependency hygiene | `grep -E '"(latest|\*)"' package.json` (must be empty); `bun outdated` (note majors, don't bump) | no `latest`/`*`; outdated list recorded in report |
 
@@ -87,7 +87,7 @@ wc -l /tmp/qa-param-worklist.txt
 
 **Probe discipline (non-negotiable):** every probe parses the JSON envelope and asserts `ok === true` explicitly — never `2>/dev/null`, never count array lengths without checking `ok` first (a missing-required-flag error read as "0 results" nearly became a false P1 in run 1). Derive flags from the MANIFEST option names, not memory (`--address` not `--range`, `--path` not `--site-path`; hand-typed flags were wrong ~12× in run 1 and again in the 2026-07-04 sweep). **Never merge stdout into a data-printing pipe** — a naive `probe 2>&1 | node` dumped real mailbox content (names/subjects/tenant) into the run log on 2026-07-04; the vendored driver above emits status only, which is the required shape.
 
-For **every command**, exercise each row of this table (live against the tenant for Graph commands — use IDs harvested in Phase E1; offline for `convert-local-file`, `resolve-*`, `docs`, `help-json`):
+For **every command**, exercise each row of this table (live against the tenant for Graph commands — use IDs harvested in Phase E1; offline for `convert-local-file-to-markdown`, `resolve-*`, `docs`, `help-json`):
 
 | Case | Expectation |
 |---|---|
@@ -118,7 +118,7 @@ The conversion pipeline is the CLI's core value. Two passes:
 
 **D1 — Contract matrix (offline, fixtures).** Convert each format through every applicable entry point and compare against this expected-behavior table (update the table only on intentional behavior change — it IS the contract):
 
-| Input | as-markdown (drive) | mail-attachment | drive-zip / mail-zip entry | convert-local-file | as-pdf |
+| Input | as-markdown (drive) | mail-attachment | drive-zip / mail-zip entry | convert-local-file-to-markdown | as-pdf |
 |---|---|---|---|---|---|
 | docx/docm/dotx | markdown (mammoth); `--inline-images`, `--include-metadata` | same | same | same | PDF |
 | xlsx/xlsm | tables per sheet; `--max-cells` cap hint | same | same | same | PDF |
@@ -173,7 +173,7 @@ Walk the canonical agent journeys end-to-end with fresh eyes, counting round-tri
 1. "Read this Outlook thread and all its attachments" (message → list attachments → per-type conversion; zips, .msg, images).
 2. "Find the X deck on SharePoint and summarize it" (site search → drive → search/browse → convert).
 3. "What changed in this Excel file?" (versions → version content → diff).
-4. "Read this local folder's report.docx and the vendor zip" (`convert-local-file`, no login).
+4. "Read this local folder's report.docx and the vendor zip" (`convert-local-file-to-markdown`, no login).
 5. "Who emailed me about Y last month?" (search-mail → read → resolve links in body).
 6. A Teams-chat retrieval (substrate commands).
 

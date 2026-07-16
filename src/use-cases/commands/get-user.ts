@@ -78,7 +78,7 @@ const execute: Command['execute'] = async (graph, params) => {
   if (looksLikeOpaqueContactId(userId)) {
     return err({
       type: 'validation_error',
-      message: `--user-id '${userId}' looks like a People-API contact id — the id shape the name search returns for EXTERNAL contacts. Graph cannot resolve a person by that id (/users/{id} takes only directory GUIDs, UPNs, or emails), so re-query with the candidate's mail instead: \`ask-marcel-office get-user --user-id <candidate-mail>\`.`,
+      message: `--user-id '${userId}' looks like a People-API contact id — the id shape the name search returns for EXTERNAL contacts. Graph cannot resolve a person by that id (/users/{id} takes only directory GUIDs, UPNs, or emails). Re-run \`ask-marcel-office get-user --user-id\` with the candidate's mail instead.`,
     });
   }
 
