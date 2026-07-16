@@ -103,6 +103,11 @@ describe('command meta — invariants on every registered command', () => {
           'filter',
           'orderby',
           'expand',
+          // `--tenant-id` selects which tenant's AUTHORITY mints the token that
+          // signs the request; it never appears in the URL. It cannot be a path
+          // placeholder even in principle, so the "every option maps to a
+          // placeholder" invariant excludes it like the other runtime-additive flags.
+          'tenant-id',
           // chatsvcagg uses different query-param names than Graph's OData;
           // they're functionally identical (runtime-additive, not path
           // placeholders) so the invariant excludes them too.

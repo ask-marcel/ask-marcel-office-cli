@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { routeGet } from './tenant-option.ts';
 import {
   appendOData,
   filterSelectSchema,
@@ -56,8 +57,8 @@ const buildCommand = (pathFn: (params: Record<string, string>) => string, schema
   const execute: Command['execute'] = async (graph, params) => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-    const path = pathFn(parsed.data as Record<string, string>);
-    return graph.get(path);
+    const data = parsed.data as Record<string, string>;
+    return routeGet(graph, pathFn(data), data['tenantId']);
   };
   return { schema, execute };
 };
@@ -84,7 +85,7 @@ const buildListCommand = <Shape extends z.ZodRawShape>(
     const selected = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
     const data = withDefaultTop(selected, options?.defaultTop);
     const path = appendOData(pathFn(data), data);
-    return graph.get(path);
+    return routeGet(graph, path, (data as { tenantId?: string }).tenantId);
   };
   return { schema: merged, execute };
 };
@@ -124,7 +125,7 @@ const buildSelectableCommand = <Shape extends z.ZodRawShape>(
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
-    return graph.get(path);
+    return routeGet(graph, path, (data as { tenantId?: string }).tenantId);
   };
   return { schema: merged, execute };
 };
@@ -170,7 +171,7 @@ const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & FilterSelectParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
-    return graph.get(path);
+    return routeGet(graph, path, (data as { tenantId?: string }).tenantId);
   };
   return { schema: merged, execute };
 };
@@ -193,7 +194,7 @@ const buildNoSkipListCommand = <Shape extends z.ZodRawShape>(
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & NoSkipParams, options?.defaultSelect);
     const path = appendOData(pathFn(data), data);
-    return graph.get(path);
+    return routeGet(graph, path, (data as { tenantId?: string }).tenantId);
   };
   return { schema: merged, execute };
 };
@@ -218,7 +219,7 @@ const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataK
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as { readonly select?: string } & Record<string, unknown>, options?.defaultSelect);
     const path = appendOData(pathFn(data as z.infer<z.ZodObject<Shape>>), data);
-    return graph.get(path);
+    return routeGet(graph, path, (data as { tenantId?: string }).tenantId);
   };
   return { schema: merged, execute };
 };
