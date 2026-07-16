@@ -201,6 +201,40 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
+  it('derives the fail-fast command lists from the injected secondary-token command sets (registry-driven via the composition root, not hardcoded)', async () => {
+    const fs = createFileSystemFake();
+    const tok = futureElevated();
+    const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, {
+      elevated: ['cmd-a', 'cmd-b'],
+      chatsvcagg: ['cmd-c'],
+      ic3: ['cmd-d'],
+    });
+    const expectations: ReadonlyArray<readonly [() => Promise<unknown>, string]> = [
+      [auth.getElevatedAccessToken, 'Commands that need it: cmd-a, cmd-b.'],
+      [auth.getChatsvcaggAccessToken, 'Commands that need it: cmd-c.'],
+      [auth.getIc3AccessToken, 'Commands that need it: cmd-d.'],
+    ];
+    for (const [getToken, expected] of expectations) {
+      const result = (await getToken()) as { ok: boolean; error?: { message?: string } };
+      expect(result.ok).toBe(false);
+      expect(result.error?.message).toContain(expected);
+    }
+  });
+
+  it('defaults the elevated fail-fast list to the four registry-flagged commands, including get-user (previously omitted from the hardcoded list)', async () => {
+    const fs = createFileSystemFake();
+    const tok = futureElevated();
+    const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+    const result = await auth.getElevatedAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('get-user');
+      expect(result.error.message).toContain('download-drive-item-version');
+    }
+  });
+
   it('returns cached token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
     const header = btoa(JSON.stringify({ alg: 'RS256' }));

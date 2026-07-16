@@ -34,6 +34,23 @@ describe('buildDeps composition root', () => {
     expect(calls[0]?.recaptureSecondaryViaBrowser).toBe(false); // secondary getters fail-fast, no per-command browser
   });
 
+  it('injects registry-derived secondary-token command lists into BOTH auth managers so the fail-fast messages track the manifest instead of a hardcoded list', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+    const deps = buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, createAuth: recordingCreateAuth });
+    deps.makeLoginAuth();
+    expect(calls.length).toBe(2);
+    for (const call of calls) {
+      expect(call.secondaryTokenCommands?.elevated).toEqual(['download-drive-item-version', 'get-chat', 'get-user', 'list-chats']);
+      expect(call.secondaryTokenCommands?.chatsvcagg).toEqual(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-messages', 'list-teams-chats-with-messages']);
+      expect(call.secondaryTokenCommands?.ic3).toEqual(['list-teams-chat-history']);
+    }
+  });
+
   it('falls back to a home-derived cache path when none is provided', () => {
     const fs = createFileSystemFake();
     const deps = buildDeps({ home: '/virtual/home', logLevel: 'error', fs });

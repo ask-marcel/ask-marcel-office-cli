@@ -34,7 +34,28 @@ describe('command meta — invariants on every registered command', () => {
     const expected = new Set(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-history', 'list-teams-chat-messages', 'list-teams-chats-with-messages']);
     const flagged = new Set(
       Object.entries(commands)
-        .filter(([, c]) => c.meta.needsSubstrateToken === true)
+        .filter(([, c]) => c.meta.needsSubstrateToken !== undefined)
+        .map(([name]) => name)
+    );
+    expect(flagged).toEqual(expected);
+  });
+
+  it('splits the substrate set by service — EXACTLY 4 chatsvcagg commands and 1 ic3 command — because the auth fail-fast messages derive their per-token command lists from these values', () => {
+    const byTier = (tier: 'chatsvcagg' | 'ic3'): ReadonlySet<string> =>
+      new Set(
+        Object.entries(commands)
+          .filter(([, c]) => c.meta.needsSubstrateToken === tier)
+          .map(([name]) => name)
+      );
+    expect(byTier('chatsvcagg')).toEqual(new Set(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-messages', 'list-teams-chats-with-messages']));
+    expect(byTier('ic3')).toEqual(new Set(['list-teams-chat-history']));
+  });
+
+  it('flags EXACTLY the elevated-token (M365ChatClient) commands with needsElevatedToken — the auth fail-fast message derives its command list from this set, so a new elevated command added without the flag would be omitted from the remedy', () => {
+    const expected = new Set(['download-drive-item-version', 'get-chat', 'get-user', 'list-chats']);
+    const flagged = new Set(
+      Object.entries(commands)
+        .filter(([, c]) => c.meta.needsElevatedToken === true)
         .map(([name]) => name)
     );
     expect(flagged).toEqual(expected);
@@ -212,9 +233,12 @@ describe('command meta — invariants on every registered command', () => {
             for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);
           }
         }
-        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.needsSubstrateToken, cmd.meta.pagination]) {
+        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
           if (flag !== undefined) expect(flag).toBe(true);
         }
+        // needsSubstrateToken carries the service name (truthy, so boolean
+        // consumers keep working) — never any other value.
+        if (cmd.meta.needsSubstrateToken !== undefined) expect(['chatsvcagg', 'ic3']).toContain(cmd.meta.needsSubstrateToken);
       });
 
       it('summary references only flags that are actually registered as options or aliases on this command', () => {

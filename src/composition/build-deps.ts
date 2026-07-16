@@ -1,6 +1,8 @@
 import { join } from 'node:path';
-import type { AuthManager } from '../infra/auth.ts';
+import type { AuthManager, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth.ts';
+import { commands } from '../use-cases/commands/index.ts';
+import type { CommandMeta } from '../use-cases/commands/command-types.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '../infra/filesystem-node.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
@@ -35,6 +37,23 @@ export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: Gra
 
 const defaultCachePath = (home: string): string => join(home, '.ask-marcel', 'token-cache.json');
 
+// The secondary-token error messages name the commands that need each token.
+// Deriving the lists from the registry flags here (instead of hardcoding them
+// inside infra/auth.ts, which cannot import the registry) keeps the messages
+// truthful as commands gain or lose a flag — the old hardcoded elevated list
+// omitted `get-user`.
+const commandNamesWhere = (matches: (meta: CommandMeta) => boolean): ReadonlyArray<string> =>
+  Object.entries(commands)
+    .filter(([, cmd]) => matches(cmd.meta))
+    .map(([name]) => name)
+    .toSorted((a, b) => a.localeCompare(b));
+
+const secondaryTokenCommands: SecondaryTokenCommands = {
+  elevated: commandNamesWhere((meta) => meta.needsElevatedToken === true),
+  chatsvcagg: commandNamesWhere((meta) => meta.needsSubstrateToken === 'chatsvcagg'),
+  ic3: commandNamesWhere((meta) => meta.needsSubstrateToken === 'ic3'),
+};
+
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
 const defaultProcessRunner = (): ProcessRunner => (typeof globalThis.Bun !== 'undefined' ? createBunProcessRunner() : createNodeProcessRunner());
@@ -53,8 +72,8 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // window per command when a secondary token lapses (~hourly for the elevated
   // token). Secondary browser capture is reserved for the explicit `login`
   // command, whose manager comes from `makeLoginAuth`.
-  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false });
+  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, secondaryTokenCommands });
   const graph = createGraphClient(auth);
-  const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs });
+  const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };

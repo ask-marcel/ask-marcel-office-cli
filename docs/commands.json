@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T12:53:27.118Z",
+  "generatedAt": "2026-07-16T12:59:07.093Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -830,7 +830,7 @@
       ],
       "example": "ask-marcel-office find-chats-with-user --name 'Alex Kim'",
       "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, chatsHydrated, unresolvedMemberCount, hasMore, nextContinuationToken?, hint? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `chatsHydrated` counts the per-chat members lookups spent resolving bare cross-tenant members in direct (1:1) chats. `unresolvedMemberCount` is how many cross-tenant members are still unresolved by name (bare members in group/meeting chats, which are not deep-probed, plus any 1:1 hydration that errored); when `matchCount` is 0 and this is non-zero, a `hint` is present explaining the likely cause and the object-id / read-by-chat-id remedy — so an empty result is never silently confident. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
-      "needsSubstrateToken": true,
+      "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
     {
@@ -2479,7 +2479,7 @@
       ],
       "example": "ask-marcel-office get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
       "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**",
-      "needsSubstrateToken": true,
+      "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
     {
@@ -6998,7 +6998,7 @@
       ],
       "example": "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
       "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
-      "needsSubstrateToken": true,
+      "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
     {
@@ -7024,7 +7024,7 @@
       ],
       "example": "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
       "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
-      "needsSubstrateToken": true,
+      "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
     {
@@ -7050,7 +7050,7 @@
       ],
       "example": "ask-marcel-office list-teams-chats-with-messages --page-size 100",
       "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member's `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
-      "needsSubstrateToken": true,
+      "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
     {

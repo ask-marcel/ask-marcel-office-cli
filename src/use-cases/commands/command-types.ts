@@ -126,20 +126,25 @@ type CommandMeta = {
   readonly scopesRequired?: ReadonlyArray<string>;
   /**
    * `true` if the command needs the M365ChatClient elevated token (captured
-   * at login from `m365.cloud.microsoft`, ODSP allow-list). Only 3 commands
-   * today — the historical-version downloads. An LLM should check this
-   * field before invoking; if the elevated capture failed at login, these
-   * commands will time out.
+   * at login from `m365.cloud.microsoft`, ODSP allow-list). The exact set is
+   * pinned in meta.test.ts, and the composition root derives the auth
+   * fail-fast message's command list from this flag — a new elevated command
+   * MUST carry it or the remedy message will omit the command. An LLM should
+   * check this field before invoking; if the elevated capture failed at
+   * login, these commands fail fast with `secondary_token_unavailable`.
    */
   readonly needsElevatedToken?: true;
   /**
-   * `true` if the command needs a Teams substrate token (chatsvcagg or ic3,
-   * captured at login from `teams.microsoft.com`) — the Teams chat-content
-   * commands. Like `needsElevatedToken`, an LLM should check this before
-   * invoking and warm up an interactive `login`; a headless or stale session
-   * times out on these (the non-interactive silent-SSO limitation, ).
+   * Which Teams substrate token the command needs: `'chatsvcagg'`
+   * (teams.microsoft.com/api/csa) or `'ic3'` (chat history), both captured
+   * at login from `teams.microsoft.com`. Truthy = "needs a substrate token"
+   * (the historical boolean semantics); the service value additionally
+   * routes the command into the right auth fail-fast list, derived by the
+   * composition root. Like `needsElevatedToken`, an LLM should check this
+   * before invoking and warm up an interactive `login`; a headless or stale
+   * session times out on these (the non-interactive silent-SSO limitation).
    */
-  readonly needsSubstrateToken?: true;
+  readonly needsSubstrateToken?: 'chatsvcagg' | 'ic3';
   /**
    * `true` if the command returns inlined bytes (`{contentType, size, base64}`
    * or `{contentType, size, text}`) and is therefore a valid target for the
