@@ -4617,6 +4617,84 @@ describe('mail-quote-stripper', () => {
     expect(r.stripped).toBe(true);
     expect(r.text).toBe('keep\n[Quoted reply chain removed — pass --keep-quoted true to include it]');
   });
+
+  // Outlook desktop (Word renderer) reply headers: the locale-independent
+  // #E1E1E1 border div, and bold From/Sent label pairs in several locales,
+  // with and without the MSO <span> wrapper inside the <b>.
+  const outlookDesktopFixtures = [
+    {
+      label: 'E1E1E1 separator div (locale-independent)',
+      html: '<p>reply body</p><div style="border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0cm 0cm 0cm"><p class="MsoNormal"><b>Fra:</b> Alice</p><p>old quoted</p></div>',
+    },
+    {
+      label: 'English bold From/Sent block',
+      html: '<p>reply body</p><p><b>From:</b> Alice Kim &lt;alice@contoso.com&gt;<br><b>Sent:</b> Monday, May 5</p><p>old quoted</p>',
+    },
+    {
+      label: 'English strong-tag From/Sent block',
+      html: '<p>reply body</p><p><strong>From:</strong> Alice<br><strong>Sent:</strong> Monday</p><p>old quoted</p>',
+    },
+    {
+      label: 'MSO span-wrapped Chinese 发件人/发送时间 block (full-width colons)',
+      html: '<p>reply body</p><p class="MsoNormal"><b><span style="font-family:等线">发件人：</span></b><span>Robin Chen</span><br><b><span>发送时间：</span></b><span>2026年5月5日</span></p><p>old quoted</p>',
+    },
+    {
+      label: 'French De/Envoyé block (space before colon)',
+      html: '<p>reply body</p><p><b>De :</b> Alice<br><b>Envoyé :</b> lundi 5 mai</p><p>old quoted</p>',
+    },
+    {
+      label: 'German Von/Gesendet block',
+      html: '<p>reply body</p><p><b>Von:</b> Alice<br><b>Gesendet:</b> Montag</p><p>old quoted</p>',
+    },
+  ];
+  it.each(outlookDesktopFixtures)('stripQuotedReplies cuts the body at an unwrapped Outlook desktop header: $label', ({ html }) => {
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(true);
+    expect(r.html.startsWith('<p>reply body</p>')).toBe(true);
+    expect(r.html).toContain('[Quoted reply chain removed');
+    expect(r.html).not.toContain('old quoted');
+  });
+
+  it('stripQuotedReplies does NOT cut on a bold "From:" that has no companion Sent/Date label nearby (false-positive guard)', () => {
+    const html = '<p>Quoting the spec: <b>From:</b> here on, all requests need auth. More body text.</p>';
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(false);
+    expect(r.html).toBe(html);
+  });
+
+  it('stripQuotedReplies does NOT cut when the Sent label sits beyond the confirmation window (labels must belong to one header block)', () => {
+    const filler = `<p>${'x'.repeat(500)}</p>`;
+    const html = `<p>body</p><p><b>From:</b> the field description</p>${filler}<p><b>Sent:</b> elsewhere entirely</p>`;
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(false);
+    expect(r.html).toBe(html);
+  });
+
+  it('stripQuotedReplies picks the Outlook desktop header when it appears EARLIER than a gmail_quote marker', () => {
+    const html = '<p>keep</p><p><b>From:</b> A<br><b>Sent:</b> B</p><p>mid</p><div class="gmail_quote">later</div>';
+    const r = stripQuotedReplies(html);
+    expect(r.stripped).toBe(true);
+    expect(r.html).toBe('<p>keep</p><p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>');
+  });
+
+  const plainHeaderFixtures = [
+    { label: 'English From/Sent pair', text: 'My reply.\n\nFrom: Alice Kim <alice@contoso.com>\nSent: Monday, May 5, 2026 3:00 PM\nTo: Bob\nold body' },
+    { label: 'Chinese 发件人/发送时间 pair (full-width colons)', text: 'My reply.\n\n发件人: Robin Chen\n发送时间: 2026年5月5日 15:00\n收件人: Bob\nold body' },
+    { label: 'German Von/Gesendet pair', text: 'My reply.\n\nVon: Alice\nGesendet: Montag, 5. Mai\nAn: Bob\nold body' },
+  ];
+  it.each(plainHeaderFixtures)('stripQuotedPlainText cuts a plain-text body at an Outlook desktop header pair: $label', ({ text }) => {
+    const r = stripQuotedPlainText(text);
+    expect(r.stripped).toBe(true);
+    expect(r.text.startsWith('My reply.')).toBe(true);
+    expect(r.text).not.toContain('old body');
+  });
+
+  it('stripQuotedPlainText does NOT cut on a lone "From:" line with no companion Sent/Date line (false-positive guard)', () => {
+    const text = 'Note to self.\nFrom: the spec, all requests need auth.\nMore notes follow here.';
+    const r = stripQuotedPlainText(text);
+    expect(r.stripped).toBe(false);
+    expect(r.text).toBe(text);
+  });
 });
 
 describe('convert-mail-to-markdown — quoted-text stripping', () => {

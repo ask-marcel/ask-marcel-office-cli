@@ -293,7 +293,7 @@ const meta: CommandMeta = {
       key: 'keepQuoted',
       required: false,
       description:
-        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling` and Gmail `gmail_quote`; in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, and leading `>` quote lines.',
+        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`, the Outlook desktop `#E1E1E1` border separator, and a bold `From:`/`Sent:` header-label pair (localized variants recognized: 发件人/发送时间, De/Envoyé, Von/Gesendet, Da/Inviato, De/Enviado, Van/Verzonden, 差出人/送信日時, 보낸 사람/보낸 날짜 — a lone bolded "From:" without its companion label never cuts); in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, leading `>` quote lines, and the same localized `From:`+`Sent:` line pairs.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],

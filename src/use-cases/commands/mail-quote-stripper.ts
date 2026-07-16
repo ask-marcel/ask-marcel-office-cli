@@ -13,6 +13,12 @@
  *   - Outlook mobile reference container:                `<div id="mail-editor-reference-message-container">`
  *   - Outlook classic separator:                         `<hr id="stopSpelling">`
  *   - Gmail quote container:                             `<div class="gmail_quote">` / `<blockquote class="gmail_quote">`
+ *   - Outlook desktop (Word renderer) separator:         `<div style="…border-top:solid #E1E1E1 1.0pt…">`
+ *     (the hex constant is locale-independent across Outlook UI languages)
+ *   - Outlook desktop bold header block without any container marker:
+ *     a `<b>`/`<strong>`-wrapped From label (localized) CONFIRMED by a
+ *     companion Sent/Date label within a bounded window, so a body that
+ *     merely bolds the word "From:" never truncates real content.
  */
 
 const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
@@ -22,7 +28,53 @@ const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
   /<hr[^>]*\bid="stopSpelling"/i,
   /<div[^>]*\bclass="[^"]*\bgmail_quote\b/i,
   /<blockquote[^>]*\bclass="[^"]*\bgmail_quote\b/i,
+  /<div[^>]*border-top:\s*solid #E1E1E1/i,
 ];
+
+// Localized Outlook header labels. From-labels anchor a candidate cut; a
+// companion Sent/Date-label within CONFIRM_WINDOW_CHARS confirms it as a real
+// reply header (two bold labels a few hundred bytes apart is the Outlook
+// header-block signature in every locale). Longer alternatives come first so
+// `Enviado el` wins over `Enviado`.
+const FROM_LABELS = 'From|发件人|寄件者|差出人|보낸 사람|De|Von|Da|Van';
+const SENT_LABELS = 'Sent|Date|发送时间|寄件日期|送信日時|보낸 날짜|Envoyé|Gesendet|Inviato|Enviado el|Enviado em|Enviado|Verzonden';
+const CONFIRM_WINDOW_CHARS = 400;
+
+// `(?:<span[^>]*>)?` tolerates the single MSO span Word nests inside the bold
+// tag (`<b><span style='…'>From:</span></b>`); `(?:\s|&nbsp;)*` covers the
+// French "De :" space-before-colon and non-breaking-space variants; `[:：]`
+// covers the CJK full-width colon.
+const HTML_FROM_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${FROM_LABELS})(?:\\s|&nbsp;)*[:：]`, 'gi');
+const HTML_SENT_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${SENT_LABELS})(?:\\s|&nbsp;)*[:：]`, 'i');
+
+const TEXT_FROM_LABEL = new RegExp(`^(?:${FROM_LABELS})\\s?[:：]`, 'gim');
+const TEXT_SENT_LABEL = new RegExp(`^(?:${SENT_LABELS})\\s?[:：]`, 'im');
+
+// Earliest index of a From-label whose confirmation window holds a
+// Sent/Date-label, or -1. Shared by the HTML and plain-text strippers via the
+// matching regex pair.
+const confirmedHeaderIndex = (body: string, fromLabel: RegExp, sentLabel: RegExp): number => {
+  fromLabel.lastIndex = 0;
+  for (let match = fromLabel.exec(body); match !== null; match = fromLabel.exec(body)) {
+    const windowStart = match.index + match[0].length;
+    if (sentLabel.test(body.slice(windowStart, windowStart + CONFIRM_WINDOW_CHARS))) return match.index;
+  }
+  return -1;
+};
+
+// A bold From-label sits INSIDE its paragraph (`<p class=MsoNormal><b>From:`),
+// so cutting at the label would leave the enclosing block's opening tag
+// dangling before the strip marker. Walk the cut back over any opening
+// block tags that immediately precede it.
+const OPEN_BLOCK_TAIL = /<(?:p|div)[^>]*>\s*$/i;
+
+const widenToBlockStart = (html: string, index: number): number => {
+  let cut = index;
+  for (let match = OPEN_BLOCK_TAIL.exec(html.slice(0, cut)); match !== null; match = OPEN_BLOCK_TAIL.exec(html.slice(0, cut))) {
+    cut = match.index;
+  }
+  return cut;
+};
 
 const STRIP_MARKER = '<p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>';
 
@@ -40,6 +92,9 @@ const stripQuotedReplies = (html: string): { readonly html: string; readonly str
     const match = boundary.exec(html);
     if (match !== null && (cut === -1 || match.index < cut)) cut = match.index;
   }
+  const headerCut = confirmedHeaderIndex(html, HTML_FROM_LABEL, HTML_SENT_LABEL);
+  const widenedHeaderCut = headerCut === -1 ? -1 : widenToBlockStart(html, headerCut);
+  if (widenedHeaderCut !== -1 && (cut === -1 || widenedHeaderCut < cut)) cut = widenedHeaderCut;
   if (cut === -1) return { html, stripped: false };
   return { html: `${html.slice(0, cut)}${STRIP_MARKER}`, stripped: true };
 };
@@ -50,6 +105,8 @@ const stripQuotedPlainText = (text: string): { readonly text: string; readonly s
     const match = boundary.exec(text);
     if (match !== null && (cut === -1 || match.index < cut)) cut = match.index;
   }
+  const headerCut = confirmedHeaderIndex(text, TEXT_FROM_LABEL, TEXT_SENT_LABEL);
+  if (headerCut !== -1 && (cut === -1 || headerCut < cut)) cut = headerCut;
   if (cut === -1) return { text, stripped: false };
   return { text: `${text.slice(0, cut)}${PLAINTEXT_MARKER}`, stripped: true };
 };
