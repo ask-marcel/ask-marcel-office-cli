@@ -258,4 +258,5 @@ export {
   buildNoSkipListCommand,
   buildPickODataListCommand,
   buildSelectableCommand,
+  withDefaultSelect,
 };

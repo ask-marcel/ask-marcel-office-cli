@@ -44,6 +44,73 @@ describe('get-user', () => {
     expect(elevatedPath).not.toContain('#EXT#'); // a raw # would truncate the path at the URL-fragment boundary
   });
 
+  it('injects a default $select with department on the direct id path when --select is absent (the help text promises the full org card)', async () => {
+    let elevatedPath = '';
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        elevatedPath = p;
+        return ok({ id: 'x' });
+      },
+    });
+    await execute(graph, { userId: 'aaaaaaaa-1111-2222-3333-444444444444' });
+    expect(elevatedPath).toBe(
+      '/users/aaaaaaaa-1111-2222-3333-444444444444?$select=id%2CdisplayName%2CuserPrincipalName%2Cmail%2CjobTitle%2Cdepartment%2CofficeLocation%2CbusinessPhones%2CmobilePhone'
+    );
+  });
+
+  it('injects the same default $select on the mail-eq fallback path', async () => {
+    let filterPath = '';
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        if (p.includes('$filter=mail eq')) {
+          filterPath = p;
+          return ok({ value: [{ id: 'g1' }] });
+        }
+        return { ok: false as const, error: { type: 'api_error' as const, status: 404, code: 'Request_ResourceNotFound', message: 'missing' } };
+      },
+    });
+    await execute(graph, { userId: 'guest@home.com' });
+    expect(filterPath).toContain('$select=id%2CdisplayName%2CuserPrincipalName%2Cmail%2CjobTitle%2Cdepartment%2CofficeLocation%2CbusinessPhones%2CmobilePhone');
+  });
+
+  it('rejects a People-API contact id (base64-ish non-GUID candidate id) with a mail re-query remedy instead of silently name-searching it into empty matches', async () => {
+    const calls: string[] = [];
+    const graph = fakeGraphClient({
+      get: async (p) => {
+        calls.push(p);
+        return ok({ value: [] });
+      },
+      getElevated: async (p) => {
+        calls.push(p);
+        return ok({});
+      },
+    });
+    const result = await execute(graph, { userId: 'uBT42cGHMke_08PinHqwRg==' });
+    expect(calls).toEqual([]); // no Graph round-trip: the id is unresolvable by design
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('validation_error');
+      expect(result.error.message).toContain('People-API contact id');
+      expect(result.error.message).toContain('mail');
+      expect(result.error.message).toContain('get-user --user-id');
+    }
+  });
+
+  it('still routes ordinary display names to the People search (short, hyphenated, CJK, spaced, alphanumeric team names)', async () => {
+    const searched: string[] = [];
+    const graph = fakeGraphClient({
+      get: async (p) => {
+        searched.push(p);
+        return ok({ value: [] });
+      },
+    });
+    for (const name of ['Bob', 'Jean-Pierre', '王伟', 'Margaret Ma']) {
+      const result = await execute(graph, { userId: name });
+      expect(result.ok).toBe(true);
+    }
+    expect(searched.length).toBe(4);
+  });
+
   it('searches the relevant-people graph for a bare name and returns candidate matches', async () => {
     let getPath = '';
     const graph = fakeGraphClient({
