@@ -1,4 +1,5 @@
 import { ok } from '../domain/result.ts';
+import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 
 /**
@@ -13,6 +14,12 @@ import type { GraphClient } from '../infra/graph-client.ts';
 export const fakeGraphClient = (overrides: Partial<GraphClient> = {}): GraphClient => ({
   get: async () => ok({}),
   getElevated: async () => ok({}),
+  getGuest: async () => ok({}),
+  getBinaryGuest: async () => ok({}),
+  // A placeholder tenant, never a real one: the repo's history was rewritten once
+  // to purge real tenant identifiers, and a fixture is the easiest place to
+  // reintroduce one.
+  discoverTenantId: async () => ok(tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04')),
   teamsChat: async () => ok({}),
   teamsChatIc3: async () => ok({}),
   post: async () => ok({}),

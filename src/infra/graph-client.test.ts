@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
 import { ok } from '../domain/result.ts';
+import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import type { AuthManager } from './auth.ts';
 import type { FetchFn } from './graph-client.ts';
@@ -1289,5 +1290,155 @@ describe('graph client', () => {
       expect(result.error.message).toContain('connection reset');
       expect(result.error.message).toContain('(ic3)');
     }
+  });
+});
+
+// A user who is only a GUEST in a partner tenant cannot read its SharePoint on
+// any home-tier token: home-tenant Graph cannot mint an SPO token for a foreign
+// tenant, so the call dies at `401 invalidAudienceUri` regardless of which home
+// tier signs it. These bind the guest tier to the right token and the right tenant.
+describe('graph client — partner-tenant guest tier', () => {
+  const CONTOSO = tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
+
+  // fakeFetch discards `init`, and WHICH token signed the request is the entire
+  // point here — so capture it.
+  const capturingFetch = (body: unknown, status = 200): FetchFn & { authHeader: () => string | undefined; lastUrl: () => string } => {
+    let seen: RequestInit | undefined;
+    let url = '';
+    const fn = async (u: string, init?: RequestInit): Promise<Response> => {
+      seen = init;
+      url = u;
+      return Response.json(body, { status });
+    };
+    return Object.assign(fn, {
+      authHeader: () => (seen?.headers as Record<string, string> | undefined)?.['Authorization'],
+      lastUrl: () => url,
+    });
+  };
+
+  const guestAuth = (): AuthManager => fakeAuthManager({ getGuestAccessToken: async () => ok(accessTokenUnsafe('partner-guest-token')) });
+
+  it('signs a guest request with the partner tenant token, not the home token', async () => {
+    const fetchFn = capturingFetch({ id: 'item-1', name: 'deck.pptx' });
+    const client = createGraphClient(guestAuth(), fetchFn);
+
+    const result = await client.getGuest('/drives/b!x/items/01ABC', CONTOSO);
+
+    expect(result.ok).toBe(true);
+    expect(fetchFn.authHeader()).toBe('Bearer partner-guest-token');
+    expect(fetchFn.lastUrl()).toBe('https://graph.microsoft.com/v1.0/drives/b!x/items/01ABC');
+  });
+
+  it('signs a guest binary download with the partner tenant token', async () => {
+    const fetchFn = capturingFetch({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/x' });
+    const client = createGraphClient(guestAuth(), fetchFn);
+
+    await client.getBinaryGuest('/drives/b!x/items/01ABC/content', CONTOSO);
+
+    expect(fetchFn.authHeader()).toBe('Bearer partner-guest-token');
+  });
+
+  // The auth layer's machine-readable code must survive into the envelope so an
+  // agent branches on it rather than substring-matching the prose.
+  it('carries the auth layer errorCode through when the partner tenant refuses a token', async () => {
+    const client = createGraphClient(
+      fakeAuthManager({
+        getGuestAccessToken: async () => ({ ok: false as const, error: { type: 'auth_failed' as const, message: 'tenant refused', code: 'secondary_token_unavailable' } }),
+      }),
+      capturingFetch({})
+    );
+
+    const result = await client.getGuest('/drives/b!x/items/01ABC', CONTOSO);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('auth_failed');
+    if (result.error.type !== 'auth_failed') return;
+    expect(result.error.code).toBe('secondary_token_unavailable');
+  });
+
+  // A sharing URL carries a host; driveId + itemId do not. The host is therefore
+  // the only thing that can name the tenant, which is why this exists.
+  it('resolves the owning tenant of a SharePoint host from its public discovery document', async () => {
+    const fetchFn = capturingFetch({ issuer: `https://login.microsoftonline.com/${CONTOSO}/v2.0` });
+    const client = createGraphClient(fakeAuthManager(), fetchFn);
+
+    const result = await client.discoverTenantId('contoso.sharepoint.com');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toBe(CONTOSO);
+    expect(fetchFn.lastUrl()).toBe('https://login.microsoftonline.com/contoso.onmicrosoft.com/v2.0/.well-known/openid-configuration');
+  });
+
+  it('resolves a personal OneDrive host to the same tenant as its SharePoint sibling', async () => {
+    const fetchFn = capturingFetch({ issuer: `https://login.microsoftonline.com/${CONTOSO}/v2.0` });
+    const client = createGraphClient(fakeAuthManager(), fetchFn);
+
+    await client.discoverTenantId('contoso-my.sharepoint.com');
+
+    expect(fetchFn.lastUrl()).toContain('/contoso.onmicrosoft.com/');
+  });
+
+  // `1drv.ms` is Microsoft's CONSUMER short-link host and belongs to no Entra
+  // tenant. "No partner tenant applies" must read as a clear answer, not a crash:
+  // the caller stays on its home token, which is today's behaviour.
+  it('reports that a non-SharePoint host names no partner tenant', async () => {
+    const client = createGraphClient(fakeAuthManager(), capturingFetch({}));
+
+    const result = await client.discoverTenantId('1drv.ms');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.code).toBe('not_a_sharepoint_host');
+  });
+});
+
+describe('graph client — partner-tenant guest tier failure paths', () => {
+  const CONTOSO = tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
+
+  // The host->onmicrosoft.com mapping is a CONVENTION, not a guarantee: a tenant
+  // whose sign-in domain differs from its SharePoint name will 404 here. That has
+  // to read as "cannot cross to this tenant", naming both the host tried and why,
+  // rather than a bare 404 the caller cannot act on.
+  it('explains the failure when a SharePoint host does not map to a known sign-in domain', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ error: 'invalid_tenant' }, { status: 400 });
+    const client = createGraphClient(fakeAuthManager(), fetchFn);
+
+    const result = await client.discoverTenantId('vanity.sharepoint.com');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.code).toBe('tenant_discovery_failed');
+    expect(result.error.message).toContain('vanity.onmicrosoft.com');
+  });
+
+  // Entra's discovery endpoint is a network call like any other, and rule 29 gives
+  // it a deadline. Without this the CLI would hang on a blocked corp proxy with no
+  // hint that tenant discovery was even what stalled.
+  it('surfaces a stalled tenant discovery as a network error naming the host', async () => {
+    const client = createGraphClient(fakeAuthManager(), timeoutFetch);
+
+    const result = await client.discoverTenantId('contoso.sharepoint.com');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('network_error');
+    if (result.error.type !== 'network_error') return;
+    expect(result.error.message).toContain('contoso.sharepoint.com');
+  });
+
+  it('surfaces a timeout against a partner tenant as a network error, not a hang', async () => {
+    const client = createGraphClient(fakeAuthManager({ getGuestAccessToken: async () => ok(accessTokenUnsafe('t')) }), timeoutFetch);
+
+    const result = await client.getGuest('/drives/b!x/items/01ABC', CONTOSO);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('network_error');
   });
 });

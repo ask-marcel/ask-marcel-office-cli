@@ -2,6 +2,9 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
+import type { TenantId } from '../domain/tenant-id.ts';
+import { tenantId } from '../domain/tenant-id.ts';
+import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
 import { BINARY_TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
 type GraphError =
@@ -27,6 +30,34 @@ type GraphClient = {
    * elevated token).
    */
   getElevated: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * JSON-GET signed with a PARTNER tenant's guest token instead of the home
+   * token. Required for any path that touches a tenant the user is only a guest
+   * in: home-tenant Graph cannot mint a SharePoint token for a foreign tenant,
+   * so those calls die at `401 invalidAudienceUri` no matter which home tier
+   * signs them.
+   *
+   * Get the `tenantId` from `resolve-drive-share-link` (it discovers it from the
+   * sharing URL) or from the caller's `--tenant-id`.
+   */
+  getGuest: (path: string, tenantId: TenantId) => Promise<Result<unknown, GraphError>>;
+  /**
+   * Binary twin of `getGuest`: follows the Graph 302 to the partner tenant's CDN
+   * and returns the bytes. The `fetchUrl` allow-list already admits any
+   * `*.sharepoint.com` / `*.svc.ms` host, so a partner tenant's download URL
+   * needs no special casing.
+   */
+  getBinaryGuest: (path: string, tenantId: TenantId) => Promise<Result<unknown, GraphError>>;
+  /**
+   * Resolves a SharePoint host to the Entra tenant that owns it, via the tenant's
+   * public OIDC discovery document. Unauthenticated: it asks "who owns this
+   * host?", not "what may I read?".
+   *
+   * This is what makes a bare sharing URL enough to cross tenants — the URL
+   * carries the host, the host names the tenant, and the tenant is the one thing
+   * `driveId` + `itemId` do not tell you.
+   */
+  discoverTenantId: (spoHost: string) => Promise<Result<TenantId, GraphError>>;
   /**
    * JSON-GET against the Teams chat substrate (post-2026-05:
    * `teams.microsoft.com/api/csa/<region>/api/v{N}/...` — see
@@ -350,6 +381,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getElevatedAccessToken);
   const chatsvcaggAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getChatsvcaggAccessToken);
   const ic3AuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getIc3AccessToken);
+  // Fifth binding, and the only parameterised one: the guest tier is per-tenant,
+  // so the getter closes over which tenant is being asked.
+  const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(() => auth.getGuestAccessToken(tenantId));
 
   const request = async (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
@@ -384,6 +418,23 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       return ok(await res.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (elevated)`, 'json'));
+    }
+  };
+
+  const getGuest = async (path: string, tenantId: TenantId): Promise<Result<unknown, GraphError>> => {
+    const headers = await guestAuthHeaders(tenantId);
+    if (!headers.ok) return headers;
+    const url = `https://graph.microsoft.com/v1.0${path}`;
+    try {
+      const res = await fetchFn(url, {
+        method: 'GET',
+        headers: { ...headers.value, 'content-type': 'application/json' },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return err(await apiErrorFrom(res, url));
+      return ok(await res.json());
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${path} (guest ${tenantId})`, 'json'));
     }
   };
 
@@ -478,6 +529,57 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     const headers = await elevatedAuthHeaders();
     if (!headers.ok) return headers;
     return getBinaryWith(path, headers.value);
+  };
+
+  const getBinaryGuest = async (path: string, tenantId: TenantId): Promise<Result<unknown, GraphError>> => {
+    const headers = await guestAuthHeaders(tenantId);
+    if (!headers.ok) return headers;
+    return getBinaryWith(path, headers.value);
+  };
+
+  /**
+   * Ask Entra which tenant owns a SharePoint host, using its public OIDC
+   * discovery document. No credentials: the question is "who owns this host?",
+   * and the answer is public.
+   *
+   * A host outside the `*.sharepoint.com` convention, or a domain Entra does not
+   * know, is not an error to retry — it means no partner tenant applies, and the
+   * caller should stay on its home token. Both surface as a clear message rather
+   * than a crash, because the host->onmicrosoft mapping is a convention and a
+   * tenant with a vanity arrangement may not follow it.
+   */
+  const discoverTenantId = async (spoHost: string): Promise<Result<TenantId, GraphError>> => {
+    const domain = spoHostToTenantDomain(spoHost);
+    if (domain === null) {
+      return err({
+        type: 'api_error',
+        status: 400,
+        message: `${spoHost} is not a tenant SharePoint host, so no partner tenant can be resolved from it`,
+        code: 'not_a_sharepoint_host',
+      });
+    }
+    const url = `https://login.microsoftonline.com/${domain}/v2.0/.well-known/openid-configuration`;
+    try {
+      const res = await fetchFn(url, { method: 'GET', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      if (!res.ok) {
+        return err({
+          type: 'api_error',
+          status: res.status,
+          message: `could not resolve a tenant for ${spoHost} (tried ${domain}) — the host may belong to a tenant whose sign-in domain differs from its SharePoint name`,
+          code: 'tenant_discovery_failed',
+        });
+      }
+      const issuer = (await res.json())['issuer'];
+      // The tenant id is the first path segment of the issuer
+      // (`https://login.microsoftonline.com/{tid}/v2.0`). Brand it: it becomes an
+      // authority segment on a POST that carries the refresh token.
+      const segment = typeof issuer === 'string' ? (new URL(issuer).pathname.split('/')[1] ?? '') : '';
+      const branded = tenantId(segment);
+      if (!branded.ok) return err({ type: 'api_error', status: 502, message: `tenant discovery for ${spoHost} returned an unusable issuer`, code: 'tenant_discovery_failed' });
+      return ok(branded.value);
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `tenant discovery for ${spoHost}`, 'json'));
+    }
   };
 
   const fetchUrl = async (url: string): Promise<Result<unknown, GraphError>> => {
@@ -651,12 +753,15 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   return {
     get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
     getElevated,
+    getGuest,
+    discoverTenantId,
     teamsChat,
     teamsChatIc3,
     post: (path, body) => request('POST', path, body),
     patch: (path, body) => request('PATCH', path, body),
     getBinary,
     getBinaryElevated,
+    getBinaryGuest,
     fetchUrl,
     put,
     delete: deleteResource,
