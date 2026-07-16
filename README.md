@@ -68,13 +68,13 @@ The CLI follows any SharePoint media-transform redirect internally, so the LLM n
 
 No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
 
-**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). `login` prints a slim confirmation — which of the four tokens are available (basic, elevated/M365, and the two Teams-chat substrate tokens chatsvcagg / ic3) — and points you to `scopes-check` for detail. `login --force` ignores the cache and re-captures every token in one browser pass (the persistent profile is reused, so you are usually not re-prompted for credentials) — the only way to refresh the elevated token while the basic one is still valid.
+**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). `login` prints a slim confirmation — which of the four tokens are available (basic, elevated/M365, and the two Teams-chat substrate tokens chatsvcagg / ic3) — and points you to `scopes-check` for detail. Three of the four self-heal headlessly from the shared refresh token; the **elevated** token has none of its own and exists only via the browser, so `login` re-captures it whenever it is missing, even when your basic token is still valid. `login --force` re-captures *every* token unconditionally, ignoring the cache (the persistent profile is reused, so you are usually not re-prompted for credentials).
 
 **`scopes-check`** is the side-effect-free status view (no Graph call, no browser): it decodes each cached token and reports, **per token**, its `available` flag, seconds-to-expiry, `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, needs a browser login), and its **own granted scopes** — the four tokens carry *distinct* scope sets (basic ~31 Graph scopes, elevated ~20, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`). Use it to pre-flight a command's `scopesRequired` without risking an auth side-effect.
 
 ```bash
-ask-marcel-office login          # sign in (or confirm which tokens are available)
-ask-marcel-office login --force  # re-capture every token, ignoring the cache
+ask-marcel-office login          # sign in; re-captures the elevated token if it is missing
+ask-marcel-office login --force  # re-capture every token unconditionally, ignoring the cache
 ask-marcel-office scopes-check   # per-token scopes + expiry + refresh route (safe, no browser)
 ```
 
@@ -167,16 +167,27 @@ const { graph } = buildDeps();
 ```ts
 import { createGraphClient } from 'ask-marcel-office-cli';
 
+const cancelled = async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } });
+
 const graph = createGraphClient({
   getAccessToken: async () => ({
     ok: true,
     value: await fetchTokenFromYourVault(),
   }),
   logout: async () => ({ ok: true, value: undefined }),
+  // The tiers your token source does not provide: decline them rather than
+  // pretend. Each is only reached by the commands that need it.
+  getElevatedAccessToken: cancelled, // ODSP-gated: historical-version downloads
+  getGuestAccessToken: cancelled, // partner tenants you are a guest in
+  getChatsvcaggAccessToken: cancelled, // Teams chat substrate
+  getIc3AccessToken: cancelled, // Teams chat history
+  getChatsvcaggRegion: async () => 'emea',
+  getLastElevatedOutcome: () => null,
+  getLastChatsvcaggOutcome: () => null,
 });
 ```
 
-The `AuthManager` interface is two async methods that return `Result<T, AuthError>`. Plug in any token source — Azure Managed Identity, a secrets vault, an on-behalf-of flow, hand-pasted JWTs in tests. The Graph client doesn't care where the token came from.
+Every `AuthManager` member is an async function returning `Result<T, AuthError>`, one per token tier. Only `getAccessToken` and `logout` usually do real work — supply the rest as declines (above) unless you can mint that tier, and the commands needing it will fail with a clear message instead of a surprise. Plug in any token source — Azure Managed Identity, a secrets vault, an on-behalf-of flow, hand-pasted JWTs in tests. The Graph client doesn't care where the token came from.
 
 ## Deep docs
 

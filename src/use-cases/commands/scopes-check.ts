@@ -5,8 +5,12 @@ import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({}).strict();
 
-// A single, jargon-free action line: `login --force` re-captures every token.
-const REFRESH_HINT = 'To refresh any token, run `ask-marcel-office login --force`.';
+// A jargon-free action line. It used to name a forced re-login as the ONLY way to
+// refresh any tier, which stopped being true once `login` learned to re-capture the
+// elevated token by itself: sending someone to `--force` for a tier that self-heals
+// is a browser they never needed.
+const REFRESH_HINT =
+  'To refresh: run `ask-marcel-office login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token. Run `ask-marcel-office login --force` to re-capture every tier unconditionally.';
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -18,7 +22,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command. The `elevated` block reports whether the *separate* M365ChatClient-elevated token (needed by the historical-version download / convert commands) is cached and still usable — so a fresh process can pre-flight `deep-scan`-style workloads instead of discovering a 403 mid-run; `available:false` when it is absent, expired, or within the same 5-minute buffer the download path applies. The `chatsvcagg` and `ic3` blocks report the two Teams-chat substrate tokens (used by `list-teams-chat*` / `find-chats-with-user`) the same way; both self-heal from the shared refresh token, so they are informational rather than a preflight gate. Every tier block also lists that token's OWN granted scopes (decoded from its `scp` claim, distinct per token) and its `refresh` route (`automatic` vs `interactive`); the `hint` field names a forced re-login as the single way to refresh any of them.",
+    "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command. The `elevated` block reports whether the *separate* M365ChatClient-elevated token (needed by the historical-version download / convert commands) is cached and still usable — so a fresh process can pre-flight `deep-scan`-style workloads instead of discovering a 403 mid-run; `available:false` when it is absent, expired, or within the same 5-minute buffer the download path applies. The `chatsvcagg` and `ic3` blocks report the two Teams-chat substrate tokens (used by `list-teams-chat*` / `find-chats-with-user`) the same way; both self-heal from the shared refresh token, so they are informational rather than a preflight gate. Every tier block also lists that token's OWN granted scopes (decoded from its `scp` claim, distinct per token) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated tier, which carries no refresh token of its own and is re-captured by a browser login); the `hint` field says how to refresh them.",
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '(meta) cached-token introspection — no Graph endpoint',
