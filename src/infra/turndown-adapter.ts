@@ -227,12 +227,30 @@ const stripHtmlToText = (html: string): string => {
     .trim();
 };
 
+// Outlook and Word emit a header label and its colon as SEPARATE bold runs
+// (`<b>发件人</b><b>:</b>`), and turndown faithfully closes and reopens each,
+// so the `**发件人****:**` seam shows as stray asterisks wherever the renderer
+// does not merge it. Two directly-adjacent SAME-tag runs are semantically one
+// run, so the close+open boundary is dropped from the HTML before turndown
+// ever sees it: turndown then emits a single `**发件人:**`. Working on the HTML
+// source, not the markdown output, is deliberate — a blunt `replaceAll('****',
+// '')` on the output also deletes a literal `****` inside a code span, a fenced
+// block, or a URL (turndown does not escape those), and collapses nested bold
+// (`**x**` -> ``) to nothing.
+//
+// Only zero-whitespace, same-tag adjacency matches (`\1` backreference): a real
+// gap (`</b> <b>` = two bold words) is left alone, and a mixed `</b><strong>`
+// pair is left alone rather than spliced into malformed markup.
+const ADJACENT_BOLD_RUNS = /<\/(b|strong)><\1(?:\s[^>]*)?>/gi;
+const mergeAdjacentBoldRuns = (html: string): string => html.replace(ADJACENT_BOLD_RUNS, '');
+
 const htmlToMarkdown = (html: string): Result<string, GraphError> => {
+  const merged = mergeAdjacentBoldRuns(html);
   try {
-    return ok(buildService({ gfm: true }).turndown(html));
+    return ok(buildService({ gfm: true }).turndown(merged));
   } catch (gfmError: unknown) {
     try {
-      const md = buildService({ gfm: false }).turndown(html);
+      const md = buildService({ gfm: false }).turndown(merged);
       const note = `> _GFM table conversion failed: ${errorMessageOf(gfmError)}; tables flattened to paragraphs_`;
       return ok(`${note}\n\n${md}`);
     } catch (coreError: unknown) {

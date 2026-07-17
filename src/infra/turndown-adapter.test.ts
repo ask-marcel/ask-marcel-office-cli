@@ -3,6 +3,73 @@ import TurndownService from 'turndown';
 import { htmlToMarkdown } from './turndown-adapter.ts';
 
 describe('htmlToMarkdown — convert Graph-returned HTML (Office docs, OneNote, Outlook bodies) into clean markdown', () => {
+  it('merges bold runs Outlook splits across tags, so a quoted header reads **发件人:** and not **发件人****:**', () => {
+    // Outlook/Word emit the label and its colon as SEPARATE bold runs; turndown
+    // closes and reopens, and the `****` seam shows as stray asterisks in
+    // renderers that do not merge it. Two adjacent runs are one bold run.
+    const result = htmlToMarkdown('<b>发件人</b><b>:</b> Robin Chen');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe('**发件人:** Robin Chen');
+      expect(result.value).not.toContain('****');
+    }
+  });
+
+  it('merges a bold run split by Word’s nested spans, and three-way splits collapse to one run', () => {
+    const nested = htmlToMarkdown('<b><span>差出人</span></b><b><span>:</span></b> Robin');
+    const threeWay = htmlToMarkdown('<b>a</b><b>b</b><b>c</b>');
+
+    if (nested.ok) expect(nested.value).toBe('**差出人:** Robin');
+    // Each `</b><b>` boundary is dropped from the HTML, so all three runs become
+    // one `<b>abc</b>` before turndown — not a half-merged **ab****c**.
+    if (threeWay.ok) expect(threeWay.value).toBe('**abc**');
+  });
+
+  it('leaves bold runs that are genuinely separated by a space alone', () => {
+    const result = htmlToMarkdown('<b>one</b> <b>two</b>');
+
+    // `** **` is not `****`; merging here would delete a real word boundary.
+    if (result.ok) expect(result.value).toBe('**one** **two**');
+  });
+
+  // The bold-run merge works on the HTML source, not the markdown output. These
+  // four cases are why: a blunt replaceAll('****','') on the output corrupts
+  // every place turndown does NOT escape asterisks. Each once regressed.
+  it('keeps four literal asterisks inside a code span, which is content and not a bold seam', () => {
+    const result = htmlToMarkdown('<code>a****b</code>');
+
+    if (result.ok) expect(result.value).toBe('`a****b`');
+  });
+
+  it('keeps four literal asterisks inside a fenced code block', () => {
+    const result = htmlToMarkdown('<pre><code>x = "****";</code></pre>');
+
+    if (result.ok) expect(result.value).toContain('****');
+  });
+
+  it('keeps four asterisks that are part of a URL, so the link still resolves', () => {
+    const result = htmlToMarkdown('<a href="https://contoso.example/a****b">link</a>');
+
+    if (result.ok) expect(result.value).toBe('[link](https://contoso.example/a****b)');
+  });
+
+  it('does not blank out nested bold, whose delimiters are content the caller wrote', () => {
+    // `<strong><b>x</b></strong>` is not two adjacent runs; deleting its `****`
+    // would erase the word. Merging only same-tag ADJACENT runs leaves it be.
+    const result = htmlToMarkdown('<strong><b>Total</b></strong>');
+
+    if (result.ok) expect(result.value).toContain('Total');
+  });
+
+  it('does not splice a mixed b/strong pair into malformed markup', () => {
+    // Only same-tag adjacency merges (`\1` backreference); a `</b><strong>`
+    // boundary is left for turndown rather than stripped into `<b>…</strong>`.
+    const result = htmlToMarkdown('<b>a</b><strong>b</strong>');
+
+    if (result.ok) expect(result.value).toBe('**a****b**');
+  });
+
   it('renders headings as ATX (# H1) not setext underline', () => {
     const result = htmlToMarkdown('<h1>Title</h1><h2>Subtitle</h2>');
     expect(result.ok).toBe(true);
