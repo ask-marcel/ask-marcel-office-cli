@@ -118,5 +118,11 @@ Thumbs.db
 # Personal append-only lessons journal (atelier) — individual workflow notes, not team-shared
 .claude/lessons.local.md
 
+# Session working plan (atelier) — scratch state that has leaked client vocabulary before; never commit
+.claude/PLAN.md
+
+# Editor-local settings — carry personal account ids (e.g. Snyk organization)
+.vscode/
+
 # Bun build temp artifacts (left in cwd by `bun build --compile`)
 *.bun-build
