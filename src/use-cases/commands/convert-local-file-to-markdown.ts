@@ -6,6 +6,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
 import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { extensionOf } from './text-passthrough.ts';
@@ -32,6 +33,7 @@ const schema = z.object({
   path: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
   includeImages: z.enum(['true', 'false']).optional(),
   maxCells: z
     .string()
@@ -55,6 +57,7 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   const { path } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const inlineImages = parsed.data.inlineImages === 'true';
+  const keepQuoted = parsed.data.keepQuoted === 'true';
   const includeImages = parsed.data.includeImages === 'true';
   const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
 
@@ -65,8 +68,8 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   }
 
   const name = basename(path);
-  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, includeMetadata, includeImages);
-  return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells }, LOCAL_HINTS);
+  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted });
+  return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted }, LOCAL_HINTS);
 };
 
 const execute = async (_graph: GraphClient, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
@@ -78,7 +81,7 @@ const execute = async (_graph: GraphClient, _params: Record<string, string>): Pr
 
 const meta: CommandMeta = {
   summary:
-    'Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.',
+    'Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body with the quoted reply chain stripped — `--keep-quoted true` restores it — and inline `cid:` images shown as placeholders, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.',
   category: 'meta',
   commandAliases: ['convert-local-file'],
   graphMethod: 'GET',
@@ -99,6 +102,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to append the converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body. Applies inside a `.zip` too.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
     {
       name: 'inline-images',
       key: 'inlineImages',

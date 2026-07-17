@@ -15,6 +15,50 @@ const failingConverter = async (): Promise<Result<unknown, GraphError>> => err({
 
 const u8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 
+describe('renderMsg — quoted-reply stripping and cid images (shared with convert-mail-to-markdown)', () => {
+  it('strips the quoted reply chain from an HTML body at a vendor marker and leaves the visible flag marker', async () => {
+    const md = await renderMsg({ ...base, bodyHtml: '<p>My reply.</p><div id="divRplyFwdMsg"><b>From:</b> Alice</div><p>old quoted history</p>' }, {}, echoConverter);
+    expect(md).toContain('My reply.');
+    expect(md).not.toContain('old quoted history');
+    // turndown escapes the marker's `[` (a link opener) — same rendering
+    // convert-mail-to-markdown produces for the shared marker.
+    expect(md).toContain('Quoted reply chain removed — pass --keep-quoted true to include it');
+  });
+
+  it('strips an unwrapped Outlook desktop header block from a .msg HTML body (the localized detector applies here too)', async () => {
+    const md = await renderMsg({ ...base, bodyHtml: '<p>Reply text.</p><p><b>发件人：</b>Robin<br><b>发送时间：</b>2026</p><p>old quoted history</p>' }, {}, echoConverter);
+    expect(md).toContain('Reply text.');
+    expect(md).not.toContain('old quoted history');
+  });
+
+  it('strips a plain-text body at the Original Message banner', async () => {
+    const md = await renderMsg({ ...base, body: 'My reply.\n\n----- Original Message -----\nFrom: Alice\nold quoted history' }, {}, echoConverter);
+    expect(md).toContain('My reply.');
+    expect(md).not.toContain('old quoted history');
+    expect(md).toContain('[Quoted reply chain removed');
+  });
+
+  it('keeps the full chain in both body kinds when keepQuoted is set', async () => {
+    const html = await renderMsg({ ...base, bodyHtml: '<p>Reply.</p><div id="divRplyFwdMsg">x</div><p>old quoted history</p>' }, { keepQuoted: true }, echoConverter);
+    expect(html).toContain('old quoted history');
+    expect(html).not.toContain('[Quoted reply chain removed');
+    const text = await renderMsg({ ...base, body: 'Reply.\n\n----- Original Message -----\nold quoted history' }, { keepQuoted: true }, echoConverter);
+    expect(text).toContain('old quoted history');
+  });
+
+  it('replaces a cid: image reference with a readable placeholder instead of a broken markdown link (.msg attachments carry no contentId to embed)', async () => {
+    const md = await renderMsg({ ...base, bodyHtml: '<p>Logo: <img src="cid:image001.png@01DD1445.ABC" alt="signatureImage"></p>' }, {}, echoConverter);
+    expect(md).toContain('inline image: signatureImage');
+    expect(md).not.toContain('cid:');
+    expect(md).not.toContain('](');
+  });
+
+  it('leaves a body with no quote markers and no cid images untouched', async () => {
+    const md = await renderMsg({ ...base, bodyHtml: '<p>Just a note.</p>' }, {}, echoConverter);
+    expect(md).toBe('Just a note.');
+  });
+});
+
 describe('renderMsg', () => {
   it('renders a complete message to exact markdown (H1 subject, header block, body, attachments)', async () => {
     const md = await renderMsg(
@@ -31,7 +75,7 @@ describe('renderMsg', () => {
         ],
         attachments: [{ fileName: 'a.txt', content: u8('x') }],
       },
-      0,
+      {},
       echoConverter
     );
     // Exact output pins every section separator (\n\n), header line format and ordering.
@@ -46,12 +90,12 @@ describe('renderMsg', () => {
   });
 
   it('renders a header-only message with no trailing body or attachments section', async () => {
-    const md = await renderMsg({ senderName: 'A', senderEmail: 'a@x.com', recipients: [], attachments: [] }, 0, echoConverter);
+    const md = await renderMsg({ senderName: 'A', senderEmail: 'a@x.com', recipients: [], attachments: [] }, {}, echoConverter);
     expect(md).toBe('**From:** A <a@x.com>');
   });
 
   it('skips an empty-string subject and empty-string header values', async () => {
-    const md = await renderMsg({ subject: '', date: '', senderName: 'A', senderEmail: 'a@x.com', recipients: [], attachments: [] }, 0, echoConverter);
+    const md = await renderMsg({ subject: '', date: '', senderName: 'A', senderEmail: 'a@x.com', recipients: [], attachments: [] }, {}, echoConverter);
     expect(md).toBe('**From:** A <a@x.com>');
   });
 
@@ -65,14 +109,14 @@ describe('renderMsg', () => {
         ],
         attachments: [],
       },
-      0,
+      {},
       echoConverter
     );
     expect(md).toBe('**To:** NameOnly\n**Cc:** emailonly@x.com\n**Bcc:** empty-name@x.com');
   });
 
   it('renders no body section when both the plain and HTML bodies are empty', async () => {
-    const md = await renderMsg({ senderName: 'A', senderEmail: 'a@x.com', body: '', bodyHtml: '', recipients: [], attachments: [] }, 0, echoConverter);
+    const md = await renderMsg({ senderName: 'A', senderEmail: 'a@x.com', body: '', bodyHtml: '', recipients: [], attachments: [] }, {}, echoConverter);
     expect(md).toBe('**From:** A <a@x.com>');
   });
 
@@ -88,25 +132,25 @@ describe('renderMsg', () => {
         ],
         attachments: [],
       },
-      0,
+      {},
       echoConverter
     );
     expect(md).toBe('**To:** Alpha <alpha@x.com>, Beta\n**Cc:** Gamma');
   });
 
   it('names an attachment with an empty filename "unnamed"', async () => {
-    const md = await renderMsg({ recipients: [], attachments: [{ fileName: '', content: u8('x') }] }, 0, echoConverter);
+    const md = await renderMsg({ recipients: [], attachments: [{ fileName: '', content: u8('x') }] }, {}, echoConverter);
     expect(md).toBe('## Attachments\n\n### unnamed\n\nCONVERTED(unnamed)');
   });
 
   it('renders an attachment whose conversion yields no text as an empty body', async () => {
     const noText = async (): Promise<Result<unknown, GraphError>> => ok({ contentType: 'text/plain', size: 0 });
-    const md = await renderMsg({ recipients: [], attachments: [{ fileName: 'x.bin', content: u8('x') }] }, 0, noText);
+    const md = await renderMsg({ recipients: [], attachments: [{ fileName: 'x.bin', content: u8('x') }] }, {}, noText);
     expect(md).toBe('## Attachments\n\n### x.bin\n\n');
   });
 
   it('omits the subject heading and every empty header line', async () => {
-    const md = await renderMsg({ ...base, body: 'just a body' }, 0, echoConverter);
+    const md = await renderMsg({ ...base, body: 'just a body' }, {}, echoConverter);
     expect(md).not.toContain('#');
     expect(md).not.toContain('**From:**');
     expect(md).not.toContain('**To:**');
@@ -115,24 +159,24 @@ describe('renderMsg', () => {
   });
 
   it('renders a sender name without an email, and groups typeless recipients under Recipients', async () => {
-    const md = await renderMsg({ ...base, senderName: 'No Email Person', recipients: [{ kind: 'unknown', name: 'Pat', email: 'pat@example.com' }] }, 0, echoConverter);
+    const md = await renderMsg({ ...base, senderName: 'No Email Person', recipients: [{ kind: 'unknown', name: 'Pat', email: 'pat@example.com' }] }, {}, echoConverter);
     expect(md).toContain('**From:** No Email Person\n');
     expect(md).not.toContain('**From:** No Email Person <');
     expect(md).toContain('**Recipients:** Pat <pat@example.com>');
   });
 
   it('renders a sender email without a name', async () => {
-    const md = await renderMsg({ ...base, senderEmail: 'lonely@example.com' }, 0, echoConverter);
+    const md = await renderMsg({ ...base, senderEmail: 'lonely@example.com' }, {}, echoConverter);
     expect(md).toContain('**From:** lonely@example.com');
   });
 
   it('prefers the plain-text body and trims it', async () => {
-    const md = await renderMsg({ ...base, body: '  hello there  ', bodyHtml: '<p>ignored</p>' }, 0, echoConverter);
+    const md = await renderMsg({ ...base, body: '  hello there  ', bodyHtml: '<p>ignored</p>' }, {}, echoConverter);
     expect(md).toBe('hello there');
   });
 
   it('falls back to the HTML body (via turndown) when the plain body is blank', async () => {
-    const md = await renderMsg({ ...base, body: '   ', bodyHtml: '<h2>Heading</h2><p>Hello <b>world</b></p>' }, 0, echoConverter);
+    const md = await renderMsg({ ...base, body: '   ', bodyHtml: '<h2>Heading</h2><p>Hello <b>world</b></p>' }, {}, echoConverter);
     expect(md).toContain('## Heading');
     expect(md).toContain('**world**');
   });
@@ -146,7 +190,7 @@ describe('renderMsg', () => {
           { fileName: 'data.csv', content: u8('y') },
         ],
       },
-      0,
+      {},
       echoConverter
     );
     expect(md).toContain('## Attachments');
@@ -157,25 +201,25 @@ describe('renderMsg', () => {
   });
 
   it('lists an unconvertible attachment with the converter note instead of failing', async () => {
-    const md = await renderMsg({ ...base, attachments: [{ fileName: 'logo.png', content: u8('x') }] }, 0, failingConverter);
+    const md = await renderMsg({ ...base, attachments: [{ fileName: 'logo.png', content: u8('x') }] }, {}, failingConverter);
     expect(md).toContain('### logo.png');
     expect(md).toContain('_png is an image — not unpacked here_');
   });
 
   it('notes an attachment that has no readable content', async () => {
-    const md = await renderMsg({ ...base, attachments: [{ fileName: 'broken.bin' }] }, 0, echoConverter);
+    const md = await renderMsg({ ...base, attachments: [{ fileName: 'broken.bin' }] }, {}, echoConverter);
     expect(md).toContain('### broken.bin');
     expect(md).toContain('_(no readable content)_');
   });
 
   it('names an attachment with no filename "unnamed" and renders an empty converted body as blank', async () => {
     const noText = async (): Promise<Result<unknown, GraphError>> => ok({ contentType: 'text/plain', size: 0 });
-    const md = await renderMsg({ ...base, attachments: [{ content: u8('x') }] }, 0, noText);
+    const md = await renderMsg({ ...base, attachments: [{ content: u8('x') }] }, {}, noText);
     expect(md).toContain('### unnamed');
   });
 
   it('stops expanding attachments once the message nesting limit is reached', async () => {
-    const md = await renderMsg({ ...base, attachments: [{ fileName: 'inner.msg', content: u8('x') }] }, MAX_MSG_DEPTH, echoConverter);
+    const md = await renderMsg({ ...base, attachments: [{ fileName: 'inner.msg', content: u8('x') }] }, { depth: MAX_MSG_DEPTH }, echoConverter);
     expect(md).toContain('### inner.msg');
     expect(md).toContain('too deeply nested');
     expect(md).not.toContain('CONVERTED');

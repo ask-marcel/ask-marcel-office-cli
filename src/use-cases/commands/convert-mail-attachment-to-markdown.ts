@@ -13,6 +13,7 @@ import {
 } from './embedded-item-to-markdown.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
@@ -22,7 +23,12 @@ const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
 });
+
+// The dispatch flags this command forwards per attachment. `keepQuoted` only
+// bites on a `.msg` attachment (an email attached to an email).
+type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean };
 
 const MAIL_HINTS: ConversionHints = {
   pdfNoText:
@@ -37,10 +43,10 @@ const MAIL_HINTS: ConversionHints = {
 
 // fileAttachment carries the bytes inline (base64) — decode and run them through the
 // shared dispatch (docx/xlsx/pptx/odf/csv/pdf/legacy + content-sniff), same as drive.
-const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> =>
-  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', { includeMetadata }, MAIL_HINTS);
+const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> =>
+  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, MAIL_HINTS);
 
-const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
+const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
     return err({
@@ -64,7 +70,7 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
         'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.',
     });
   }
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, opts);
 };
 
 const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): Result<unknown, GraphError> => {
@@ -103,7 +109,7 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // Route an ALREADY-FETCHED attachment object to markdown by its polymorphic
 // `@odata.type`. Split out from the path-based fetch so `read-mail-attachment`
 // can peek the type for zip-routing without a second Graph round-trip.
-const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>, includeMetadata: boolean): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
+const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>, opts: ConvertOptions): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
   const odataType = a['@odata.type'];
   if (typeof odataType !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'attachment response missing @odata.type discriminator' });
@@ -111,9 +117,9 @@ const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(a, includeMetadata);
+      return convertFileAttachment(a, opts);
     case '#microsoft.graph.referenceAttachment':
-      return convertReferenceAttachment(graph, a, includeMetadata);
+      return convertReferenceAttachment(graph, a, opts);
     case '#microsoft.graph.itemAttachment':
       return convertItemAttachment(a);
     default:
@@ -121,22 +127,25 @@ const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>
   }
 };
 
-const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
+const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
-  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, includeMetadata);
+  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
-  return convertAttachmentToMarkdown(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, parsed.data.includeMetadata === 'true');
+  return convertAttachmentToMarkdown(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, {
+    includeMetadata: parsed.data.includeMetadata === 'true',
+    keepQuoted: parsed.data.keepQuoted === 'true',
+  });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg attachment rendered to markdown — headers + body with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
+    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg attachment rendered to markdown — headers + body (quoted reply chain stripped unless `--keep-quoted true`; inline `cid:` images shown as placeholders) with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
@@ -152,6 +161,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to surface side-channel content for docx, xlsx, pptx, and OpenDocument attachments (file + reference). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag) as a standalone document, since pptx has no convertible body; odt/ods/odp → `## OpenDocument metadata` (Dublin Core + ODF properties, keywords, user-defined fields), appended after the converted body. Each OOXML family also covers its macro-enabled and template variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other attachment types and on itemAttachment renderers.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
   ],
   example: "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

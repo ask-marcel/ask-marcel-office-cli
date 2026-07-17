@@ -4,6 +4,8 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import { extractMsg } from '../../infra/msg-reader-adapter.ts';
 import type { MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg } from '../../infra/msg-reader-adapter.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import { replaceUnresolvedCidImages } from './inline-image-embedder.ts';
+import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 
 /**
  * Render an Outlook `.msg` file to markdown: an H1 subject, a From/To/Cc/Bcc/Date
@@ -13,6 +15,14 @@ import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
  * `.docx`/`.pdf`/`.csv` attached to an email becomes markdown inline, exactly as the
  * user asked ("maybe same way as zip"). Unconvertible attachments (images, binaries)
  * are listed with the dispatch's note instead of failing the whole message.
+ *
+ * The body goes through the same two passes `convert-mail-to-markdown` applies to a
+ * Graph mail body (they share the helpers): the quoted reply chain is stripped by
+ * default — `keepQuoted` restores it, and every command that can hand a `.msg` to
+ * this renderer exposes that as `--keep-quoted`, so the marker's remedy always
+ * works — and any `cid:` image becomes a readable placeholder. A `.msg` carries no
+ * contentId on its attachments, so embedding is impossible here and the placeholder
+ * falls back to the img alt text or the cid's filename prefix.
  *
  * `recurse` is the attachment converter injected by `markdown-dispatch` (its own
  * `bytesToMarkdown`, with the recursion depth incremented). Injecting it — rather
@@ -24,7 +34,7 @@ import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 
 const MAX_MSG_DEPTH = 3;
 
-type MsgToMarkdownOptions = { readonly depth?: number };
+type MsgToMarkdownOptions = { readonly depth?: number; readonly keepQuoted?: boolean };
 type MsgAttachmentConverter = (bytes: Uint8Array, filename: string) => Promise<Result<unknown, GraphError>>;
 
 const formatAddress = (name: string | undefined, email: string | undefined): string | undefined => {
@@ -54,11 +64,18 @@ const renderHeader = (msg: ParsedMsg): string =>
     .filter((s): s is string => s !== undefined)
     .join('\n');
 
-const renderBody = (msg: ParsedMsg): string => {
-  if (msg.body !== undefined && msg.body.trim() !== '') return msg.body.trim();
+const renderBody = (msg: ParsedMsg, keepQuoted: boolean): string => {
+  if (msg.body !== undefined && msg.body.trim() !== '') {
+    return (keepQuoted ? msg.body : stripQuotedPlainText(msg.body).text).trim();
+  }
   if (msg.bodyHtml !== undefined && msg.bodyHtml !== '') {
-    const converted = htmlToMarkdown(msg.bodyHtml);
-    return converted.ok ? converted.value : msg.bodyHtml;
+    const stripped = keepQuoted ? msg.bodyHtml : stripQuotedReplies(msg.bodyHtml).html;
+    // No contentId on a .msg attachment, so nothing can be embedded: an empty
+    // label map still degrades every cid img to alt text / the cid's filename
+    // prefix, which beats a broken ![](cid:…) link.
+    const placeheld = replaceUnresolvedCidImages(stripped, new Map());
+    const converted = htmlToMarkdown(placeheld);
+    return converted.ok ? converted.value : placeheld;
   }
   return '';
 };
@@ -80,14 +97,14 @@ const renderAttachments = async (attachments: readonly MsgAttachment[], depth: n
   return ['## Attachments', ...sections].join('\n\n');
 };
 
-const renderMsg = async (msg: ParsedMsg, depth: number, recurse: MsgAttachmentConverter): Promise<string> => {
+const renderMsg = async (msg: ParsedMsg, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<string> => {
   const sections: string[] = [];
   if (msg.subject !== undefined && msg.subject !== '') sections.push(`# ${msg.subject}`);
   const header = renderHeader(msg);
   if (header !== '') sections.push(header);
-  const body = renderBody(msg);
+  const body = renderBody(msg, opts.keepQuoted === true);
   if (body !== '') sections.push(body);
-  const attachments = await renderAttachments(msg.attachments, depth, recurse);
+  const attachments = await renderAttachments(msg.attachments, opts.depth ?? 0, recurse);
   if (attachments !== '') sections.push(attachments);
   return sections.join('\n\n');
 };
@@ -95,7 +112,7 @@ const renderMsg = async (msg: ParsedMsg, depth: number, recurse: MsgAttachmentCo
 const msgToMarkdown = async (bytes: Uint8Array, opts: MsgToMarkdownOptions, recurse: MsgAttachmentConverter): Promise<Result<unknown, GraphError>> => {
   const parsed = await extractMsg(bytes);
   if (!parsed.ok) return parsed;
-  const text = await renderMsg(parsed.value, opts.depth ?? 0, recurse);
+  const text = await renderMsg(parsed.value, opts, recurse);
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(text).byteLength, text });
 };
 

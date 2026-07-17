@@ -26,7 +26,15 @@ type ConversionHints = {
 
 // `depth` is internal recursion plumbing for `.msg` attachments (a .msg can attach
 // another .msg); callers never set it. It caps `.msg`-inside-`.msg` nesting.
-type BytesToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly inlineImages?: boolean; readonly depth?: number };
+// `keepQuoted` is `.msg`-only (every other format has no reply chain); it rides the
+// `--keep-quoted` flag on each command that can hand a `.msg` to the dispatch.
+type BytesToMarkdownOptions = {
+  readonly includeMetadata?: boolean;
+  readonly maxCells?: number;
+  readonly inlineImages?: boolean;
+  readonly keepQuoted?: boolean;
+  readonly depth?: number;
+};
 
 // Hints for files NESTED inside a container (zip entry, .msg attachment). The
 // caller-specific hints point at sibling commands (`download-drive-item-as-pdf`,
@@ -73,7 +81,9 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
     // loop. Attachments are NESTED files — container-neutral hints, not the
     // caller's (a png inside a .msg must not point at drive-item commands).
     const depth = opts.depth ?? 0;
-    return msgToMarkdown(bytes, { depth }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
+    return msgToMarkdown(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) =>
+      bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS)
+    );
   }
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, code: 'unsupported_image', message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);

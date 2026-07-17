@@ -28,7 +28,7 @@ const DRIVE_HINTS: ConversionHints = {
   generic: (ext) => `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`,
 };
 
-type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean; readonly maxCells?: number };
+type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean; readonly maxCells?: number; readonly keepQuoted?: boolean };
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);

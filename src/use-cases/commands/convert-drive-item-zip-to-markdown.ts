@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
@@ -25,6 +26,7 @@ const schema = z.object({
   driveId: z.string().min(1),
   itemId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
   ...tenantIdShape,
 });
 
@@ -39,7 +41,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!bytes.ok) return bytes;
-  return convertZipArchive(bytes.value, includeMetadata);
+  return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true' });
 };
 
 const meta: CommandMeta = {
@@ -67,6 +69,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
   ],
   example: "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:

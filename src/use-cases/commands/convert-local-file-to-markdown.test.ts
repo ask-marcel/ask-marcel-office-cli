@@ -22,6 +22,27 @@ describe('convert-local-file-to-markdown', () => {
     expect(env.text).not.toContain('## DOCX metadata');
   });
 
+  it('accepts --keep-quoted on a local .msg and threads it to the renderer (the vendored fixture has no quoted chain, so both modes render the same body)', async () => {
+    const fs = createFileSystemFake();
+    fs.seedBytes('/work/mail.msg', await buildSampleMsg());
+    const stripped = await executeLocal(fs, { path: '/work/mail.msg' });
+    const kept = await executeLocal(fs, { path: '/work/mail.msg', keepQuoted: 'true' });
+    expect(stripped.ok).toBe(true);
+    expect(kept.ok).toBe(true);
+    if (!stripped.ok || !kept.ok) return;
+    expect((stripped.value as Envelope).text).toContain('Please find the quarterly figures attached.');
+    expect((kept.value as Envelope).text).toBe((stripped.value as Envelope).text);
+    expect((stripped.value as Envelope).text).not.toContain('Quoted reply chain removed');
+  });
+
+  it('rejects a --keep-quoted value other than true/false as a validation_error', async () => {
+    const fs = createFileSystemFake();
+    fs.seedBytes('/work/mail.msg', await buildSampleMsg());
+    const result = await executeLocal(fs, { path: '/work/mail.msg', keepQuoted: 'yes' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
   it('appends the side-channel metadata block when --include-metadata true', async () => {
     const fs = createFileSystemFake();
     fs.seedBytes('/work/report.docx', await buildSampleDocx());

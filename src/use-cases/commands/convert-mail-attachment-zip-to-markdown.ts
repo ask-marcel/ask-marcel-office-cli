@@ -5,6 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
@@ -21,6 +22,7 @@ const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
 });
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
@@ -45,7 +47,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (typeof contentBytes !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
   }
-  return convertZipArchive(base64ToBytes(contentBytes), includeMetadata);
+  return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true' });
 };
 
 const meta: CommandMeta = {
@@ -67,6 +69,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
   ],
   example: "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

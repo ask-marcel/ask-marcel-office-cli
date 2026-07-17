@@ -4,6 +4,7 @@ import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
@@ -14,6 +15,7 @@ const schema = z.object({
   ...tenantIdShape,
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
   maxCells: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
@@ -26,6 +28,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const { driveId, itemId } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const inlineImages = parsed.data.inlineImages === 'true';
+  const keepQuoted = parsed.data.keepQuoted === 'true';
   const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
   const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
   if (tenant !== undefined && !tenant.ok) return tenant;
@@ -38,7 +41,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
   // byte fetch through the whole conversion pipeline with nothing else to change.
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, tenantId });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, keepQuoted, tenantId });
 };
 
 const meta: CommandMeta = {
@@ -65,6 +68,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to surface the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, persons. For pptx (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern), and per-slide title / speaker notes / hidden flag — returned as a standalone document since pptx has no convertible body (use `download-drive-item-as-pdf` for slide visuals). For OpenDocument (`.odt`/`.ods`/`.odp`, `## OpenDocument metadata`): Dublin Core + ODF properties, keywords, user-defined custom fields — appended after the converted body. Each OOXML family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other sources.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
     {
       name: 'inline-images',
       key: 'inlineImages',

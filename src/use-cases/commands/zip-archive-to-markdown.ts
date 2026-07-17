@@ -41,21 +41,26 @@ const entryImages = async (entry: ZipEntry): Promise<MediaEnvelope['media']> => 
   return r.ok ? r.value.media : [];
 };
 
-const convertEntry = async (entry: ZipEntry, includeMetadata: boolean, includeImages: boolean): Promise<FileResult> => {
-  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata }, NESTED_HINTS);
+// An options object rather than a positional-boolean tail: the flags each zip
+// command forwards to the per-entry dispatch only grow (a `.msg` entry now honours
+// `--keep-quoted` too), and `f(bytes, true, false, true)` is unreadable.
+type ZipArchiveOptions = { readonly includeMetadata: boolean; readonly includeImages?: boolean; readonly keepQuoted?: boolean };
+
+const convertEntry = async (entry: ZipEntry, opts: ZipArchiveOptions): Promise<FileResult> => {
+  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata: opts.includeMetadata, keepQuoted: opts.keepQuoted }, NESTED_HINTS);
   if (!r.ok) return { path: entry.path, note: r.error.message };
   const env = r.value as { contentType: string; size: number; text: string };
   const base = { path: entry.path, contentType: env.contentType, size: env.size, text: env.text };
-  if (!includeImages) return base;
+  if (opts.includeImages !== true) return base;
   const images = await entryImages(entry);
   return images.length > 0 ? { ...base, images } : base;
 };
 
-const convertZipArchive = async (bytes: Uint8Array, includeMetadata: boolean, includeImages = false): Promise<Result<ZipArchiveResult, GraphError>> => {
+const convertZipArchive = async (bytes: Uint8Array, opts: ZipArchiveOptions): Promise<Result<ZipArchiveResult, GraphError>> => {
   const entries = await openZipEntries(bytes);
   if (!entries.ok) return entries;
   const capped = entries.value.slice(0, MAX_ENTRIES);
-  const files = await Promise.all(capped.map((entry) => convertEntry(entry, includeMetadata, includeImages)));
+  const files = await Promise.all(capped.map((entry) => convertEntry(entry, opts)));
   if (entries.value.length > MAX_ENTRIES) {
     return ok({ count: files.length, totalEntries: entries.value.length, truncated: true, files });
   }
@@ -63,4 +68,4 @@ const convertZipArchive = async (bytes: Uint8Array, includeMetadata: boolean, in
 };
 
 export { convertZipArchive, MAX_ENTRIES };
-export type { FileResult, ZipArchiveResult };
+export type { FileResult, ZipArchiveOptions, ZipArchiveResult };

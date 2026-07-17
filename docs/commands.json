@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-16T13:03:31.113Z",
+  "generatedAt": "2026-07-17T00:45:58.529Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -28,6 +28,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to surface side-channel content for docx, xlsx, pptx, and OpenDocument attachments. docx → `## DOCX metadata`; xlsx → `## Workbook metadata`; pptx → `## PPTX metadata` (standalone, since pptx has no convertible body); odt/ods/odp → `## OpenDocument metadata`, appended after the converted body. No-op on other attachment types and on itemAttachment renderers.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -107,6 +120,19 @@
               "false"
             ]
           }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
@@ -114,7 +140,7 @@
     },
     {
       "name": "convert-local-file-to-markdown",
-      "summary": "Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.",
+      "summary": "Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body with the quoted reply chain stripped — `--keep-quoted true` restores it — and inline `cid:` images shown as placeholders, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.",
       "category": "meta",
       "commandAliases": [
         "convert-local-file"
@@ -134,6 +160,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to append the converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body. Applies inside a `.zip` too.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -181,7 +220,7 @@
     },
     {
       "name": "convert-mail-attachment-to-markdown",
-      "summary": "Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg attachment rendered to markdown — headers + body with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).",
+      "summary": "Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg attachment rendered to markdown — headers + body (quoted reply chain stripped unless `--keep-quoted true`; inline `cid:` images shown as placeholders) with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -204,6 +243,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to surface side-channel content for docx, xlsx, pptx, and OpenDocument attachments (file + reference). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag) as a standalone document, since pptx has no convertible body; odt/ods/odp → `## OpenDocument metadata` (Dublin Core + ODF properties, keywords, user-defined fields), appended after the converted body. Each OOXML family also covers its macro-enabled and template variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other attachment types and on itemAttachment renderers.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -270,6 +322,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (`## DOCX metadata` / `## Workbook metadata` / `## PPTX metadata` / `## OpenDocument metadata`, etc.) after its body.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -531,6 +596,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to surface the side-channel content the rendered body hides. For docx (`## DOCX metadata`): core/app/custom document properties, people registry, external hyperlinks, comments, tracked changes (insertions + deletions), hidden-formatted text (w:vanish), field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks. For xlsx (`## Workbook metadata`): core/app/custom properties, external relationships, defined names, hidden / very-hidden sheets, legacy cell comments, threaded comments, persons. For pptx (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern), and per-slide title / speaker notes / hidden flag — returned as a standalone document since pptx has no convertible body (use `download-drive-item-as-pdf` for slide visuals). For OpenDocument (`.odt`/`.ods`/`.odp`, `## OpenDocument metadata`): Dublin Core + ODF properties, keywords, user-defined custom fields — appended after the converted body. Each OOXML family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`. No-op on other sources.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -7441,7 +7519,7 @@
     },
     {
       "name": "read-mail-attachment",
-      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.",
+      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively (quoted chain stripped unless `--keep-quoted true`), plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -7464,6 +7542,19 @@
           "key": "includeMetadata",
           "required": false,
           "description": "Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (docx / xlsx / pptx / OpenDocument). No-op on images, embedded items, and plain text.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [

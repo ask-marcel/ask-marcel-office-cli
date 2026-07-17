@@ -6,12 +6,14 @@ import type { CommandMeta } from './command-types.ts';
 import { convertFetchedAttachment } from './convert-mail-attachment-to-markdown.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  keepQuoted: keepQuotedSchemaField,
 });
 
 // A fileAttachment whose bytes are a zip archive — by extension or content-type.
@@ -61,6 +63,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
+  const keepQuoted = parsed.data.keepQuoted === 'true';
 
   // Single fetch, then auto-route by content-type: a zip is unpacked + converted
   // entry-by-entry; everything else (docx/xlsx/pptx/odf/csv/pdf/.msg/legacy/text,
@@ -75,14 +78,14 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     if (typeof contentBytes !== 'string') {
       return err({ type: 'api_error', status: 400, message: 'zip fileAttachment has no contentBytes to unpack (the attachment may be empty).' });
     }
-    return convertZipArchive(base64ToBytes(contentBytes), includeMetadata);
+    return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted });
   }
-  return convertFetchedAttachment(graph, nameByContentType(a), includeMetadata);
+  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively, plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.',
+    'Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively (quoted chain stripped unless `--keep-quoted true`), plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
@@ -98,6 +101,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to append each converted Office file’s side-channel metadata block (docx / xlsx / pptx / OpenDocument). No-op on images, embedded items, and plain text.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    keepQuotedOption,
   ],
   example: "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

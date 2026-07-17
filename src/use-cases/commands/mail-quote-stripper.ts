@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import type { CommandOptionMeta } from './command-types.ts';
+
 /**
  * Strips quoted reply chains / forwarded-message blocks from an Outlook or
  * Gmail HTML email body so long threads don't duplicate quoted content into the
@@ -111,4 +114,20 @@ const stripQuotedPlainText = (text: string): { readonly text: string; readonly s
   return { text: `${text.slice(0, cut)}${PLAINTEXT_MARKER}`, stripped: true };
 };
 
-export { stripQuotedPlainText, stripQuotedReplies };
+// Shared `--keep-quoted` schema field + option meta for every command that can
+// hand an Outlook `.msg` to the markdown dispatch (the six converters below and
+// `convert-mail-to-markdown`'s own Graph-body path). Declared once so the six
+// descriptions cannot drift apart, and so the strip marker's remedy is real on
+// every command that can emit it.
+const keepQuotedSchemaField = z.enum(['true', 'false']).optional();
+
+const keepQuotedOption: CommandOptionMeta = {
+  name: 'keep-quoted',
+  key: 'keepQuoted',
+  required: false,
+  description:
+    'Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.',
+  argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
+};
+
+export { keepQuotedOption, keepQuotedSchemaField, stripQuotedPlainText, stripQuotedReplies };
