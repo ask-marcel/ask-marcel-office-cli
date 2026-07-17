@@ -89,7 +89,14 @@ const PLAINTEXT_BOUNDARIES: ReadonlyArray<RegExp> = [/^-{2,}\s*Original Message\
 
 const PLAINTEXT_MARKER = '[Quoted reply chain removed — pass --keep-quoted true to include it]';
 
-const stripQuotedReplies = (html: string): { readonly html: string; readonly stripped: boolean } => {
+/**
+ * Index where the quoted history begins in an HTML body, or -1 when the body
+ * quotes nothing. Earliest of the structural markers merged with the widened
+ * confirmed-header index. Exported because the draft-comment splicer needs the
+ * same cut to place a reply ABOVE the quote without disturbing it — the stripper
+ * throws the tail away, the splicer keeps it, but both agree on where it starts.
+ */
+const findQuoteBoundary = (html: string): number => {
   let cut = -1;
   for (const boundary of QUOTE_BOUNDARIES) {
     const match = boundary.exec(html);
@@ -98,11 +105,11 @@ const stripQuotedReplies = (html: string): { readonly html: string; readonly str
   const headerCut = confirmedHeaderIndex(html, HTML_FROM_LABEL, HTML_SENT_LABEL);
   const widenedHeaderCut = headerCut === -1 ? -1 : widenToBlockStart(html, headerCut);
   if (widenedHeaderCut !== -1 && (cut === -1 || widenedHeaderCut < cut)) cut = widenedHeaderCut;
-  if (cut === -1) return { html, stripped: false };
-  return { html: `${html.slice(0, cut)}${STRIP_MARKER}`, stripped: true };
+  return cut;
 };
 
-const stripQuotedPlainText = (text: string): { readonly text: string; readonly stripped: boolean } => {
+/** The plain-text counterpart of `findQuoteBoundary`, for `contentType === 'text'` bodies. */
+const findPlainTextQuoteBoundary = (text: string): number => {
   let cut = -1;
   for (const boundary of PLAINTEXT_BOUNDARIES) {
     const match = boundary.exec(text);
@@ -110,6 +117,17 @@ const stripQuotedPlainText = (text: string): { readonly text: string; readonly s
   }
   const headerCut = confirmedHeaderIndex(text, TEXT_FROM_LABEL, TEXT_SENT_LABEL);
   if (headerCut !== -1 && (cut === -1 || headerCut < cut)) cut = headerCut;
+  return cut;
+};
+
+const stripQuotedReplies = (html: string): { readonly html: string; readonly stripped: boolean } => {
+  const cut = findQuoteBoundary(html);
+  if (cut === -1) return { html, stripped: false };
+  return { html: `${html.slice(0, cut)}${STRIP_MARKER}`, stripped: true };
+};
+
+const stripQuotedPlainText = (text: string): { readonly text: string; readonly stripped: boolean } => {
+  const cut = findPlainTextQuoteBoundary(text);
   if (cut === -1) return { text, stripped: false };
   return { text: `${text.slice(0, cut)}${PLAINTEXT_MARKER}`, stripped: true };
 };
@@ -130,4 +148,4 @@ const keepQuotedOption: CommandOptionMeta = {
   argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
 };
 
-export { keepQuotedOption, keepQuotedSchemaField, stripQuotedPlainText, stripQuotedReplies };
+export { findPlainTextQuoteBoundary, findQuoteBoundary, keepQuotedOption, keepQuotedSchemaField, stripQuotedPlainText, stripQuotedReplies };
