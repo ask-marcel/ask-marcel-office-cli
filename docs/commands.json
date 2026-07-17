@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-17T03:06:27.984Z",
+  "generatedAt": "2026-07-17T06:41:28.612Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1769,6 +1769,34 @@
       ],
       "example": "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
       "responseShape": "single Microsoft Graph `messageRule` resource"
+    },
+    {
+      "name": "get-mail-signature",
+      "summary": "Read your own email signature as HTML, lifted from a message you already sent. Graph-created drafts carry NO signature (create-mail-draft, create-reply-draft, and create-forward-draft all produce unsigned bodies), so this is where you get one: take the `text` this returns, append it to your reply text, and hand the result to `update-mail-draft` in comment mode (HTML body-content-type) to place it above the quoted history. Scans your last 10 sent messages newest-first and returns the first `<div id=\"Signature\">` block it finds, stopping there. Any logo the block references comes back as a raw `cid:` reference. Read-only. NOTE: the marker is written by Outlook on the web and new Outlook; mail composed in Outlook desktop does not carry it, so pin a webmail-sent message with --message-id if the scan finds nothing.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/mailFolders/sentitems/messages (scan, skipped when {message-id} is given) then /me/messages/{message-id}?$select=body,sentDateTime (+ /attachments per referenced logo)",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-get",
+      "options": [
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": false,
+          "aliases": [
+            {
+              "name": "id",
+              "key": "id"
+            }
+          ],
+          "description": "Read the signature from THIS message instead of scanning the sent folder. Use when the scan finds nothing (the message was composed in Outlook desktop) or to pin a specific signature. Source from list-mail-folder-messages --mail-folder-id sentitems. Accepts `--id` as an alias.",
+          "argumentHint": {
+            "kind": "idOrName"
+          }
+        }
+      ],
+      "example": "ask-marcel-office get-mail-signature",
+      "responseShape": "`{ contentType: \"text/html\", size, text, sourceMessageId, sentDateTime? }`. `text` is the signature block itself (the `<div id=\"Signature\">` element, not the whole body), ready to append to a reply. Any logo in the block is a raw `cid:` reference; resolve it with get-mail-attachment. `--output-path` writes the HTML to a file.",
+      "producesBytes": true
     },
     {
       "name": "get-mailbox-settings",
@@ -8011,10 +8039,10 @@
     },
     {
       "name": "update-mail-draft",
-      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
+      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
       "category": "mail",
       "graphMethod": "PATCH",
-      "graphPathTemplate": "/me/messages/{message-id}",
+      "graphPathTemplate": "/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used)",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-update",
       "options": [
         {
@@ -8042,13 +8070,19 @@
           "name": "body-content",
           "key": "bodyContent",
           "required": false,
-          "description": "New email body content. Replaces the entire body. Pass --body-content-type HTML for rich text."
+          "description": "New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft this is almost never what you want - use --comment to revise only your own text and keep the quote. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment."
+        },
+        {
+          "name": "comment",
+          "key": "comment",
+          "required": false,
+          "description": "Rewrite ONLY the reply text above the quoted history on a threaded draft, keeping the quote and its styles byte-identical. This is the flag for revising a draft made by create-reply-draft or create-forward-draft; repeated edits replace your text rather than stacking. Refused when the draft has no quoted history (use --body-content), when it is not a draft, and when HTML markup you pass carries a quote boundary marker of its own. Mutually exclusive with --body-content."
         },
         {
           "name": "body-content-type",
           "key": "bodyContentType",
           "required": false,
-          "description": "Body format for the new body: Text (default) or HTML. Only used when --body-content is provided.",
+          "description": "Format of --body-content, or of --comment in comment mode: Text (default) or HTML. With --comment on an HTML draft, Text is escaped into the draft (markup shows as characters) and HTML is spliced in as markup; HTML is refused on a plain-text draft. The draft keeps its own body format either way - this flag describes what you are passing, not what the draft becomes.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -8092,7 +8126,7 @@
       ],
       "example": "ask-marcel-office update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
       "responseShape": "The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.",
-      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent",
+      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged",
       "mutates": true
     }
   ]
