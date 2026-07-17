@@ -87,6 +87,7 @@
   },
   "dependencies": {
     "@kenjiuno/msgreader": "^1.28.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^14.0.3",
     "fast-xml-parser": "^5.8.0",
     "jszip": "^3.10.1",
