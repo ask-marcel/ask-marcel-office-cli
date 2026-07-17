@@ -46,12 +46,62 @@ const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: stri
   catch { return { ok: false, note: 'CRASH/non-JSON: ' + (p.stdout?.toString() || p.stderr?.toString() || '').slice(0, 60) }; }
 };
 
+/*
+ * `ask-marcel-office mcp` speaks JSON-RPC over stdout, so it needs a DIFFERENT probe.
+ *
+ * This asserts on RAW stdout, deliberately NOT via the SDK's Client. Two
+ * distinct failure modes have to be caught and only one of them is visible to
+ * a client:
+ *
+ *   1. Protocol breakage      -> a Client would catch this.
+ *   2. stdout POLLUTION       -> a Client would NOT. Verified 2026-07-17: with
+ *      `process.stdout.write('STRAY BANNER\n')` injected into the mcp path, the
+ *      bundle emitted `STRAY BANNER\n{"result":...}` and a Client-based probe
+ *      still reported a clean 5-tool handshake. The SDK's ReadBuffer skips
+ *      lines it cannot parse, so a tolerant client hides the very bug this gate
+ *      exists to find. The spec says the server MUST NOT write non-MCP output
+ *      to stdout; a stricter client (or a future SDK) would drop the session.
+ *
+ * `mcp.test.ts` cannot cover this either — InMemoryTransport never touches
+ * stdout. So this probe is the ONLY thing standing between a stray banner,
+ * log line, or debug print and a broken release.
+ */
+const MCP_INIT = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'qa', version: '1' } } };
+const MCP_LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
+
+const probeMcp = (rt: string): { ok: boolean; note: string } => {
+  const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
+    input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n`,
+    timeout: 60000,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const stdout = p.stdout?.toString() ?? '';
+  const lines = stdout.split('\n').filter((l) => l.trim() !== '');
+  if (lines.length === 0) return { ok: false, note: `no stdout (stderr: ${(p.stderr?.toString() ?? '').slice(0, 60)})` };
+  // EVERY line must be a JSON-RPC frame. One banner and this fails, which is
+  // the whole point.
+  const polluted = lines.filter((l) => {
+    try {
+      return (JSON.parse(l) as { jsonrpc?: string }).jsonrpc !== '2.0';
+    } catch {
+      return true;
+    }
+  });
+  if (polluted.length > 0) return { ok: false, note: `STDOUT POLLUTED by ${polluted.length} non-JSON-RPC line(s): ${JSON.stringify(polluted[0]?.slice(0, 40))}` };
+  const listReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { tools?: ReadonlyArray<{ name: string }> } }).find((m) => m.id === 2);
+  const tools = listReply?.result?.tools ?? [];
+  if (tools.length !== 5) return { ok: false, note: `expected 5 gateway tools, got ${tools.length}` };
+  return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };
+};
+
 let fails = 0;
 for (const rt of ['node', 'bun']) {
   console.log(`\n=== convert-local-file-to-markdown @ ${rt} ===`);
   for (const [fmt, path] of Object.entries(F)) { const r = probe(rt, 'convert-local-file-to-markdown', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
   console.log(`=== extract-local-file-images @ ${rt} ===`);
   for (const [fmt, path] of [['docx', F.docx], ['xlsx', F.xlsx], ['pptx', F.pptx], ['pdf', pdfImg]]) { const r = probe(rt, 'extract-local-file-images', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
+  console.log(`=== mcp stdio handshake @ ${rt} ===`);
+  const m = probeMcp(rt); if (!m.ok) fails++; console.log(`  ${m.ok ? '✓' : '✗'} mcp   -> ${m.note}`);
 }
-console.log(`\n${fails === 0 ? 'ALL CONVERTERS OK under node + bun ✓' : `!! ${fails} bundler-interop FAILURES`}`);
+console.log(`\n${fails === 0 ? 'ALL CONVERTERS + MCP OK under node + bun ✓' : `!! ${fails} bundler-interop FAILURES`}`);
 process.exit(fails > 0 ? 1 : 0);
