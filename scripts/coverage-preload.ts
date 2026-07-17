@@ -42,6 +42,10 @@ import '../src/use-cases/commands/update.ts';
 
 import '../src/composition/build-deps.ts';
 import '../src/composition/cli.ts';
+// Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
+// run-registry-command.ts (pulled in via cli.ts) it is not transitively
+// imported by anything already listed here.
+import '../src/composition/mcp.ts';
 
 import '../src/presenter/output.ts';
 
