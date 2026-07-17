@@ -23,7 +23,7 @@ describe('create-forward-draft', () => {
     const graph = fakeGraphClient({
       post: async (path, body) => {
         posts.push({ path, body });
-        return ok({ id: 'draft-9', isDraft: true, subject: 'FW: TEMPO PATH' });
+        return ok({ id: 'draft-9', isDraft: true, subject: 'FW: Contoso migration' });
       },
       patch: async (path, body) => {
         patches.push({ path, body });

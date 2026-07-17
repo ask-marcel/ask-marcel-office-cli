@@ -19,7 +19,7 @@ describe('create-reply-draft', () => {
     const graph = fakeGraphClient({
       post: async (path, body) => {
         posts.push({ path, body });
-        return ok({ id: 'draft-9', isDraft: true, subject: 'RE: TEMPO PATH // Transition' });
+        return ok({ id: 'draft-9', isDraft: true, subject: 'RE: Contoso migration' });
       },
       patch: async (path, body) => {
         patches.push({ path, body });
@@ -27,12 +27,12 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed for Concur.' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed for Contoso.' });
 
     expect(result.ok).toBe(true);
     // The reply text travels via `comment` (Graph places it above the quote); a
     // body PATCH would replace the draft body and drop the quoted thread.
-    expect(posts).toEqual([{ path: '/me/messages/msg-1/createReplyAll', body: { comment: 'Confirmed for Concur.' } }]);
+    expect(posts).toEqual([{ path: '/me/messages/msg-1/createReplyAll', body: { comment: 'Confirmed for Contoso.' } }]);
     expect(patches).toEqual([]);
   });
 
@@ -46,10 +46,10 @@ describe('create-reply-draft', () => {
       },
     });
 
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', subject: 'RE: TEMPO PATH - Concur confirmed' });
+    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', subject: 'RE: Contoso migration - scope confirmed' });
     // Body-free: the PATCH carries ONLY the subject. A `body` key would clobber the
     // reply text + quoted thread, so `toEqual` pins its absence.
-    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { subject: 'RE: TEMPO PATH - Concur confirmed' } }]);
+    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { subject: 'RE: Contoso migration - scope confirmed' } }]);
 
     patches.length = 0;
     await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });

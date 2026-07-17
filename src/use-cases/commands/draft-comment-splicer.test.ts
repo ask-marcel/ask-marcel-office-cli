@@ -16,9 +16,9 @@ const GRAPH_REPLY_DRAFT = `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}${QUOTE_TAIL}`
 
 describe('placing an author’s reply text above the quoted history Graph minted', () => {
   it('inserts the reply above the quote while keeping the head styles, the body tag, and every byte of the quoted thread', () => {
-    const result = insertCommentAboveQuote(GRAPH_REPLY_DRAFT, '<p>Confirmed for Concur.</p>');
+    const result = insertCommentAboveQuote(GRAPH_REPLY_DRAFT, '<p>Confirmed for Contoso.</p>');
 
-    expect(result).toEqual({ html: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p>Confirmed for Concur.</p>${QUOTE_TAIL}`, boundaryFound: true });
+    expect(result).toEqual({ html: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p>Confirmed for Contoso.</p>${QUOTE_TAIL}`, boundaryFound: true });
   });
 
   it('replaces a previous reply with the revised one, dropping the div Graph minted and leaving the quoted thread whole', () => {

@@ -12,7 +12,7 @@ describe('locating where a reply body stops being the author’s new text and st
     // The real Outlook shape: `appendonsend` (the "type above this line" marker)
     // precedes `divRplyFwdMsg`, which itself wraps a bold From:/Sent: pair. All
     // three markers fire; the earliest must win, or the reply keeps dead history.
-    const authorText = '<p>Confirmed for Concur.</p>';
+    const authorText = '<p>Confirmed for Contoso.</p>';
     const quote = '<div id="appendonsend"></div><hr><div id="divRplyFwdMsg"><b>From:</b> Robin Chen<br><b>Sent:</b> Monday, May 5, 2026<br><b>To:</b> Alex Kim</div>';
     const html = `${authorText}${quote}<p>the original</p>`;
 
@@ -52,7 +52,7 @@ describe('locating where a reply body stops being the author’s new text and st
   });
 
   it('points at the underscore rule Outlook classic draws above a quoted plain-text original', () => {
-    const authorText = 'Confirmed for Concur.\n\n';
+    const authorText = 'Confirmed for Contoso.\n\n';
 
     expect(findPlainTextQuoteBoundary(`${authorText}_______________________________\nFrom: Robin Chen`)).toBe(authorText.length);
   });
