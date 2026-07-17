@@ -38,9 +38,14 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   Both run tools accept `outputPath` / `outputDir`, mirroring the CLI flags, so
   a multi-MB PDF lands on disk instead of flooding the model's context.
 
-  **Sign in from a terminal the first time** (`ask-marcel-office login`): an MFA prompt
-  can outlive an MCP client's tool-call timeout. Raise `MCP_TOOL_TIMEOUT` in
-  your client if a slow login still trips it.
+  **Raise your MCP client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`
+  or equivalent). Measured against a real tenant: a browser sign-in takes
+  **37–64 s even with no MFA prompt**, while the MCP default request timeout is
+  **60 s** — so `login` times out intermittently at the default. The server keeps
+  running through a client-side timeout, so the sign-in has usually completed
+  anyway; re-run your original command before calling `login` again. Sign in
+  from a terminal the first time (`ask-marcel-office login`), where an MFA prompt adds
+  minutes on top.
 
   Read/write sets are derived from the registry's `mutates` flag, so a new
   command lands on the correct tool with no code change here.

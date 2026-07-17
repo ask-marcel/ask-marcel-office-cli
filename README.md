@@ -163,7 +163,9 @@ You get **five gateway tools**, not one per command — 183 tool schemas would b
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 
-**Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`). Measured: a browser sign-in takes 37–64 s even with no MFA prompt, against a 60 s default — so `login` times out intermittently otherwise. If it does, the sign-in usually completed; re-run your command before retrying. Sign in from a terminal the first time (`ask-marcel-office login`), where MFA can add minutes.
+**Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000` or the equivalent). This is not optional-ish: a browser sign-in measured **37–64 s even with no MFA prompt**, and the MCP default timeout is **60 s** — so `login` times out intermittently at the default. If it does time out, the sign-in has often completed anyway; re-run your original command before calling `login` again.
+
+Sign in from a **terminal first** (`ask-marcel-office login`), where an MFA prompt can add minutes. After that the `login` tool handles the hourly elevated-token refresh.
 
 ## Embed it as a TypeScript library
 

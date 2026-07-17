@@ -207,9 +207,14 @@ Notes:
 - `run-command` is annotated `readOnlyHint: true` so clients can auto-approve it. A write routed
   through it is refused before it executes. `run-write-command` carries the 4 draft commands and is
   marked non-destructive: each produces an UNSENT draft, and this CLI cannot send mail.
-- **Log in from a terminal first** (`ask-marcel-office login`). An MFA prompt can outlive an MCP client's
-  tool-call timeout; raise `MCP_TOOL_TIMEOUT` in your client if a slow login still trips it. After
-  the first sign-in the `login` tool covers the hourly elevated-token refresh.
+- **Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`, or the equivalent).
+  Measured live: a browser sign-in takes **37–64 s with no MFA prompt at all** (it varies with how
+  warm the persistent browser profile is), and the MCP default request timeout is **60 s** — so
+  `login` times out intermittently at the default, right on the boundary. The server keeps running
+  through a client-side timeout, so the sign-in has usually completed anyway: re-run your original
+  command, or check `scopes-check`, before calling `login` a second time.
+- **Log in from a terminal first** (`ask-marcel-office login`). A first-time MFA prompt adds minutes on top
+  of the above. After that the `login` tool covers the hourly elevated-token refresh.
 - `logout` and `update` are deliberately CLI-only.
 - Results are text (the same YAML-ish rendering the CLI prints, `hint:` / `source:` remedies
   included). Two known v1 warts: paginated results print `next: ask-marcel-office next-page --url '...'`,
