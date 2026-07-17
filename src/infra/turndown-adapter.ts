@@ -77,7 +77,7 @@ const isHeadingRowLike = (tr: DomNode): boolean => {
   return parent.firstChild === tr && (parent.nodeName === 'TABLE' || isFirstTbodyLike(parent)) && Array.from(tr.childNodes).every((n) => n.nodeName === 'TH');
 };
 
-const hasProperHeader = (table: DomNode): boolean => table.rows.length > 0 && isHeadingRowLike(table.rows[0] as DomNode);
+const hasProperHeader = (table: DomNode): boolean => table.rows.length > 0 && isHeadingRowLike(table.rows[0]);
 
 // Turndown's DOM (domino) implements `.rows` / `.cells` as DEEP
 // getElementsByTagName walks that include rows of tables nested inside
