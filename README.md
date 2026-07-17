@@ -1,6 +1,6 @@
 # ask-marcel-office-cli
 
-**A Microsoft Graph CLI built for LLMs.** 182 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus local-file tools (markdown conversion, image extraction) that need no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+**A Microsoft Graph CLI built for LLMs.** 183 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus local-file tools (markdown conversion, image extraction) that need no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
 
 ```bash
 npm i -g ask-marcel-office-cli
@@ -25,7 +25,7 @@ LLM tool-loops keep hitting the same three walls with Microsoft Graph:
 
 ### Read-only by design
 
-**This is the most important property.** 174 GET endpoints + 4 read-only POST (three searches + free/busy lookup) + 3 POST (create mail draft / threaded reply draft / forward draft) + 1 PATCH (update draft) = 182 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation (a new mail, a threaded reply-all, or a forward) and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
+**This is the most important property.** 175 GET endpoints + 4 read-only POST (three searches + free/busy lookup) + 3 POST (create mail draft / threaded reply draft / forward draft) + 1 PATCH (update draft) = 183 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation (a new mail, a threaded reply, or a forward) and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
 
 ### One call gets the full email context
 
@@ -191,7 +191,7 @@ Every `AuthManager` member is an async function returning `Result<T, AuthError>`
 
 ## Deep docs
 
-- **[All 182 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
+- **[All 183 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
 - **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
