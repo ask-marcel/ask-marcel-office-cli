@@ -1,144 +1,155 @@
-# ask-marcel-office-cli
+<div align="center">
 
-**A Microsoft Graph CLI built for LLMs.** 183 commands across Mail, Calendar, OneDrive, SharePoint, Excel, Teams chats, Planner / To-Do, OneNote, and directory — plus local-file tools (markdown conversion, image extraction) that need no sign-in at all. Sign in once with your Microsoft 365 account — no Azure app registration, no admin consent, no client secrets.
+# ask-marcel-office
 
-```bash
-npm i -g ask-marcel-office-cli
-ask-marcel-office login                 # browser opens once, token cached
-ask-marcel-office my-quick-context      # who am I + my IDs, in one round trip
-ask-marcel-office list-mail-messages --top 5
-```
+### The Microsoft 365 command line built for AI agents
+
+**One sign-in. 183 read-only commands. Every document as clean markdown.**
+
+[![npm version](https://img.shields.io/npm/v/ask-marcel-office-cli.svg?logo=npm&color=cb3837)](https://www.npmjs.com/package/ask-marcel-office-cli)
+[![license: MIT](https://img.shields.io/npm/l/ask-marcel-office-cli.svg?color=blue)](LICENSE)
+[![node ≥20](https://img.shields.io/node/v/ask-marcel-office-cli?logo=node.js&color=339933)](https://nodejs.org)
+[![bun ≥1.0](https://img.shields.io/badge/bun-%E2%89%A51.0-14151a?logo=bun)](https://bun.sh)
+[![types included](https://img.shields.io/npm/types/ask-marcel-office-cli?logo=typescript&color=3178c6)](docs/USAGE.md)
+
+Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
+
+[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 183 commands](docs/COMMANDS.md)
+
+</div>
 
 ---
 
-## Why it exists
+Your agent is smart enough to answer *"what did Contoso say about the Q3 budget, and what's in the attached deck?"* It just can't see your mailbox.
 
-LLM tool-loops keep hitting the same three walls with Microsoft Graph:
-
-1. **Auth is a project.** Register an app, get tenant-admin consent, manage secrets, refresh tokens — before the first API call.
-2. **Default payloads are tuned for backend services, not context windows.** Listing endpoints return every field on every item, used-range Excel calls return four redundant 2D arrays, attachment endpoints inline base64 by default. An agent that reads "what's in my inbox" without trimming burns its budget on metadata it never needed.
-3. **Errors are opaque.** `BadRequest: Invalid filter clause` doesn't tell a model what to fix.
-
-`ask-marcel-office` fixes all three at the CLI layer, so the model just calls commands and reads back-pressure-friendly responses.
-
-## What you get
-
-### Read-only by design
-
-**This is the most important property.** 175 GET endpoints + 4 read-only POST (three searches + free/busy lookup) + 3 POST (create mail draft / threaded reply draft / forward draft) + 1 PATCH (update draft) = 183 commands. No `send-mail`, no `create-event`, no `upload-file`, no `delete-anything`. The only write operations are draft creation (a new mail, a threaded reply, or a forward) and update — a hallucinated command can at most create an unsent draft in your Drafts folder. Safe default for autonomous agents, MCP servers, and "let Claude poke around my mailbox" sessions where you can't fully review every tool call.
-
-### One call gets the full email context
-
-A typical "read this email" loop in raw Graph: GET the message → GET the attachments list → GET each attachment's bytes → scan the body HTML for `sharepoint.com` URLs → resolve each URL to a driveItem → GET each driveItem. Six round-trips minimum, plus HTML-to-text conversion the LLM has to do itself.
-
-`convert-mail-to-markdown` collapses that into one call:
-
-- Body rendered as markdown (turndown pipeline)
-- Quoted reply chains / forwarded-message blocks stripped by default so a long thread doesn't duplicate earlier messages into the model's context (the cut is replaced with a visible marker; opt out with `--keep-quoted true` to keep the full body)
-- Inline images shown as readable `[inline image: logo.png]` placeholders and listed as attachments, so a signature's images cost a few bytes instead of tens of KB of base64 (opt in with `--inline-images true` to embed them as size-capped base64 `data:` URIs for self-contained output)
-- File attachments listed below the body with id + name + size, ready for follow-up calls
-- Pair with `extract-sharepoint-links-in-mail` to resolve every SharePoint URL in the body to its driveItem in parallel (capped at 25 unique URLs per call)
-
-### Office docs → markdown or PDF on the fly
-
-Feed any Office-shaped file (docx, xlsx, pptx, csv, rtf, odt, …) into the local conversion pipeline OR through Graph's `?format=pdf` when slide layout and images matter:
-
-- `download-drive-item-as-markdown` — docx via mammoth (embedded images become `[image]` placeholders by default — `--inline-images true` to embed them as base64, or pull the full-resolution originals with `extract-drive-item-images`), xlsx as one markdown table per sheet (a sheet whose used range exceeds the `--max-cells` cap, default 50 000, becomes a band-by-band read hint instead of a multi-hundred-MB table that would OOM), csv as a table, odt/ods/odp via content.xml (headings, lists, tables, named sheets, per-slide text, with `office:annotation` comments folded inline), **pptx** flattened to per-slide text (titles + bullets + text boxes + table cells, speaker notes inline, as `## Slide N` sections — `download-drive-item-as-pdf` + a vision model when layout / images matter), **pdf** via text-layer extraction ([unpdf](https://github.com/unjs/unpdf) → `text/plain`; a scanned / image-only PDF with no text layer points you at `download-drive-item-as-pdf` + a vision model), **legacy OLE Office** (`.xls` read by sheetjs like `.xlsx`; `.doc` extracted by [word-extractor](https://www.npmjs.com/package/word-extractor) as plain text; `.ppt` has no pure-JS path → convert to PDF first), plain-text passthrough
-- `download-drive-item-as-pdf` — Graph PDF conversion for anything it supports (preserves slide layout, images, charts — the right call for pptx and image-heavy docs)
-- `convert-mail-attachment-to-markdown` / `convert-mail-attachment-to-pdf` — same pipelines but starting from an email attachment
-- `read-mail-attachment` — one call that reads any mail attachment, auto-routing by file type (a `.zip` is unpacked and every entry converted; docx/xlsx/pptx/odf/csv/PDF/`.msg`/legacy/text → markdown; images, scanned PDFs, and legacy `.ppt` return an actionable 415 pointing at the raw-bytes / vision route) so an agent never has to choose between the `convert-mail-attachment-*` siblings
-- `convert-local-file-to-markdown` — same pipelines but starting from a file **on disk** (`--path ./report.docx`); never calls Graph (works offline, no login). A `.zip` is unpacked with every contained file converted in one call. The two things it can't do locally — convert **to** PDF and Loop/Fluid/Whiteboard sources — need Graph's server-side renderer (upload to OneDrive and use the drive-item siblings)
-- `convert-drive-item-zip-to-markdown` / `convert-mail-attachment-zip-to-markdown` — unzip an archive (OneDrive/SharePoint item, or an Outlook attachment) and convert **every** contained file in one call; legacy GBK / CP437 entry names (Chinese vendor archives from WinRAR / Windows Explorer) are decoded correctly, never mojibaked; unsupported entries are listed with a note instead of failing the archive
-- **Outlook `.msg` files** (saved/forwarded emails) convert to markdown through every entry point above — H1 subject, From/To/Cc/Date header block, the body, and an `## Attachments` section where each attachment is itself converted recursively (depth-capped). The body gets the same treatment as a live mailbox message: the quoted reply chain is stripped (`--keep-quoted true` restores it — real threads shrink 78-90%) and inline `cid:` images become placeholders
-- `extract-sharepoint-links-in-documents` — the doc-side sibling of `extract-sharepoint-links-in-mail`: resolve every `*.sharepoint.com` URL embedded in a docx/xlsx/pptx (read from the package's relationship parts) or an odt/ods/odp (read from the inline `xlink:href` links in content.xml) to its driveItem, so an agent can follow references out of a document the same way it follows them out of an email
-
-Pass `--include-metadata true` on any `*-as-markdown` (or `convert-mail-attachment-to-markdown`) command to surface the side-channel content the rendered body hides. For **docx** (`## DOCX metadata`): core/app/custom doc properties, people registry, external hyperlinks, comments (each quoting the document text span it annotates), tracked changes, hidden text (`w:vanish`), MERGEFIELD / HYPERLINK / DOCVARIABLE instructions, bookmarks. For **xlsx** (`## Workbook metadata`): properties, external relationships, defined names, hidden / very-hidden sheets, legacy + threaded cell comments (each tagged with its cell), the persons registry. For **pptx** (`## PPTX metadata`): properties, external relationships, slide tags, comment authors + comments (legacy + modern, each anchored to its slide), and per-slide title / speaker notes / hidden flag — appended after the per-slide text body (use `download-drive-item-as-pdf` + a vision model for slide visuals / layout). Each family also covers its macro-enabled (`.docm` / `.xlsm` / `.pptm`) and template (`.dotx` / `.xltx` / `.potx`, etc.) variants, and surfaces a `### Macros (VBA)` section flagging an embedded `vbaProject.bin` (the file can execute code on open). For **OpenDocument** (`.odt` / `.ods` / `.odp`) the flag appends a `## OpenDocument metadata` block (Dublin Core + ODF properties, keywords, user-defined custom fields) after the converted body. No-op on other sources.
-
-### Extract embedded images from documents
-
-`extract-drive-item-images` (OneDrive / SharePoint), `extract-mail-attachment-images` (Outlook attachments), and `extract-local-file-images` (a file **on disk** — no Graph, no login) pull the embedded images out of a **docx, xlsx, pptx, or pdf**. For Office files it reads the OOXML media parts (png/jpg/gif/bmp/tiff/webp/svg) — including original full-resolution / un-cropped originals and images on hidden slides that the rendered view never shows. SVG rides back as its XML source (which carries the diagram's own text labels); legacy vector (emf/wmf) and audio/video are skipped. For a PDF it walks every page via [unpdf](https://github.com/unjs/unpdf) (a pure-JS, no-native-deps pdf.js build) and re-encodes each painted image as PNG — page-oriented, so it captures images as drawn on each page (it does not reach layer-hidden/unpainted XObjects or the full uncropped original behind a clipped image). Pair with the global `--output-dir <dir>` to write every image to a folder (the directory is auto-created and each `base64` becomes a `savedTo` path); without it the bytes ride back base64-encoded so a vision model can read them directly. The same OOXML / PDF image extraction runs over every file **inside a `.zip`** when you pass `convert-local-file-to-markdown --include-images true`: each archive entry gains an `images` array, so a screenshot pasted into a zipped document is still reachable in one call.
-
-The CLI follows any SharePoint media-transform redirect internally, so the LLM never has to fetch an external URL.
-
-### Find every drive you can reach
-
-`list-drives` only returns your personal OneDrive(s). `list-accessible-drives` unions every discovery vector the delegated token can hit — `/me/drives` (personal), `/me/joinedTeams` (Teams libraries), `/me/memberOf` Unified groups → each group's drive (SharePoint M365-group sites), `/me/drive/sharedWithMe` (drives behind files shared with you), per-team `/teams/{id}/channels` → `filesFolder` for **private/shared channels** (which live in their own sites, not the team default drive), activity signals (`/me/drive/recent`, `/me/drive/following`, `/me/insights/{trending,used,shared}`), and every **non-default document library** of each discovered site via a path-addressed `/sites/{host}:/sites/{name}:/drives` (catches secondary libraries the default-drive vectors skip) — deduped by drive id and tagged with the `sources[]` that surfaced each one (`channel` = private/shared channel drive, `activity` = a recently-used/followed/trending item drive, `siteLibrary` = a non-default site library). These vectors catch OneDrives, channel sites, and direct-link sites the tenant search index (`search-sharepoint-sites-by-name`) never returns; the index in turn returns sites you can open but aren't a member of. For that index half, `search-all-accessible-sites` deep-pages the Microsoft Search API (`POST /search/query`, `entityTypes: ['site']`) past the single-page cap of `search-sharepoint-sites-by-name`, returning the *full* security-trimmed site index (on one tenant: ~154 sites vs 80). So **the union of `search-all-accessible-sites` + `list-accessible-drives` is the practical maximum on a delegated token** (truly enumerating *every* site in the tenant needs tenant-admin app-only `/sites/getAllSites`). Both site-search commands **exclude archived sites**: each result is probed (`GET /sites/{id}?$select=…,siteCollection`) and dropped when Graph reports it archived or fails with `423 resourceLocked` — the signal a departed/unlicensed user's auto-archived OneDrive returns (no more `sharepointerror.aspx?scenario=SiteArchived` dead links in the output); the count surfaces as `archivedExcluded`. `--max-groups` caps every fan-out, and `partialErrors[]` stays signal-only: benign "can't reach this one" results (404 no-drive, 403 access-denied / non-member channel, 423 admin-locked site, 400 stale id) are dropped silently — only actionable failures (auth, throttling, 5xx, network) are listed. Both commands also surface a best-effort `fileEstimate` — the Microsoft Search index's security-trimmed `driveItem` count, i.e. roughly how many files you can access across all of SharePoint/OneDrive (index-wide, not limited to the listed drives).
-
-### Browser-OAuth at first launch
-
-No Azure app, no tenant admin. The CLI captures the same token the Teams web client uses — works for any Microsoft 365 account, personal or enterprise.
-
-**Login flow:** the CLI drives a Playwright-launched Edge/Chrome window through the Teams sign-in, captures the tokens, and caches them at `~/.ask-marcel/token-cache.json` (0600). `login` prints a slim confirmation — which of the four tokens are available (basic, elevated/M365, and the two Teams-chat substrate tokens chatsvcagg / ic3) — and points you to `scopes-check` for detail. Three of the four self-heal headlessly from the shared refresh token; the **elevated** token has none of its own and exists only via the browser, so `login` re-captures it whenever it is missing, even when your basic token is still valid. `login --force` re-captures *every* token unconditionally, ignoring the cache (the persistent profile is reused, so you are usually not re-prompted for credentials).
-
-**`scopes-check`** is the side-effect-free status view (no Graph call, no browser): it decodes each cached token and reports, **per token**, its `available` flag, seconds-to-expiry, `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, needs a browser login), and its **own granted scopes** — the four tokens carry *distinct* scope sets (basic ~31 Graph scopes, elevated ~20, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`). Use it to pre-flight a command's `scopesRequired` without risking an auth side-effect.
+`ask-marcel-office` gives any tool-calling LLM (Claude Code, Cursor, Cline, an MCP server, your own loop) eyes on your entire Microsoft 365:
 
 ```bash
-ask-marcel-office login          # sign in; re-captures the elevated token if it is missing
-ask-marcel-office login --force  # re-capture every token unconditionally, ignoring the cache
-ask-marcel-office scopes-check   # per-token scopes + expiry + refresh route (safe, no browser)
+npm i -g ask-marcel-office-cli
+ask-marcel-office login          # your normal Microsoft sign-in, in a browser, once
+ask-marcel-office list-mail-messages --top 5
 ```
 
-### Stable error envelope with actionable hints
+That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And nothing for a runaway agent to break: the command surface is read-only by design.
 
-Every failure — Graph, CLI parser, Zod validation, substrate — comes back as `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`. The `hint` field tells the model *what to do next* (e.g. "string literals MUST use single quotes; embed one by doubling it") and `source` tells it where the failure came from. Curated rules for 20+ recurring Graph errors plus cross-resolver pointers (passed a Teams URL to `resolve-mail-link`? Hint says "re-run with `resolve-teams-link`"). When Graph throttles (HTTP 429, sometimes 503) the response's `Retry-After` is surfaced as `retryAfterSeconds` — the integer seconds to wait — so a caller running tenant-scale crawls can honor the server's backoff instead of guessing.
+## The three walls it removes
 
-### Lean responses
+### 🔑 Sign in like a human, not like an app
 
-Listings ship with hand-tuned `--select` defaults — a mail listing returns id, subject, from, to, cc, dates, read-state, importance, bodyPreview rather than every field on every message. `get-excel-used-range` returns the `values` array instead of the four 2D arrays Graph emits. Opt out per call with `--full true`, or override with your own `--select id,subject,body`.
+Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `scopes-check` reports per-token scopes and expiry with zero side effects.
 
-### Saves big binaries to disk so they never hit the model's context
+### 🛡️ Safe to hand to an autonomous agent
 
-A typical conversion command returns multi-MB PDF bytes. Sending 5 MB of base64 through stdout would blow most context windows AND quadruple the token bill.
+The 183 commands break down as 175 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call.
 
-Two flag patterns avoid the round-trip:
+### 🧠 Responses budgeted for a context window
 
-- **`--output-path /path/to/file.pdf`** — the CLI decodes the bytes, writes them to disk, and replaces `base64: "..."` in the envelope with `savedTo: "/path/to/file.pdf"`. The LLM sees a 3-line confirmation instead of a 7-million-character payload. Works on every command that returns binary or text content; rejected with a clear error on plain-JSON commands so a misapplied flag is never silent. A binary payload over ~1 MB is **refused** without this flag (an `inline_too_large` error pointing you here), so a multi-MB base64 string can never flood the context by accident.
-- **No flag, text mode** — binary commands print a one-line summary (`binary: application/pdf, 4837291 bytes — use --output-path to save`) instead of spilling base64 to stdout. The LLM sees a hint without ever pulling the bytes.
+Graph payloads are tuned for backend services. These are tuned for models. Listings return hand-picked fields instead of every property on every item (opt out with `--full true`). Email threads arrive with quoted reply chains stripped, which shrinks real threads by 78-90%. Inline images become `[inline image: logo.png]` placeholders instead of kilobytes of base64. Binaries over ~1 MB are refused inline and routed to disk via `--output-path`. And every failure returns `{error, hint, source, retryAfterSeconds}` so the model can repair its own call instead of retrying blind.
 
-### Relative dates on calendar windows
+## See it work
 
-`--start-date-time "start-of-week" --end-date-time "+7d"`. No timestamp math before answering "what's on my calendar this week".
+Reading one email with its attachments in raw Graph: GET the message, GET the attachment list, GET each attachment's bytes, resolve every SharePoint link in the body, then run your own HTML-to-text pipeline. Six round trips minimum. Here:
 
-## 30-second quickstart
+```console
+$ ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
+
+# Q3 budget review: action needed
+**From:** Robin Chen <robin.chen@contoso.com>
+
+Before Friday's review, the forecast tab still shows last quarter's
+headcount. Can you sanity-check the attached numbers?
+
+## Attachments
+- Q3-forecast.xlsx (48 KB) · id AAMkAD...
+```
+
+The quoted chain below the reply is replaced by a one-line marker (restore it with `--keep-quoted true`), inline images become named placeholders, and attachments arrive with the ids ready for the follow-up call:
+
+```console
+$ ask-marcel-office convert-mail-attachment-to-markdown \
+    --message-id "AAMkAD..." --attachment-id "AAMkAD..."
+```
+
+That xlsx comes back as one markdown table per sheet. And when the answer lives in a deck someone shared three weeks ago:
+
+```console
+$ ask-marcel-office microsoft-search-query --query "Q3 budget filetype:pptx"
+$ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item-id "01BYE..."
+```
+
+## The difference in practice
+
+| You need | Raw Microsoft Graph | ask-marcel-office |
+|---|---|---|
+| Access | App registration, admin consent, secret rotation | `login`: one browser sign-in with your own account |
+| An email + attachments | 6+ round trips, HTML-to-text is your problem | `convert-mail-to-markdown`: one call, markdown out |
+| A pptx / pdf / legacy .doc as text | Raw bytes, bring your own converter | `download-drive-item-as-markdown`: one call |
+| A useful error | `BadRequest: Invalid filter clause` | `hint: "string literals MUST use single quotes; embed one by doubling it"` |
+| A 5 MB PDF | Base64 flooding the context window | `--output-path` writes it to disk; the model reads 3 lines |
+| Throttling | HTTP 429, guess the backoff | `retryAfterSeconds` surfaced in the error envelope |
+
+## What your agent can reach
+
+| Surface | Commands | In practice |
+|---|---:|---|
+| 📧 Outlook Mail | 35 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, prepare reply / forward drafts (the only writes) |
+| 📁 OneDrive + SharePoint | 49 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history, share links resolved even into partner tenants where you're a guest |
+| 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
+| 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
+| 💬 Teams | 16 | Your teams, channels, chats, and message history |
+| ✅ Planner + To Do | 15 | Plans, buckets, tasks, checklists, due dates |
+| 📊 Excel | 11 | Live workbook reads: worksheets, used ranges, tables (lean values, not Graph's four redundant 2D arrays) |
+| 📓 OneNote | 11 | Notebooks, sections, page content |
+| 🔎 Search + utilities | 6 | Federated Microsoft Search across the tenant, cursor pagination (`next-page`), token status (`scopes-check`), offline local-file conversion |
+
+Full per-command tables with required parameters and Graph endpoints: **[docs/COMMANDS.md](docs/COMMANDS.md)**.
+
+## Any file becomes markdown
+
+One conversion pipeline, four entry points: a OneDrive / SharePoint item, an Outlook attachment, a `.zip` archive, or a file on disk (`convert-local-file-to-markdown` runs fully offline, no login).
+
+| Source | What comes back |
+|---|---|
+| docx / docm / dotx | Clean markdown; `--include-metadata true` adds comments, tracked changes, hidden text, and a VBA-macro flag |
+| xlsx / xlsm / csv | One markdown table per sheet, with a 50 000-cell guard so a huge sheet becomes a band-by-band read plan instead of an OOM |
+| pptx / pptm | Per-slide text with speaker notes (`## Slide N`); switch to the PDF sibling + a vision model when layout matters |
+| pdf | Text-layer extraction; a scanned PDF answers with a pointer to the vision route instead of silence |
+| odt / ods / odp | Headings, lists, tables, per-slide text, comments folded inline |
+| Legacy .doc / .xls | `.xls` reads like `.xlsx`; `.doc` extracts as plain text (`.ppt`: convert to PDF first) |
+| Outlook .msg | The full email: headers, quote-stripped body, and every attachment converted recursively |
+| .zip | Every entry converted in one call; GBK / CP437 entry names decoded, never mojibake |
+| Loop / Whiteboard | Rendered through Graph's server-side converter |
+
+Need the pictures instead of the words? `extract-drive-item-images`, `extract-mail-attachment-images`, and `extract-local-file-images` pull the embedded images out of docx / xlsx / pptx / pdf (including full-resolution originals and images on hidden slides), ready for a vision model; `--output-dir` writes them straight to disk.
+
+## Designed for the agent loop
+
+- **Self-teaching.** `help-json --terse` returns a slim JSON manifest built for a model's first contact; add `--category mail` to scope it. `docs <command>` prints one command's full documentation (response shape, examples, the underlying Graph endpoint). Scan, pick, read, call.
+- **Errors that repair the call.** Every failure is `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`, with curated hints for 20+ recurring Graph mistakes, including wrong-resolver pointers (a Teams URL passed to `resolve-mail-link` answers with the command to use instead).
+- **Pagination without state.** Every listing returns an opaque cursor; `next-page --url "<cursor>"` continues any of them.
+- **Relative dates.** `--start-date-time start-of-week --end-date-time +7d`. No timestamp math before "what's on my calendar".
+- **Binary discipline.** Multi-MB payloads never hit stdout by accident: without `--output-path`, a binary answer is a one-line summary; with it, the bytes land on disk and the envelope carries `savedTo`.
+- **Tenant-wide reach.** `list-accessible-drives` unions every discovery vector a delegated token can hit (Teams libraries, group sites, private channels, shared-with-me, activity signals, secondary site libraries) and `search-all-accessible-sites` deep-pages the search index. Together: the practical maximum reachable without tenant-admin rights.
+
+## Install in 60 seconds
 
 ```bash
-# install (Bun ≥1.0 or Node ≥20)
+# Bun >=1.0 or Node >=20 · macOS, Windows, Linux
 npm i -g ask-marcel-office-cli
 
-# authenticate (cached → refresh → browser fallback)
-ask-marcel-office login
-
-# the rest is read-only (the only writes are mail drafts) and discoverable from --help
-ask-marcel-office list-drives
-ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
-ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
+ask-marcel-office login             # browser opens once, tokens cached
+ask-marcel-office my-quick-context  # who am I + my IDs, one round trip
 ask-marcel-office list-calendar-view --start-date-time today --end-date-time +7d
-ask-marcel-office convert-mail-attachment-to-pdf \
-  --message-id "AAMkAD..." --attachment-id "AAMkAD...attach1" \
-  --output-path /tmp/deck.pdf
+ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
 ```
 
-## Asking the CLI what it can do
+## Plug it into Claude Code, Cursor, Cline, or your own stack
 
-Five discovery surfaces, each tuned for a different audience and token budget:
+Any agent that can run a shell command can use the whole surface today: point it at `help-json --terse`, let it call commands with `--output json`, and the lean defaults plus structured hints let it recover from its own mistakes. No wrapper required.
 
-| When you want | Run | Returns |
-|---|---|---|
-| Help with a single command | `ask-marcel-office <command> --help` | Required flags, optional flags, an example, pagination notes |
-| A scan of every command | `ask-marcel-office --help` | One-sentence summary per command, grouped by category |
-| The slim LLM-friendly index | `ask-marcel-office help-json --terse` | JSON manifest with heavy fields (options, response shape) stripped — best first-call for an agent meeting the CLI for the first time |
-| The slim index for one domain | `ask-marcel-office help-json --terse --category mail` | Same as above, filtered to one of 12 categories — keeps the response tiny when the agent already knows the domain |
-| Rich docs for one command | `ask-marcel-office docs <command>` | Full Markdown to stdout (response shape, examples, the underlying Graph endpoint, Microsoft Learn link) |
+## Embed it as a TypeScript library
 
-Pair `help-json --terse --category <name>` with `docs <command>` for the canonical agent loop: scan the category, pick a command, fetch its full docs, then call it.
-
-## Use it from Claude Code, Cursor, Cline, or any tool-calling LLM
-
-Most agents already know how to read JSON from stdout. Two patterns work:
-
-**1. Drop in as a shell tool** — the agent learns the manifest, then runs `ask-marcel-office <command> --output json`. The slim defaults + structured error hints mean it can self-recover from typos.
-
-**2. Embed as a library** — every command is exported. Compose it inside your own MCP server, Claude Agent, or LangChain tool:
+Every command is exported, typed, and returns `Result<T, E>` (no thrown surprises). Compose them inside your own MCP server, Claude agent, or LangChain tool:
 
 ```ts
 import { commands, buildDeps } from 'ask-marcel-office-cli';
@@ -146,23 +157,11 @@ import { commands, buildDeps } from 'ask-marcel-office-cli';
 const { graph } = buildDeps();
 const result = await commands['list-mail-messages'].execute(graph, { top: '10' });
 if (result.ok) {
-  // result.value is the Graph payload — typed Result<unknown, GraphError>
+  // result.value is the Graph payload
 }
 ```
 
-### Auth — two paths
-
-**Most users — use the built-in browser-OAuth ladder:**
-
-```ts
-import { buildDeps } from 'ask-marcel-office-cli';
-
-const { graph } = buildDeps();
-// First call triggers cache → refresh → headed-Chromium fallback automatically.
-// Tokens cached at ~/.ask-marcel/token-cache.json for subsequent calls.
-```
-
-**Agents / CI / MCP servers — bring your own token:**
+**Bring your own token** (CI, MCP servers, vault-managed environments): swap the built-in browser auth for any token source via `createGraphClient`.
 
 ```ts
 import { createGraphClient } from 'ask-marcel-office-cli';
@@ -170,44 +169,47 @@ import { createGraphClient } from 'ask-marcel-office-cli';
 const cancelled = async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } });
 
 const graph = createGraphClient({
-  getAccessToken: async () => ({
-    ok: true,
-    value: await fetchTokenFromYourVault(),
-  }),
+  getAccessToken: async () => ({ ok: true, value: await fetchTokenFromYourVault() }),
   logout: async () => ({ ok: true, value: undefined }),
-  // The tiers your token source does not provide: decline them rather than
-  // pretend. Each is only reached by the commands that need it.
-  getElevatedAccessToken: cancelled, // ODSP-gated: historical-version downloads
-  getGuestAccessToken: cancelled, // partner tenants you are a guest in
+  // Decline the token tiers your source cannot mint; only the commands
+  // that need them will notice, and they fail with a clear message.
+  getElevatedAccessToken: cancelled,   // ODSP-gated: historical-version downloads
+  getGuestAccessToken: cancelled,      // partner tenants you are a guest in
   getChatsvcaggAccessToken: cancelled, // Teams chat substrate
-  getIc3AccessToken: cancelled, // Teams chat history
+  getIc3AccessToken: cancelled,        // Teams chat history
   getChatsvcaggRegion: async () => 'emea',
   getLastElevatedOutcome: () => null,
   getLastChatsvcaggOutcome: () => null,
 });
 ```
 
-Every `AuthManager` member is an async function returning `Result<T, AuthError>`, one per token tier. Only `getAccessToken` and `logout` usually do real work — supply the rest as declines (above) unless you can mint that tier, and the commands needing it will fail with a clear message instead of a surprise. Plug in any token source — Azure Managed Identity, a secrets vault, an on-behalf-of flow, hand-pasted JWTs in tests. The Graph client doesn't care where the token came from.
+Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Graph client doesn't care where the token came from. Full library guide: **[docs/USAGE.md](docs/USAGE.md)**.
 
 ## Deep docs
 
-- **[All 183 commands](docs/COMMANDS.md)** — per-category tables with required params + Graph endpoint
-- **[Usage guide](docs/USAGE.md)** — output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration, quality gates
-- **[Machine-readable manifest](docs/commands.json)** — JSON for programmatic discovery (LLM tool-loops, IDE plugins, MCP servers); also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
-- **[QA playbook](docs/QA-PLAYBOOK.md)** — the repeatable full-surface health-check procedure (offline gates, parameter matrix, conversion contracts, live Graph drift probes) used to audit each release
+- **[All 183 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
+- **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
+- **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
+- **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release
 
 ## Roadmap
 
-Read-only stays the default forever. There's no fixed feature backlog — coverage grows out of real LLM workflows as they come up.
-
-Suggestions, requests, and pull requests welcome — see the [issues page](https://github.com/vdelacou/ask-marcel-office-cli/issues).
+Read-only stays the default forever. Coverage grows out of real LLM workflows as they come up: suggestions, requests, and pull requests welcome on the [issues page](https://github.com/vdelacou/ask-marcel-office-cli/issues).
 
 ## Built with
 
-- **Bun + TypeScript** — single binary install, Node ≥20 fallback. `Result<T, E>` at every IO boundary, branded value-object types at trust boundaries, classicist outside-in TDD, zero lint warnings, 100% coverage on every tier.
-- **Microsoft Graph v1.0** — the public API surface, no beta endpoints in production code.
-- **Playwright** — headed Chromium for the first-launch browser-OAuth dance.
+- **Bun + TypeScript**: single-package install, Node >=20 fallback, `Result<T, E>` at every IO boundary, a 100% coverage gate on every tier
+- **Microsoft Graph v1.0**: the public API surface, no beta endpoints in production code
+- **Playwright**: the headed browser behind the one-time sign-in
 
 ## License
 
 MIT © Vincent Delacourt
+
+---
+
+<div align="center">
+
+**If this saved your agent a few round trips, a ⭐ helps other agents' humans find it.**
+
+</div>

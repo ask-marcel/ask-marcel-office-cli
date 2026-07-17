@@ -6,8 +6,8 @@ describe('search-escape — wire-safe Graph search clause builders', () => {
     expect(kqlSearchClause('invoice')).toBe('$search=%22invoice%22');
   });
 
-  it('escapes an embedded field:"phrase" quote pair so it reaches Graph as KQL phrase syntax (the live Contoso A2 & B7 case)', () => {
-    expect(kqlSearchClause('subject:"Contoso A2 & B7 timeline"')).toBe('$search=%22subject%3A%5C%22Contoso%20R2%20%26%20B27%20timeline%5C%22%22');
+  it('escapes an embedded field:"phrase" quote pair so it reaches Graph as KQL phrase syntax (the field-phrase case that broke live)', () => {
+    expect(kqlSearchClause('subject:"Contoso A2 & B7 timeline"')).toBe('$search=%22subject%3A%5C%22Contoso%20A2%20%26%20B7%20timeline%5C%22%22');
   });
 
   it('turns a fully quoted phrase query into escaped KQL phrase quotes instead of a BadRequest', () => {

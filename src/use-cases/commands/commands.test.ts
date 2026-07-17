@@ -5436,7 +5436,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   {
     name: 'search-mail-messages',
     params: { query: 'Contoso A2 & B7 timeline', select: 'id' },
-    expectedPath: '/me/messages?$search=%22Contoso%20R2%20%26%20B27%20timeline%22&$select=id',
+    expectedPath: '/me/messages?$search=%22Contoso%20A2%20%26%20B7%20timeline%22&$select=id',
   },
   { name: 'search-mail-messages', params: { query: '"budget allocation"', select: 'id' }, expectedPath: '/me/messages?$search=%22%5C%22budget%20allocation%5C%22%22&$select=id' },
   // The OData search(q='…') form doubles single quotes and percent-encodes.
