@@ -147,9 +147,27 @@ ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget
 
 Any agent that can run a shell command can use the whole surface today: point it at `help-json --terse`, let it call commands with `--output json`, and the lean defaults plus structured hints let it recover from its own mistakes. No wrapper required.
 
+**No shell? Register it as an MCP server** (Claude Desktop and friends):
+
+```bash
+claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
+```
+
+You get **five gateway tools**, not one per command — 183 tool schemas would bloat every session, the opposite of the point:
+
+| Tool | Does |
+|:--|:--|
+| `list-commands` | The terse manifest. Start here; `category` narrows it. |
+| `get-command-docs` | Full docs for one command: options, endpoint, example. |
+| `run-command` | The 179 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
+| `login` | Sign in / refresh. Opens a browser on this machine. |
+
+**Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`). Measured: a browser sign-in takes 37–64 s even with no MFA prompt, against a 60 s default — so `login` times out intermittently otherwise. If it does, the sign-in usually completed; re-run your command before retrying. Sign in from a terminal the first time (`ask-marcel-office login`), where MFA can add minutes.
+
 ## Embed it as a TypeScript library
 
-Every command is exported, typed, and returns `Result<T, E>` (no thrown surprises). Compose them inside your own MCP server, Claude agent, or LangChain tool:
+Every command is exported, typed, and returns `Result<T, E>` (no thrown surprises). Compose them inside your own agent or LangChain tool:
 
 ```ts
 import { commands, buildDeps } from 'ask-marcel-office-cli';

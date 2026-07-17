@@ -174,6 +174,48 @@ Every paginated command advertises this in three places: `ask-marcel-office <cmd
 
 `ask-marcel-office my-quick-context` returns `{ user, primaryDriveId, inboxId, todoLists, primaryCalendarId }` in a single round trip — five Graph calls in parallel. Use it as the first call in any LLM session that needs per-user IDs to feed into other commands.
 
+## MCP server (`ask-marcel-office mcp`)
+
+Serves every command to an MCP client over stdio. Register it:
+
+```bash
+claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
+# from a dev clone:
+claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
+```
+
+Five gateway tools, not one per command (183 schemas per session is the bloat this CLI exists to
+avoid). Discovery is three hops:
+
+```
+list-commands { category?: string }            → terse manifest, start here
+get-command-docs { command: string }           → full docs for one command
+run-command { command, params?, outputPath?, outputDir? }        → the 179 READ commands
+run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
+login { force?: boolean }                      → sign in / refresh
+```
+
+`params` are the command's flags **without** the `--` prefix, keyed camelCase:
+
+```jsonc
+// CLI:  ask-marcel-office list-mail-messages --top 10
+run-command { "command": "list-mail-messages", "params": { "top": "10" } }
+```
+
+Notes:
+
+- `run-command` is annotated `readOnlyHint: true` so clients can auto-approve it. A write routed
+  through it is refused before it executes. `run-write-command` carries the 4 draft commands and is
+  marked non-destructive: each produces an UNSENT draft, and this CLI cannot send mail.
+- **Log in from a terminal first** (`ask-marcel-office login`). An MFA prompt can outlive an MCP client's
+  tool-call timeout; raise `MCP_TOOL_TIMEOUT` in your client if a slow login still trips it. After
+  the first sign-in the `login` tool covers the hourly elevated-token refresh.
+- `logout` and `update` are deliberately CLI-only.
+- Results are text (the same YAML-ish rendering the CLI prints, `hint:` / `source:` remedies
+  included). Two known v1 warts: paginated results print `next: ask-marcel-office next-page --url '...'`,
+  which maps to `run-command { "command": "next-page", "params": { "url": "..." } }`; and
+  `--output-path` rejections name the CLI flag rather than the `outputPath` param.
+
 ## Library API
 
 The package exports a typed library API for embedding inside your own CLI, agent, or MCP server.
@@ -216,9 +258,20 @@ src/
   domain/          — Result<T,E>, branded value-object types (AccessToken, EnvVar), JWT utilities, format-error
   infra/           — Auth recovery ladder (cache → refresh → Playwright browser), Graph API HTTP client, Winston logger
   use-cases/       — Commands (schemas + execute functions), ports
-  composition/     — CLI wiring (Commander), dependency graph
-  presenter/       — Output formatting (text YAML-ish default + JSON envelope opt-in)
+  composition/     — CLI wiring (Commander), MCP gateway, the shared command executor, dependency graph
+  presenter/       — Output formatting: pure renderers (render-to-string) + the CLI's stdout shim (output)
 ```
+
+Two front ends, one execution path. `composition/cli.ts` (Commander) and `composition/mcp.ts` (MCP
+stdio) both call `composition/run-registry-command.ts`, which owns everything between "resolved
+command + params" and "value or failure": option-alias normalization, local-filesystem routing,
+error-source classification, and `--output-path` / `--output-dir` persistence. Adding a fix there
+reaches both surfaces.
+
+The presenter split exists for the same reason. `render-to-string.ts` formats and returns a string;
+`output.ts` is the only sanctioned `process.stdout` writer. The MCP server cannot write to stdout —
+that stream carries its JSON-RPC frames — so it renders through the pure module and returns the text
+as tool content.
 
 - **Auth**: Three-rung recovery ladder — file-based cached JWT → OAuth refresh_token exchange → Playwright browser intercepting Teams login
 - **Client ID**: `5e3ce6c0-2b1f-4285-8d4b-75ee78787346` (Teams Web)

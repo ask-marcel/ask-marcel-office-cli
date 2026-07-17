@@ -2,6 +2,64 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.3.0
+
+### Added
+
+- **`ask-marcel-office mcp` — serve the whole CLI to any MCP client over stdio.** Hosts
+  without a shell (Claude Desktop, other MCP clients) can now reach every
+  command. Register it with:
+
+  ```bash
+  claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
+  ```
+
+  It exposes **five gateway tools**, not one per command — 183 tool schemas
+  would inject hundreds of KB into every session, the exact token bloat this
+  CLI exists to avoid:
+
+  - `list-commands` — the terse manifest (`{name, summary, category}`),
+    optionally filtered to one category. The discovery entry point.
+  - `get-command-docs` — full Markdown docs for a single command: every option,
+    its Graph endpoint, an example, the response shape. Lifecycle commands and
+    deprecated command names both resolve.
+  - `run-command` — runs any of the **179 read** commands. Declared
+    `readOnlyHint: true`, so an MCP client can auto-approve it; a write routed
+    here is refused *before* it executes.
+  - `run-write-command` — runs the **4** mail-draft write commands
+    (`create-mail-draft`, `create-forward-draft`, `create-reply-draft`,
+    `update-mail-draft`). A separate tool precisely so the 179 read commands
+    keep an honest read-only annotation. Marked non-destructive: every write
+    produces an UNSENT draft, and this CLI still cannot send mail.
+  - `login` — sign in or refresh. The elevated (M365) token lapses roughly
+    hourly and only a browser can recapture it, so this saves a terminal
+    round-trip mid-session.
+
+  Both run tools accept `outputPath` / `outputDir`, mirroring the CLI flags, so
+  a multi-MB PDF lands on disk instead of flooding the model's context.
+
+  **Sign in from a terminal the first time** (`ask-marcel-office login`): an MFA prompt
+  can outlive an MCP client's tool-call timeout. Raise `MCP_TOOL_TIMEOUT` in
+  your client if a slow login still trips it.
+
+  Read/write sets are derived from the registry's `mutates` flag, so a new
+  command lands on the correct tool with no code change here.
+
+### Changed
+
+- **Command execution is now shared by both front ends.** The per-command
+  handler (alias normalization, local-filesystem routing, error-source
+  classification, `--output-path` / `--output-dir` persistence) moved out of
+  `cli.ts` into `composition/run-registry-command.ts`, which the CLI and the MCP
+  gateway both call. Behaviour is unchanged — the existing CLI suite passes
+  untouched — but a future fix now reaches both surfaces instead of one.
+- **The output envelope logic is now pure and reusable.** `presenter/output.ts`
+  wrote directly to stdout, which an MCP stdio server cannot do (stdout is its
+  JSON-RPC channel). The envelope layer moved to `presenter/render-to-string.ts`
+  (`renderToString` / `renderErrorToString`); `output.ts` is a thin stdout shim
+  over it. Output is byte-identical. MCP callers therefore get the same
+  `hint:` / `source:` remedies the terminal does.
+
 ## 2.2.0
 
 ### Added
