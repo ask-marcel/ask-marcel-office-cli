@@ -39,8 +39,19 @@ const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
 // reply header (two bold labels a few hundred bytes apart is the Outlook
 // header-block signature in every locale). Longer alternatives come first so
 // `Enviado el` wins over `Enviado`.
+//
+// The second label is a "sent" word in some clients and a "date" word in
+// others, for the SAME locale — a Chinese client quoted with 发件人/日期 where
+// another writes 发件人/发送时间, and that whole message level survived stripping
+// (live-reported 2026-07-17). Both vocabularies belong here.
+//
+// `Data` and `Date` are ambiguous outside their locale (an English body may
+// legitimately bold "Data:"), so they widen the false-positive surface. That is
+// accepted: a cut still needs a bold From-label within 400 chars, and a wrong
+// cut is visible (it leaves the strip marker) and reversible (`--keep-quoted
+// true`) rather than silent.
 const FROM_LABELS = 'From|发件人|寄件者|差出人|보낸 사람|De|Von|Da|Van';
-const SENT_LABELS = 'Sent|Date|发送时间|寄件日期|送信日時|보낸 날짜|Envoyé|Gesendet|Inviato|Enviado el|Enviado em|Enviado|Verzonden';
+const SENT_LABELS = 'Sent|Datum|Date|Data|Fecha|发送时间|寄件日期|日期|送信日時|日付|보낸 날짜|날짜|Envoyé|Gesendet|Inviato|Enviado el|Enviado em|Enviado|Verzonden';
 const CONFIRM_WINDOW_CHARS = 400;
 
 // `(?:<span[^>]*>)?` tolerates the single MSO span Word nests inside the bold

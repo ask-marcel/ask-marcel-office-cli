@@ -51,6 +51,40 @@ describe('locating where a reply body stops being the author’s new text and st
     expect(findQuoteBoundary(`${authorText}${header}`)).toBe(authorText.length);
   });
 
+  // Outlook localizes the header block's SECOND label as either "sent" or
+  // "date" depending on the client, and only the English/French "Date" was
+  // recognized — so a reply quoted by a Chinese client (发件人/日期 rather than
+  // 发件人/发送时间) kept one whole message level. Live-reported 2026-07-17.
+  const dateLabelHeaders = [
+    { label: 'Chinese 发件人/日期 (the reported case)', header: '<b>发件人:</b> Robin Chen<br><b>日期:</b> 2026年7月16日<br><b>收件人:</b> Alex Kim<br><b>主题:</b> x' },
+    { label: 'German Von/Datum', header: '<b>Von:</b> Robin Chen<br><b>Datum:</b> 16. Juli 2026<br><b>An:</b> Alex Kim' },
+    { label: 'Japanese 差出人/日付', header: '<b>差出人:</b> Robin Chen<br><b>日付:</b> 2026年7月16日<br><b>宛先:</b> Alex Kim' },
+    { label: 'Korean 보낸 사람/날짜', header: '<b>보낸 사람:</b> Robin Chen<br><b>날짜:</b> 2026<br><b>받는 사람:</b> Alex Kim' },
+    { label: 'Spanish De/Fecha', header: '<b>De:</b> Robin Chen<br><b>Fecha:</b> 16 julio 2026<br><b>Para:</b> Alex Kim' },
+    { label: 'Italian Da/Data', header: '<b>Da:</b> Robin Chen<br><b>Data:</b> 16 luglio 2026<br><b>A:</b> Alex Kim' },
+  ];
+
+  it.each(dateLabelHeaders)('cuts at a header block whose date label is a Date word rather than a Sent word: $label', ({ header }) => {
+    const authorText = '<p>my reply</p>';
+
+    expect(findQuoteBoundary(`${authorText}<p class=MsoNormal>${header}</p><p>the quoted original</p>`)).toBe(authorText.length);
+  });
+
+  it('still refuses to cut on a bold From label whose only companion is an unrelated bold label', () => {
+    // The From + (Sent|Date) pair is the whole false-positive guard. Widening the
+    // date vocabulary must not weaken it into "any bold From cuts".
+    const html = '<p><b>From:</b> the spec, all requests need auth.</p><p><b>Note:</b> see appendix.</p>';
+
+    expect(findQuoteBoundary(html)).toBe(-1);
+  });
+
+  it('cuts a plain-text reply at a localized Date header pair too, not only the HTML one', () => {
+    const authorText = 'my reply\n\n';
+    const text = `${authorText}发件人: Robin Chen\n日期: 2026年7月16日\n收件人: Alex Kim\n\nold body`;
+
+    expect(findPlainTextQuoteBoundary(text)).toBe(authorText.length);
+  });
+
   it('points at the underscore rule Outlook classic draws above a quoted plain-text original', () => {
     const authorText = 'Confirmed for Contoso.\n\n';
 
