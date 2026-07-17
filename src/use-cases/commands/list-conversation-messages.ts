@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
 
 // Hardcoded `$filter=conversationId eq '...'` in the path means a
 // user-supplied `--filter` would cause Graph to receive two `$filter` query
@@ -20,8 +20,7 @@ const schema = z.object({ conversationId: z.string().min(1) }).extend(allowedSha
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const escaped = parsed.data.conversationId.replace(/'/g, "''");
-  const path = appendOData(`/me/messages?$filter=conversationId eq '${escaped}'`, parsed.data);
+  const path = appendOData(`/me/messages?$filter=conversationId eq '${odataStringLiteral(parsed.data.conversationId)}'`, parsed.data);
   return graph.get(path);
 };
 

@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'bun:test';
-import { appendOData, odataQuerySchema } from './odata-query.ts';
+import { appendOData, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
+
+describe('odataStringLiteral — embed a user value inside an OData single-quoted literal, wire-safe', () => {
+  it('percent-encodes a plain value so spaces survive the query string', () => {
+    expect(odataStringLiteral('q1 budget')).toBe('q1%20budget');
+  });
+
+  it('doubles an embedded single quote per OData string-literal escaping so it cannot terminate the literal', () => {
+    // encodeURIComponent leaves `'` alone (it is unreserved), so the doubled
+    // quote reaches Graph literally — which is exactly the OData escape.
+    expect(odataStringLiteral("O'Brien")).toBe("O''Brien");
+  });
+
+  it('percent-encodes a + so the server does not decode it back to a space (base64 ids and plus-addressed emails carry one)', () => {
+    expect(odataStringLiteral('AAQkAD+x/y=')).toBe('AAQkAD%2Bx%2Fy%3D');
+    expect(odataStringLiteral('alice+news@contoso.com')).toBe('alice%2Bnews%40contoso.com');
+  });
+
+  it('percent-encodes & and # so they cannot truncate the query string on the wire', () => {
+    expect(odataStringLiteral('R&D #plan')).toBe('R%26D%20%23plan');
+  });
+
+  it('escapes the quote BEFORE encoding, so an injected quote-plus-ampersand can neither break out of the literal nor truncate the query', () => {
+    expect(odataStringLiteral("a' or b eq 'c&x")).toBe("a''%20or%20b%20eq%20''c%26x");
+  });
+});
 
 describe('appendOData', () => {
   it('returns the path unchanged when every OData param is omitted', () => {

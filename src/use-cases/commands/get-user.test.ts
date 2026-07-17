@@ -238,7 +238,7 @@ describe('get-user', () => {
     });
     const result = await execute(graph, { userId: 'robin.chen@fabrikam.com' });
     expect(paths[0]).toContain('/users/robin.chen%40fabrikam.com'); // direct path, @ percent-encoded
-    expect(paths[1]).toContain("/users?$filter=mail eq 'robin.chen@fabrikam.com'"); // fallback filter
+    expect(paths[1]).toContain("/users?$filter=mail eq 'robin.chen%40fabrikam.com'"); // fallback filter, value percent-encoded
     expect(result.ok).toBe(true);
     if (result.ok) expect((result.value as { id: string }).id).toBe('g1'); // the matched user's full profile
   });
@@ -315,6 +315,22 @@ describe('get-user', () => {
     if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(404); // the direct 404, not the fallback's 500
   });
 
+  it('percent-encodes the mail-eq filter value so a plus-addressed email resolves (a raw + decodes back to a space server-side and matches nobody)', async () => {
+    let filterPath = '';
+    const graph = fakeGraphClient({
+      getElevated: async (p) => {
+        if (p.includes('$filter=mail eq')) {
+          filterPath = p;
+          return ok({ value: [{ id: 'p1' }] });
+        }
+        return notFound;
+      },
+    });
+    await execute(graph, { userId: 'alice+news@contoso.com', select: 'id' });
+    expect(filterPath).toContain("$filter=mail eq 'alice%2Bnews%40contoso.com'");
+    expect(filterPath).not.toContain('alice+news');
+  });
+
   it('doubles a single quote in the mail-eq filter (OData string-literal escaping)', async () => {
     let filterPath = '';
     const graph = fakeGraphClient({
@@ -327,6 +343,8 @@ describe('get-user', () => {
       },
     });
     await execute(graph, { userId: "o'brien@x.com" });
-    expect(filterPath).toContain("mail eq 'o''brien@x.com'"); // the ' is doubled, not left raw (prevents breaking the literal)
+    // The ' is doubled, not left raw (prevents breaking the literal); the
+    // doubled quote survives encoding because ' is unreserved.
+    expect(filterPath).toContain("mail eq 'o''brien%40x.com'");
   });
 });

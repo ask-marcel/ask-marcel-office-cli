@@ -5442,6 +5442,16 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   // The OData search(q='…') form doubles single quotes and percent-encodes.
   { name: 'search-my-documents', params: { query: "john's plan & co" }, expectedPath: "/me/drive/search(q='john''s%20plan%20%26%20co')" },
   { name: 'search-onedrive-files', params: { driveId: 'd1', query: 'q1 budget' }, expectedPath: "/drives/d1/search(q='q1%20budget')" },
+  // Every remaining single-quoted OData literal escapes the quote AND
+  // percent-encodes: a raw `+` in a base64 conversationId decodes back to a
+  // SPACE server-side (silently matching nothing), and a raw `&` truncates.
+  { name: 'search-onenote-pages', params: { titleSubstring: "Q3 review & O'Brien" }, expectedPath: "/me/onenote/pages?$filter=contains(title,'Q3%20review%20%26%20O''Brien')" },
+  {
+    name: 'list-conversation-messages',
+    params: { conversationId: 'AAQkAD+x/y=' },
+    expectedPath: "/me/messages?$filter=conversationId eq 'AAQkAD%2Bx%2Fy%3D'",
+  },
+  { name: 'search-sharepoint-sites-by-name', params: { query: 'R&D marketing' }, expectedPath: '/sites?search=R%26D%20marketing' },
   { name: 'extract-sharepoint-links-in-mail', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1?$select=subject,body' },
   { name: 'convert-mail-to-markdown', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1' },
   { name: 'list-onenote-notebooks', params: {}, expectedPath: '/me/onenote/notebooks' },

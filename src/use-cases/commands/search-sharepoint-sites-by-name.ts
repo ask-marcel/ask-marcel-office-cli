@@ -6,7 +6,9 @@ import { filterOutArchivedSites } from './filter-archived-sites.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ query: z.string().min(1) });
-const built = buildListCommand((p) => `/sites?search=${p.query}`, baseSchema);
+// Bare query-param value (not an OData literal): percent-encode only, so a
+// `&` in the query cannot truncate it on the wire.
+const built = buildListCommand((p) => `/sites?search=${encodeURIComponent(p.query)}`, baseSchema);
 const { schema } = built;
 
 const sitesOf = (body: unknown): ReadonlyArray<unknown> => {

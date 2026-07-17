@@ -1,11 +1,15 @@
 /**
- * Wire-safe builders for Graph search clauses. graph-client concatenates
- * command paths verbatim (`https://graph.microsoft.com/v1.0${path}`) with no
- * percent-encoding pass, so a raw `&`, `#`, `%`, or `+` inside a user query
- * corrupts the query string on the wire: a live ` & ` truncated the KQL
+ * Wire-safe builder for Graph `$search=` KQL clauses. graph-client
+ * concatenates command paths verbatim (`https://graph.microsoft.com/v1.0${path}`)
+ * with no percent-encoding pass, so a raw `&`, `#`, `%`, or `+` inside a user
+ * query corrupts the query string on the wire: a live ` & ` truncated the KQL
  * mid-phrase (`$search="subject:"Contoso A2` reached Graph). Values are
  * percent-encoded here, at the only layer that knows which part of the path
  * is data.
+ *
+ * The sibling concern — a value inside a single-quoted OData literal
+ * (`$filter=x eq '…'`, `contains(…)`, `search(q='…')`) — is
+ * `odataStringLiteral` in odata-query.ts, which owns OData query construction.
  */
 
 /**
@@ -21,10 +25,4 @@ const kqlSearchClause = (query: string): string => {
   return `$search=${encodeURIComponent(quoted)}`;
 };
 
-/**
- * Value for the OData `search(q='…')` function form: single quotes double
- * per OData string-literal escaping, then percent-encode.
- */
-const odataSearchQ = (query: string): string => encodeURIComponent(query.replaceAll("'", "''"));
-
-export { kqlSearchClause, odataSearchQ };
+export { kqlSearchClause };

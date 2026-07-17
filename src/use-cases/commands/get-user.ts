@@ -4,7 +4,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { withDefaultSelect } from './build-command.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
+import { appendOData, odataStringLiteral, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 import { kqlSearchClause } from './search-escape.ts';
 
 const schema = z.object({ userId: z.string().min(1) }).extend(selectExpandSchema.shape);
@@ -59,8 +59,9 @@ const resolveByIdentifier = async (graph: GraphClient, userId: string, query: Pa
   // The `@` input 404'd — it may be a `mail` that differs from the UPN. A guest carries
   // `alias@homeorg` as mail but `alias_homeorg#EXT#@tenant` as UPN, and /users/{key} resolves by
   // id/UPN only, never the mail attribute. Fall back to a mail-eq filter so a plain email resolves
-  // too. Single quotes are doubled per OData string-literal escaping.
-  const byMail = await graph.getElevated(appendOData(`/users?$filter=mail eq '${userId.replaceAll("'", "''")}'`, query));
+  // too. odataStringLiteral escapes the quote and percent-encodes: a plus-addressed
+  // `alice+news@contoso.com` would otherwise reach Graph as `alice news@…` and match nobody.
+  const byMail = await graph.getElevated(appendOData(`/users?$filter=mail eq '${odataStringLiteral(userId)}'`, query));
   if (!byMail.ok) return direct;
   const matches = (byMail.value as { readonly value?: ReadonlyArray<unknown> }).value;
   return Array.isArray(matches) && matches.length > 0 ? ok(matches[0]) : direct;

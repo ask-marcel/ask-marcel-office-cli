@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
 
 // The path already pins `?$filter=contains(title,...)` for the title-substring
 // match Graph requires. A user-supplied --filter would land Graph in
@@ -17,7 +17,7 @@ const schema = z.object({ titleSubstring: z.string().min(1) }).extend(noFilterSh
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const path = appendOData(`/me/onenote/pages?$filter=contains(title,'${parsed.data.titleSubstring}')`, parsed.data);
+  const path = appendOData(`/me/onenote/pages?$filter=contains(title,'${odataStringLiteral(parsed.data.titleSubstring)}')`, parsed.data);
   return graph.get(path);
 };
 

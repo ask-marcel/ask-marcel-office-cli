@@ -63,6 +63,21 @@ type ODataQueryParams = z.infer<typeof odataQuerySchema>;
 
 const ORDERED_KEYS = ['top', 'skip', 'select', 'filter', 'orderby', 'expand'] as const;
 
+/**
+ * Embed a user-supplied value inside an OData single-quoted string literal
+ * (`$filter=mail eq '<here>'`, `contains(title,'<here>')`, `search(q='<here>')`).
+ * Two steps, in this order:
+ * 1. double any `'` — OData's string-literal escape, so the value cannot
+ *    terminate the literal early;
+ * 2. percent-encode — graph-client concatenates command paths verbatim, so an
+ *    un-encoded value corrupts the query string. `&`/`#` truncate it outright,
+ *    and a raw `+` is decoded back to a SPACE server-side, which silently
+ *    matches nothing (base64 conversationIds and plus-addressed emails both
+ *    carry `+`). encodeURIComponent leaves `'` unreserved, so the doubled
+ *    quote survives as the escape OData expects.
+ */
+const odataStringLiteral = (value: string): string => encodeURIComponent(value.replaceAll("'", "''"));
+
 const appendOData = (path: string, params: ODataQueryParams): string => {
   const parts: string[] = [];
   for (const key of ORDERED_KEYS) {
@@ -207,6 +222,7 @@ export {
   noSkipShape,
   odataQueryOptions,
   odataQuerySchema,
+  odataStringLiteral,
   pickODataOptions,
   pickODataShape,
   selectExpandOptions,

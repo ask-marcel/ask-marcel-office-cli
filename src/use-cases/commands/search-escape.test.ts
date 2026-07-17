@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { kqlSearchClause, odataSearchQ } from './search-escape.ts';
+import { kqlSearchClause } from './search-escape.ts';
 
 describe('search-escape — wire-safe Graph search clause builders', () => {
   it('wraps a plain KQL query in the double quotes Graph requires and percent-encodes the value', () => {
@@ -16,13 +16,5 @@ describe('search-escape — wire-safe Graph search clause builders', () => {
 
   it('percent-encodes &, #, and + so they cannot truncate or corrupt the query string on the wire', () => {
     expect(kqlSearchClause('R&D #plan +next')).toBe('$search=%22R%26D%20%23plan%20%2Bnext%22');
-  });
-
-  it('doubles single quotes per OData string-literal escaping and percent-encodes for the search(q=) function form', () => {
-    expect(odataSearchQ("john's plan & co")).toBe("john''s%20plan%20%26%20co");
-  });
-
-  it('passes a plain OData search(q=) value through with only percent-encoding', () => {
-    expect(odataSearchQ('q1 budget')).toBe('q1%20budget');
   });
 });
