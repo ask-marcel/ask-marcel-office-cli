@@ -123,7 +123,6 @@ const meta: CommandMeta = {
   ],
   example: 'ask-marcel-office get-mail-signature',
   producesBytes: true,
-  scopesRequired: ['Mail.Read'],
   responseShape:
     '`{ contentType: "text/html", size, text, sourceMessageId, sentDateTime?, inlinedImages, note? }`. `text` is the signature block itself (the `<div id="Signature">` element, not the whole body), ready to append to a reply. `inlinedImages` counts the logos embedded as data: URIs; any image too large (> 2 MB) or unfetchable keeps its raw `cid:` reference and is named in `note` — no placeholder is substituted, so the reference stays resolvable via get-mail-attachment. `--output-path` writes the HTML to a file.',
 };
