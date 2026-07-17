@@ -186,7 +186,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     {
       title: 'Sign in to Microsoft 365',
       description:
-        'Authenticate via the Teams web client (cached token -> refresh -> browser). Opens a browser window on this machine when it needs one. Run this when a command fails with an auth error: the elevated (M365) token lapses roughly hourly and only a browser can recapture it. FIRST-TIME setup is better done in a terminal (`ask-marcel-office login`) — an MFA prompt can outlive this tool call timeout.',
+        "Authenticate via the Teams web client (cached token -> refresh -> browser). Opens a browser window on this machine when it needs one. Run this when a command fails with an auth error: the elevated (M365) token lapses roughly hourly and only a browser can recapture it. SLOW BY NATURE — a browser sign-in measured 37-64 seconds even with no MFA prompt, which straddles the 60s default MCP tool timeout, so this call may time out. If it does, the sign-in often completed anyway: re-run your original command before calling login again. Raise MCP_TOOL_TIMEOUT (or your client's equivalent) to ~300000 to avoid it. First-time setup, where an MFA prompt adds minutes, is better done in a terminal: `ask-marcel-office login`.",
       inputSchema: {
         force: z
           .boolean()
