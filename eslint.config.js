@@ -128,6 +128,32 @@ export default [
     },
   },
   {
+    // The MCP gateway serves JSON-RPC frames over stdout. ANY other write to
+    // that stream corrupts the protocol, and nothing else can catch it:
+    // `mcp.test.ts` drives InMemoryTransport (never touches stdout), and even a
+    // real stdio handshake stays green because the SDK's client-side ReadBuffer
+    // silently skips lines it cannot parse (verified 2026-07-17 by injecting a
+    // banner — the Client-based probe reported a clean 5-tool handshake against
+    // a provably corrupt stream).
+    //
+    // So this rule is the enforcement. Render via `renderToString` /
+    // `renderErrorToString` (pure) and return the string; never write it.
+    // Scoped to mcp.ts deliberately: `cli.ts` and `presenter/output.ts` own
+    // stdout legitimately in CLI mode.
+    files: ['src/composition/mcp.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'stdout',
+          message:
+            'stdout is the MCP JSON-RPC frame channel — writing to it corrupts the protocol and no test can see it. Return text from the tool handler (renderToString / renderErrorToString) instead. Use the stderr-backed Logger port if you need diagnostics.',
+        },
+      ],
+    },
+  },
+  {
     ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];
