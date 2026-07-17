@@ -56,4 +56,37 @@ describe('update-mail-draft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
+
+  it('clears a recipient list when handed an empty string, which is the only way to drop the recipients a reply inherited', async () => {
+    const patches: Array<{ path: string; body: unknown }> = [];
+    const graph = fakeGraphClient({
+      patch: async (path, body) => {
+        patches.push({ path, body });
+        return ok({});
+      },
+    });
+
+    await execute(graph, { messageId: 'AAMk1', ccRecipients: '' });
+    await execute(graph, { messageId: 'AAMk1', toRecipients: '' });
+    await execute(graph, { messageId: 'AAMk1', bccRecipients: '' });
+
+    // An empty list is Graph's clear payload. Each empty string also satisfies
+    // the at-least-one guard ALONE: clearing a list is a change like any other.
+    expect(patches).toEqual([
+      { path: '/me/messages/AAMk1', body: { ccRecipients: [] } },
+      { path: '/me/messages/AAMk1', body: { toRecipients: [] } },
+      { path: '/me/messages/AAMk1', body: { bccRecipients: [] } },
+    ]);
+  });
+
+  it('tells a caller who passed nothing to change how to clear a list, since an empty string is no longer nothing', async () => {
+    const result = await execute(fakeGraphClient(), { messageId: 'AAMk3' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toBe(
+        'At least one field must be provided to update (--subject, --body-content, --to-recipients, --cc-recipients, --bcc-recipients, or --importance). Pass an empty string to a recipient flag to clear that list.'
+      );
+    }
+  });
 });

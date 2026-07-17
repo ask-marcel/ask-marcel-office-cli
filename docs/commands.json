@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-17T02:40:15.843Z",
+  "generatedAt": "2026-07-17T03:06:27.984Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -8011,7 +8011,7 @@
     },
     {
       "name": "update-mail-draft",
-      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
+      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
       "category": "mail",
       "graphMethod": "PATCH",
       "graphPathTemplate": "/me/messages/{message-id}",
@@ -8061,19 +8061,19 @@
           "name": "to-recipients",
           "key": "toRecipients",
           "required": false,
-          "description": "Comma-separated list of recipient email addresses. Replaces the entire toRecipients list."
+          "description": "Comma-separated list of recipient email addresses. Replaces the entire toRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited)."
         },
         {
           "name": "cc-recipients",
           "key": "ccRecipients",
           "required": false,
-          "description": "Comma-separated list of CC recipient email addresses. Replaces the entire ccRecipients list."
+          "description": "Comma-separated list of CC recipient email addresses. Replaces the entire ccRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited)."
         },
         {
           "name": "bcc-recipients",
           "key": "bccRecipients",
           "required": false,
-          "description": "Comma-separated list of BCC recipient email addresses. Replaces the entire bccRecipients list."
+          "description": "Comma-separated list of BCC recipient email addresses. Replaces the entire bccRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited)."
         },
         {
           "name": "importance",

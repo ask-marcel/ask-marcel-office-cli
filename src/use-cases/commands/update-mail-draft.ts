@@ -20,28 +20,33 @@ const execute: Command['execute'] = async (graph, params) => {
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, subject, bodyContent, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance } = parsed.data;
 
-  // At least one field must be provided for the update.
-  if (!subject && !bodyContent && !toRecipients && !ccRecipients && !bccRecipients && !importance) {
+  // At least one field must be provided for the update. Keyed on presence, not
+  // truthiness: an empty string is a real instruction (clear this list), and a
+  // truthiness gate would silently read it as "flag absent" and refuse.
+  if ([subject, bodyContent, toRecipients, ccRecipients, bccRecipients, importance].every((v) => v === undefined)) {
     return err({
       type: 'validation_error',
-      message: 'At least one field must be provided to update (--subject, --body-content, --to-recipients, --cc-recipients, --bcc-recipients, or --importance)',
+      message:
+        'At least one field must be provided to update (--subject, --body-content, --to-recipients, --cc-recipients, --bcc-recipients, or --importance). Pass an empty string to a recipient flag to clear that list.',
     });
   }
 
   const body: Record<string, unknown> = {};
   if (subject !== undefined) body.subject = subject;
   if (bodyContent !== undefined) body.body = { contentType: bodyContentType ?? 'Text', content: bodyContent };
-  if (toRecipients) body.toRecipients = parseRecipients(toRecipients);
-  if (ccRecipients) body.ccRecipients = parseRecipients(ccRecipients);
-  if (bccRecipients) body.bccRecipients = parseRecipients(bccRecipients);
-  if (importance) body.importance = importance;
+  // `parseRecipients('')` yields `[]`, which is exactly Graph's clear payload, so
+  // an inherited Cc list can finally be dropped without leaving the CLI.
+  if (toRecipients !== undefined) body.toRecipients = parseRecipients(toRecipients);
+  if (ccRecipients !== undefined) body.ccRecipients = parseRecipients(ccRecipients);
+  if (bccRecipients !== undefined) body.bccRecipients = parseRecipients(bccRecipients);
+  if (importance !== undefined) body.importance = importance;
 
   return graph.patch(`/me/messages/${messageId}`, body);
 };
 
 const meta: CommandMeta = {
   summary:
-    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Returns the updated message object. Use get-mail-message to verify the final state before sending.',
+    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.',
   category: 'mail',
   graphMethod: 'PATCH',
   graphPathTemplate: '/me/messages/{message-id}',
@@ -78,19 +83,22 @@ const meta: CommandMeta = {
       name: 'to-recipients',
       key: 'toRecipients',
       required: false,
-      description: 'Comma-separated list of recipient email addresses. Replaces the entire toRecipients list.',
+      description:
+        'Comma-separated list of recipient email addresses. Replaces the entire toRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited).',
     },
     {
       name: 'cc-recipients',
       key: 'ccRecipients',
       required: false,
-      description: 'Comma-separated list of CC recipient email addresses. Replaces the entire ccRecipients list.',
+      description:
+        'Comma-separated list of CC recipient email addresses. Replaces the entire ccRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited).',
     },
     {
       name: 'bcc-recipients',
       key: 'bccRecipients',
       required: false,
-      description: 'Comma-separated list of BCC recipient email addresses. Replaces the entire bccRecipients list.',
+      description:
+        'Comma-separated list of BCC recipient email addresses. Replaces the entire bccRecipients list. Pass an empty string to CLEAR the list (the only way to drop recipients a reply or forward inherited).',
     },
     {
       name: 'importance',
