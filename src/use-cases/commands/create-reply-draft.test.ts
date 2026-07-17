@@ -109,4 +109,42 @@ describe('create-reply-draft', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
+
+  it('replies to the sender alone when reply-all is turned off, and to everyone when it is on or left unsaid', async () => {
+    const posts: Array<{ path: string; body: unknown }> = [];
+    const graph = fakeGraphClient({
+      post: async (path, body) => {
+        posts.push({ path, body });
+        return ok({ id: 'draft-9', isDraft: true });
+      },
+    });
+
+    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.', replyAll: 'false' });
+    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.', replyAll: 'true' });
+    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.' });
+
+    // Only the action differs; the comment payload is identical on both paths,
+    // and anything other than an explicit `false` still replies to everyone.
+    expect(posts).toEqual([
+      { path: '/me/messages/msg-1/createReply', body: { comment: 'Confirmed.' } },
+      { path: '/me/messages/msg-1/createReplyAll', body: { comment: 'Confirmed.' } },
+      { path: '/me/messages/msg-1/createReplyAll', body: { comment: 'Confirmed.' } },
+    ]);
+  });
+
+  it('refuses a reply-all value that is neither true nor false, before any draft is created', async () => {
+    let postCalls = 0;
+    const graph = fakeGraphClient({
+      post: async () => {
+        postCalls += 1;
+        return ok({ id: 'draft-9', isDraft: true });
+      },
+    });
+
+    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', replyAll: 'maybe' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+    expect(postCalls).toBe(0);
+  });
 });
