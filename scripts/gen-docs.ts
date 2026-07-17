@@ -18,6 +18,7 @@ import pkg from '../package.json' with { type: 'json' };
 import { commands } from '../src/use-cases/commands/index.ts';
 import type { CommandManifest, CommandManifestEntry } from '../src/use-cases/commands/docs-render.ts';
 import { renderReadmeTables } from '../src/use-cases/commands/docs-render.ts';
+import { buildManifest as buildHelpJsonManifest } from '../src/use-cases/commands/docs.ts';
 
 const COMMANDS_DOC_PATH = 'docs/COMMANDS.md';
 const MANIFEST_PATH = 'docs/commands.json';
@@ -81,8 +82,14 @@ const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
   // registry so it can never drift from the actual surface (it has before).
   // N = registry command count; M = distinct categories among them (the
   // lifecycle commands live in their own hand-written table, not the registry).
+  // The help-json total in the same sentence is derived from the real manifest
+  // builder (registry + lifecycle entries), not hardcoded: it sat stale at
+  // "179-vs-184" long after the registry had moved on.
   const categoryCount = new Set(manifest.commands.map((c) => c.category)).size;
-  const text = rawText.replace(/All \d+ commands across \d+ categories/, `All ${manifest.commands.length} commands across ${categoryCount} categories`);
+  const helpJsonTotal = buildHelpJsonManifest(commands, pkg.name, pkg.version).commands.length;
+  const text = rawText
+    .replace(/All \d+ commands across \d+ categories/, `All ${manifest.commands.length} commands across ${categoryCount} categories`)
+    .replace(/manifest total \(\d+\), so a \d+-vs-\d+ gap/, `manifest total (${helpJsonTotal}), so a ${manifest.commands.length}-vs-${helpJsonTotal} gap`);
   const begin = text.indexOf(COMMANDS_DOC_BEGIN);
   const end = text.indexOf(COMMANDS_DOC_END);
   if (begin === -1 || end === -1 || end < begin) {
