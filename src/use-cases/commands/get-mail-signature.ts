@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, fetchInlineImageBytes, formatBytes, isInlineImage } from './convert-mail-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { embedInlineImages } from './inline-image-embedder.ts';
 import { extractSignatureBlock } from './signature-extractor.ts';
 
 const schema = z.object({
@@ -18,7 +20,34 @@ const sentListSchema = z.object({ value: z.array(z.object({ id: z.string() })).o
 const messageSchema = z.object({
   body: z.object({ contentType: z.string(), content: z.string() }).optional(),
   sentDateTime: z.string().optional(),
+  hasAttachments: z.boolean().optional(),
 });
+
+type InlineResult = { readonly html: string; readonly count: number; readonly note?: string };
+
+/**
+ * Embeds the inline images the signature actually references. Deliberately does
+ * NOT run `replaceUnresolvedCidImages`: a text placeholder is right for a body
+ * being read, but this block is destined for a draft, and swapping the img for
+ * `[inline image: logo]` would destroy the reference the caller could still
+ * resolve. Anything not embedded keeps its cid: and is named in the note.
+ */
+const inlineSignatureImages = async (graph: GraphClient, messageId: string, block: string): Promise<InlineResult> => {
+  const listed = await graph.get(`/me/messages/${messageId}/attachments?${ATTACHMENT_METADATA_SELECT}`);
+  if (!listed.ok) return { html: block, count: 0, note: 'inline images could not be listed, so any cid: references are unresolved' };
+  const parsed = attachmentsListSchema.safeParse(listed.value);
+  if (!parsed.success) return { html: block, count: 0, note: 'the inline-image list came back in an unreadable shape, so any cid: references are unresolved' };
+
+  const referenced = (parsed.data.value ?? []).filter(isInlineImage).filter((a) => block.includes(`cid:${a.contentId}`));
+  const fetched = await Promise.all(referenced.map((meta) => fetchInlineImageBytes(graph, messageId, meta)));
+  const embeddable = fetched.flatMap((f) => (f.inline === undefined ? [] : [f.inline]));
+  const skipped = fetched.filter((f) => f.inline === undefined);
+
+  const html = embeddable.length > 0 ? embedInlineImages(block, embeddable) : block;
+  if (skipped.length === 0) return { html, count: embeddable.length };
+  const named = skipped.map((f) => `${f.meta.name ?? 'image'} (${formatBytes(f.meta.size ?? 0)})`).join(', ');
+  return { html, count: embeddable.length, note: `${skipped.length} inline image${skipped.length === 1 ? '' : 's'} left as a cid: reference: ${named}` };
+};
 
 const noSignatureFound = (messageId: string | undefined, scanned: number): GraphError => {
   const plural = scanned === 1 ? '' : 's';
@@ -27,13 +56,15 @@ const noSignatureFound = (messageId: string | undefined, scanned: number): Graph
   return { type: 'validation_error', message: messageId === undefined ? scanMessage : pinnedMessage };
 };
 
-const buildEnvelope = (messageId: string, block: string, sentDateTime: string | undefined): Record<string, unknown> => ({
+const buildEnvelope = (messageId: string, block: string, sentDateTime: string | undefined, inlined: InlineResult): Record<string, unknown> => ({
   contentType: 'text/html',
   // UTF-8 bytes; `text.length` would be UTF-16 code units.
-  size: new TextEncoder().encode(block).byteLength,
-  text: block,
+  size: new TextEncoder().encode(inlined.html).byteLength,
+  text: inlined.html,
   sourceMessageId: messageId,
   ...(sentDateTime === undefined ? {} : { sentDateTime }),
+  inlinedImages: inlined.count,
+  ...(inlined.note === undefined ? {} : { note: inlined.note }),
 });
 
 const readCandidates = async (graph: GraphClient, messageId: string | undefined): Promise<Result<ReadonlyArray<string>, GraphError>> => {
@@ -59,24 +90,25 @@ const execute: Command['execute'] = async (graph, params) => {
   // signature, so this is one body read in the common case. Fanning out over ten
   // would cost ten reads every time to save latency the caller rarely needs.
   for (const id of candidates.value) {
-    const fetched = await graph.get(`/me/messages/${id}?$select=body,sentDateTime`);
+    const fetched = await graph.get(`/me/messages/${id}?$select=body,sentDateTime,hasAttachments`);
     if (!fetched.ok) return fetched;
     const message = messageSchema.safeParse(fetched.value);
     if (!message.success || message.data.body === undefined) continue;
     const block = extractSignatureBlock(message.data.body.content);
     if (block === undefined) continue;
-    return ok(buildEnvelope(id, block, message.data.sentDateTime));
+    const inlined = message.data.hasAttachments === true ? await inlineSignatureImages(graph, id, block) : { html: block, count: 0 };
+    return ok(buildEnvelope(id, block, message.data.sentDateTime, inlined));
   }
   return err(noSignatureFound(messageId, candidates.value.length));
 };
 
 const meta: CommandMeta = {
   summary:
-    'Read your own email signature as HTML, lifted from a message you already sent. Graph-created drafts carry NO signature (create-mail-draft, create-reply-draft, and create-forward-draft all produce unsigned bodies), so this is where you get one: take the `text` this returns, append it to your reply text, and hand the result to `update-mail-draft` in comment mode (HTML body-content-type) to place it above the quoted history. Scans your last 10 sent messages newest-first and returns the first `<div id="Signature">` block it finds, stopping there. Any logo the block references comes back as a raw `cid:` reference. Read-only. NOTE: the marker is written by Outlook on the web and new Outlook; mail composed in Outlook desktop does not carry it, so pin a webmail-sent message with --message-id if the scan finds nothing.',
+    'Read your own email signature as HTML, lifted from a message you already sent. Graph-created drafts carry NO signature (create-mail-draft, create-reply-draft, and create-forward-draft all produce unsigned bodies), so this is where you get one: take the `text` this returns, append it to your reply text, and hand the result to `update-mail-draft` in comment mode (HTML body-content-type) to place it above the quoted history. Scans your last 10 sent messages newest-first and returns the first `<div id="Signature">` block it finds, stopping there, with any logo the block references embedded as a base64 data: URI so the HTML renders on its own. Read-only. NOTE: the marker is written by Outlook on the web and new Outlook; mail composed in Outlook desktop does not carry it, so pin a webmail-sent message with --message-id if the scan finds nothing.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate:
-    '/me/mailFolders/sentitems/messages (scan, skipped when {message-id} is given) then /me/messages/{message-id}?$select=body,sentDateTime (+ /attachments per referenced logo)',
+    '/me/mailFolders/sentitems/messages (scan, skipped when {message-id} is given) then /me/messages/{message-id}?$select=body,sentDateTime,hasAttachments (+ /attachments per referenced logo)',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-get',
   options: [
     {
@@ -93,7 +125,7 @@ const meta: CommandMeta = {
   producesBytes: true,
   scopesRequired: ['Mail.Read'],
   responseShape:
-    '`{ contentType: "text/html", size, text, sourceMessageId, sentDateTime? }`. `text` is the signature block itself (the `<div id="Signature">` element, not the whole body), ready to append to a reply. Any logo in the block is a raw `cid:` reference; resolve it with get-mail-attachment. `--output-path` writes the HTML to a file.',
+    '`{ contentType: "text/html", size, text, sourceMessageId, sentDateTime?, inlinedImages, note? }`. `text` is the signature block itself (the `<div id="Signature">` element, not the whole body), ready to append to a reply. `inlinedImages` counts the logos embedded as data: URIs; any image too large (> 2 MB) or unfetchable keeps its raw `cid:` reference and is named in `note` — no placeholder is substituted, so the reference stays resolvable via get-mail-attachment. `--output-path` writes the HTML to a file.',
 };
 
 export { execute, meta, schema };

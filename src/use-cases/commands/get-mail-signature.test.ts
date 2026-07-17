@@ -7,11 +7,14 @@ import { execute } from './get-mail-signature.ts';
 const SCAN_PATH = '/me/mailFolders/sentitems/messages?$top=10&$orderby=sentDateTime%20desc&$select=id,sentDateTime';
 const SIGNATURE = '<div id="Signature"><div>Robin Chen</div><div>Fabrikam</div></div>';
 const QUOTE_TAIL = '<div id="appendonsend"></div><div id="divRplyFwdMsg"><b>From:</b> Alex Kim<br><b>Sent:</b> Monday</div>';
-const bodyOf = (id: string): string => `/me/messages/${id}?$select=body,sentDateTime`;
+const bodyOf = (id: string): string => `/me/messages/${id}?$select=body,sentDateTime,hasAttachments`;
+const attsOf = (id: string): string => `/me/messages/${id}/attachments?${'$select=id,name,contentType,size,isInline,microsoft.graph.fileAttachment/contentId'}`;
 
-const sent = (html: string): Record<string, unknown> => ({
+const sent = (html: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   body: { contentType: 'html', content: `<html><body><div>text</div>${html}</body></html>` },
   sentDateTime: '2026-07-16T09:00:00Z',
+  hasAttachments: false,
+  ...extra,
 });
 
 // Routes each GET by path and records the order, so a test can prove a message
@@ -41,6 +44,7 @@ describe('get-mail-signature', () => {
         text: SIGNATURE,
         sourceMessageId: 'sent-1',
         sentDateTime: '2026-07-16T09:00:00Z',
+        inlinedImages: 0,
       });
     }
     // sent-2's body is never fetched: the scan stops at the first hit, so the
@@ -144,10 +148,81 @@ describe('get-mail-signature', () => {
     }
   });
 
+  it('names an unembeddable image even when Graph gives the attachment no filename', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:x@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({ value: [{ id: 'att-1', contentType: 'image/png', size: 3_000_000, isInline: true, contentId: 'x@fabrikam' }] }),
+    });
+
+    const result = await execute(graph, {});
+
+    if (result.ok) expect(result.value).toMatchObject({ note: '1 inline image left as a cid: reference: image (3.0 MB)' });
+  });
+
+  it('treats an attachment list with no entries as nothing to embed', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:gone@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({}),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ text: '<div id="Signature"><img src="cid:gone@fabrikam"></div>', inlinedImages: 0 });
+  });
+
   it('passes a failed sent-folder read through untouched', async () => {
     const { graph } = scanningGraph({ [SCAN_PATH]: err({ type: 'api_error', status: 403, message: 'Forbidden' }) });
 
     expect(await execute(graph, {})).toEqual(err({ type: 'api_error', status: 403, message: 'Forbidden' }));
+  });
+
+  it('embeds a logo the signature references, so the block renders on its own', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:logo@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({ value: [{ id: 'att-1', name: 'logo.png', contentType: 'image/png', size: 120, isInline: true, contentId: 'logo@fabrikam' }] }),
+      '/me/messages/sent-1/attachments/att-1': ok({ contentBytes: 'QUJD' }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // toEqual, not toMatchObject: a successful embed reports NO note. There is
+      // nothing the caller has to go and resolve themselves.
+      expect(result.value).toEqual({
+        contentType: 'text/html',
+        size: 64,
+        text: '<div id="Signature"><img src="data:image/png;base64,QUJD"></div>',
+        sourceMessageId: 'sent-1',
+        sentDateTime: '2026-07-16T09:00:00Z',
+        inlinedImages: 1,
+      });
+      // The key is absent, not present-and-undefined: `note` means "something
+      // needs your attention", so an always-present one would be noise.
+      expect(Object.hasOwn(result.value as object, 'note')).toBe(false);
+    }
+  });
+
+  it('names every image it could not embed, counting them, when a signature carries more than one', async () => {
+    const block = '<div id="Signature"><img src="cid:a@fabrikam"><img src="cid:b@fabrikam"></div>';
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent(block, { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({
+        value: [
+          { id: 'att-1', name: 'wide.png', contentType: 'image/png', size: 3_000_000, isInline: true, contentId: 'a@fabrikam' },
+          { id: 'att-2', name: 'tall.png', contentType: 'image/png', size: 4_000_000, isInline: true, contentId: 'b@fabrikam' },
+        ],
+      }),
+    });
+
+    const result = await execute(graph, {});
+
+    if (result.ok) expect(result.value).toMatchObject({ inlinedImages: 0, note: '2 inline images left as a cid: reference: wide.png (3.0 MB), tall.png (4.0 MB)' });
   });
 
   it('omits the sent date rather than reporting an empty one when Graph does not give it', async () => {
@@ -197,6 +272,81 @@ describe('get-mail-signature', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toContain('the last 2 sent messages');
+  });
+
+  it('does not fetch bytes for an inline image the signature never references', async () => {
+    const { graph, gets } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent(SIGNATURE, { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({ value: [{ id: 'att-1', name: 'chart.png', contentType: 'image/png', size: 120, isInline: true, contentId: 'chart@fabrikam' }] }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ inlinedImages: 0 });
+    expect(gets.some((p) => p.includes('/attachments/att-1'))).toBe(false);
+  });
+
+  it('keeps the cid reference and names the image when it is too large to embed, rather than destroying the reference', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:big@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({ value: [{ id: 'att-1', name: 'banner.png', contentType: 'image/png', size: 3_000_000, isInline: true, contentId: 'big@fabrikam' }] }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // The cid: ref survives. A placeholder would be a lie inside a signature
+      // destined for a draft: the caller can still fetch the bytes themselves.
+      expect(result.value).toMatchObject({
+        text: '<div id="Signature"><img src="cid:big@fabrikam"></div>',
+        inlinedImages: 0,
+        note: '1 inline image left as a cid: reference: banner.png (3.0 MB)',
+      });
+    }
+  });
+
+  it('still returns the signature when the attachment list cannot be read, saying what was lost', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:logo@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: err({
+        type: 'api_error',
+        status: 500,
+        message: 'boom',
+      }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ inlinedImages: 0, note: 'inline images could not be listed, so any cid: references are unresolved' });
+  });
+
+  it('still returns the signature when the attachment list comes back in a shape it cannot read, saying what was lost', async () => {
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:logo@fabrikam"></div>', { hasAttachments: true })),
+      [attsOf('sent-1')]: ok({ value: 'not-an-array' }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({ inlinedImages: 0, note: 'the inline-image list came back in an unreadable shape, so any cid: references are unresolved' });
+    }
+  });
+
+  it('skips the attachments call entirely for a signature on a message that has none', async () => {
+    const { graph, gets } = scanningGraph({ [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }), [bodyOf('sent-1')]: ok(sent(SIGNATURE)) });
+
+    await execute(graph, {});
+
+    expect(gets.some((p) => p.includes('/attachments'))).toBe(false);
   });
 
   it('measures the signature in utf-8 bytes, not in characters', async () => {

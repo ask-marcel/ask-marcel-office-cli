@@ -313,4 +313,7 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { execute, meta, schema };
+// Shared with get-mail-signature, which fetches the same inline images by the
+// same rules. Cross-command import precedent: read-mail-attachment.ts.
+export { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, execute, fetchInlineImageBytes, formatBytes, isInlineImage, meta, schema };
+export type { AttachmentMeta, InlineImageCandidate };
