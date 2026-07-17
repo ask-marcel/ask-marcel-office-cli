@@ -1,0 +1,99 @@
+import { z } from 'zod';
+import { err, ok, type Result } from '../../domain/result.ts';
+import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { Command, CommandMeta } from './command-types.ts';
+import { formatZodError } from './format-zod-error.ts';
+import { extractSignatureBlock } from './signature-extractor.ts';
+
+const schema = z.object({
+  messageId: z.string().optional(),
+});
+
+const SCAN_LIMIT = 10;
+// The space in `$orderby` is percent-encoded by hand: this path is hardcoded,
+// so there is no builder to do it.
+const SENT_SCAN_PATH = `/me/mailFolders/sentitems/messages?$top=${SCAN_LIMIT}&$orderby=sentDateTime%20desc&$select=id,sentDateTime`;
+
+const sentListSchema = z.object({ value: z.array(z.object({ id: z.string() })).optional() });
+const messageSchema = z.object({
+  body: z.object({ contentType: z.string(), content: z.string() }).optional(),
+  sentDateTime: z.string().optional(),
+});
+
+const noSignatureFound = (messageId: string | undefined, scanned: number): GraphError => {
+  const plural = scanned === 1 ? '' : 's';
+  const scanMessage = `No OWA signature block (\`<div id="Signature">\`) was found in the last ${scanned} sent message${plural}. Mail composed in Outlook desktop does not carry the marker, so a signature may exist without being findable this way - pass --message-id to pin a message you know was sent from Outlook on the web.`;
+  const pinnedMessage = `Message ${messageId} carries no OWA signature block (\`<div id="Signature">\`). Mail composed in Outlook desktop does not carry the marker; pin a message sent from Outlook on the web instead.`;
+  return { type: 'validation_error', message: messageId === undefined ? scanMessage : pinnedMessage };
+};
+
+const buildEnvelope = (messageId: string, block: string, sentDateTime: string | undefined): Record<string, unknown> => ({
+  contentType: 'text/html',
+  // UTF-8 bytes; `text.length` would be UTF-16 code units.
+  size: new TextEncoder().encode(block).byteLength,
+  text: block,
+  sourceMessageId: messageId,
+  ...(sentDateTime === undefined ? {} : { sentDateTime }),
+});
+
+const readCandidates = async (graph: GraphClient, messageId: string | undefined): Promise<Result<ReadonlyArray<string>, GraphError>> => {
+  if (messageId !== undefined) return ok([messageId]);
+  const listed = await graph.get(SENT_SCAN_PATH);
+  if (!listed.ok) return listed;
+  const parsed = sentListSchema.safeParse(listed.value);
+  const ids = (parsed.success ? (parsed.data.value ?? []) : []).map((m) => m.id);
+  if (ids.length === 0)
+    return err({ type: 'validation_error', message: 'Found no sent messages to read a signature from. Send one from Outlook on the web first, or pass --message-id.' });
+  return ok(ids);
+};
+
+const execute: Command['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const { messageId } = parsed.data;
+
+  const candidates = await readCandidates(graph, messageId);
+  if (!candidates.ok) return candidates;
+
+  // Sequential on purpose: the newest sent message almost always carries the
+  // signature, so this is one body read in the common case. Fanning out over ten
+  // would cost ten reads every time to save latency the caller rarely needs.
+  for (const id of candidates.value) {
+    const fetched = await graph.get(`/me/messages/${id}?$select=body,sentDateTime`);
+    if (!fetched.ok) return fetched;
+    const message = messageSchema.safeParse(fetched.value);
+    if (!message.success || message.data.body === undefined) continue;
+    const block = extractSignatureBlock(message.data.body.content);
+    if (block === undefined) continue;
+    return ok(buildEnvelope(id, block, message.data.sentDateTime));
+  }
+  return err(noSignatureFound(messageId, candidates.value.length));
+};
+
+const meta: CommandMeta = {
+  summary:
+    'Read your own email signature as HTML, lifted from a message you already sent. Graph-created drafts carry NO signature (create-mail-draft, create-reply-draft, and create-forward-draft all produce unsigned bodies), so this is where you get one: take the `text` this returns, append it to your reply text, and hand the result to `update-mail-draft` in comment mode (HTML body-content-type) to place it above the quoted history. Scans your last 10 sent messages newest-first and returns the first `<div id="Signature">` block it finds, stopping there. Any logo the block references comes back as a raw `cid:` reference. Read-only. NOTE: the marker is written by Outlook on the web and new Outlook; mail composed in Outlook desktop does not carry it, so pin a webmail-sent message with --message-id if the scan finds nothing.',
+  category: 'mail',
+  graphMethod: 'GET',
+  graphPathTemplate:
+    '/me/mailFolders/sentitems/messages (scan, skipped when {message-id} is given) then /me/messages/{message-id}?$select=body,sentDateTime (+ /attachments per referenced logo)',
+  graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-get',
+  options: [
+    {
+      name: 'message-id',
+      key: 'messageId',
+      required: false,
+      aliases: [{ name: 'id', key: 'id' }],
+      description:
+        'Read the signature from THIS message instead of scanning the sent folder. Use when the scan finds nothing (the message was composed in Outlook desktop) or to pin a specific signature. Source from list-mail-folder-messages --mail-folder-id sentitems. Accepts `--id` as an alias.',
+      argumentHint: { kind: 'idOrName' },
+    },
+  ],
+  example: 'ask-marcel-office get-mail-signature',
+  producesBytes: true,
+  scopesRequired: ['Mail.Read'],
+  responseShape:
+    '`{ contentType: "text/html", size, text, sourceMessageId, sentDateTime? }`. `text` is the signature block itself (the `<div id="Signature">` element, not the whole body), ready to append to a reply. Any logo in the block is a raw `cid:` reference; resolve it with get-mail-attachment. `--output-path` writes the HTML to a file.',
+};
+
+export { execute, meta, schema };
