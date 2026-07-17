@@ -2,9 +2,8 @@ import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
-import { insertCommentAboveQuote } from './draft-comment-splicer.ts';
+import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { findQuoteBoundary } from './mail-quote-stripper.ts';
 
 const schema = z.object({
   replyToMessageId: z.string().min(1),
@@ -55,12 +54,8 @@ const execute: Command['execute'] = async (graph, params) => {
   // the splice, and the NEXT `update-mail-draft --comment` edit would cut the
   // draft AT the pasted marker, silently dropping everything below it. Refuse
   // before creating anything, so there is no orphan draft to clean up.
-  if (asHtml && findQuoteBoundary(bodyContent) !== -1) {
-    return err({
-      type: 'validation_error',
-      message:
-        '--body-content carries a quoted-reply boundary marker (a pasted gmail_quote container, an Outlook divRplyFwdMsg / appendonsend / border-top separator, or a bold From: + Sent: header pair). Graph would keep it, and a later `update-mail-draft --comment` edit would cut the draft there and lose the real quoted history below it. Remove the pasted quote from your reply, or pass --body-content-type Text to have it escaped into literal characters.',
-    });
+  if (asHtml && commentCarriesQuoteBoundary(bodyContent)) {
+    return err({ type: 'validation_error', message: boundaryMarkerRefusal('--body-content') });
   }
 
   // Graph mints the threaded draft (inherited recipients, RE: subject, quoted

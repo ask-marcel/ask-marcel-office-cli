@@ -46,6 +46,18 @@ const findBodyInsertStart = (html: string): number => {
   return match === null ? 0 : match.index + match[0].length;
 };
 
+/**
+ * True when the author's own markup carries a quote boundary marker, e.g. they
+ * pasted a reply chain into it. Such a comment must be refused: the splice would
+ * keep the marker verbatim, and the NEXT revision would cut the draft AT it,
+ * silently dropping the real quoted history below.
+ */
+const commentCarriesQuoteBoundary = (commentHtml: string): boolean => findQuoteBoundary(commentHtml) !== -1;
+
+/** The refusal copy for `commentCarriesQuoteBoundary`, named for the flag that carried it. */
+const boundaryMarkerRefusal = (flagName: string): string =>
+  `${flagName} carries a quoted-reply boundary marker (a pasted gmail_quote container, an Outlook divRplyFwdMsg / appendonsend / border-top separator, or a bold From: + Sent: header pair). It would be kept verbatim, and a later \`update-mail-draft --comment\` edit would cut the draft at that marker and lose the real quoted history below it. Remove the pasted quote from your text, or pass --body-content-type Text to have it escaped into literal characters.`;
+
 const insertCommentAboveQuote = (html: string, commentHtml: string): SpliceResult => {
   const cut = findQuoteBoundary(html);
   const at = cut === -1 ? findBodyInsertStart(html) : cut;
@@ -64,4 +76,12 @@ const replacePlainTextCommentAboveQuote = (text: string, comment: string): Plain
   return { text: `${comment}\n\n${text.slice(cut)}`, boundaryFound: true };
 };
 
-export { escapeTextAsHtml, findBodyInsertStart, insertCommentAboveQuote, replaceCommentAboveQuote, replacePlainTextCommentAboveQuote };
+export {
+  boundaryMarkerRefusal,
+  commentCarriesQuoteBoundary,
+  escapeTextAsHtml,
+  findBodyInsertStart,
+  insertCommentAboveQuote,
+  replaceCommentAboveQuote,
+  replacePlainTextCommentAboveQuote,
+};
