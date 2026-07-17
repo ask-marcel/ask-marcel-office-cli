@@ -2,7 +2,7 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
-## 2.3.0
+## 2.2.0
 
 ### Added
 
@@ -49,25 +49,6 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
   Read/write sets are derived from the registry's `mutates` flag, so a new
   command lands on the correct tool with no code change here.
-
-### Changed
-
-- **Command execution is now shared by both front ends.** The per-command
-  handler (alias normalization, local-filesystem routing, error-source
-  classification, `--output-path` / `--output-dir` persistence) moved out of
-  `cli.ts` into `composition/run-registry-command.ts`, which the CLI and the MCP
-  gateway both call. Behaviour is unchanged — the existing CLI suite passes
-  untouched — but a future fix now reaches both surfaces instead of one.
-- **The output envelope logic is now pure and reusable.** `presenter/output.ts`
-  wrote directly to stdout, which an MCP stdio server cannot do (stdout is its
-  JSON-RPC channel). The envelope layer moved to `presenter/render-to-string.ts`
-  (`renderToString` / `renderErrorToString`); `output.ts` is a thin stdout shim
-  over it. Output is byte-identical. MCP callers therefore get the same
-  `hint:` / `source:` remedies the terminal does.
-
-## 2.2.0
-
-### Added
 
 - **Files in a partner tenant you are a guest in are now readable.** Previously
   every such read died at `401 invalidAudienceUri: Invalid audience Uri
@@ -124,6 +105,19 @@ All notable changes to `ask-marcel-office-cli` are documented here.
   the broad tenant-wide person search. (181st command.)
 
 ### Changed
+
+- **Command execution is now shared by both front ends.** The per-command
+  handler (alias normalization, local-filesystem routing, error-source
+  classification, `--output-path` / `--output-dir` persistence) moved out of
+  `cli.ts` into `composition/run-registry-command.ts`, which the CLI and the MCP
+  gateway both call. Behaviour is unchanged — the existing CLI suite passes
+  untouched — but a future fix now reaches both surfaces instead of one.
+- **The output envelope logic is now pure and reusable.** `presenter/output.ts`
+  wrote directly to stdout, which an MCP stdio server cannot do (stdout is its
+  JSON-RPC channel). The envelope layer moved to `presenter/render-to-string.ts`
+  (`renderToString` / `renderErrorToString`); `output.ts` is a thin stdout shim
+  over it. Output is byte-identical. MCP callers therefore get the same
+  `hint:` / `source:` remedies the terminal does.
 
 - **`scopes-check` is now the single detailed token-status view.** Per token
   (basic / elevated / chatsvcagg / ic3) it reports the `available` flag,

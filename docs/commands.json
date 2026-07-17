@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
-  "version": "2.3.0",
-  "generatedAt": "2026-07-17T08:49:34.675Z",
+  "version": "2.2.0",
+  "generatedAt": "2026-07-17T09:08:34.181Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
