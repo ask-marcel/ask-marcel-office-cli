@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok, type Result } from '../../domain/result.ts';
+import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { findQuoteBoundary } from './mail-quote-stripper.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
 const schema = z.object({
@@ -10,10 +13,35 @@ const schema = z.object({
   ccRecipients: z.string().optional(),
   bodyContent: z.string().min(1),
   subject: z.string().optional(),
+  bodyContentType: z.enum(['Text', 'HTML']).optional(),
 });
 
 const isUnsentDraft = (value: unknown): value is { id: string } =>
   typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' && 'isDraft' in value && value.isDraft === true;
+
+const draftBodySchema = z.object({ body: z.object({ contentType: z.string(), content: z.string() }) });
+
+type DraftBody = z.infer<typeof draftBodySchema>['body'];
+
+// Mirrors create-reply-draft's reader: the body normally rides back on the
+// create response, so the common case costs no extra call. Duplicated rather
+// than shared while there are only two of them (Rule of Three).
+const readDraftBody = async (graph: GraphClient, created: unknown, draftId: string): Promise<Result<DraftBody, GraphError>> => {
+  const inline = draftBodySchema.safeParse(created);
+  if (inline.success) return ok(inline.data.body);
+  const fetched = await graph.get(`/me/messages/${draftId}?$select=body`);
+  if (!fetched.ok) return fetched;
+  const parsed = draftBodySchema.safeParse(fetched.value);
+  if (!parsed.success) {
+    return err({
+      type: 'api_error',
+      status: 500,
+      code: 'draft_body_unreadable',
+      message: `Draft ${draftId} was created but its body could not be read back, so the comment was never written into it. The draft exists - review it in Outlook Drafts, or set its body with \`update-mail-draft --message-id ${draftId} --body-content ...\`.`,
+    });
+  }
+  return ok(parsed.data.body);
+};
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -22,14 +50,30 @@ const execute: Command['execute'] = async (graph, params) => {
       type: 'validation_error',
       message: formatZodError(parsed.error),
     });
-  const { forwardMessageId, toRecipients, ccRecipients, bodyContent, subject } = parsed.data;
+  const { forwardMessageId, toRecipients, ccRecipients, bodyContent, subject, bodyContentType } = parsed.data;
 
-  // Graph's createForward mints the draft with the comment placed ABOVE the
-  // quoted forwarded message in one call. The comment MUST travel via `comment`,
-  // never a body PATCH: PATCHing `body` replaces the whole draft body and drops
-  // the entire forwarded original (it did - fixed 2026-07-13 after a live smoke).
+  const asHtml = bodyContentType === 'HTML';
+
+  // A comment carrying a boundary marker of its own would be kept verbatim by the
+  // splice, and the NEXT `update-mail-draft --comment` edit would cut the draft AT
+  // the pasted marker, dropping the forwarded original below it. Refuse before
+  // creating anything, so there is no orphan draft to clean up.
+  if (asHtml && findQuoteBoundary(bodyContent) !== -1) {
+    return err({
+      type: 'validation_error',
+      message:
+        '--body-content carries a quoted-reply boundary marker (a pasted gmail_quote container, an Outlook divRplyFwdMsg / appendonsend / border-top separator, or a bold From: + Sent: header pair). Graph would keep it, and a later `update-mail-draft --comment` edit would cut the draft there and lose the forwarded original below it. Remove the pasted quote from your comment, or pass --body-content-type Text to have it escaped into literal characters.',
+    });
+  }
+
+  // Graph's createForward mints the draft in one call. On the Text path the
+  // comment travels via `comment`, never a body PATCH: PATCHing `body` with
+  // freshly built HTML replaces the whole draft body and drops the entire
+  // forwarded original (it did - fixed 2026-07-13 after a live smoke). The HTML
+  // path posts an EMPTY comment (Graph HTML-escapes what `comment` carries) and
+  // splices the markup in below, keeping the quote inside the body it patches.
   const created = await graph.post(`/me/messages/${forwardMessageId}/createForward`, {
-    comment: bodyContent,
+    comment: asHtml ? '' : bodyContent,
     toRecipients: parseRecipients(toRecipients),
   });
   if (!created.ok) return created;
@@ -45,14 +89,39 @@ const execute: Command['execute'] = async (graph, params) => {
     });
   }
 
-  // Optional cc recipients / subject override: PATCH ONLY these - never `body`,
-  // which carries the comment + quoted original. Nothing to set -> the draft is
-  // already complete, return it as-is.
-  const patch: Record<string, unknown> = {};
+  const draftId = created.value.id;
+
+  // Text path, unchanged: optional cc / subject override PATCHes ONLY those -
+  // never `body`, which carries the comment + quoted original. Nothing to set ->
+  // the draft is already complete, return it as-is.
+  if (!asHtml) {
+    const patch: Record<string, unknown> = {};
+    if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
+    if (subject) patch.subject = subject;
+    if (Object.keys(patch).length === 0) return created;
+    return graph.patch(`/me/messages/${draftId}`, patch);
+  }
+
+  const draftBody = await readDraftBody(graph, created.value, draftId);
+  if (!draftBody.ok) return draftBody;
+
+  // A text-bodied original cannot take HTML: splicing markup in would show it as
+  // literal characters, and converting the body to HTML would rewrite the quote.
+  if (draftBody.value.contentType.toLowerCase() !== 'html') {
+    return err({
+      type: 'validation_error',
+      message: `The forwarded draft's body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above the quoted original without rewriting it. Draft ${draftId} was already created - set its text with \`update-mail-draft --message-id ${draftId} --comment "..."\`, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
+    });
+  }
+
+  // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
+  // never PATCH body WITHOUT the quote in it. Cc and subject merge into the same
+  // call rather than costing a second round trip.
+  const spliced = insertCommentAboveQuote(draftBody.value.content, bodyContent);
+  const patch: Record<string, unknown> = { body: { contentType: 'HTML', content: spliced.html } };
   if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
   if (subject) patch.subject = subject;
-  if (Object.keys(patch).length === 0) return created;
-  return graph.patch(`/me/messages/${created.value.id}`, patch);
+  return graph.patch(`/me/messages/${draftId}`, patch);
 };
 
 const meta: CommandMeta = {
@@ -88,7 +157,7 @@ const meta: CommandMeta = {
       name: 'body-content',
       key: 'bodyContent',
       required: true,
-      description: 'The comment text, placed above the quoted forwarded message by Graph.',
+      description: 'The comment text, placed above the quoted forwarded message. Plain text by default; pass --body-content-type HTML to send it as markup.',
     },
     {
       name: 'subject',
@@ -96,10 +165,19 @@ const meta: CommandMeta = {
       required: false,
       description: 'Optional subject override. Omit to keep the inherited "FW: ..." subject.',
     },
+    {
+      name: 'body-content-type',
+      key: 'bodyContentType',
+      required: false,
+      description:
+        'Format of --body-content: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in above the forwarded original, leaving it and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.',
+      argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
+    },
   ],
   example:
     'ask-marcel-office create-forward-draft --forward-message-id "AAMkAD..." --to-recipients "bob@example.com" --body-content "Bob owns this now, forwarding for your action."',
-  bodyTemplate: "POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+  bodyTemplate:
+    "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:

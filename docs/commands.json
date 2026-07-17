@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-17T02:26:15.983Z",
+  "generatedAt": "2026-07-17T02:40:15.843Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -430,18 +430,31 @@
           "name": "body-content",
           "key": "bodyContent",
           "required": true,
-          "description": "The comment text, placed above the quoted forwarded message by Graph."
+          "description": "The comment text, placed above the quoted forwarded message. Plain text by default; pass --body-content-type HTML to send it as markup."
         },
         {
           "name": "subject",
           "key": "subject",
           "required": false,
           "description": "Optional subject override. Omit to keep the inherited \"FW: ...\" subject."
+        },
+        {
+          "name": "body-content-type",
+          "key": "bodyContentType",
+          "required": false,
+          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in above the forwarded original, leaving it and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "Text",
+              "HTML"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
       "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
-      "bodyTemplate": "POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+      "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
     {
