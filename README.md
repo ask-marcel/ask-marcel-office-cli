@@ -147,13 +147,12 @@ ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget
 
 Any agent that can run a shell command can use the whole surface today: point it at `help-json --terse`, let it call commands with `--output json`, and the lean defaults plus structured hints let it recover from its own mistakes. No wrapper required.
 
-**No shell? Register it as an MCP server.** It speaks MCP over stdio, so any MCP client can drive it.
+**No shell? Register it as an MCP server.** It speaks MCP over stdio, so any MCP client can drive it — straight off the npm registry via `npx`, nothing to clone or preinstall.
 
-**Claude Code** — one command, and it inherits your shell, so the bare name resolves:
+**Claude Code** — one command:
 
 ```bash
-claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
-export MCP_TOOL_TIMEOUT=300000   # see the timeout note below
+claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-marcel-office-cli mcp
 ```
 
 **Claude Desktop, Cursor, or any other MCP client** — they all take the same `mcpServers` block; only the file location differs:
@@ -168,16 +167,16 @@ export MCP_TOOL_TIMEOUT=300000   # see the timeout note below
 {
   "mcpServers": {
     "ask-marcel-office": {
-      "command": "/usr/local/bin/node",
-      "args": ["/usr/local/lib/node_modules/ask-marcel-office-cli/dist/cli.js", "mcp"]
+      "description": "Ask Marcel Office CLI MCP server",
+      "command": "npx",
+      "args": ["-y", "ask-marcel-office-cli", "mcp"],
+      "env": {}
     }
   }
 }
 ```
 
-> **Use absolute paths for both, and don't shortcut to `"command": "ask-marcel-office"`.** A GUI app is not launched from your shell, so it doesn't inherit your `PATH`. The bare name gives `command not found`; worse, even the binary's absolute path fails with `env: node: No such file or directory`, because its `#!/usr/bin/env node` shebang can't find `node` either (Homebrew/nvm put it outside the default `PATH`). Pointing at `node` directly is the only shape that survives any launcher.
->
-> Get your two paths with `which node` and `echo "$(npm root -g)/ask-marcel-office-cli/dist/cli.js"`.
+> **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
 
 You get **five gateway tools**, not one per command — 183 tool schemas would bloat every session, the opposite of the point:
 
@@ -189,9 +188,7 @@ You get **five gateway tools**, not one per command — 183 tool schemas would b
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 
-**Sign in from a terminal first** — `ask-marcel-office login`. Do this once before wiring up any client, and the reads just work.
-
-The reason is the `login` tool specifically. A browser sign-in measured **37–64 s even with no MFA prompt**, while MCP's default tool timeout is **60 s** — so it lands right on the boundary and fails intermittently. In Claude Code, `export MCP_TOOL_TIMEOUT=300000` fixes it. Claude Desktop exposes no equivalent knob, so `login` there may simply time out; when it does, **the sign-in has usually still completed** (the server keeps working after the client stops waiting), so re-run your original command before calling `login` again. Everything except `login` is unaffected — reads return in well under a second.
+**Sign in from a terminal first** — `npx -y ask-marcel-office-cli login`. Do this once before wiring up any client, and the reads just work.
 
 ## Embed it as a TypeScript library
 
