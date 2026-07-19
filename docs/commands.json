@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-19T09:47:57.851Z",
+  "generatedAt": "2026-07-19T12:40:32.946Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -453,7 +453,7 @@
         }
       ],
       "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
-      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
@@ -600,7 +600,7 @@
         }
       ],
       "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --body-content \"Confirmed for Contoso, aligned with the group choice.\"",
-      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
       "mutates": true
     },
@@ -958,6 +958,30 @@
       "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, chatsHydrated, unresolvedMemberCount, hasMore, nextContinuationToken?, hint? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `chatsHydrated` counts the per-chat members lookups spent resolving bare cross-tenant members in direct (1:1) chats. `unresolvedMemberCount` is how many cross-tenant members are still unresolved by name (bare members in group/meeting chats, which are not deep-probed, plus any 1:1 hydration that errored); when `matchCount` is 0 and this is non-zero, a `hint` is present explaining the likely cause and the object-id / read-by-chat-id remedy — so an empty result is never silently confident. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
+    },
+    {
+      "name": "find-mail-drafts",
+      "summary": "Find existing drafts on a mail thread WITHOUT trusting a conversationId $filter. Reply and forward drafts do not always inherit the inbound message conversationId (a thread can split across several), and Graph $filter on the Drafts folder is not read-your-writes consistent, so filtering Drafts by conversationId misses drafts. This command instead scans the 50 most recently modified drafts and matches them client-side on a normalized subject (stripping RE:/FW: and localized reply/forward prefixes) plus, optionally, a shared recipient. Use it before create-reply-draft to avoid creating a duplicate: if a match comes back, revise it with update-mail-draft instead of making a new one. Read-only.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/me/mailFolders/drafts/messages?$top=50&$orderby=lastModifiedDateTime desc&$select=id,subject,toRecipients,ccRecipients,conversationId,lastModifiedDateTime,webLink (a read-only scan of the 50 most recently modified drafts; each is matched CLIENT-SIDE on a normalized {subject} and, when given, a shared {to-recipients} address, so neither value is sent to Graph)",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-list-messages",
+      "options": [
+        {
+          "name": "subject",
+          "key": "subject",
+          "required": true,
+          "description": "The thread subject to match. Reply and forward prefixes (RE:, FW:, and localized variants) are stripped on both sides before comparing, so \"Contoso Q3\" matches a draft titled \"RE: Contoso Q3\"."
+        },
+        {
+          "name": "to-recipients",
+          "key": "toRecipients",
+          "required": false,
+          "description": "Optional comma-separated recipient addresses. When given, a draft matches only if it shares at least one To or Cc address with this list, narrowing subject-only collisions."
+        }
+      ],
+      "example": "ask-marcel-office find-mail-drafts --subject \"Contoso Q3 budget\" --to-recipients \"kim@example.com\"",
+      "responseShape": "`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window."
     },
     {
       "name": "get-calendar-event",
@@ -4974,7 +4998,7 @@
               "key": "id"
             }
           ],
-          "description": "mailFolder ID. Returned by `ask-marcel-office list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`."
+          "description": "mailFolder ID. Returned by `ask-marcel-office list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`. When listing `drafts`, a `conversationId` `$filter` is not a reliable check for whether a draft already exists on a thread: reply and forward drafts can split across several conversationIds, and `$filter` on Drafts is not read-your-writes consistent. Match client-side on subject and recipients instead, or use the `find-mail-drafts` command, which does exactly that."
         },
         {
           "name": "top",
@@ -8125,7 +8149,7 @@
         }
       ],
       "example": "ask-marcel-office update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
-      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged",
       "mutates": true
     }
