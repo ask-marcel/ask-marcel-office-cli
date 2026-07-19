@@ -297,7 +297,7 @@ describe('buildCli command surface', () => {
     expect(graphCalled).toBe(false);
   });
 
-  it('resolves a deprecated command name via meta.commandAliases — `convert-local-file` still runs after the v2.3 rename to convert-local-file-to-markdown', async () => {
+  it('resolves a deprecated command name via meta.commandAliases — `convert-local-file` still runs after the rename to convert-local-file-to-markdown', async () => {
     const fs = createFileSystemFake();
     fs.seed('/work/data.csv', 'name,age\nAlice,30');
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
@@ -445,7 +445,7 @@ describe('buildCli command surface', () => {
     // First-sentence truncation keeps the listing compact. The pre-compaction
     // full-summary form ran ~60 KB; if compaction silently regresses (e.g.
     // compactSummary cuts wrong), this guard fires. 45 KB ceiling: the
-    // listing is ~37 KB as of v2.3 (the -to-markdown renames widened the
+    // listing is ~37 KB as of 2.2.0 (the -to-markdown renames widened the
     // name|alias column commander pads every row to), leaving headroom for
     // new commands while still firing well before the ~60 KB regression form.
     expect(compact.length).toBeLessThan(45 * 1024);

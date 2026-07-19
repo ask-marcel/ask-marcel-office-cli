@@ -15,7 +15,7 @@ import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.
 // every `cid:<contentId>` img degrades to a readable
 // `[inline image: <name>]` placeholder and the file-attachments list still
 // surfaces the inline images so the caller can fetch any of them via
-// `get-mail-attachment` on demand. (Default flipped from `true` in v2.3.)
+// `get-mail-attachment` on demand. (Default flipped from `true` in 2.2.0.)
 const schema = z.object({
   messageId: z.string().min(1),
   inlineImages: z.enum(['true', 'false']).optional(),
@@ -296,7 +296,7 @@ const meta: CommandMeta = {
       key: 'inlineImages',
       required: false,
       description:
-        'Pass `--inline-images true` to fetch small inline images (≤ 2 MB, `image/*` only) and embed them as base64 `data:` URIs. Default is `false` (text-first, changed in v2.3): no per-image bytes fetch, and every inline `cid:` image renders as a `[inline image: <name>]` placeholder while still appearing in the file-attachments list, so the LLM caller sees what exists and can fetch any specific image via `get-mail-attachment` on demand. Embedding a 6-inline-image email inflated a 6 KB body to ~36 KB; the default keeps it near 6 KB.',
+        'Pass `--inline-images true` to fetch small inline images (≤ 2 MB, `image/*` only) and embed them as base64 `data:` URIs. Default is `false` (text-first): no per-image bytes fetch, and every inline `cid:` image renders as a `[inline image: <name>]` placeholder while still appearing in the file-attachments list, so the LLM caller sees what exists and can fetch any specific image via `get-mail-attachment` on demand. Embedding a 6-inline-image email inflated a 6 KB body to ~36 KB; the default keeps it near 6 KB.',
     },
     {
       name: 'keep-quoted',
