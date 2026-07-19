@@ -3,6 +3,7 @@ import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, escapeTextAsHtml, replaceCommentAboveQuote, replacePlainTextCommentAboveQuote } from './draft-comment-splicer.ts';
+import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
@@ -106,7 +107,7 @@ const execute: Command['execute'] = async (graph, params) => {
   if (bccRecipients !== undefined) body.bccRecipients = parseRecipients(bccRecipients);
   if (importance !== undefined) body.importance = importance;
 
-  if (comment === undefined) return graph.patch(`/me/messages/${messageId}`, body);
+  if (comment === undefined) return slimDraftResult(await graph.patch(`/me/messages/${messageId}`, body));
 
   // The comment path costs one read: the reply text can only be replaced in
   // place if we know what the quote below it looks like.
@@ -117,12 +118,12 @@ const execute: Command['execute'] = async (graph, params) => {
   // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
   // never PATCH body WITHOUT the quote in it.
   body.body = revised.value;
-  return graph.patch(`/me/messages/${messageId}`, body);
+  return slimDraftResult(await graph.patch(`/me/messages/${messageId}`, body));
 };
 
 const meta: CommandMeta = {
   summary:
-    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.',
+    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.',
   category: 'mail',
   graphMethod: 'PATCH',
   graphPathTemplate: '/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used)',
@@ -199,7 +200,7 @@ const meta: CommandMeta = {
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
-    'The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.',
+    "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
 };
 
 export { execute, meta, schema };

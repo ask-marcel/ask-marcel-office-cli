@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
@@ -34,12 +35,12 @@ const execute: Command['execute'] = async (graph, params) => {
   if (importance) body.importance = importance;
 
   const path = mailFolderId ? `/me/mailFolders/${mailFolderId}/messages` : '/me/messages';
-  return graph.post(path, body);
+  return slimDraftResult(await graph.post(path, body));
 };
 
 const meta: CommandMeta = {
   summary:
-    'Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns the created message object with its id — use this id with update-mail-draft to modify the draft before sending.',
+    'Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the body you just wrote; read the full draft back with get-mail-message if you need it. Use the returned id with update-mail-draft to modify before sending.',
   category: 'mail',
   graphMethod: 'POST',
   graphPathTemplate: '/me/messages (or /me/mailFolders/{mail-folder-id}/messages)',
@@ -104,7 +105,7 @@ const meta: CommandMeta = {
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
-    'The created Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. The `id` field is the draft message ID — use it with `update-mail-draft` to modify before sending.',
+    'A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just supplied it; read it back with `get-mail-message --id <the returned id>` if you need it. The `id` is the draft — modify it with `update-mail-draft` before sending.',
 };
 
 export { execute, meta, schema };

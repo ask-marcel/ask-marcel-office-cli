@@ -3,6 +3,7 @@ import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
+import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({
@@ -86,8 +87,8 @@ const execute: Command['execute'] = async (graph, params) => {
   if (!asHtml) {
     const patch: Record<string, unknown> = {};
     if (subject) patch.subject = subject;
-    if (Object.keys(patch).length === 0) return created;
-    return graph.patch(`/me/messages/${draftId}`, patch);
+    if (Object.keys(patch).length === 0) return slimDraftResult(created);
+    return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
   }
 
   const draftBody = await readDraftBody(graph, created.value, draftId);
@@ -107,7 +108,7 @@ const execute: Command['execute'] = async (graph, params) => {
   const spliced = insertCommentAboveQuote(draftBody.value.content, bodyContent);
   const patch: Record<string, unknown> = { body: { contentType: 'HTML', content: spliced.html } };
   if (subject) patch.subject = subject;
-  return graph.patch(`/me/messages/${draftId}`, patch);
+  return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
 };
 
 const meta: CommandMeta = {
@@ -161,7 +162,7 @@ const meta: CommandMeta = {
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
-    'The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.',
+    "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
 };
 
 export { execute, meta, schema };

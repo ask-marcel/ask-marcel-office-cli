@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-17T09:08:34.181Z",
+  "generatedAt": "2026-07-18T09:18:23.592Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -371,7 +371,7 @@
           "name": "inline-images",
           "key": "inlineImages",
           "required": false,
-          "description": "Pass `--inline-images true` to fetch small inline images (≤ 2 MB, `image/*` only) and embed them as base64 `data:` URIs. Default is `false` (text-first, changed in v2.3): no per-image bytes fetch, and every inline `cid:` image renders as a `[inline image: <name>]` placeholder while still appearing in the file-attachments list, so the LLM caller sees what exists and can fetch any specific image via `get-mail-attachment` on demand. Embedding a 6-inline-image email inflated a 6 KB body to ~36 KB; the default keeps it near 6 KB."
+          "description": "Pass `--inline-images true` to fetch small inline images (≤ 2 MB, `image/*` only) and embed them as base64 `data:` URIs. Default is `false` (text-first): no per-image bytes fetch, and every inline `cid:` image renders as a `[inline image: <name>]` placeholder while still appearing in the file-attachments list, so the LLM caller sees what exists and can fetch any specific image via `get-mail-attachment` on demand. Embedding a 6-inline-image email inflated a 6 KB body to ~36 KB; the default keeps it near 6 KB."
         },
         {
           "name": "keep-quoted",
@@ -453,13 +453,13 @@
         }
       ],
       "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
-      "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
       "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
     {
       "name": "create-mail-draft",
-      "summary": "Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns the created message object with its id — use this id with update-mail-draft to modify the draft before sending.",
+      "summary": "Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the body you just wrote; read the full draft back with get-mail-message if you need it. Use the returned id with update-mail-draft to modify before sending.",
       "category": "mail",
       "graphMethod": "POST",
       "graphPathTemplate": "/me/messages (or /me/mailFolders/{mail-folder-id}/messages)",
@@ -533,7 +533,7 @@
         }
       ],
       "example": "ask-marcel-office create-mail-draft --subject \"Q3 Report\" --body-content \"Please review the attached report.\" --to-recipients \"alice@example.com,bob@example.com\" --importance High",
-      "responseShape": "The created Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. The `id` field is the draft message ID — use it with `update-mail-draft` to modify before sending.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just supplied it; read it back with `get-mail-message --id <the returned id>` if you need it. The `id` is the draft — modify it with `update-mail-draft` before sending.",
       "bodyTemplate": "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
       "mutates": true
     },
@@ -600,7 +600,7 @@
         }
       ],
       "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --body-content \"Confirmed for Contoso, aligned with the group choice.\"",
-      "responseShape": "The updated draft message object (or `{ ok: true }` when Graph answers 204): `{ id, subject, body, toRecipients, ccRecipients, isDraft: true, … }`. The `id` is the draft - update further with update-mail-draft, or open Outlook Drafts to review and send.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
       "bodyTemplate": "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, subject?: '{subject}' }",
       "mutates": true
     },
@@ -8039,7 +8039,7 @@
     },
     {
       "name": "update-mail-draft",
-      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns the updated message object. Use get-mail-message to verify the final state before sending.",
+      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.",
       "category": "mail",
       "graphMethod": "PATCH",
       "graphPathTemplate": "/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used)",
@@ -8125,7 +8125,7 @@
         }
       ],
       "example": "ask-marcel-office update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
-      "responseShape": "The updated Microsoft Graph message object: `{ id, subject, body, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, isDraft, … }`. Graph returns 204 No Content on success with no body — the CLI surfaces `{ ok: true }` in that case.",
+      "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
       "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged",
       "mutates": true
     }
