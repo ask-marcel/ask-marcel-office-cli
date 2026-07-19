@@ -39,10 +39,9 @@ const stringField = (data: unknown, field: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-const firstOf = (data: unknown): unknown => {
-  const value = (data as Record<string, unknown> | undefined)?.value;
-  const list = Array.isArray(value) ? value : Array.isArray(data) ? (data as ReadonlyArray<unknown>) : [];
-  return list[0];
+const arrayUnder = (data: unknown, field: 'value'): ReadonlyArray<unknown> => {
+  const list = (data as Record<string, unknown> | undefined)?.[field];
+  return Array.isArray(list) ? list : [];
 };
 
 const idsUnder = (data: unknown, field: 'value' | 'matches'): ReadonlyArray<string> => {
@@ -62,33 +61,54 @@ const main = async (): Promise<void> => {
     process.exit(2);
   }
 
-  // Harvest one real inbound thread: its id (to reply to) and conversationId C0.
-  const src = run(['list-mail-messages', '--top', '1', '--select', 'id,subject,conversationId']);
-  const first = firstOf(src.data);
-  const srcId = stringField(first, 'id');
-  const subject = stringField(first, 'subject') ?? '';
-  const c0 = stringField(first, 'conversationId');
-  if (!src.ok || srcId === undefined || c0 === undefined) {
-    process.stdout.write(`Could not harvest a source message with a conversationId (ok=${src.ok}). Need at least one message in the mailbox.\n`);
-    process.exit(1);
-  }
-  if (subject.length === 0) {
-    process.stdout.write('The harvested message has an empty subject, which find-mail-drafts matches on. Pick a mailbox whose newest message has a subject.\n');
+  // Harvest replyable Inbox candidates. Drafts, delivery reports, and meeting
+  // items reject createReply (ErrorInvalidReferenceItem), so try candidates
+  // until one accepts a reply draft; that message's thread becomes the target.
+  const listed = run(['list-mail-folder-messages', '--mail-folder-id', 'inbox', '--top', '10', '--select', 'id,subject,conversationId']);
+  const candidates = arrayUnder(listed.data, 'value');
+  if (!listed.ok || candidates.length === 0) {
+    process.stdout.write(`Could not list Inbox messages to harvest a thread (ok=${listed.ok}). Need at least one replyable message in the Inbox.\n`);
     process.exit(1);
   }
 
-  // Create 3 reply drafts on the SAME thread; record each returned conversationId.
   const stamp = String(Bun.nanoseconds());
   const draftConversationIds: string[] = [];
-  for (let i = 0; i < 3; i += 1) {
-    const reply = run(['create-reply-draft', '--reply-to-message-id', srcId, '--body-content', `SMOKE dedup ${stamp} #${i}`]);
-    const id = stringField(reply.data, 'id');
-    const conv = stringField(reply.data, 'conversationId');
-    if (!reply.ok || id === undefined) {
-      process.stdout.write(`create-reply-draft #${i} failed (ok=${reply.ok}, err=${reply.error ?? '-'}). Cleaning up any created drafts below.\n`);
+  let replyTargetId = '';
+  let subject = '';
+  let c0 = '';
+  for (const candidate of candidates) {
+    const id = stringField(candidate, 'id');
+    const candidateSubject = stringField(candidate, 'subject') ?? '';
+    const candidateC0 = stringField(candidate, 'conversationId');
+    if (id === undefined || candidateC0 === undefined || candidateSubject.length === 0) continue;
+    const reply = run(['create-reply-draft', '--reply-to-message-id', id, '--body-content', `SMOKE dedup ${stamp} #0`]);
+    const draftId = stringField(reply.data, 'id');
+    if (reply.ok && draftId !== undefined) {
+      createdDraftIds.push(draftId);
+      const conv = stringField(reply.data, 'conversationId');
+      if (conv !== undefined) draftConversationIds.push(conv);
+      replyTargetId = id;
+      subject = candidateSubject;
+      c0 = candidateC0;
       break;
     }
-    createdDraftIds.push(id);
+  }
+  if (createdDraftIds.length === 0) {
+    process.stdout.write('No Inbox message in the top 10 accepted a reply draft (all drafts/reports/meeting items?). Try a mailbox with ordinary received mail.\n');
+    process.exit(1);
+  }
+
+  // Create 2 more reply drafts on the SAME inbound message; record each returned
+  // conversationId (they may split off the inbound C0 — that is the finding).
+  for (let i = 1; i < 3; i += 1) {
+    const reply = run(['create-reply-draft', '--reply-to-message-id', replyTargetId, '--body-content', `SMOKE dedup ${stamp} #${i}`]);
+    const draftId = stringField(reply.data, 'id');
+    if (!reply.ok || draftId === undefined) {
+      process.stdout.write(`follow-up create-reply-draft #${i} failed (ok=${reply.ok}, err=${reply.error ?? '-'}). Continuing with ${createdDraftIds.length} draft(s).\n`);
+      break;
+    }
+    createdDraftIds.push(draftId);
+    const conv = stringField(reply.data, 'conversationId');
     if (conv !== undefined) draftConversationIds.push(conv);
   }
 
