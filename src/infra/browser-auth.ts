@@ -86,8 +86,13 @@ type BrowserAuth = {
    * different Microsoft web app whose first-party app identity is on
    * Microsoft's allow-list for ODSP `logicalPermissions` (the scope our
    * Teams web client token lacks for historical-version stream
-   * content). Reuses the persistent profile cookies — no second
-   * sign-in. Headless by default.
+   * content). Launches a HEADED browser (`launchContext(false)`) and
+   * relies, best-effort, on the persistent profile's cookies to complete
+   * sign-in silently. This is NOT guaranteed: on tenants that do not
+   * persist SSO cookies (or once they lapse) the navigation lands on a
+   * sign-in wall and the capture times out (verified headed AND headless
+   * 2026-07-19). That is why it stays headed and why the caller treats a
+   * miss as non-fatal and points the user at an interactive `login`.
    *
    * Returns a discriminated union so the caller can distinguish the three
    * failure modes (browser-launch hang, navigation failure, silent-SSO

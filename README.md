@@ -14,7 +14,7 @@
 
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
 
-[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 183 commands](docs/COMMANDS.md)
+[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 184 commands](docs/COMMANDS.md)
 
 </div>
 
@@ -40,7 +40,7 @@ Microsoft Graph normally means registering an Azure app, chasing tenant-admin co
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 183 commands break down as 175 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call.
+The 184 commands break down as 176 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -92,7 +92,7 @@ $ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item
 
 | Surface | Commands | In practice |
 |---|---:|---|
-| 📧 Outlook Mail | 35 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, prepare reply / forward drafts (the only writes) |
+| 📧 Outlook Mail | 36 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
 | 📁 OneDrive + SharePoint | 49 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history, share links resolved even into partner tenants where you're a guest |
 | 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
 | 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
@@ -230,7 +230,7 @@ Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Gra
 
 ## Deep docs
 
-- **[All 183 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
+- **[All 184 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
 - **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release

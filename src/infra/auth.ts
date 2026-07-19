@@ -249,7 +249,7 @@ const commandList = (names: ReadonlyArray<string>): string => names.join(', ');
 
 const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
 const RECAPTURE_ELEVATED_VIA_LOGIN =
-  'It carries no refresh token of its own, so re-capture it with `ask-marcel-office login` — the login command self-escalates to the browser re-capture when the elevated token is missing (it needs a host that can run the sign-in browser; the sign-in stays headless while the persistent profile cookies are warm)';
+  'It carries no refresh token of its own, so re-capture it with `ask-marcel-office login`: the login command self-escalates to a browser sign-in when the elevated token is missing. That sign-in needs a host with a display and may prompt, so unlike the other tiers this one cannot be refreshed non-interactively (a warm token cache does not imply warm browser-profile cookies).';
 
 // Stable machine-readable code for the secondary-token fail-fast (elevated /
 // chatsvcagg / ic3), so an agent can branch on `errorCode` instead of
