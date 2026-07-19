@@ -16,8 +16,10 @@ import type { CommandOptionMeta } from './command-types.ts';
  *   - Outlook mobile reference container:                `<div id="mail-editor-reference-message-container">`
  *   - Outlook classic separator:                         `<hr id="stopSpelling">`
  *   - Gmail quote container:                             `<div class="gmail_quote">` / `<blockquote class="gmail_quote">`
- *   - Outlook desktop (Word renderer) separator:         `<div style="…border-top:solid #E1E1E1 1.0pt…">`
- *     (the hex constant is locale-independent across Outlook UI languages)
+ *   - Outlook reply divider (Word renderer / Mac / mobile):
+ *     `<div style="…border-top:solid #E1E1E1|#B5C4DF 1.0pt…">`
+ *     (the hex constants are locale-independent across Outlook UI languages;
+ *     #E1E1E1 is the desktop Word renderer, #B5C4DF the Mac / mobile reply rule)
  *   - Outlook desktop bold header block without any container marker:
  *     a `<b>`/`<strong>`-wrapped From label (localized) CONFIRMED by a
  *     companion Sent/Date label within a bounded window, so a body that
@@ -31,7 +33,7 @@ const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
   /<hr[^>]*\bid="stopSpelling"/i,
   /<div[^>]*\bclass="[^"]*\bgmail_quote\b/i,
   /<blockquote[^>]*\bclass="[^"]*\bgmail_quote\b/i,
-  /<div[^>]*border-top:\s*solid #E1E1E1/i,
+  /<div[^>]*border-top:\s*solid #(?:E1E1E1|B5C4DF)/i,
 ];
 
 // Localized Outlook header labels. From-labels anchor a candidate cut; a
@@ -55,11 +57,20 @@ const SENT_LABELS = 'Sent|Datum|Date|Data|Fecha|发送时间|寄件日期|日期
 const CONFIRM_WINDOW_CHARS = 400;
 
 // `(?:<span[^>]*>)?` tolerates the single MSO span Word nests inside the bold
-// tag (`<b><span style='…'>From:</span></b>`); `(?:\s|&nbsp;)*` covers the
-// French "De :" space-before-colon and non-breaking-space variants; `[:：]`
-// covers the CJK full-width colon.
-const HTML_FROM_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${FROM_LABELS})(?:\\s|&nbsp;)*[:：]`, 'gi');
-const HTML_SENT_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${SENT_LABELS})(?:\\s|&nbsp;)*[:：]`, 'i');
+// tag (`<b><span style='…'>From:</span></b>`); the leading `(?:\s|&nbsp;)*`
+// covers the French "De :" space-before-colon and non-breaking-space variants;
+// `[:：]` covers the CJK full-width colon.
+//
+// LABEL_COLON_GAP covers a Chinese Outlook web client that styles the colon
+// differently from the label word and so emits them as two separate bold runs
+// (`发件人</span></b><b><span lang=EN-HK>:`). Between the label and its colon we
+// tolerate any run of inline open/close tags, not only whitespace. Every
+// alternative is a tag or whitespace token, so the run still stops at the first
+// character of real text: a bolded word followed by prose never reaches a later
+// colon, keeping the From + (Sent|Date) false-positive guard intact.
+const LABEL_COLON_GAP = '(?:\\s|&nbsp;|</span>|</b>|</strong>|<span[^>]*>|<(?:b|strong)[^>]*>)*';
+const HTML_FROM_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${FROM_LABELS})${LABEL_COLON_GAP}[:：]`, 'gi');
+const HTML_SENT_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${SENT_LABELS})${LABEL_COLON_GAP}[:：]`, 'i');
 
 const TEXT_FROM_LABEL = new RegExp(`^(?:${FROM_LABELS})\\s?[:：]`, 'gim');
 const TEXT_SENT_LABEL = new RegExp(`^(?:${SENT_LABELS})\\s?[:：]`, 'im');

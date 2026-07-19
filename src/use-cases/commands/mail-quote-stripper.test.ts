@@ -78,6 +78,45 @@ describe('locating where a reply body stops being the author’s new text and st
     expect(findQuoteBoundary(html)).toBe(-1);
   });
 
+  // Outlook-for-Mac and the mobile clients draw the reply divider as a top
+  // border in #B5C4DF, not the desktop Word renderer's #E1E1E1; only the latter
+  // hue was recognized, so a reply carrying only the Mac/mobile divider kept its
+  // quoted history (live-reported 2026-07-19).
+  const replyDividers = [
+    { label: 'the desktop Word renderer #E1E1E1 rule', color: '#E1E1E1' },
+    { label: 'the Outlook-for-Mac / mobile #B5C4DF rule', color: '#B5C4DF' },
+  ];
+
+  it.each(replyDividers)('cuts at the top-border rule Outlook draws above a quoted reply, whichever standard hue it uses: $label', ({ color }) => {
+    const authorText = '<p>Confirmed.</p>';
+    const quote = `<div style="border:none; border-top:solid ${color} 1.0pt; padding:3.0pt 0cm 0cm 0cm"><p>the quoted original</p></div>`;
+
+    expect(findQuoteBoundary(`${authorText}${quote}`)).toBe(authorText.length);
+  });
+
+  // A Chinese Outlook web client styles the colon differently from the label
+  // word and so emits them as two separate bold runs
+  // (`发件人</span></b><b><span lang=EN-HK>:`). The label-to-colon match tolerated
+  // only whitespace there, so the topmost quoted message escaped the header scan
+  // and one full quote level leaked (live-reported 2026-07-19). Both the From and
+  // the Sent/Date label arrive in this split-run shape.
+  const splitLabel = (word: string): string =>
+    `<b><span style="font-family:宋体; color:black">${word}</span></b><b><span lang="EN-HK" style="font-family:&quot;Calibri&quot;,sans-serif; color:black">:</span></b>`;
+
+  it('cuts at a header whose label and colon sit in separate bold runs, as a Chinese Outlook web client writes 发件人 and 日期', () => {
+    const authorText = '<p>Dear Robin, no updates so far. Alex</p>';
+    const header = `<p class=MsoNormal>${splitLabel('发件人')}<span lang="EN-HK"> Robin Chen &lt;robin.chen@contoso.com&gt;<br>${splitLabel('日期')}<span lang="EN-HK"> 2026年7月16日 9:06</span></span></p>`;
+
+    expect(findQuoteBoundary(`${authorText}${header}<p>the quoted original</p>`)).toBe(authorText.length);
+  });
+
+  it('strips the whole quoted message from a Chinese Outlook reply carrying both the #B5C4DF divider and split-run header labels, keeping only the new reply', () => {
+    const reply = '<p>Dear Robin,</p><p>So far, we haven’t made any updates to this version.</p><p>Alex</p>';
+    const quoted = `<div style="border:none; border-top:solid #B5C4DF 1.0pt; padding:3.0pt 0cm 0cm 0cm"><p class=MsoNormal>${splitLabel('发件人')}<span lang="EN-HK"> Robin Chen &lt;robin.chen@contoso.com&gt;<br>${splitLabel('日期')}<span lang="EN-HK"> 2026年7月16日 9:06</span><br>${splitLabel('收件人')}<span lang="EN-HK"> Alex Kim<br>${splitLabel('主题')}<span lang="EN-HK"> 答复: Q3 timeline</span></span></p><p>the original message body</p></div>`;
+
+    expect(stripQuotedReplies(`${reply}${quoted}`)).toEqual({ html: `${reply}${STRIP_MARKER}`, stripped: true });
+  });
+
   it('cuts a plain-text reply at a localized Date header pair too, not only the HTML one', () => {
     const authorText = 'my reply\n\n';
     const text = `${authorText}发件人: Robin Chen\n日期: 2026年7月16日\n收件人: Alex Kim\n\nold body`;
