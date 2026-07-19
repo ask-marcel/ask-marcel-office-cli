@@ -13,9 +13,10 @@ import { findPlainTextQuoteBoundary, findQuoteBoundary } from './mail-quote-stri
  * still in it".
  *
  * Two operations, deliberately different:
- *   - `insertCommentAboveQuote` INSERTS at the quote boundary. Used when Graph
- *     has just minted the draft, so everything above the quote is Graph's own
- *     empty-comment scaffolding and must be kept.
+ *   - `insertCommentAboveQuote` INSERTS at the top of the body. Used when Graph
+ *     has just minted the draft: everything below is Graph's own scaffolding
+ *     (empty comment div, `<hr>` separator, quoted history), kept verbatim, and
+ *     the author's reply leads the body — above Graph's separator, not under it.
  *   - `replaceCommentAboveQuote` REPLACES everything from the body tag to the
  *     quote boundary. Used when revising an existing draft: inserting there
  *     would stack a second reply above the first on every edit.
@@ -59,9 +60,16 @@ const boundaryMarkerRefusal = (flagName: string): string =>
   `${flagName} carries a quoted-reply boundary marker (a pasted gmail_quote container, an Outlook divRplyFwdMsg / appendonsend / border-top separator, or a bold From: + Sent: header pair). It would be kept verbatim, and a later \`update-mail-draft --comment\` edit would cut the draft at that marker and lose the real quoted history below it. Remove the pasted quote from your text, or pass --body-content-type Text to have it escaped into literal characters.`;
 
 const insertCommentAboveQuote = (html: string, commentHtml: string): SpliceResult => {
-  const cut = findQuoteBoundary(html);
-  const at = cut === -1 ? findBodyInsertStart(html) : cut;
-  return { html: `${html.slice(0, at)}${commentHtml}${html.slice(at)}`, boundaryFound: cut !== -1 };
+  // Insert at the top of the body, ABOVE Graph's reply scaffolding (its empty
+  // comment div, its `<hr>` separator, and the quoted history). Graph does not
+  // always emit `appendonsend`: on tenants where it doesn't, the earliest quote
+  // boundary is `divRplyFwdMsg` sitting BELOW the plain `<hr>`, so inserting at
+  // the boundary parked the comment under the separator (reported 2026-07-19).
+  // Body-start is above every scaffolding variant, so the author's text always
+  // leads the body. The revise path (`replaceCommentAboveQuote`) already writes
+  // from body-start, so create and revise agree on where the comment lives.
+  const at = findBodyInsertStart(html);
+  return { html: `${html.slice(0, at)}${commentHtml}${html.slice(at)}`, boundaryFound: findQuoteBoundary(html) !== -1 };
 };
 
 const replaceCommentAboveQuote = (html: string, commentHtml: string): SpliceResult => {

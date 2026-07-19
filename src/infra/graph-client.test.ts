@@ -1053,7 +1053,7 @@ describe('graph client', () => {
         expiresInSeconds: undefined,
         scopes: [],
         refresh: 'interactive',
-        reason: expect.stringContaining('login --force'),
+        reason: expect.stringContaining('ask-marcel-office login'),
       });
   });
 
@@ -1071,7 +1071,7 @@ describe('graph client', () => {
     const result = await client.getCachedTokenInfo();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.elevated.reason).toContain('login --force'); // interactive: how to re-capture
+      expect(result.value.elevated.reason).toContain('ask-marcel-office login'); // interactive: how to re-capture
       expect(result.value.elevated.reason).toContain('no refresh token of its own'); // phrase UNIQUE to the interactive text — proves the tier picked its own branch
       expect(result.value.ic3.reason).toContain('self-heals'); // phrase UNIQUE to the automatic text (the interactive text never says this)
       expect(result.value.ic3.reason).toContain('login --force'); // automatic tiers still name the force fallback

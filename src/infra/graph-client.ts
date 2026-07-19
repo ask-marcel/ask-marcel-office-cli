@@ -175,7 +175,8 @@ type TokenInfo = {
 
 // Recovery hints attached to an UNAVAILABLE tier so a bare `scopes: []` on a
 // missing token reads as "not captured yet", not "this token has no scopes".
-const TIER_REASON_INTERACTIVE = 'not cached (absent or expired) — run `ask-marcel-office login --force` to re-capture it; the elevated token carries no refresh token of its own';
+const TIER_REASON_INTERACTIVE =
+  'not cached (absent or expired) — run `ask-marcel-office login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
 const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `ask-marcel-office login --force`';
 
 const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {

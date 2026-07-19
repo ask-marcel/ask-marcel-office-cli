@@ -172,12 +172,12 @@ describe('auth manager recovery ladder', () => {
   });
 
   // The three secondary tiers do NOT share a remedy, though they shared a message.
-  // chatsvcagg / ic3 ride the shared refresh token and self-heal headlessly, so
-  // they only reach the fail-fast once the RT itself is gone — which a plain
-  // `login` fixes. Elevated has no refresh token at all, so a plain `login` that
-  // finds a valid basic token returns without re-capturing it, and telling the
-  // user to run `login` sends them round a loop that never terminates.
-  it('sends you to login --force for the elevated token, and plain login for the substrate tiers', async () => {
+  // Every secondary tier now points at a plain `login`. chatsvcagg / ic3 ride
+  // the shared refresh token and self-heal headlessly. Elevated has no refresh
+  // token of its own, but `login.execute` self-escalates to the browser
+  // re-capture when it is missing, so a plain `login` recovers it too — no
+  // `--force` needed. Every fail-fast also names `scopes-check` for preflight.
+  it('points every secondary tier at a plain login (never --force), the elevated message flagging its no-refresh-token nature and every message naming scopes-check', async () => {
     const fs = createFileSystemFake();
     const tok = futureElevated();
     const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
@@ -188,7 +188,10 @@ describe('auth manager recovery ladder', () => {
     if (elevated.ok) return;
     expect(elevated.error.type).toBe('auth_failed');
     if (elevated.error.type !== 'auth_failed') return;
-    expect(elevated.error.message).toContain('login --force');
+    expect(elevated.error.message).toContain('ask-marcel-office login');
+    expect(elevated.error.message).not.toContain('--force');
+    expect(elevated.error.message).toContain('no refresh token of its own'); // elevated-specific explanation
+    expect(elevated.error.message).toContain('scopes-check'); // preflight pointer
 
     for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
       const result = await getToken();
@@ -427,6 +430,32 @@ describe('auth manager recovery ladder', () => {
     if (!result.ok && result.error.type === 'auth_failed') {
       expect(result.error.message).toBe('edge process killed');
     }
+  });
+
+  it('fails fast on the command path (acquireBasicViaBrowser:false) when the basic token cannot be refreshed, instead of launching the browser that hangs a headless run', async () => {
+    const fs = createFileSystemFake(); // empty cache: no access token, no refresh token
+    let browserLaunched = false;
+    const browser: BrowserAuth = {
+      acquireElevatedToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireBothTokens: async () => {
+        browserLaunched = true;
+        throw new Error('the command path must never launch a browser for the basic token');
+      },
+      acquireChatsvcaggToken: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      acquireIc3Token: async () => ({ ok: false as const, reason: 'sso_timeout' as const }),
+      close: async () => {},
+    };
+    // 8th arg = acquireBasicViaBrowser: false, the wiring build-deps uses for every command.
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, false);
+
+    const result = await auth.getAccessToken();
+
+    expect(result.ok).toBe(false);
+    if (result.ok || result.error.type !== 'auth_failed') return;
+    expect(result.error.code).toBe('not_authenticated');
+    expect(result.error.message).toContain('ask-marcel-office login');
+    expect(result.error.message).toContain('scopes-check');
+    expect(browserLaunched).toBe(false);
   });
 
   it('skips browser when cached token has wrong audience', async () => {

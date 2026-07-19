@@ -211,14 +211,17 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
  * `login` genuinely fixes that.
  *
  * Elevated carries NO refresh token of its own: it exists only via the browser
- * dance. A plain `login` that finds a valid basic token returns on the cache
- * rung without re-capturing it, so telling the user to run `login` sent them
- * round a loop with no exit — the command says "run login", login says
- * "authenticated", the command fails again. `--force` is the only rung that
- * re-captures it, and the message now says so AND says why.
+ * dance. A plain `login` that finds a valid basic token used to return on the
+ * cache rung without re-capturing it — a loop with no exit — so this message
+ * once demanded `--force`. `login.execute` closed that loop: the login command
+ * now inspects the cached elevated token and self-escalates to the forced
+ * browser re-capture when it is missing, so a plain `login` recovers elevated
+ * too. The remedy points there, and the message names `scopes-check` for
+ * preflight so an unattended agent can re-auth up front rather than discover the
+ * lapse mid-run.
  */
 const failFastSecondaryMessage = (token: string, commands: string, remedy: string): string =>
-  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. (Commands that need it: ${commands}.)`;
+  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office scopes-check\` (no Graph call) before a long unattended run. (Commands that need it: ${commands}.)`;
 
 /**
  * Command names quoted in the secondary-token error messages, per token kind.
@@ -245,14 +248,25 @@ const DEFAULT_SECONDARY_TOKEN_COMMANDS: SecondaryTokenCommands = {
 const commandList = (names: ReadonlyArray<string>): string => names.join(', ');
 
 const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
-const RECAPTURE_VIA_FORCED_LOGIN =
-  'It carries no refresh token of its own, so a plain `ask-marcel-office login` that finds a valid cached token returns without re-capturing it — run `ask-marcel-office login --force`';
+const RECAPTURE_ELEVATED_VIA_LOGIN =
+  'It carries no refresh token of its own, so re-capture it with `ask-marcel-office login` — the login command self-escalates to the browser re-capture when the elevated token is missing (it needs a host that can run the sign-in browser; the sign-in stays headless while the persistent profile cookies are warm)';
 
 // Stable machine-readable code for the secondary-token fail-fast (elevated /
 // chatsvcagg / ic3), so an agent can branch on `errorCode` instead of
 // substring-matching the human message. The message names which token, which
 // commands, and the tier-specific remedy.
 const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
+
+// Machine-readable code + message for the BASIC-token fail-fast on the command
+// path. When the cached basic token is absent/expired AND its refresh fails, the
+// only remaining rung is an interactive browser sign-in — a 5-minute poll that a
+// headless agent can never complete, so `get-user` (and every command) hung for
+// minutes rather than erroring (reported 2026-07-19). On the command path
+// (`acquireBasicViaBrowser: false`) we fail fast here instead; the browser rung is
+// reserved for the explicit `login` command, exactly as the secondary tokens are.
+const NOT_AUTHENTICATED_CODE = 'not_authenticated';
+const NOT_AUTHENTICATED_MESSAGE =
+  'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';
 
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
@@ -261,7 +275,8 @@ const createAuthManagerFromApi = (
   logger: Logger,
   fs: FileSystem,
   recaptureSecondaryViaBrowser: boolean = true,
-  secondaryTokenCommands: SecondaryTokenCommands = DEFAULT_SECONDARY_TOKEN_COMMANDS
+  secondaryTokenCommands: SecondaryTokenCommands = DEFAULT_SECONDARY_TOKEN_COMMANDS,
+  acquireBasicViaBrowser: boolean = true
 ): AuthManager => {
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
@@ -534,6 +549,10 @@ const createAuthManagerFromApi = (
         if (refreshed.ok) return refreshed;
       }
     }
+    // Command path: never launch an interactive browser for the basic token —
+    // fail fast with a single-line "run login" error instead of the 5-minute
+    // headless-hang poll. The `login` command's manager sets this true.
+    if (!acquireBasicViaBrowser) return err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
     // Under --force, tell the browser layer to skip its concurrent-refresh probe
     // so the still-valid cached token cannot short-circuit the full re-capture.
     return acquireViaBrowserShared(options?.force ?? false);
@@ -690,7 +709,7 @@ const createAuthManagerFromApi = (
     if (!recaptureSecondaryViaBrowser)
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('Elevated (M365)', commandList(secondaryTokenCommands.elevated), RECAPTURE_VIA_FORCED_LOGIN),
+        message: failFastSecondaryMessage('Elevated (M365)', commandList(secondaryTokenCommands.elevated), RECAPTURE_ELEVATED_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     // The persistent profile cookies do the silent SSO, no UI prompt.
@@ -959,6 +978,7 @@ const createAuthManager = (deps: {
   browserProfileDir?: string;
   recaptureSecondaryViaBrowser?: boolean;
   secondaryTokenCommands?: SecondaryTokenCommands;
+  acquireBasicViaBrowser?: boolean;
 }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
@@ -968,7 +988,16 @@ const createAuthManager = (deps: {
     freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
     onProgress: stderrProgress,
   });
-  return createAuthManagerFromApi(browserAuth, deps.cachePath, browserProfileDir, deps.logger, fs, deps.recaptureSecondaryViaBrowser, deps.secondaryTokenCommands);
+  return createAuthManagerFromApi(
+    browserAuth,
+    deps.cachePath,
+    browserProfileDir,
+    deps.logger,
+    fs,
+    deps.recaptureSecondaryViaBrowser,
+    deps.secondaryTokenCommands,
+    deps.acquireBasicViaBrowser
+  );
 };
 
 export { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress };

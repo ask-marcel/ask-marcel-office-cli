@@ -186,7 +186,7 @@ describe('create-reply-draft', () => {
     expect(gets).toEqual([]);
     // Exactly one PATCH, and the quote is INSIDE the body it carries.
     expect(patches).toEqual([
-      { path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p><b>bold</b> &amp; entity</p>${QUOTE_TAIL}` } } },
+      { path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}<p><b>bold</b> &amp; entity</p>${EMPTY_COMMENT_DIV}${QUOTE_TAIL}` } } },
     ]);
   });
 
@@ -209,7 +209,7 @@ describe('create-reply-draft', () => {
 
     expect(result.ok).toBe(true);
     expect(gets).toEqual(['/me/messages/draft-9?$select=body']);
-    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p>hi</p>${QUOTE_TAIL}` } } }]);
+    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}<p>hi</p>${EMPTY_COMMENT_DIV}${QUOTE_TAIL}` } } }]);
   });
 
   it('passes a failed draft-body read through untouched, never patching a body it could not see', async () => {

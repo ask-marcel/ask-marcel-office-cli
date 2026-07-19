@@ -172,7 +172,7 @@ describe('create-forward-draft', () => {
     expect(posts).toEqual([{ path: '/me/messages/msg-1/createForward', body: { comment: '', toRecipients: [{ emailAddress: { address: 'bob@example.com' } }] } }]);
     expect(gets).toEqual([]);
     expect(patches).toEqual([
-      { path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p><b>Bob</b> owns this now.</p>${QUOTE_TAIL}` } } },
+      { path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}<p><b>Bob</b> owns this now.</p>${EMPTY_COMMENT_DIV}${QUOTE_TAIL}` } } },
     ]);
   });
 
@@ -185,7 +185,7 @@ describe('create-forward-draft', () => {
       {
         path: '/me/messages/draft-9',
         body: {
-          body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p>hi</p>${QUOTE_TAIL}` },
+          body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}<p>hi</p>${EMPTY_COMMENT_DIV}${QUOTE_TAIL}` },
           ccRecipients: [{ emailAddress: { address: 'carol@example.com' } }],
           subject: 'FW: Q3 planning',
         },
@@ -209,7 +209,7 @@ describe('create-forward-draft', () => {
 
     expect(result.ok).toBe(true);
     expect(gets).toEqual(['/me/messages/draft-9?$select=body']);
-    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}${EMPTY_COMMENT_DIV}<p>hi</p>${QUOTE_TAIL}` } } }]);
+    expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { body: { contentType: 'HTML', content: `${HEAD}${BODY_OPEN}<p>hi</p>${EMPTY_COMMENT_DIV}${QUOTE_TAIL}` } } }]);
   });
 
   it('passes a failed draft-body read through untouched, never patching a body it could not see', async () => {

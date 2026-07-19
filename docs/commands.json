@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-19T06:37:06.532Z",
+  "generatedAt": "2026-07-19T09:47:57.851Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -442,7 +442,7 @@
           "name": "body-content-type",
           "key": "bodyContentType",
           "required": false,
-          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in above the forwarded original, leaving it and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
+          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's separator (the `<hr>` line) and the forwarded original, so your comment leads the body content — leaving the original and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -454,7 +454,7 @@
       ],
       "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
-      "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+      "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
     {
@@ -570,7 +570,7 @@
           "name": "body-content-type",
           "key": "bodyContentType",
           "required": false,
-          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in above the quote, leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
+          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -601,7 +601,7 @@
       ],
       "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --body-content \"Confirmed for Contoso, aligned with the group choice.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send.",
-      "bodyTemplate": "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced above the quote> }, subject?: '{subject}' }",
+      "bodyTemplate": "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
       "mutates": true
     },
     {
@@ -2690,7 +2690,7 @@
     },
     {
       "name": "get-user",
-      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the elevated M365 token — run a forced login first if it is cold. An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Only THIS tenant's directory is queried: a person's home-tenant object id (e.g. a cross-tenant Teams `8:orgid:<home-id>` participant, whose id lives in their own tenant) and any email that is not their `mail`/UPN here are unresolvable by design — reach an external person via their LOCAL guest projection (by name, or by their real `mail`), never by their home id. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query. Re-query by the candidate's `id` when it is a directory GUID; an EXTERNAL contact's candidate carries a base64-ish People-API id instead, which nothing can resolve — re-query those by the candidate's `mail` (the CLI rejects an opaque contact id with that remedy rather than returning empty matches). Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search. Without `--select`, the profile ships a default projection of id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone.",
+      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the elevated M365 token — preflight it with `ask-marcel-office scopes-check` (no Graph call) and run `ask-marcel-office login` first if it is cold. An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Only THIS tenant's directory is queried: a person's home-tenant object id (e.g. a cross-tenant Teams `8:orgid:<home-id>` participant, whose id lives in their own tenant) and any email that is not their `mail`/UPN here are unresolvable by design — reach an external person via their LOCAL guest projection (by name, or by their real `mail`), never by their home id. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query. Re-query by the candidate's `id` when it is a directory GUID; an EXTERNAL contact's candidate carries a base64-ish People-API id instead, which nothing can resolve — re-query those by the candidate's `mail` (the CLI rejects an opaque contact id with that remedy rather than returning empty matches). Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search. Without `--select`, the profile ships a default projection of id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/users/{user-id}  (id / UPN; an email that misses falls back to /users?$filter=mail eq)  OR /me/people?$search=\"{user-id}\"  (a bare name)",
@@ -2722,7 +2722,7 @@
         }
       ],
       "example": "ask-marcel-office get-user --user-id 'alice@contoso.com' --select 'id,displayName,mail,jobTitle,department'",
-      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path needs the elevated M365 token and fail-fasts with `secondary_token_unavailable` when it is cold — run `ask-marcel-office login --force`.",
+      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path needs the elevated M365 token and fail-fasts with `secondary_token_unavailable` when it is cold — preflight with `ask-marcel-office scopes-check` and run `ask-marcel-office login` to re-capture it.",
       "needsElevatedToken": true
     },
     {

@@ -70,9 +70,12 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // `recaptureSecondaryViaBrowser: false` makes the elevated/chatsvcagg/ic3
   // getters FAIL-FAST ("run `ask-marcel-office login`") instead of opening a visible
   // window per command when a secondary token lapses (~hourly for the elevated
-  // token). Secondary browser capture is reserved for the explicit `login`
-  // command, whose manager comes from `makeLoginAuth`.
-  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, secondaryTokenCommands });
+  // token). `acquireBasicViaBrowser: false` extends the same rule to the BASIC
+  // token: when the cache is cold and refresh fails, fail fast instead of the
+  // 5-minute interactive-login poll that hangs a headless agent. All browser
+  // capture is reserved for the explicit `login` command, whose manager comes
+  // from `makeLoginAuth`.
+  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, acquireBasicViaBrowser: false, secondaryTokenCommands });
   const graph = createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };
