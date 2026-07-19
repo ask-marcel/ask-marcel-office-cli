@@ -207,6 +207,25 @@ describe('get-mail-signature', () => {
     }
   });
 
+  it('inlines the signature logo even when Graph reports hasAttachments:false, the shape a message carries when its only images are inline', async () => {
+    // Inline images (contentId + isInline) do NOT flip Graph's `hasAttachments`,
+    // so a signature's logo rides in a message reported as hasAttachments:false.
+    // Gating the embed on that flag left the logo a raw cid: reference, broken
+    // once pasted into a fresh draft (reported 2026-07-19). The gate is the
+    // block's own cid: reference, not the flag.
+    const { graph } = scanningGraph({
+      [SCAN_PATH]: ok({ value: [{ id: 'sent-1' }] }),
+      [bodyOf('sent-1')]: ok(sent('<div id="Signature"><img src="cid:logo@fabrikam"></div>', { hasAttachments: false })),
+      [attsOf('sent-1')]: ok({ value: [{ id: 'att-1', name: 'logo.png', contentType: 'image/png', size: 120, isInline: true, contentId: 'logo@fabrikam' }] }),
+      '/me/messages/sent-1/attachments/att-1': ok({ contentBytes: 'QUJD' }),
+    });
+
+    const result = await execute(graph, {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ text: '<div id="Signature"><img src="data:image/png;base64,QUJD"></div>', inlinedImages: 1 });
+  });
+
   it('names every image it could not embed, counting them, when a signature carries more than one', async () => {
     const block = '<div id="Signature"><img src="cid:a@fabrikam"><img src="cid:b@fabrikam"></div>';
     const { graph } = scanningGraph({

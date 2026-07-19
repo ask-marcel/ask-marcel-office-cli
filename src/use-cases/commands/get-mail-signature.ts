@@ -49,6 +49,14 @@ const inlineSignatureImages = async (graph: GraphClient, messageId: string, bloc
   return { html, count: embeddable.length, note: `${skipped.length} inline image${skipped.length === 1 ? '' : 's'} left as a cid: reference: ${named}` };
 };
 
+// A signature references its logo as `<img src="cid:...">`. The single attachments
+// call is gated on THIS, not on Graph's `hasAttachments`: an inline image carries
+// `isInline` + a contentId but does NOT flip `hasAttachments`, so a signature whose
+// only images are inline rides in a message reported `hasAttachments:false`. Gating
+// on the flag skipped the embed and left the logo a raw cid: reference — broken
+// once pasted into a fresh draft (reported 2026-07-19).
+const referencesCidImage = (block: string): boolean => /\bsrc\s*=\s*["']cid:/i.test(block);
+
 const noSignatureFound = (messageId: string | undefined, scanned: number): GraphError => {
   const plural = scanned === 1 ? '' : 's';
   const scanMessage = `No OWA signature block (\`<div id="Signature">\`) was found in the last ${scanned} sent message${plural}. Mail composed in Outlook desktop does not carry the marker, so a signature may exist without being findable this way - pass --message-id to pin a message you know was sent from Outlook on the web.`;
@@ -96,7 +104,7 @@ const execute: Command['execute'] = async (graph, params) => {
     if (!message.success || message.data.body === undefined) continue;
     const block = extractSignatureBlock(message.data.body.content);
     if (block === undefined) continue;
-    const inlined = message.data.hasAttachments === true ? await inlineSignatureImages(graph, id, block) : { html: block, count: 0 };
+    const inlined = referencesCidImage(block) ? await inlineSignatureImages(graph, id, block) : { html: block, count: 0 };
     return ok(buildEnvelope(id, block, message.data.sentDateTime, inlined));
   }
   return err(noSignatureFound(messageId, candidates.value.length));
