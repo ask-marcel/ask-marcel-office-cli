@@ -21,6 +21,14 @@ export type BuildDepsConfig = {
   readonly fs?: FileSystem;
   readonly processRunner?: ProcessRunner;
   readonly createAuth?: typeof createAuthManager;
+  /**
+   * Whether this is an interactive session (a real TTY with a human present).
+   * Defaults to `process.stdin.isTTY`. When true, the command-path auth keeps
+   * the first-run auto-launched sign-in browser for the basic token; when false
+   * (a headless / piped agent run) that rung fails fast instead of hanging on
+   * the interactive-login poll. Injectable so tests pin the behavior.
+   */
+  readonly interactive?: boolean;
 };
 
 /**
@@ -66,16 +74,19 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const processRunner = config.processRunner ?? defaultProcessRunner();
   const logger = createWinstonLogger({ logLevel });
   const makeAuth = config.createAuth ?? createAuthManager;
-  // The command-path auth must never pop a browser per command:
-  // `recaptureSecondaryViaBrowser: false` makes the elevated/chatsvcagg/ic3
-  // getters FAIL-FAST ("run `ask-marcel-office login`") instead of opening a visible
-  // window per command when a secondary token lapses (~hourly for the elevated
-  // token). `acquireBasicViaBrowser: false` extends the same rule to the BASIC
-  // token: when the cache is cold and refresh fails, fail fast instead of the
-  // 5-minute interactive-login poll that hangs a headless agent. All browser
-  // capture is reserved for the explicit `login` command, whose manager comes
-  // from `makeLoginAuth`.
-  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, acquireBasicViaBrowser: false, secondaryTokenCommands });
+  // Secondary tokens (elevated / chatsvcagg / ic3) NEVER pop a per-command
+  // browser: `recaptureSecondaryViaBrowser: false` fails them fast ("run
+  // `ask-marcel-office login`") whether or not the session is interactive.
+  //
+  // The BASIC token is gated on the SESSION instead. A real terminal keeps the
+  // first-run convenience of an auto-launched sign-in browser; a headless / piped
+  // run (an agent, CI) has no TTY and no human to complete that sign-in, so its
+  // basic-token browser rung fails fast rather than blocking on the 5-minute
+  // interactive-login poll that hung a headless agent. Full browser capture stays
+  // available through the explicit `login` command (`makeLoginAuth` leaves
+  // `acquireBasicViaBrowser` at its `true` default).
+  const interactive = config.interactive ?? process.stdin.isTTY === true;
+  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, acquireBasicViaBrowser: interactive, secondaryTokenCommands });
   const graph = createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };

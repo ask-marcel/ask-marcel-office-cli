@@ -261,9 +261,10 @@ const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
 // path. When the cached basic token is absent/expired AND its refresh fails, the
 // only remaining rung is an interactive browser sign-in — a 5-minute poll that a
 // headless agent can never complete, so `get-user` (and every command) hung for
-// minutes rather than erroring (reported 2026-07-19). On the command path
-// (`acquireBasicViaBrowser: false`) we fail fast here instead; the browser rung is
-// reserved for the explicit `login` command, exactly as the secondary tokens are.
+// minutes rather than erroring (reported 2026-07-19). On a non-interactive run
+// (`acquireBasicViaBrowser: false`, wired from the absence of a TTY) we fail fast
+// here instead; an interactive terminal keeps the auto-browser, and the explicit
+// `login` command always has it.
 const NOT_AUTHENTICATED_CODE = 'not_authenticated';
 const NOT_AUTHENTICATED_MESSAGE =
   'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';

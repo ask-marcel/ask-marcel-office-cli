@@ -34,6 +34,24 @@ describe('buildDeps composition root', () => {
     expect(calls[0]?.recaptureSecondaryViaBrowser).toBe(false); // secondary getters fail-fast, no per-command browser
   });
 
+  it('gates the command-path basic-token browser on the session: fails fast when not interactive, keeps the auto-browser when it is', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+
+    // Non-interactive (an agent / piped run): no auto-browser for the basic token,
+    // so a cold cache fails fast instead of hanging on the interactive-login poll.
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: false, createAuth: recordingCreateAuth });
+    expect(calls[0]?.acquireBasicViaBrowser).toBe(false);
+
+    // Interactive (a real TTY): the first-run auto-launched sign-in browser stays.
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: true, createAuth: recordingCreateAuth });
+    expect(calls[1]?.acquireBasicViaBrowser).toBe(true);
+  });
+
   it('injects registry-derived secondary-token command lists into BOTH auth managers so the fail-fast messages track the manifest instead of a hardcoded list', () => {
     const fs = createFileSystemFake();
     const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
