@@ -100,6 +100,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-mail-folder-messages-delta': ['Mail.Read'],
   'get-mail-message': ['Mail.Read'],
   'get-mail-signature': ['Mail.Read'],
+  'find-mail-drafts': ['Mail.Read'],
   'get-mail-message-mime': ['Mail.Read'],
   'list-mail-attachments': ['Mail.Read'],
   'get-mail-attachment': ['Mail.Read'],

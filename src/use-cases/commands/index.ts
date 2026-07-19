@@ -17,6 +17,7 @@ import * as getExcelTable from './get-excel-table.ts';
 import * as getMailAttachment from './get-mail-attachment.ts';
 import * as getMailMessage from './get-mail-message.ts';
 import * as getMailSignature from './get-mail-signature.ts';
+import * as findMailDrafts from './find-mail-drafts.ts';
 import * as getMailboxSettings from './get-mailbox-settings.ts';
 import * as getMyProfilePhoto from './get-my-profile-photo.ts';
 import * as getOnenotePageAsMarkdown from './get-onenote-page-as-markdown.ts';
@@ -236,6 +237,7 @@ const commands: Record<string, Command> = {
   'list-mail-folder-messages': listMailFolderMessages,
   'get-mail-message': getMailMessage,
   'get-mail-signature': getMailSignature,
+  'find-mail-drafts': findMailDrafts,
   'list-mail-attachments': listMailAttachments,
   'get-mail-attachment': getMailAttachment,
   'list-mail-rules': listMailRules,
