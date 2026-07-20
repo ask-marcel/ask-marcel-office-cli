@@ -24,6 +24,7 @@ import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
+import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
@@ -71,7 +72,9 @@ const writeCommandNames = Object.entries(cmdRegistry)
   .map(([n]) => n)
   .toSorted((a, b) => a.localeCompare(b));
 
-const CATEGORY_LIST = 'lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta';
+// Derived from the single curated order in docs-render, never hardcoded, so a new category can never
+// drift out of sync with what the category filter actually accepts (docs-render.test pins completeness).
+const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 
 const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
   const { auth, graph, fs } = deps;

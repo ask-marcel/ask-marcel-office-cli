@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
-import { renderCommandMarkdown, renderReadmeTables } from './docs-render.ts';
+import { CATEGORY_LABELS, CATEGORY_ORDER, renderCommandMarkdown, renderReadmeTables } from './docs-render.ts';
 
 const calendarEvent: CommandManifestEntry = {
   name: 'get-calendar-event',
@@ -236,5 +236,15 @@ describe('renderCommandMarkdown', () => {
     // canonical heading first; alias surfaced so an LLM that learned the old name still finds it
     expect(md).toContain('# `list-drives`');
     expect(md).toContain('list-onedrive-drives');
+  });
+});
+
+describe('CATEGORY_ORDER', () => {
+  // CATEGORY_ORDER is the single source the MCP list-commands description derives its category list
+  // from. Pinning it to CATEGORY_LABELS (a Record over every CommandCategory) guarantees a new
+  // category cannot be added without appearing in the advertised list too.
+  it('lists every command category, so a list derived from it can never silently omit one', () => {
+    const advertised: readonly string[] = CATEGORY_ORDER;
+    expect([...advertised].toSorted((a, b) => a.localeCompare(b))).toEqual(Object.keys(CATEGORY_LABELS).toSorted((a, b) => a.localeCompare(b)));
   });
 });
