@@ -18,7 +18,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   },
 });
 
-const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'update'] as const;
+const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'mcp', 'update'] as const;
 
 describe('buildManifest', () => {
   it('builds a manifest with package name, version, generatedAt, and registry+lifecycle commands sorted alphabetically', () => {
@@ -27,7 +27,7 @@ describe('buildManifest', () => {
     expect(manifest.package).toBe('fake-pkg');
     expect(manifest.version).toBe('0.0.1');
     expect(manifest.generatedAt).toBe('2026-04-30T12:00:00.000Z');
-    expect(manifest.commands.map((c) => c.name)).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'update']);
+    expect(manifest.commands.map((c) => c.name)).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp', 'update']);
   });
 
   it('marks every lifecycle entry with category `lifecycle` so consumers can filter them', () => {
@@ -224,7 +224,7 @@ describe('renderSingleCommand', () => {
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'unknown_command') {
       expect(result.error.name).toBe('list-banana');
-      expect(result.error.available).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'update']);
+      expect(result.error.available).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp', 'update']);
     }
   });
 });

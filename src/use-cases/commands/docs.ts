@@ -156,6 +156,18 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     example: 'ask-marcel-office help-json',
     responseShape: '{ package, version, generatedAt, commands: [{ name, summary, category, ... }, ...] }',
   },
+  {
+    name: 'mcp',
+    summary:
+      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as five gateway tools (list-commands, get-command-docs, run-command, run-write-command, login). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp`. See docs/USAGE.md (MCP server).',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) serves the command registry over MCP stdio; not a Graph endpoint',
+    graphDocsUrl: 'https://modelcontextprotocol.io/',
+    options: [],
+    example: 'ask-marcel-office mcp',
+    responseShape: 'None — a long-lived stdio server emitting JSON-RPC frames until the client disconnects (never a JSON envelope).',
+  },
 ];
 
 const buildEntries = (registry: Readonly<Record<string, Command>>): ReadonlyArray<CommandManifestEntry> =>

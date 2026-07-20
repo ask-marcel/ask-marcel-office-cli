@@ -1,7 +1,7 @@
 /*
  * The MCP gateway — `ask-marcel-office mcp`.
  *
- * Five tools, not 183. The registry already carries everything a tool manifest
+ * Five tools, not 184. The registry already carries everything a tool manifest
  * needs, but exposing one MCP tool per command would inject hundreds of KB of
  * schema into every client session — the exact token bloat this CLI exists to
  * avoid. So discovery is three hops (list -> docs -> run) and the tool list is
@@ -61,7 +61,7 @@ const errText = (message: string, code?: string, source?: Parameters<typeof rend
   isError: true,
 });
 
-// Derived, never hardcoded. The ADR said 182/3; the registry says 183/4. Any
+// Derived, never hardcoded. The ADR said 182/3; the registry says 180/4. Any
 // literal here would be stale the next time a command lands.
 const readCommandNames = Object.entries(cmdRegistry)
   .filter(([, c]) => c.meta.mutates !== true)
@@ -102,7 +102,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     {
       title: 'Get command docs',
       description:
-        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/update/docs/help-json).',
+        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/update/docs/help-json/mcp).',
       inputSchema: {
         command: z.string().describe('Command name, e.g. `list-mail-messages`. A deprecated former name also resolves.'),
       },
@@ -121,7 +121,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     }
   );
 
-  // The read/write split exists so the 179 read commands keep an honest
+  // The read/write split exists so the 180 read commands keep an honest
   // `readOnlyHint: true` (which lets a client auto-approve them) instead of
   // losing it to the 4 draft commands sharing one tool.
   const runToolInput = {
