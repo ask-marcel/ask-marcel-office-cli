@@ -35,6 +35,18 @@ describe('replaceUnresolvedCidImages — swap leftover cid: img tags for readabl
   it('leaves an img with no src attribute untouched', () => {
     expect(replaceUnresolvedCidImages('<img alt="no src">', new Map())).toBe('<img alt="no src">');
   });
+
+  // HTML allows whitespace around the attribute `=`; `src = "..."` and `alt = "..."`
+  // must still be parsed, or a spaced tag would slip through as a broken cid: image.
+  it('matches src and alt even with whitespace around the equals sign', () => {
+    expect(replaceUnresolvedCidImages('<img src = "cid:ghost@x" alt = "chart screenshot">', new Map())).toBe('[inline image: chart screenshot]');
+  });
+
+  // An empty `alt=""` is not a usable label, so it is skipped and the cid prefix is used
+  // instead — `alt=""` must never produce the empty placeholder `[inline image: ]`.
+  it('skips an empty alt attribute and falls back to the cid prefix', () => {
+    expect(replaceUnresolvedCidImages('<img src="cid:image001.png@01DD" alt="">', new Map())).toBe('[inline image: image001.png]');
+  });
 });
 
 describe('embedInlineImages — replace cid: refs in mail body HTML with self-contained data: URIs', () => {

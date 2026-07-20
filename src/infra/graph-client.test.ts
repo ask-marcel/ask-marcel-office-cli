@@ -1394,6 +1394,37 @@ describe('graph client — partner-tenant guest tier', () => {
     if (result.error.type !== 'api_error') return;
     expect(result.error.code).toBe('not_a_sharepoint_host');
   });
+
+  // A lookalike host that only SUFFIXES the real one — `contoso.sharepoint.com.evil.com`
+  // — must NOT resolve to contoso's tenant. The trailing `$` anchor is what rejects it;
+  // without the anchor the prefix `contoso` would be lifted out and a guest token minted
+  // for the wrong tenant off an attacker-controlled domain.
+  it('reports no tenant for a host that only suffixes a real SharePoint host', async () => {
+    const client = createGraphClient(fakeAuthManager(), capturingFetch({}));
+
+    const result = await client.discoverTenantId('contoso.sharepoint.com.evil.com');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.code).toBe('not_a_sharepoint_host');
+  });
+
+  // A subdomain-prefixed lookalike — `evil.contoso.sharepoint.com` — must NOT resolve to
+  // contoso either. The leading `^` anchor is what rejects it; without the anchor the match
+  // could start mid-string at `contoso` and mint a guest token for the wrong tenant.
+  it('reports no tenant for a host prefixed with an extra subdomain', async () => {
+    const client = createGraphClient(fakeAuthManager(), capturingFetch({}));
+
+    const result = await client.discoverTenantId('evil.contoso.sharepoint.com');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type !== 'api_error') return;
+    expect(result.error.code).toBe('not_a_sharepoint_host');
+  });
 });
 
 describe('graph client — partner-tenant guest tier failure paths', () => {

@@ -85,6 +85,24 @@ describe('search-all-files', () => {
     expect((result.value as { value: ReadonlyArray<{ id: string }> }).value.map((f) => f.id)).toEqual(['f1', 'f2', 'f3']);
   });
 
+  // Dedup keys on hitId FIRST: two hits that share a hitId are the same file even when
+  // their resource ids differ, so they collapse to a single result rather than two.
+  it('dedupes two hits that share a hitId even when their resource ids differ', async () => {
+    const graph = graphWith(() =>
+      page(
+        [
+          { hitId: 'same', resource: { id: 'r1', name: 'a.docx' } },
+          { hitId: 'same', resource: { id: 'r2', name: 'b.docx' } },
+        ],
+        false
+      )
+    );
+    const result = await execute(graph, { query: 'x' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.value as { value: ReadonlyArray<unknown> }).value).toHaveLength(1);
+  });
+
   it('falls back to resource id for dedup when a hit carries no hitId', async () => {
     const noHitId = (id: string): FileHit => ({ resource: { id } });
     const graph = graphWith((from) => (from === 0 ? page([noHitId('a'), noHitId('b')], true) : page([noHitId('b'), noHitId('c')], false)));
