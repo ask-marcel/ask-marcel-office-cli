@@ -161,11 +161,15 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
   if (request.outputDir !== undefined) {
     const persistedMedia = await persistMediaIfRequested(deps.fs, request.outputDir, result.value);
     if (persistedMedia.ok) return ok(persistedMedia.value);
-    return err({ message: formatOutputDirError(persistedMedia.error, name) });
+    // The error's discriminant doubles as a machine-readable errorCode (`no_media`, `empty_path`,
+    // `write_failed`) so an agent routes on the code instead of substring-matching the message.
+    return err({ message: formatOutputDirError(persistedMedia.error, name), code: persistedMedia.error.type });
   }
   const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value);
   if (persisted.ok) return ok(persisted.value);
-  return err({ message: formatOutputPathError(persisted.error, name) });
+  // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
+  // `passthrough_extension_mismatch`, `inline_too_large`, `empty_path`, `write_failed`.
+  return err({ message: formatOutputPathError(persisted.error, name), code: persisted.error.type });
 };
 
 export { formatOutputDirError, formatOutputPathError };

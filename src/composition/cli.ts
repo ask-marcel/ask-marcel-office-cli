@@ -273,7 +273,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       if (opts.category !== undefined) {
         const filtered = filterManifestByCategory(fullOrTerse, opts.category);
         if (!filtered.ok) {
-          fail(`Unknown --category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`);
+          fail(`Unknown --category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`, 'cli_unknown_category');
           return;
         }
         await writeOrPrintText(JSON.stringify(filtered.value), 'application/json', 'help-json');

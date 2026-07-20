@@ -528,6 +528,37 @@ describe('buildCli command surface', () => {
     expect(parsed.error).toContain('drive');
   });
 
+  it('stamps a machine-readable errorCode on an unknown --category rejection so an agent routes on the code, not the message', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', async () => {
+      try {
+        await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
+      } catch {
+        /* commander exits */
+      }
+    });
+    const parsed = JSON.parse(out.trim()) as { ok: false; errorCode?: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.errorCode).toBe('cli_unknown_category');
+  });
+
+  it('stamps a no_inlined_bytes errorCode when --output-path is used on a plain-JSON command with no body to write', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({
+      auth: okAuth(),
+      graph: okGraph({ id: '1', displayName: 'Jordan Avery' }),
+      logger,
+      processRunner: createProcessRunnerFake(),
+      fs: createFileSystemFake(),
+    });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/out.json', 'get-current-user']));
+    const parsed = JSON.parse(out.trim()) as { ok: false; errorCode?: string; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.errorCode).toBe('no_inlined_bytes');
+    expect(parsed.error).toContain('did not return inlined bytes');
+  });
+
   it('rejects a duplicate --output flag', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({ id: 'u1' }), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
