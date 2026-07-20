@@ -18,7 +18,7 @@ bun add -g ask-marcel-office-cli
 ask-marcel-office login
 
 # the rest is discoverable
-ask-marcel-office --help                                # ~34 KB, one-sentence summaries
+ask-marcel-office --help                                # ~38 KB, one-sentence summaries
 ask-marcel-office help-json --terse --category mail     # ~6 KB JSON for one category
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
@@ -184,13 +184,13 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-of
 claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
 ```
 
-Five gateway tools, not one per command (183 schemas per session is the bloat this CLI exists to
+Five gateway tools, not one per command (184 schemas per session is the bloat this CLI exists to
 avoid). Discovery is three hops:
 
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 179 READ commands
+run-command { command, params?, outputPath?, outputDir? }        → the 180 READ commands
 run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
 ```
@@ -306,7 +306,7 @@ Environment variables read at composition time:
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun test           # full suite (3700+ tests)
+bun test           # full suite (4800+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)

@@ -4,7 +4,7 @@
 
 ### The Microsoft 365 command line built for AI agents
 
-**One sign-in. 183 read-only commands. Every document as clean markdown.**
+**One sign-in. 180 read-only commands. Every document as clean markdown.**
 
 [![npm version](https://img.shields.io/npm/v/ask-marcel-office-cli.svg?logo=npm&color=cb3837)](https://www.npmjs.com/package/ask-marcel-office-cli)
 [![license: MIT](https://img.shields.io/npm/l/ask-marcel-office-cli.svg?color=blue)](LICENSE)
@@ -178,13 +178,13 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-ma
 
 > **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
 
-You get **five gateway tools**, not one per command — 183 tool schemas would bloat every session, the opposite of the point:
+You get **five gateway tools**, not one per command — 184 tool schemas would bloat every session, the opposite of the point:
 
 | Tool | Does |
 |:--|:--|
 | `list-commands` | The terse manifest. Start here; `category` narrows it. |
 | `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 179 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-command` | The 180 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 
