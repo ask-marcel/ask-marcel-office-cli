@@ -1,0 +1,40 @@
+# .github/workflows/ci.yml (Java/Quarkus variant) - the authoritative gate set (rules 4.6, 15.1)
+#
+# CI runs every gate, fast and slow, so a bypassed local hook is still caught.
+# This is the required merge check; the pre-commit-java hook is the fast first
+# line. Make it a required status check in branch protection (rule 13.2).
+#
+# Actions are pinned to major tags for readability; pin to a commit SHA for
+# supply-chain safety in a real repo (rule 5.4).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for gitleaks detect
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: pom sanity (no ranges / -SNAPSHOT)
+        run: bash scripts/check-pom.sh
+      - name: secret scan (full history)
+        run: gitleaks detect --redact --no-banner
+      - name: format check
+        run: ./mvnw -q spotless:check
+      - name: verify (compile -Werror, unit + integration tests, JaCoCo tiers)
+        run: ./mvnw -q verify
+      - name: mutation (PIT, >= 90 on domain and usecases)
+        run: ./mvnw -q test-compile org.pitest:pitest-maven:mutationCoverage
+      - name: dependency CVEs (OWASP dependency-check, fails on high CVSS)
+        run: ./mvnw -q org.owasp:dependency-check-maven:check

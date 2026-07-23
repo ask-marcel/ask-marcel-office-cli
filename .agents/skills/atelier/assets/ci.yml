@@ -1,0 +1,50 @@
+# .github/workflows/ci.yml - the authoritative gate set (rules 4.6, 15.1)
+#
+# CI runs every gate, fast and slow, on a frozen lockfile, so a bypassed local
+# hook is still caught. This is the line that cannot be skipped with
+# --no-verify: make it a required status check in branch protection (rule 13.2,
+# governance.md), and nothing merges while it is red. The pre-commit hook
+# (assets/pre-commit) is the fast first line; this is the real one.
+#
+# Actions are pinned to major tags for readability; pin to a commit SHA for
+# supply-chain safety in a real repo (rule 5.4).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for gitleaks detect and mutate:changed
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile # lockfile drift fails here (rule 5.3)
+      - name: package.json (no latest / * / bare dist-tag)
+        run: bash scripts/check-package-json.sh
+      - name: secret scan (full history)
+        run: gitleaks detect --redact --no-banner
+      - name: lint (strict, type-aware, zero errors AND zero warnings)
+        run: bun run lint:strict
+      - name: typecheck
+        run: bun run typecheck
+      - name: tests
+        run: bun test
+      - name: coverage-preload sync (an out-of-sync preload lies about coverage)
+        run: bun run scripts/regenerate-coverage-preload.ts --check
+      - name: coverage (per-tier thresholds)
+        run: bun run coverage
+      - name: mutation (changed files on a PR, full sweep on main)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bun run mutate:changed
+          else
+            bun run mutate
+          fi
+      - name: dependency CVEs (fails on high)
+        run: bun audit --audit-level=high
