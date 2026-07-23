@@ -31,7 +31,7 @@ describe('create-forward-draft', () => {
       },
     });
 
-    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com, carol@example.com', bodyContent: 'Bob owns this, forwarding.' });
+    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com, carol@example.com', comment: 'Bob owns this, forwarding.' });
 
     expect(result.ok).toBe(true);
     // The comment travels via `comment` (Graph places it above the quote); a body
@@ -55,13 +55,13 @@ describe('create-forward-draft', () => {
       },
     });
 
-    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'carol@example.com', bodyContent: 'x', subject: 'FW: reassigned' });
+    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'carol@example.com', comment: 'x', subject: 'FW: reassigned' });
     // Body-free: the PATCH carries ONLY cc/subject. A `body` key would clobber the
     // createForward comment + quoted original, so `toEqual` pins its absence.
     expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { ccRecipients: [{ emailAddress: { address: 'carol@example.com' } }], subject: 'FW: reassigned' } }]);
 
     patches.length = 0;
-    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'x' });
+    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', comment: 'x' });
     expect(patches).toEqual([]);
   });
 
@@ -80,7 +80,7 @@ describe('create-forward-draft', () => {
         },
       });
 
-      const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'x' });
+      const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', comment: 'x' });
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.type).toBe('api_error');
@@ -99,7 +99,7 @@ describe('create-forward-draft', () => {
       },
     });
 
-    const result = await execute(graph, { forwardMessageId: 'msg-gone', toRecipients: 'bob@example.com', bodyContent: 'x' });
+    const result = await execute(graph, { forwardMessageId: 'msg-gone', toRecipients: 'bob@example.com', comment: 'x' });
 
     expect(result).toEqual(err({ type: 'api_error', status: 502, message: 'InvalidForward' }));
     expect(patchCalls).toBe(0);
@@ -112,19 +112,19 @@ describe('create-forward-draft', () => {
     });
 
     // A cc override triggers the body-free PATCH; its failure must propagate.
-    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'bad-addr', bodyContent: 'x' });
+    const result = await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'bad-addr', comment: 'x' });
 
     expect(result).toEqual(err({ type: 'api_error', status: 400, message: 'ErrorInvalidRecipients' }));
   });
 
   it('returns a validation_error when forward-message-id is missing', async () => {
-    const result = await execute(fakeGraphClient(), { toRecipients: 'bob@example.com', bodyContent: 'x' });
+    const result = await execute(fakeGraphClient(), { toRecipients: 'bob@example.com', comment: 'x' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
 
   it('returns a validation_error when to-recipients is missing (a forward with no recipient is not actionable)', async () => {
-    const result = await execute(fakeGraphClient(), { forwardMessageId: 'msg-1', bodyContent: 'x' });
+    const result = await execute(fakeGraphClient(), { forwardMessageId: 'msg-1', comment: 'x' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
@@ -159,12 +159,12 @@ describe('create-forward-draft', () => {
   };
 
   const htmlDraft = { id: 'draft-9', isDraft: true, body: { contentType: 'html', content: DRAFT_BODY } };
-  const forwardAsHtml = { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' };
+  const forwardAsHtml = { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', comment: '<p>hi</p>', bodyContentType: 'HTML' };
 
   it('splices an HTML comment above the forwarded original in one patch, keeping the head styles and the whole quoted original', async () => {
     const { graph, posts, patches, gets } = recordingGraph(htmlDraft);
 
-    const result = await execute(graph, { ...forwardAsHtml, bodyContent: '<p><b>Bob</b> owns this now.</p>' });
+    const result = await execute(graph, { ...forwardAsHtml, comment: '<p><b>Bob</b> owns this now.</p>' });
 
     expect(result.ok).toBe(true);
     // The recipients still ride in the create; only the comment is emptied, so the
@@ -196,7 +196,7 @@ describe('create-forward-draft', () => {
   it('still sends a body-free patch for cc on the text path, so the comment and quoted original Graph wrote are never rewritten', async () => {
     const { graph, patches } = recordingGraph(htmlDraft);
 
-    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'carol@example.com', bodyContent: 'over to you' });
+    await execute(graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', ccRecipients: 'carol@example.com', comment: 'over to you' });
 
     // `toEqual` pins the ABSENCE of a body key: today's behaviour, unchanged.
     expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { ccRecipients: [{ emailAddress: { address: 'carol@example.com' } }] } }]);
@@ -257,7 +257,7 @@ describe('create-forward-draft', () => {
   it('refuses a comment that itself carries a quote boundary marker, before any draft is created', async () => {
     const { graph, posts } = recordingGraph(htmlDraft);
 
-    const result = await execute(graph, { ...forwardAsHtml, bodyContent: '<div class="gmail_quote">pasted history</div>' });
+    const result = await execute(graph, { ...forwardAsHtml, comment: '<div class="gmail_quote">pasted history</div>' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
@@ -269,8 +269,8 @@ describe('create-forward-draft', () => {
     const explicit = recordingGraph(htmlDraft);
     const implicit = recordingGraph(htmlDraft);
 
-    await execute(explicit.graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'plain', bodyContentType: 'Text' });
-    await execute(implicit.graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', bodyContent: 'plain' });
+    await execute(explicit.graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', comment: 'plain', bodyContentType: 'Text' });
+    await execute(implicit.graph, { forwardMessageId: 'msg-1', toRecipients: 'bob@example.com', comment: 'plain' });
 
     expect(explicit.posts).toEqual(implicit.posts);
     expect(explicit.patches).toEqual(implicit.patches);

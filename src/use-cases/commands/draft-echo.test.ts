@@ -24,23 +24,23 @@ const echoingGraph = (): ReturnType<typeof fakeGraphClient> =>
   });
 
 const paths = [
-  { label: 'create-reply-draft, text, no subject', run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', bodyContent: 'x' }) },
-  { label: 'create-reply-draft, text, subject override', run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', bodyContent: 'x', subject: 'S' }) },
+  { label: 'create-reply-draft, text, no subject', run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', comment: 'x' }) },
+  { label: 'create-reply-draft, text, subject override', run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', comment: 'x', subject: 'S' }) },
   {
     label: 'create-reply-draft, HTML splice',
-    run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', bodyContent: '<p>x</p>', bodyContentType: 'HTML' }),
+    run: () => createReplyDraft(echoingGraph(), { replyToMessageId: 'm1', comment: '<p>x</p>', bodyContentType: 'HTML' }),
   },
   {
     label: 'create-forward-draft, text',
-    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', bodyContent: 'x' }),
+    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', comment: 'x' }),
   },
   {
     label: 'create-forward-draft, text, cc override',
-    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', bodyContent: 'x', ccRecipients: 'b@contoso.com' }),
+    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', comment: 'x', ccRecipients: 'b@contoso.com' }),
   },
   {
     label: 'create-forward-draft, HTML splice',
-    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', bodyContent: '<p>x</p>', bodyContentType: 'HTML' }),
+    run: () => createForwardDraft(echoingGraph(), { forwardMessageId: 'm1', toRecipients: 'a@contoso.com', comment: '<p>x</p>', bodyContentType: 'HTML' }),
   },
   { label: 'update-mail-draft, plain field update', run: () => updateMailDraft(echoingGraph(), { messageId: 'm1', subject: 'S' }) },
   { label: 'update-mail-draft, --comment revise', run: () => updateMailDraft(echoingGraph(), { messageId: 'm1', comment: 'revised' }) },

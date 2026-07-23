@@ -27,7 +27,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed for Contoso.' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: 'Confirmed for Contoso.' });
 
     expect(result.ok).toBe(true);
     // The reply text travels via `comment` (Graph places it above the quote); a
@@ -46,13 +46,13 @@ describe('create-reply-draft', () => {
       },
     });
 
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', subject: 'RE: Contoso migration - scope confirmed' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'x', subject: 'RE: Contoso migration - scope confirmed' });
     // Body-free: the PATCH carries ONLY the subject. A `body` key would clobber the
     // reply text + quoted thread, so `toEqual` pins its absence.
     expect(patches).toEqual([{ path: '/me/messages/draft-9', body: { subject: 'RE: Contoso migration - scope confirmed' } }]);
 
     patches.length = 0;
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'x' });
     expect(patches).toEqual([]);
   });
 
@@ -66,7 +66,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: 'x' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('api_error');
@@ -87,7 +87,7 @@ describe('create-reply-draft', () => {
         },
       });
 
-      const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x' });
+      const result = await execute(graph, { replyToMessageId: 'msg-1', comment: 'x' });
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.type).toBe('api_error');
@@ -106,14 +106,14 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-gone', bodyContent: 'x' });
+    const result = await execute(graph, { replyToMessageId: 'msg-gone', comment: 'x' });
 
     expect(result).toEqual(err({ type: 'api_error', status: 502, message: 'InvalidReplyAll' }));
     expect(patchCalls).toBe(0);
   });
 
   it('returns a validation_error when reply-to-message-id is missing', async () => {
-    const result = await execute(fakeGraphClient(), { bodyContent: 'x' });
+    const result = await execute(fakeGraphClient(), { comment: 'x' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
@@ -128,9 +128,9 @@ describe('create-reply-draft', () => {
       },
     });
 
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.', replyAll: 'false' });
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.', replyAll: 'true' });
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'Confirmed.' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'Confirmed.', replyAll: 'false' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'Confirmed.', replyAll: 'true' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'Confirmed.' });
 
     // Only the action differs; the comment payload is identical on both paths,
     // and anything other than an explicit `false` still replies to everyone.
@@ -150,7 +150,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'x', replyAll: 'maybe' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: 'x', replyAll: 'maybe' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
@@ -176,7 +176,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p><b>bold</b> &amp; entity</p>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<p><b>bold</b> &amp; entity</p>', bodyContentType: 'HTML' });
 
     expect(result.ok).toBe(true);
     // The create carries an EMPTY comment: Graph mints the scaffolding, we splice
@@ -205,7 +205,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<p>hi</p>', bodyContentType: 'HTML' });
 
     expect(result.ok).toBe(true);
     expect(gets).toEqual(['/me/messages/draft-9?$select=body']);
@@ -223,7 +223,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<p>hi</p>', bodyContentType: 'HTML' });
 
     expect(result).toEqual(err({ type: 'api_error', status: 404, message: 'ItemNotFound' }));
     expect(patchCalls).toBe(0);
@@ -241,7 +241,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<p>hi</p>', bodyContentType: 'HTML' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toContain('draft-9');
@@ -258,7 +258,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<p>hi</p>', bodyContentType: 'HTML' });
 
     expect(result.ok).toBe(false);
     // The draft EXISTS by the time this fails, so the message must name it or the
@@ -278,7 +278,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<p>hi</p>', bodyContentType: 'HTML' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: '<p>hi</p>', bodyContentType: 'HTML' });
 
     // Nothing is ever dropped for want of a boundary: the reply goes to the top
     // of the body and the rest of the document survives.
@@ -296,7 +296,7 @@ describe('create-reply-draft', () => {
       },
     });
 
-    const result = await execute(graph, { replyToMessageId: 'msg-1', bodyContent: '<div class="gmail_quote">pasted history</div>', bodyContentType: 'HTML' });
+    const result = await execute(graph, { replyToMessageId: 'msg-1', comment: '<div class="gmail_quote">pasted history</div>', bodyContentType: 'HTML' });
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
@@ -318,10 +318,10 @@ describe('create-reply-draft', () => {
       },
     });
 
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'plain reply', bodyContentType: 'Text' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'plain reply', bodyContentType: 'Text' });
     const explicitText = [...calls];
     calls.length = 0;
-    await execute(graph, { replyToMessageId: 'msg-1', bodyContent: 'plain reply' });
+    await execute(graph, { replyToMessageId: 'msg-1', comment: 'plain reply' });
 
     expect(explicitText).toEqual(calls);
     // And that shared path is still today's: the reply rides in the create, and

@@ -345,6 +345,30 @@ describe('buildCli command surface', () => {
     expect(capturedPath).toBe('/me/messages/AAMkAGI2');
   });
 
+  // 2026-07-23 bug report: --body-content named the above-the-quote text here
+  // and the WHOLE body on update-mail-draft. --comment is now the canonical
+  // spelling on all three (it is Graph's own field name), with the old flag
+  // kept working so nothing that learned it breaks.
+  it.each([
+    ['create-reply-draft', ['--reply-to-message-id', 'AAMkAGI2']],
+    ['create-forward-draft', ['--forward-message-id', 'AAMkAGI2', '--to-recipients', 'bob@example.com']],
+  ])('sends the same reply text on %s whether the caller writes --comment or the deprecated --body-content', async (command, idArgs) => {
+    const postedComment = async (flag: string): Promise<unknown> => {
+      let captured: unknown;
+      const captureGraph: GraphClient = fakeGraphClient({
+        post: async (_path: string, body: unknown) => {
+          captured = (body as { comment?: unknown }).comment;
+          return { ok: true, value: { id: 'AAMkAGI2', isDraft: true } };
+        },
+      });
+      const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', command, ...idArgs, flag, 'Confirmed for Contoso.']));
+      return captured;
+    };
+    expect(await postedComment('--comment')).toBe('Confirmed for Contoso.');
+    expect(await postedComment('--body-content')).toBe('Confirmed for Contoso.');
+  });
+
   it('accepts --start/--end as aliases for --start-date-time/--end-date-time on the calendar-view family', async () => {
     const pathFor = async (args: ReadonlyArray<string>): Promise<string> => {
       let captured = '';

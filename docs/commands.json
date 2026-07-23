@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.2.0",
-  "generatedAt": "2026-07-19T12:40:32.946Z",
+  "generatedAt": "2026-07-23T12:21:26.140Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -427,10 +427,16 @@
           "description": "Comma-separated list of CC recipient email addresses."
         },
         {
-          "name": "body-content",
-          "key": "bodyContent",
+          "name": "comment",
+          "key": "comment",
           "required": true,
-          "description": "The comment text, placed above the quoted forwarded message. Plain text by default; pass --body-content-type HTML to send it as markup."
+          "aliases": [
+            {
+              "name": "body-content",
+              "key": "bodyContent"
+            }
+          ],
+          "description": "The comment text, placed above the quoted forwarded message. Named for Graph's own createForward payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup. Accepts `--body-content` as a deprecated alias - beware that on update-mail-draft that flag means \"replace the ENTIRE body, quote included\"."
         },
         {
           "name": "subject",
@@ -442,7 +448,7 @@
           "name": "body-content-type",
           "key": "bodyContentType",
           "required": false,
-          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's separator (the `<hr>` line) and the forwarded original, so your comment leads the body content — leaving the original and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
+          "description": "Format of --comment: Text (default) or HTML. Text is handed to Graph as the forward comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's separator (the `<hr>` line) and the forwarded original, so your comment leads the body content — leaving the original and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the original is a plain-text message.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -452,9 +458,9 @@
           }
         }
       ],
-      "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --body-content \"Bob owns this now, forwarding for your action.\"",
+      "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --comment \"Bob owns this now, forwarding for your action.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
-      "bodyTemplate": "Text: POST { comment: '{body-content}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
+      "bodyTemplate": "Text: POST { comment: '{comment}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
       "mutates": true
     },
     {
@@ -561,16 +567,22 @@
           }
         },
         {
-          "name": "body-content",
-          "key": "bodyContent",
+          "name": "comment",
+          "key": "comment",
           "required": true,
-          "description": "The reply text, placed above the quoted history. Plain text by default; pass --body-content-type HTML to send it as markup."
+          "aliases": [
+            {
+              "name": "body-content",
+              "key": "bodyContent"
+            }
+          ],
+          "description": "The reply text, placed above the quoted history. Named for Graph's own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup. Accepts `--body-content` as a deprecated alias - beware that on update-mail-draft that flag means \"replace the ENTIRE body, quote included\"."
         },
         {
           "name": "body-content-type",
           "key": "bodyContentType",
           "required": false,
-          "description": "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
+          "description": "Format of --comment: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -599,9 +611,9 @@
           }
         }
       ],
-      "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --body-content \"Confirmed for Contoso, aligned with the group choice.\"",
+      "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --comment \"Confirmed for Contoso, aligned with the group choice.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
-      "bodyTemplate": "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
+      "bodyTemplate": "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
       "mutates": true
     },
     {
@@ -8063,10 +8075,10 @@
     },
     {
       "name": "update-mail-draft",
-      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.",
+      "summary": "Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content replaces the whole body and would drop the thread, so it is REFUSED on a draft that still carries a quote unless you pass --replace-quoted-history true. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.",
       "category": "mail",
       "graphMethod": "PATCH",
-      "graphPathTemplate": "/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used)",
+      "graphPathTemplate": "/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used, or when {body-content} is used without {replace-quoted-history})",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/message-update",
       "options": [
         {
@@ -8094,13 +8106,26 @@
           "name": "body-content",
           "key": "bodyContent",
           "required": false,
-          "description": "New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft this is almost never what you want - use --comment to revise only your own text and keep the quote. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment."
+          "description": "New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft that is almost never what you want, so the command reads the draft first and REFUSES when it still carries a quote - use --comment to revise only your own text and keep the quote, or pass --replace-quoted-history true to drop it deliberately. Note the sibling commands: on create-reply-draft / create-forward-draft, --body-content is a deprecated alias for --comment and means the text ABOVE the quote, not the whole body. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment."
         },
         {
           "name": "comment",
           "key": "comment",
           "required": false,
           "description": "Rewrite ONLY the reply text above the quoted history on a threaded draft, keeping the quote and its styles byte-identical. This is the flag for revising a draft made by create-reply-draft or create-forward-draft; repeated edits replace your text rather than stacking. Refused when the draft has no quoted history (use --body-content), when it is not a draft, and when HTML markup you pass carries a quote boundary marker of its own. Mutually exclusive with --body-content."
+        },
+        {
+          "name": "replace-quoted-history",
+          "key": "replaceQuotedHistory",
+          "required": false,
+          "description": "Allow --body-content to drop the quoted history on a threaded draft. Without it, --body-content is REFUSED when the draft still carries a quote, because replacing the whole body there silently loses the thread; the refusal points at --comment, which revises only your own text. Pass `true` for the deliberate case: strip the quote but keep the draft threaded on its conversation. Ignored in comment mode, which never touches the quote.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         },
         {
           "name": "body-content-type",
@@ -8150,7 +8175,7 @@
       ],
       "example": "ask-marcel-office update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
-      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged",
+      "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
       "mutates": true
     }
   ]

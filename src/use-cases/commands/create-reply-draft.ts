@@ -8,7 +8,7 @@ import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({
   replyToMessageId: z.string().min(1),
-  bodyContent: z.string().min(1),
+  comment: z.string().min(1),
   subject: z.string().optional(),
   replyAll: z.enum(['true', 'false']).optional(),
   bodyContentType: z.enum(['Text', 'HTML']).optional(),
@@ -35,7 +35,7 @@ const readDraftBody = async (graph: GraphClient, created: unknown, draftId: stri
       type: 'api_error',
       status: 500,
       code: 'draft_body_unreadable',
-      message: `Draft ${draftId} was created but its body could not be read back, so the reply text was never written into it. The draft exists - review it in Outlook Drafts, or set its body with \`update-mail-draft --message-id ${draftId} --body-content ...\`.`,
+      message: `Draft ${draftId} was created but its body could not be read back, so the reply text was never written into it. The draft exists - review it in Outlook Drafts, or revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode (see \`ask-marcel-office docs update-mail-draft\`).`,
     });
   }
   return ok(parsed.data.body);
@@ -44,7 +44,7 @@ const readDraftBody = async (graph: GraphClient, created: unknown, draftId: stri
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { replyToMessageId, bodyContent, subject, replyAll, bodyContentType } = parsed.data;
+  const { replyToMessageId, comment, subject, replyAll, bodyContentType } = parsed.data;
 
   // Reply-all stays the default: dropping recipients is a deliberate act, so it
   // takes an explicit `false`. Anything else (absent, or `true`) replies to all.
@@ -55,8 +55,8 @@ const execute: Command['execute'] = async (graph, params) => {
   // the splice, and the NEXT `update-mail-draft --comment` edit would cut the
   // draft AT the pasted marker, silently dropping everything below it. Refuse
   // before creating anything, so there is no orphan draft to clean up.
-  if (asHtml && commentCarriesQuoteBoundary(bodyContent)) {
-    return err({ type: 'validation_error', message: boundaryMarkerRefusal('--body-content') });
+  if (asHtml && commentCarriesQuoteBoundary(comment)) {
+    return err({ type: 'validation_error', message: boundaryMarkerRefusal('--comment') });
   }
 
   // Graph mints the threaded draft (inherited recipients, RE: subject, quoted
@@ -65,7 +65,7 @@ const execute: Command['execute'] = async (graph, params) => {
   // whole draft body and drops the quoted thread (fixed 2026-07-13). The HTML
   // path posts an EMPTY comment (Graph HTML-escapes what `comment` carries) and
   // splices the markup in below, keeping the quote inside the body it patches.
-  const created = await graph.post(`/me/messages/${replyToMessageId}/${action}`, { comment: asHtml ? '' : bodyContent });
+  const created = await graph.post(`/me/messages/${replyToMessageId}/${action}`, { comment: asHtml ? '' : comment });
   if (!created.ok) return created;
 
   // Defense in depth: both reply actions are documented to return an UNSENT
@@ -99,13 +99,13 @@ const execute: Command['execute'] = async (graph, params) => {
   if (draftBody.value.contentType.toLowerCase() !== 'html') {
     return err({
       type: 'validation_error',
-      message: `The thread's draft body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above its quoted history without rewriting the quote. Draft ${draftId} was already created - reply to it with \`update-mail-draft --message-id ${draftId} --comment "..."\`, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
+      message: `The thread's draft body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above its quoted history without rewriting the quote. Draft ${draftId} was already created - revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
     });
   }
 
   // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
   // never PATCH body WITHOUT the quote in it. Subject merges into the same call.
-  const spliced = insertCommentAboveQuote(draftBody.value.content, bodyContent);
+  const spliced = insertCommentAboveQuote(draftBody.value.content, comment);
   const patch: Record<string, unknown> = { body: { contentType: 'HTML', content: spliced.html } };
   if (subject) patch.subject = subject;
   return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
@@ -128,17 +128,19 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'idOrName' },
     },
     {
-      name: 'body-content',
-      key: 'bodyContent',
+      name: 'comment',
+      key: 'comment',
       required: true,
-      description: 'The reply text, placed above the quoted history. Plain text by default; pass --body-content-type HTML to send it as markup.',
+      aliases: [{ name: 'body-content', key: 'bodyContent' }],
+      description:
+        'The reply text, placed above the quoted history. Named for Graph\'s own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup. Accepts `--body-content` as a deprecated alias - beware that on update-mail-draft that flag means "replace the ENTIRE body, quote included".',
     },
     {
       name: 'body-content-type',
       key: 'bodyContentType',
       required: false,
       description:
-        "Format of --body-content: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
+        "Format of --comment: Text (default) or HTML. Text is handed to Graph as the reply comment, which HTML-escapes it, so markup shows as literal characters. HTML instead creates the draft with an empty comment and splices your markup in at the TOP of the body — above Graph's reply separator (the `<hr>` line) and the quoted thread, so your reply leads the body content — leaving the quoted thread and its styles byte-identical. Rejected when your markup itself contains a quote boundary marker (a pasted reply chain), and when the thread is a plain-text one.",
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
     {
@@ -156,9 +158,9 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: 'ask-marcel-office create-reply-draft --reply-to-message-id "AAMkAD..." --body-content "Confirmed for Contoso, aligned with the group choice."',
+  example: 'ask-marcel-office create-reply-draft --reply-to-message-id "AAMkAD..." --comment "Confirmed for Contoso, aligned with the group choice."',
   bodyTemplate:
-    "Text: POST { comment: '{body-content}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{body-content}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
+    "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
