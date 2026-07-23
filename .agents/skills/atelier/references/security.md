@@ -219,6 +219,18 @@ Protection is the default on every route and every environment, never a per-rout
 
 One baseline for every project, not standards that drift per repo: this section plus the categories above are that baseline.
 
+## One inspectable edge, no reachable origin (5.10)
+
+The private network above is only half the rule. Public traffic funnels through a **single filtering edge** (a WAF or the platform's managed gateway) that inspects, rate-limits, and blocks before anything reaches your code, and the **origin is locked to that edge**: it lives in the private subnets, has no public address, and accepts connections only from the edge. A filter you can sidestep by hitting the origin's IP is theater. Where the network cannot guarantee it, the origin verifies a shared edge secret too, defense in depth on top of the network:
+
+```ts
+// the origin refuses anything that did not pass the edge; unreachable looks absent (7.1), not forbidden
+app.use('*', (c, next) =>
+  c.req.header('x-edge-secret') === env.EDGE_SECRET ? next() : c.text('not found', 404));
+```
+
+The edge is the one place this pillar's rate limits (5.7) and pillar 10's call deadlines (10.13) live, every public request passing through it. The origin lock itself is infrastructure (`references/delivery.md`); a fully managed gateway with no separately addressable origin already satisfies the rule.
+
 ## Next.js specifics
 
 - **`output: 'export'`** | static export means no runtime server code. There is no backend to defend in-package; every auth check must happen at your actual backend (Firebase, Cloud Run, etc.). Do not assume Next.js will filter anything at runtime.

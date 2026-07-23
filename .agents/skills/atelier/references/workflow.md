@@ -63,7 +63,7 @@ If any of the four fail, fix the cause and re-run all four. Do not move on while
 }
 ```
 
-`bun run lint:strict` (~25 s) sets the env var `LINT_STRICT=1`; the same `eslint.config.js` reads `process.env['LINT_STRICT']` and conditionally adds a type-aware block (`parserOptions.projectService: true` plus `@typescript-eslint/no-unnecessary-type-assertion` and `@typescript-eslint/prefer-promise-reject-errors`). One config file, two modes — no separate `eslint.strict.config.js` to keep in sync. The pre-commit hook (gate 5) runs the strict version; trust the hook for the inner loop.
+`bun run lint:strict` (~25 s) sets the env var `LINT_STRICT=1`; the same `eslint.config.js` reads `process.env['LINT_STRICT']` and conditionally adds a type-aware block (`parserOptions.projectService: true` plus `@typescript-eslint/no-unnecessary-type-assertion` and `@typescript-eslint/prefer-promise-reject-errors`). One config file, two modes, no separate `eslint.strict.config.js` to keep in sync. CI runs the strict version as a merge gate; the pre-commit hook runs the fast, non-type-aware `lint:staged` on the staged files, so run `bun run lint:strict` yourself in the inner loop to see the type-aware findings before you push.
 
 ## Zero warnings; no inline ignores
 
@@ -112,17 +112,15 @@ bun run scripts/regenerate-coverage-preload.ts
 bun run scripts/regenerate-coverage-preload.ts --check
 ```
 
-**Optional: wire `--check` into pre-commit as a pre-flight check** before the eight numbered gates. It's <100 ms and an out-of-sync preload silently lies about coverage:
+**Wire `--check` into CI, right before the coverage gate.** An out-of-sync preload silently lies about coverage, so the check belongs beside the gate it protects, and the coverage gate runs in CI:
 
 ```bash
-# In .githooks/pre-commit (or assets/pre-commit), before "[1/8] commit size":
+# In .github/workflows/ci.yml, before the coverage step:
 echo "pre-flight: coverage-preload sync" >&2
 bun run scripts/regenerate-coverage-preload.ts --check
 ```
 
-The pre-flight check is **not part of the eight numbered gates** — those stay 1..8 to keep the branding stable. The pre-flight is "you forgot to regenerate after adding a new file"; treat it like a typo check, not a quality gate.
-
-Then the workflow becomes: add a new file under `src/infra/`, run `bun run scripts/regenerate-coverage-preload.ts`, stage both files together, commit. The `--check` invocation catches any forgotten regeneration before it merges. CI can run the same `--check` as a separate job.
+It is <100 ms and O(files), so it is cheap enough to also drop into the pre-commit hook as a pre-flight if you like, but its real home is CI, next to the coverage gate. Then the workflow becomes: add a new file under `src/infra/`, run `bun run scripts/regenerate-coverage-preload.ts`, stage both files together, commit. The `--check` invocation catches any forgotten regeneration before it merges.
 
 ## SDK-bridge lines: how coverage handles unreachable wiring
 
@@ -320,7 +318,7 @@ Integrate to one branch — `main` (the trunk) — continuously. Commit straight
 
 The rules already in this skill are precisely what makes committing to the trunk safe — trunk-based development is their reason for existing, not a separate concern:
 
-- **Every commit keeps `main` releasable.** The eight-gate pre-commit hook (below) is the gate that lets you commit to a shared trunk without breaking everyone else — tests pass, types check, coverage and mutation hold, no secrets, before the commit lands.
+- **Every commit keeps `main` releasable.** The fast pre-commit hook (below) blocks the obvious breakage locally (size, secrets, staged lint, types) in a few seconds, and CI holds the full line (the whole test suite, coverage, mutation, strict lint) as the required merge check, so what reaches the shared trunk is green.
 - **Commits stay small** (gate 1: ≤10 files AND ≤300 lines). Small commits are the unit of continuous integration; they review in minutes, revert cleanly, and bisect precisely. A 300-line ceiling is a trunk-based ceiling.
 - **History stays linear and legible** (Conventional Commits, `commit-msg` hook). A trunk read top-to-bottom is the changelog.
 - **Incomplete work hides behind a flag, not a branch.** When a feature spans several commits, keep each commit green and the half-built path dark behind a feature flag or simply unreferenced — never park weeks of work on a divergent branch. This is the same instinct as YAGNI and "minimal": ship the smallest safe increment.
@@ -331,70 +329,57 @@ This is the default for this codebase. It overrides any tooling habit of "branch
 
 ## Commit identity (rule 26)
 
-Every commit carries an author and a committer (each a name plus an email), taken from git config, and whatever they are becomes permanent public history the moment you push. `gitleaks` (gate 3) scans the staged *diff* for secrets, but it is blind to the *identity* on the commit itself: a real name or an `@company.com` email in the author field sails through every gate. Rule 26 covers that gap. It is a behavioural gate, not a tool.
+Every commit carries an author and a committer (each a name plus an email), taken from git config, and whatever they are becomes permanent public history the moment you push. Carrying the contributor's real identity in that metadata is normal, the default of the whole open-source world, and never a finding, an audit item, or a publish blocker.
 
-**Decide the identity on purpose, before the first commit.** Do not let the global git config leak whatever it happens to hold. Set a repo-local identity so the choice is explicit and scoped to this repo:
+File contents are the opposite. No tracked file ever names a person, an employer, or a client: not a name in a comment or a LICENSE holder line, not an employer's internal hostname in a config, not a client name in a fixture. A content mention outlives the commit that added it, travels with every copy and quote of the file, and once pushed cannot be removed by anything short of a history rewrite. Where a holder or author string is structurally required, use a neutral handle (e.g. `atelier`). Host control files whose format is identities (CODEOWNERS, `.mailmap`) are metadata in file form, not mentions; they are exempt. The cheap moment to catch a mention is review (atelier-review-me checks it); the expensive moment is after a push.
 
-```bash
-# Neutral: the repo is not tied to a person or employer.
-git config --local user.name  "atelier"
-git config --local user.email "atelier@users.noreply.github.com"
+Secrets are the other real pre-publish concern: run `gitleaks detect` (the history-wide mode, not the pre-commit `protect --staged`) before the first push to a public host. Secrets in history are always findings; metadata identities never are.
 
-# Attributed: you deliberately want credit on your own work.
-git config --local user.name  "Your Name"
-git config --local user.email "you@personal.example"   # or <id>+<user>@users.noreply.github.com
-```
-
-`--local` writes to this repo's `.git/config` only, so it never changes how you commit elsewhere and it wins over the global identity. Neither choice is wrong; the failure mode rule 26 prevents is the *unchosen* one, where a client's name or a work email you never meant to publish rides along by default.
-
-**Audit before publishing or handing off.** The identity is already inside every commit, so grepping files is not enough; check the metadata across all of history:
+**Scrubbing pushed history is a rewrite, gated and user-initiated.** A one-time, destructive operation; never run it unprompted (rule 25). Use `git filter-repo` (install: `brew install git-filter-repo`): `--replace-text` removes a mention from file contents across history, and `--mailmap` remaps commit metadata when the user wants that changed too:
 
 ```bash
-git log --all --format='%an <%ae>  ||  %cn <%ce>' | sort -u   # every identity ever used
-git log --all --format='%an <%ae>' | grep -i '@yourcompany'   # hunt a specific leak
-```
-
-`gitleaks detect` (the history-wide mode, not the pre-commit `protect --staged`) is the secret-scanning complement. Run both before the first push to a public host.
-
-**If the wrong identity already shipped, rewrite history.** A one-time, destructive, gated operation; never run it unprompted (rule 25). Use `git filter-repo` (install: `brew install git-filter-repo`) with a mailmap that maps the leaked identity to the intended one:
-
-```bash
-# mailmap.txt maps any commit with the old email to the new identity:
-#   Intended Name <intended@email>  <leaked@company.com>
-git filter-repo --mailmap mailmap.txt --force
+# replacements.txt, one rule per line (mention ==> neutral replacement):
+#   Old Name==>atelier
+#   old@company.com==>atelier@users.noreply.github.com
+git filter-repo --replace-text replacements.txt --force
 git remote add origin <url>          # filter-repo strips the remote as a safety measure
 git push --force-with-lease origin main
 ```
 
-To scrub a name from *file contents* too (a LICENSE header, a comment), add `--replace-text` with `Old Name==>New Name` lines. `filter-repo` rewrites every commit SHA, so this is a coordinated force-push: anyone holding a clone must re-clone.
+To also remap the author and committer fields, add `--mailmap` with `Intended Name <intended@email> <old@email>` lines. `filter-repo` rewrites every commit SHA, so this is a coordinated force-push: anyone holding a clone must re-clone.
 
-**A force-push does not purge the old commits.** The rewritten branch no longer points at them, but the host keeps unreferenced commits reachable by their SHA, through cached views, and via any fork or open PR, until it garbage-collects on its own schedule. Treat a leaked commit as exposed even after the fix: rotate anything that was a live secret, and for a hard guarantee delete-and-recreate the repo or ask the host's support to purge. atelier-greenfield sets the identity at repo birth so the whole procedure is never needed; atelier-review-me's adopt mode scans an existing repo for the leak.
+**A force-push does not purge the old commits.** The rewritten branch no longer points at them, but the host keeps unreferenced commits reachable by their SHA, through cached views, and via any fork or open PR, until it garbage-collects on its own schedule. Treat a leaked commit as exposed even after the fix: rotate anything that was a live secret, and for a hard guarantee delete-and-recreate the repo or ask the host's support to purge.
 
-## Pre-commit hook (eight gates)
+## Gates: a fast pre-commit hook plus the full set in CI
 
-The hook is the safety net for the entire workflow. It runs **eight gates** in cost-ascending order — cheap fast-fail gates first, expensive gates last so a slow mutation run only happens when everything else is clean.
+The gate set has two homes, split by speed and not by importance (rule 15.1). The pre-commit hook runs the **fast gates** only, because a multi-minute hook trains `git commit --no-verify` (rule 15.3). Every gate, fast and slow, also runs in **CI**, the line that cannot be skipped and the required merge check (rule 4.6). The full test suite, per-tier coverage, and Stryker mutation are slow and grow with the codebase, so they live in CI and only in CI.
 
-This eight-gate hook is the **Bun-script variant's** mechanism. The Next.js monorepo uses `simple-git-hooks` (test + lint + commitlint) instead — see `references/nextjs-monorepo.md`. Never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other.
+This is the **Bun-script variant's** mechanism. The Next.js monorepo uses `simple-git-hooks` (staged lint + typecheck + commitlint) instead, see `references/nextjs-monorepo.md`. Never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other.
+
+**The pre-commit hook (fast gates, target under ~5s):**
 
 | # | Gate | Purpose | Typical time |
 |:--:|:---|:---|:--:|
-| 1 | `scripts/check-commit-size.sh` | ≤10 files AND ≤300 lines | <1s |
-| 2 | `scripts/check-package-json.sh` | no `"latest"` or `"*"` version strings | <1s |
+| 1 | `scripts/check-commit-size.sh` | <=10 files AND <=300 lines | <1s |
+| 2 | `scripts/check-package-json.sh` | no `"latest"` / `"*"` / bare dist-tag | <1s |
 | 3 | `gitleaks protect --staged` | secret scan on the staged diff | ~50ms |
-| 4 | `bun test` | unit tests pass | seconds |
-| 5 | `bun run lint:strict` | type-aware ESLint, 0 errors AND 0 warnings | ~25s |
-| 6 | `bun run typecheck` | `tsc --noEmit` clean | seconds |
-| 7 | `bun run coverage` | per-tier thresholds pass | seconds |
-| 8 | `bun run mutate:staged` | ≥90% mutation score on staged domain/use-case files | 1–3 min per staged file |
+| 4 | `bun run lint:staged` | ESLint on the staged TS files only | ~1-2s |
+| 5 | `bun run typecheck` | `tsc --noEmit` clean | seconds |
 
-A ready-to-copy script lives in the skill at `assets/pre-commit`. The companion scripts (`check-commit-size.sh`, `check-package-json.sh`, `mutate-staged.sh`, `mutate-changed.sh`, `regenerate-coverage-preload.ts`) live alongside it, plus `assets/commit-msg` — a separate git hook documented under *Commit message format* below.
+Every gate here is O(staged files) or O(1). Typecheck is the one that grows with the whole codebase; if it exceeds the hook budget on your repo, move it to CI too. Never add the test suite, coverage, or mutation to the hook.
+
+**CI (`assets/ci.yml`, the authoritative merge gate):** install on a frozen lockfile, then `check-package-json.sh`, `gitleaks detect` (full history), `lint:strict` (type-aware, zero warnings, ~25s), `typecheck`, `bun test` (the whole suite), `bun run coverage` (per-tier), `bun run mutate:changed` on a pull request or `bun run mutate` on main (1-3 min per file), and `bun audit`. Make it a required status check in branch protection (rule 13.2) so a bypassed hook is still caught.
+
+A ready-to-copy hook lives in the skill at `assets/pre-commit`, the CI workflow at `assets/ci.yml`, and the staged-lint helper at `assets/lint-staged.sh`. The companion scripts (`check-commit-size.sh`, `check-package-json.sh`, `mutate-staged.sh`, `mutate-changed.sh`, `regenerate-coverage-preload.ts`) live alongside, plus `assets/commit-msg`, a separate git hook documented under *Commit message format* below.
 
 ### Install once per clone
 
 ```bash
-mkdir -p .githooks scripts
+mkdir -p .githooks scripts .github/workflows
 cp <skill>/assets/pre-commit .githooks/pre-commit
 cp <skill>/assets/commit-msg .githooks/commit-msg
+cp <skill>/assets/ci.yml .github/workflows/ci.yml
+cp <skill>/assets/lint-staged.sh scripts/lint-staged.sh
 cp <skill>/assets/check-commit-size.sh scripts/check-commit-size.sh
 cp <skill>/assets/check-package-json.sh scripts/check-package-json.sh
 cp <skill>/assets/check-coverage.ts scripts/check-coverage.ts
@@ -408,13 +393,14 @@ git config core.hooksPath .githooks
 bun run scripts/regenerate-coverage-preload.ts
 ```
 
-`core.hooksPath .githooks` picks up **both** `.githooks/pre-commit` (the eight gates, on the staged diff) and `.githooks/commit-msg` (Conventional Commits, on the message) — one config, two hooks.
+`core.hooksPath .githooks` picks up **both** `.githooks/pre-commit` (the fast gates, on the staged diff) and `.githooks/commit-msg` (Conventional Commits, on the message), one config, two hooks. `.github/workflows/ci.yml` is the authoritative gate set that runs every gate on every push and pull request.
 
 Add to `package.json`:
 
 ```json
 {
   "scripts": {
+    "lint:staged": "bash scripts/lint-staged.sh",
     "mutate": "stryker run",
     "mutate:changed": "bash scripts/mutate-changed.sh",
     "mutate:staged": "bash scripts/mutate-staged.sh"
@@ -467,7 +453,7 @@ The hook runs `gitleaks protect --staged --redact --verbose --no-banner`. Two di
 
 Run `gitleaks detect` once before the first push to GitHub to catch anything that snuck in pre-hook.
 
-### Mutation testing with Stryker (gate 8)
+### Mutation testing with Stryker (a CI gate)
 
 [Stryker](https://stryker-mutator.io/) generates small "mutants" of the production code (e.g. `>` becomes `>=`, `&&` becomes `||`, `return x` becomes `return undefined`) and runs the test suite against each. A mutant that survives means your tests don't actually pin the behaviour they appear to.
 
@@ -505,7 +491,7 @@ There is no first-party `@stryker-mutator` Bun runner today (community plugins e
 
 - **`bun run mutate`** — full run on `src/domain/**` + `src/use-cases/**`. Slow (1–2 hr on ~150 files). Periodic audit.
 - **`bun run mutate:changed`** — files differing from `origin/main` plus uncommitted edits. Run during iteration. Override base ref with `BASE=HEAD~3 bun run mutate:changed`.
-- **`bun run mutate:staged`** — files staged for the next commit. Used by gate 8. Skips with exit 0 when no relevant files are staged, so commits to docs, tests, or scripts are unaffected.
+- **`bun run mutate:staged`**: files staged for the next commit. An optional local pre-push check; CI is the enforcing home, running `mutate:changed` on a pull request and `mutate` on main. Skips with exit 0 when no relevant files are staged, so commits to docs, tests, or scripts are unaffected.
 
 **Mutation scope is exactly `src/domain/**` + `src/use-cases/**`, with only two structural exclusions:**
 
@@ -524,7 +510,7 @@ ESLint must ignore `.stryker-tmp/` and `reports/` so Stryker scratch dirs do not
 
 ### Commit message format (commit-msg hook)
 
-The eight gates above run on the **staged diff** via `pre-commit`. Commit *messages* are validated by a separate git hook, `commit-msg`, which fires after you write the message — `assets/commit-msg`, installed to `.githooks/commit-msg` and picked up by the same `core.hooksPath`. It is not a ninth gate; it is a different hook on a different input (SKILL.md hard rule 23).
+The fast gates above run on the **staged diff** via `pre-commit`. Commit *messages* are validated by a separate git hook, `commit-msg`, which fires after you write the message, `assets/commit-msg`, installed to `.githooks/commit-msg` and picked up by the same `core.hooksPath`. It is a different hook on a different input (SKILL.md hard rule 23).
 
 The contract is [Conventional Commits](https://www.conventionalcommits.org):
 
@@ -565,7 +551,7 @@ Four shipped guards move the mechanical slices of the production disciplines int
 | `assets/check-data-lifecycle.sh` | 30 | a hard delete in app code (erasure/retention paths exempt); destructive DDL outside a `*contract*` migration |
 | `assets/check-isolation-tests.sh` | 28 | a new route file with no nearby test mentioning 404 (`*public*`/`*health*` exempt) |
 
-They are not part of the branded eight gates: wire them as pre-commit pre-flight steps or CI checks **in repos where the concern exists** (personal data, network IO, a schema, tenants). They are tripwires, not proofs; the discipline references keep the full review duty. The repo smoke test exercises all four so a regression in a guard fails CI here first.
+They are not part of the core gate set: wire them as pre-commit pre-flight steps or CI checks **in repos where the concern exists** (personal data, network IO, a schema, tenants). They are tripwires, not proofs; the discipline references keep the full review duty. The repo smoke test exercises all four so a regression in a guard fails CI here first.
 
 ### Never bypass with `--no-verify`
 
@@ -714,8 +700,8 @@ After the change, restart the TS server in VS Code (Cmd/Ctrl + Shift + P → "Ty
 - **Zero warnings, zero inline ignores.** Refactor or change severity at the project level; never suppress per-line.
 - **Coverage gates per-tier:** 100% on `domain` + `use-cases`, 80% on `composition` + `infra` + `presenter`, skip `test-helpers` and `main.ts` only. `build-deps.ts` is now in scope (testable via optional config DI).
 - **SonarLint parity at lint time** via `eslint-plugin-sonarjs` + type-aware `@typescript-eslint` rules.
-- **Pre-commit hook runs eight gates**, in cost-ascending order: commit size → package.json (no `"latest"` / `"*"`) → gitleaks → tests → lint:strict → typecheck → coverage → mutate:staged.
-- **Commit identity is chosen deliberately** (rule 26): a repo-local `user.name` / `user.email`, neutral or attributed, set before commit one. `gitleaks` catches secrets in the diff but not a name or `@company` email in the commit itself; a leaked identity is undone only by a `git filter-repo` rewrite plus a force-push, and even then the host may keep the old commits cached.
+- **Pre-commit hook runs the fast gates** (commit size, package.json, gitleaks protect, lint:staged, typecheck); **CI (`assets/ci.yml`) runs the full set** and is the required merge check: strict lint, typecheck, the whole test suite, coverage, and mutation, on a frozen lockfile, plus `bun audit`.
+- **Commit identity** (rule 26): contributor identity in commit metadata is normal and never a finding; file contents never name a person, an employer, or a client. Scrubbing a mention from pushed history takes a gated `git filter-repo` rewrite plus a force-push, and the host may keep the old commits cached.
 - **Dependency CVE scanning lives in CI, not the gate** (`bun audit --audit-level=high`): a daily scheduled watchdog for new CVEs in untouched deps, plus a PR run scoped to `package.json` / `bun.lock` for deliberately-introduced ones.
 - **Mutation testing on staged files** (Stryker, ≥90% break threshold) makes "tests don't actually pin behaviour" findable in CI.
 - **Verification discipline:** a control is a hypothesis until a test walks the forbidden path; test the bypass, audit the seams, fix the class not the instance, and proof is a runnable check, not a checklist or a screenshot. Generated code meets the identical bar; provenance is not proof.

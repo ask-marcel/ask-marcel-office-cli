@@ -4,6 +4,25 @@ Anyone with a stake in the project should be able to see its real state at any m
 
 Two ground rules first: the project has **one working language** (docs, comments, commit messages, identifiers), chosen once and kept everywhere, because a mixed-language repo taxes every reader; and **documentation drift is a defect**: if the README no longer matches how the project installs, runs, or deploys, the change is not finished even with green tests (Behavioural Guideline #5; `references/workflow.md`, README consistency).
 
+## README stays runnable (docs-check in CI, 12.1)
+
+Drift-as-a-defect is a review duty until a gate makes it mechanical. Keep a README that actually installs and runs the project (exact, runnable commands, not prose), and **fail CI when it goes stale**: the shipped `assets/check-docs.sh` runs the fenced ```bash block under the README's `## Verify` heading, so a documented command that no longer works fails the pull request. Keep the Verify block self-contained and fast (a health curl, a smoke command, a path assertion), not the full install.
+
+```yaml
+# .github/workflows/docs-check.yml
+name: docs-check
+on: [pull_request]
+jobs:
+  readme-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bash scripts/check-docs.sh # runs the README's ## Verify commands
+```
+
+The atelier repo's own `scripts/smoke-test.sh` is the reference implementation: it follows this README's install steps verbatim into a scratch repo and fails if any of them break, which is exactly a docs-check for a project whose product is its instructions.
+
 ## Decision records (why is it like this)
 
 Two tiers, one rule: the record changes in the same commit as the code it explains, so it cannot drift.

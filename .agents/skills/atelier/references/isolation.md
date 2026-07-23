@@ -114,6 +114,20 @@ export const invoices = pgTable('invoices', {
 app.get('/me/invoices', requireAuth, (c) => c.json(listInvoices(c.get('claims').org_id)));
 ```
 
+## 7. No service-token backdoor for bulk reads (7.7)
+
+Every API call carries the token of the user or tenant it acts for (section 1). There is **no anonymous service-key route** that returns everyone's rows for a dashboard or an export: that one endpoint bypasses every per-owner control in the system, and one leaked key becomes total exposure.
+
+```ts
+// DON'T: a shared service key opens a firehose past all per-owner scoping
+app.get('/internal/all-orders', (c) =>
+  c.req.header('x-service-key') === env.SERVICE_KEY ? c.json(db.select().from(orders)) : c.text('nope', 401));
+// DO: the API stays user-scoped; bulk analysis reads its own copy, never this database
+app.get('/me/orders', requireAuth, (c) => c.json(listOrders(c.get('claims').org_id)));
+```
+
+When you need volume to analyze, read it from the analytical platform (`references/reliability.md`, Separate the analytical store), fed by ETL from the operational store and governed by its own access model. The transactional path stays per-user, always; a service-key bulk endpoint is a review red flag on sight.
+
 ## Fakes for isolation
 
 The in-memory fakes in `src/test-helpers/` must model the boundary, or use-case tests cannot exercise it: a fake repository stores rows keyed by owner and its readers require the `OrgId`. A fake whose `list()` ignores the owner will happily pass a use-case that leaks.

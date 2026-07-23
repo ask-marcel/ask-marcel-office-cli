@@ -27,7 +27,7 @@ Java: `HttpClient.newBuilder().connectTimeout(...)` plus a per-request `.timeout
 
 ## Reads are explicit; writes go through the mapper
 
-An ORM or query builder is welcome on the write path, where its mapping and safety are what you want. On the **hot read path**, write the query by hand so you can see it, EXPLAIN it, and tune it. A lazy relation walk fires a cascade of hidden queries (the N+1) that is invisible until it is slow.
+An ORM or query builder is welcome on the write path, where its mapping and safety are what you want. On the **hot read path**, keep the query explicit and tunable, hand-written SQL or a typed query builder that emits visible SQL, so you can see it, EXPLAIN it, and tune it. A lazy relation walk fires a cascade of hidden queries (the N+1) that is invisible until it is slow.
 
 ```ts
 // BAD: relation walk; one hidden SELECT per row, nothing to EXPLAIN
@@ -131,6 +131,19 @@ Parse, don't validate (rule 12): validate once at the boundary, then carry the f
 
 - **Money is integer minor units** (`cents`) behind a branded type or value record, never a float: `0.1 + 0.2 !== 0.3`, and the rounding error lands on an invoice.
 - **Instants are UTC** behind a type; a timezone is a display concern applied at the presentation edge, never stored in the domain value.
+
+## Separate the analytical store from the operational one (10.14)
+
+The transactional database serves the running application only. Anything that reads at volume (reporting, dashboards, bulk export, data science) reads a **separate analytical copy** (a warehouse or lake) fed by ETL or change-data-capture, never the production store directly. A heavy scan on the primary competes with real users and couples every report to the app's private schema.
+
+```text
+[ app + users ] --user-scoped (7.1)--> [ PRIMARY OLTP ]
+                                              | CDC / nightly ETL (one direction: out)
+                                              v
+                                       [ WAREHOUSE / LAKE ]  <-- BI, exports, ML read here
+```
+
+Writes stay on the transactional path, done by a user; reads at scale move to the copy, so the app database is tuned for the transaction and the warehouse for the scan, and neither fights the other. The pipeline is the **one sanctioned bulk reader**: its own narrowly granted job at the database layer (`references/isolation.md`, Shrink the blast radius), never the user-facing API (`references/isolation.md`, No service-token backdoor). The analytical copy inherits pillar 6, so subject erasure and the retention sweep propagate to it, and the platform is chosen under the open-interface rule (`references/delivery.md`) or its lock-in taken deliberately behind a port.
 
 ## Executable tripwires
 
