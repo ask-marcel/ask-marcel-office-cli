@@ -50,6 +50,9 @@ describe('update-mail-draft', () => {
   it('sends the HTML body, recipients, cc, bcc, and importance when every updatable field is supplied', async () => {
     let capturedBody: Record<string, unknown> = {};
     const graph = fakeGraphClient({
+      // A whole-body replace reads the draft first, to refuse when it would
+      // drop a quote. This one is quote-free, so the write goes through.
+      get: async () => ok({ isDraft: true, body: { contentType: 'html', content: '<html><body>a plain draft</body></html>' } }),
       patch: async (_path, body) => {
         capturedBody = body as Record<string, unknown>;
         return ok({});
@@ -221,6 +224,64 @@ describe('update-mail-draft', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
+    expect(patches).toEqual([]);
+  });
+
+  // 2026-07-23 bug report: `--body-content` means "the text above the quote" on
+  // create-reply-draft and "replace the whole body, quote included" here. A
+  // caller who learned the flag on the create command and reused it here wiped
+  // the quoted history, with nothing warning at call time.
+  it('refuses to replace the whole body of a threaded draft, pointing at the flag that keeps the quote', async () => {
+    const { graph, patches } = recordingGraph(ok({ isDraft: true, body: { contentType: 'html', content: htmlDraft('<div>the reply</div>') } }));
+
+    const result = await execute(graph, { messageId: 'AAMk1', bodyContent: '<p>whole new body</p>', bodyContentType: 'HTML' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toBe(
+        'Draft AAMk1 carries quoted reply history, and --body-content replaces the entire body, quote included. Revise only your own text with --comment, which keeps the quote byte-identical, or pass --replace-quoted-history true to drop the quote deliberately.'
+      );
+    }
+    expect(patches).toEqual([]);
+  });
+
+  it('refuses to replace the whole body of a threaded plain-text draft, exactly as it refuses an HTML one', async () => {
+    const { graph, patches } = recordingGraph(ok({ isDraft: true, body: { contentType: 'text', content: TEXT_DRAFT } }));
+
+    const result = await execute(graph, { messageId: 'AAMk1', bodyContent: 'whole new body' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('carries quoted reply history');
+    expect(patches).toEqual([]);
+  });
+
+  it('replaces the whole body of a threaded draft when the caller asks for it explicitly, without reading the draft first', async () => {
+    const { graph, patches, gets } = recordingGraph(ok({ isDraft: true, body: { contentType: 'html', content: htmlDraft('<div>the reply</div>') } }));
+
+    const result = await execute(graph, { messageId: 'AAMk1', bodyContent: '<p>whole new body</p>', bodyContentType: 'HTML', replaceQuotedHistory: 'true' });
+
+    expect(result.ok).toBe(true);
+    expect(patches).toEqual([{ path: '/me/messages/AAMk1', body: { body: { contentType: 'HTML', content: '<p>whole new body</p>' } } }]);
+    // The escape is the caller stating intent, so the guard's read is skipped.
+    expect(gets).toEqual([]);
+  });
+
+  it('replaces the whole body of a quote-free draft with no escape flag, since there is no history to lose', async () => {
+    const { graph, patches } = recordingGraph(ok({ isDraft: true, body: { contentType: 'html', content: '<html><body>a plain draft</body></html>' } }));
+
+    const result = await execute(graph, { messageId: 'AAMk1', bodyContent: '<p>whole new body</p>', bodyContentType: 'HTML' });
+
+    expect(result.ok).toBe(true);
+    expect(patches).toEqual([{ path: '/me/messages/AAMk1', body: { body: { contentType: 'HTML', content: '<p>whole new body</p>' } } }]);
+  });
+
+  it('refuses to replace the body of a message that is not a draft, before writing to it', async () => {
+    const { graph, patches } = recordingGraph(ok({ isDraft: false, body: { contentType: 'html', content: '<html><body>sent</body></html>' } }));
+
+    const result = await execute(graph, { messageId: 'AAMk1', bodyContent: '<p>whole new body</p>' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('is not a draft');
     expect(patches).toEqual([]);
   });
 

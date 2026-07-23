@@ -55,6 +55,15 @@ const findBodyInsertStart = (html: string): number => {
  */
 const commentCarriesQuoteBoundary = (commentHtml: string): boolean => findQuoteBoundary(commentHtml) !== -1;
 
+/**
+ * True when a draft body still carries the quoted history Graph minted with it.
+ * Dispatches on the draft's own contentType: the HTML and plain-text boundary
+ * markers are different things entirely. Used to refuse a whole-body replace
+ * that would drop the quote (2026-07-23 bug report).
+ */
+const bodyCarriesQuote = (contentType: string, content: string): boolean =>
+  contentType.toLowerCase() === 'html' ? findQuoteBoundary(content) !== -1 : findPlainTextQuoteBoundary(content) !== -1;
+
 /** The refusal copy for `commentCarriesQuoteBoundary`, named for the flag that carried it. */
 const boundaryMarkerRefusal = (flagName: string): string =>
   `${flagName} carries a quoted-reply boundary marker (a pasted gmail_quote container, an Outlook divRplyFwdMsg / appendonsend / border-top separator, or a bold From: + Sent: header pair). It would be kept verbatim, and a later \`update-mail-draft --comment\` edit would cut the draft at that marker and lose the real quoted history below it. Remove the pasted quote from your text, or pass --body-content-type Text to have it escaped into literal characters.`;
@@ -85,6 +94,7 @@ const replacePlainTextCommentAboveQuote = (text: string, comment: string): Plain
 };
 
 export {
+  bodyCarriesQuote,
   boundaryMarkerRefusal,
   commentCarriesQuoteBoundary,
   escapeTextAsHtml,

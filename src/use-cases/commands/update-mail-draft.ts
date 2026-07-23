@@ -2,7 +2,14 @@ import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { Command, CommandMeta } from './command-types.ts';
-import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, escapeTextAsHtml, replaceCommentAboveQuote, replacePlainTextCommentAboveQuote } from './draft-comment-splicer.ts';
+import {
+  bodyCarriesQuote,
+  boundaryMarkerRefusal,
+  commentCarriesQuoteBoundary,
+  escapeTextAsHtml,
+  replaceCommentAboveQuote,
+  replacePlainTextCommentAboveQuote,
+} from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
@@ -12,6 +19,7 @@ const schema = z.object({
   subject: z.string().optional(),
   bodyContent: z.string().optional(),
   comment: z.string().min(1).optional(),
+  replaceQuotedHistory: z.enum(['true', 'false']).optional(),
   bodyContentType: z.enum(['Text', 'HTML']).optional(),
   toRecipients: z.string().optional(),
   ccRecipients: z.string().optional(),
@@ -26,6 +34,15 @@ type DraftBody = z.infer<typeof draftSchema>['body'];
 const noQuoteRefusal = (messageId: string): GraphError => ({
   type: 'validation_error',
   message: `Draft ${messageId} has no quoted reply history to preserve, so there is nothing for --comment to sit above. Use --body-content to replace the whole body instead.`,
+});
+
+// The mirror image of noQuoteRefusal. `--body-content` means "the text above
+// the quote" on create-reply-draft / create-forward-draft and "replace the
+// entire body" here, so a caller who learned it there and reused it here wiped
+// the quoted history with nothing warning at call time (reported 2026-07-23).
+const quotedHistoryRefusal = (messageId: string): GraphError => ({
+  type: 'validation_error',
+  message: `Draft ${messageId} carries quoted reply history, and --body-content replaces the entire body, quote included. Revise only your own text with --comment, which keeps the quote byte-identical, or pass --replace-quoted-history true to drop the quote deliberately.`,
 });
 
 // Rewrites the reply text ABOVE the quote, keeping the quote. The draft's own
@@ -67,10 +84,21 @@ const readDraft = async (graph: GraphClient, messageId: string): Promise<Result<
   return ok(parsed.data);
 };
 
+/**
+ * Reads the draft to decide whether a whole-body replace would drop a quote.
+ * The read doubles as the is-this-a-draft check the comment path already made.
+ */
+const guardQuotedHistory = async (graph: GraphClient, messageId: string): Promise<Result<undefined, GraphError>> => {
+  const draft = await readDraft(graph, messageId);
+  if (!draft.ok) return draft;
+  if (!bodyCarriesQuote(draft.value.body.contentType, draft.value.body.content)) return ok(undefined);
+  return err(quotedHistoryRefusal(messageId));
+};
+
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, subject, bodyContent, comment, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance } = parsed.data;
+  const { messageId, subject, bodyContent, comment, replaceQuotedHistory, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance } = parsed.data;
 
   // At least one field must be provided for the update. Keyed on presence, not
   // truthiness: an empty string is a real instruction (clear this list), and a
@@ -95,6 +123,13 @@ const execute: Command['execute'] = async (graph, params) => {
 
   if (comment !== undefined && bodyContentType === 'HTML' && commentCarriesQuoteBoundary(comment)) {
     return err({ type: 'validation_error', message: boundaryMarkerRefusal('--comment') });
+  }
+
+  // Costs one read, skipped when the caller states the intent explicitly - the
+  // deliberate "strip the thread but keep the threading" case stays free.
+  if (bodyContent !== undefined && replaceQuotedHistory !== 'true') {
+    const guarded = await guardQuotedHistory(graph, messageId);
+    if (!guarded.ok) return guarded;
   }
 
   const body: Record<string, unknown> = {};
@@ -123,10 +158,10 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content would replace the whole body and drop the thread. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.',
+    'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content replaces the whole body and would drop the thread, so it is REFUSED on a draft that still carries a quote unless you pass --replace-quoted-history true. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.',
   category: 'mail',
   graphMethod: 'PATCH',
-  graphPathTemplate: '/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used)',
+  graphPathTemplate: '/me/messages/{message-id} (+ a GET of body,isDraft first when {comment} is used, or when {body-content} is used without {replace-quoted-history})',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/message-update',
   options: [
     {
@@ -148,7 +183,7 @@ const meta: CommandMeta = {
       key: 'bodyContent',
       required: false,
       description:
-        'New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft this is almost never what you want - use --comment to revise only your own text and keep the quote. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment.',
+        'New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft that is almost never what you want, so the command reads the draft first and REFUSES when it still carries a quote - use --comment to revise only your own text and keep the quote, or pass --replace-quoted-history true to drop it deliberately. Note the sibling commands: on create-reply-draft / create-forward-draft, --body-content is a deprecated alias for --comment and means the text ABOVE the quote, not the whole body. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment.',
     },
     {
       name: 'comment',
@@ -156,6 +191,14 @@ const meta: CommandMeta = {
       required: false,
       description:
         'Rewrite ONLY the reply text above the quoted history on a threaded draft, keeping the quote and its styles byte-identical. This is the flag for revising a draft made by create-reply-draft or create-forward-draft; repeated edits replace your text rather than stacking. Refused when the draft has no quoted history (use --body-content), when it is not a draft, and when HTML markup you pass carries a quote boundary marker of its own. Mutually exclusive with --body-content.',
+    },
+    {
+      name: 'replace-quoted-history',
+      key: 'replaceQuotedHistory',
+      required: false,
+      description:
+        'Allow --body-content to drop the quoted history on a threaded draft. Without it, --body-content is REFUSED when the draft still carries a quote, because replacing the whole body there silently loses the thread; the refusal points at --comment, which revises only your own text. Pass `true` for the deliberate case: strip the quote but keep the draft threaded on its conversation. Ignored in comment mode, which never touches the quote.',
+      argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     {
       name: 'body-content-type',
@@ -196,7 +239,7 @@ const meta: CommandMeta = {
   ],
   example: 'ask-marcel-office update-mail-draft --message-id "AAMkAD..." --subject "Updated: Q3 Report" --to-recipients "alice@example.com,charlie@example.com"',
   bodyTemplate:
-    "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged",
+    "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
   mutates: true,
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:
