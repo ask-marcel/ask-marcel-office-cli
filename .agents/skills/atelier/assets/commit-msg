@@ -2,7 +2,7 @@
 #
 # atelier commit-msg hook — enforce Conventional Commits
 #
-# Fires after the message is composed (separate from the eight-gate
+# Fires after the message is composed (separate from the fast-gate
 # pre-commit hook, which inspects the staged diff). git passes the path to
 # the message file as $1; this validates the subject line against the
 # Conventional Commits grammar:

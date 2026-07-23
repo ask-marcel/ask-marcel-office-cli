@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
 #
-# atelier pre-commit hook (Java/Quarkus variant): 6 gates
+# atelier pre-commit hook (Java/Quarkus variant): the fast gates only
 #
-# Order matters: cheap fast-fail gates first, expensive gates last so a slow
-# mutation run is only paid when everything else is clean.
+# A multi-minute hook trains `git commit --no-verify` (rule 15.1, and 15.3), so
+# the hook carries only the fast gates. The slow, repo-scaling gates, `./mvnw
+# verify` (compile, tests, JaCoCo tiers) and PIT mutation, run in CI, the line
+# that cannot be skipped. See assets/ci-java.yml and references/java-quarkus.md.
 #
-#   1. commit size       : <=10 files AND <=300 lines (insertions + deletions)
-#   2. pom sanity        : no version ranges, no -SNAPSHOT dependencies
-#   3. secret scan       : gitleaks protect --staged (degrades gracefully)
-#   4. format            : ./mvnw spotless:check
-#   5. verify            : ./mvnw verify (compile -Werror, tests, JaCoCo tier check)
-#   6. mutation testing  : PIT with history, only when staged files touch
-#                          the mutation scope (domain/usecases)
+#   1. commit size   : <=10 files AND <=300 lines (insertions + deletions)
+#   2. pom sanity    : no version ranges, no -SNAPSHOT dependencies
+#   3. secret scan   : gitleaks protect --staged (degrades gracefully)
+#   4. format        : ./mvnw spotless:check
 #
-# Install once per clone (alongside the shared commit-msg validator):
+# Budget: keep the hook quick. spotless:check pays Maven startup; if that pushes
+# the hook past the budget on your machine, move it to CI too. Never add `./mvnw
+# verify` or PIT to this hook; they are CI-only by design.
 #
-#   cp <skill>/assets/pre-commit-java  .githooks/pre-commit
-#   cp <skill>/assets/commit-msg       .githooks/commit-msg
-#   cp <skill>/assets/check-commit-size.sh scripts/check-commit-size.sh
-#   cp <skill>/assets/check-pom.sh         scripts/check-pom.sh
-#   chmod +x .githooks/* scripts/*.sh
+# Install once per clone (alongside the shared commit-msg validator and CI):
+#
+#   cp <skill>/assets/pre-commit-java        .githooks/pre-commit
+#   cp <skill>/assets/commit-msg             .githooks/commit-msg
+#   cp <skill>/assets/ci-java.yml            .github/workflows/ci.yml
+#   cp <skill>/assets/check-commit-size.sh   scripts/check-commit-size.sh
+#   cp <skill>/assets/check-pom.sh           scripts/check-pom.sh
+#   chmod +x .githooks/pre-commit .githooks/commit-msg scripts/*.sh
 #   git config core.hooksPath .githooks
 #
-# Bypass with `git commit --no-verify` is reserved for genuine big-bang
-# changes (initial scaffolds, mass-renames, generated-file updates). Justify
-# every bypass in the commit body. Do not normalise bypassing.
+# Bypass with `git commit --no-verify` is reserved for genuine big-bang changes
+# (initial scaffolds, mass-renames, generated-file updates). Justify every bypass
+# in the commit body. Do not normalise bypassing.
 
 set -euo pipefail
 
@@ -33,15 +37,15 @@ if [ ! -x ./mvnw ]; then
   exit 1
 fi
 
-echo "pre-commit: running 6 gates..."
+echo "pre-commit: running the fast gates..."
 
-echo "[1/6] commit size"
+echo "[1/4] commit size"
 bash scripts/check-commit-size.sh
 
-echo "[2/6] pom sanity (no ranges / -SNAPSHOT deps)"
+echo "[2/4] pom sanity (no ranges / -SNAPSHOT deps)"
 bash scripts/check-pom.sh
 
-echo "[3/6] gitleaks protect --staged"
+echo "[3/4] gitleaks protect --staged"
 if command -v gitleaks >/dev/null 2>&1; then
   gitleaks protect --staged --redact --verbose --no-banner
 else
@@ -49,22 +53,7 @@ else
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
 fi
 
-echo "[4/6] ./mvnw spotless:check"
+echo "[4/4] ./mvnw spotless:check"
 ./mvnw -q spotless:check
 
-echo "[5/6] ./mvnw verify"
-./mvnw -q verify
-
-echo "[6/6] PIT mutation (staged domain/usecases files)"
-staged_scope=$(git diff --cached --name-only --diff-filter=ACMR | grep -E 'src/main/java/.*/(domain|usecases)/.*\.java$' || true)
-if [ -z "$staged_scope" ]; then
-  echo "  no staged files in the mutation scope, skipping."
-else
-  # The threshold lives in the pom (pitest-maven mutationThreshold=90 scoped
-  # to domain/usecases packages, run with parallel threads). PIT's incremental
-  # history needs Arcmutate's commercial +arcmutate_history plugin in current
-  # PIT, so the free speed levers are the narrow scope, threads, and this trigger.
-  ./mvnw -q test-compile org.pitest:pitest-maven:mutationCoverage
-fi
-
-echo "pre-commit: all gates passed"
+echo "pre-commit: fast gates passed. ./mvnw verify and PIT run in CI (assets/ci-java.yml)."
