@@ -15,7 +15,6 @@ Interaction: terse, direct prose with no filler, praise, or recap; never use em 
 
 - The user asks to be grilled, or to stress-test / pressure-test a plan or design.
 - A decision carries real stakes and a bad call is expensive to reverse: architecture, data model, public API shape, a migration, a dependency choice, a security boundary.
-- The plan creates or publishes a repo: whether it will be public, and whether its commit identity is chosen deliberately (neutral, or attributed) for the permanent history it will expose (rule 26). Git history is forensic, and an unintended identity is expensive to reverse once pushed.
 - The plan is a new product or feature: before grilling how to build it, grill whether to build it at all (the atelier `references/product.md` § Validate before you build). What evidence of the problem exists beyond the room? What is the cheapest test of demand (a landing page, a concierge run) before the build? What dated go/no-go criteria would make "no" sayable? What adoption threshold decides keep-or-kill after launch? A killed idea at interview cost is this skill's best outcome.
 - A plan is vague, broad, or hides many unstated branches.
 

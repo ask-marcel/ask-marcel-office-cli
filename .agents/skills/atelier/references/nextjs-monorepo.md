@@ -74,7 +74,7 @@ This reference describes two shapes that share the same toolchain: the **static 
 
 Activate hooks after install: `bun run prepare`.
 
-**This variant's hook mechanism is `simple-git-hooks`** (test + lint per package, commitlint on the message). The eight-gate `.githooks/pre-commit` from `references/workflow.md` belongs to the Bun-script variant — never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other. The commit-size, package.json, and gitleaks gates are portable here if wanted; the coverage and mutation gates are not (see SKILL.md, "What applies where").
+**This variant's hook mechanism is `simple-git-hooks`** (test + lint per package, commitlint on the message). The `.githooks/pre-commit` fast-gate hook from `references/workflow.md` belongs to the Bun-script variant, never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other. The commit-size, package.json, and gitleaks gates are portable here if wanted; the coverage and mutation gates are not (see SKILL.md, "What applies where").
 
 ## Package `package.json`
 

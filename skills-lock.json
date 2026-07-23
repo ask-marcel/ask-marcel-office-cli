@@ -5,25 +5,25 @@
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier/SKILL.md",
-      "computedHash": "09075160d4869daa06296fb48d7581c63f7fec4f501ec79339bcba16778b8b17"
+      "computedHash": "0b0ea7fd0b1c438f8fb429d2cae2a59292f94bcb667d1f94809d7c1042b68102"
     },
     "atelier-greenfield": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-greenfield/SKILL.md",
-      "computedHash": "ae53e9754e4803a0040a28487b92a2dd1a7c158df9570d50cdce47af958a9c22"
+      "computedHash": "3a130c20de78b09c1596de7653d9736a3f6b35a735f3ff4a32e658ed3d03b76d"
     },
     "atelier-grill-me": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-grill-me/SKILL.md",
-      "computedHash": "420727086eb33368c24142bbfe4eda6a3040e6e96ccaad5538d09bd9c216eabb"
+      "computedHash": "70ef971c4798c6dd379da0c80f3c89f1b1503a16ba81403a61885a4733f6edc5"
     },
     "atelier-review-me": {
       "source": "vdelacou/atelier",
       "sourceType": "github",
       "skillPath": "skills/atelier-review-me/SKILL.md",
-      "computedHash": "5273d321e9271eed2673f6c3a85cbee7e63a296cfc96d38c043cd0870c98ac0a"
+      "computedHash": "1984f80aafceb085c119a4b10bc6c5eb4628c3a44818441c1f3464459d89b7c3"
     }
   }
 }

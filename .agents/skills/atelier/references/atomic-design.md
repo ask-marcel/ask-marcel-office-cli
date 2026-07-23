@@ -203,7 +203,7 @@ Style rules, all enforced at review:
 - Variant/size dispatch through a typed `Record` map; look up via `switch` so `eslint-plugin-security`'s object-injection rule stays quiet without an inline ignore (hard rule 15).
 - Semantic elements first: `header`, `nav` with `aria-label`, `section`, `ul`/`li` — not `div` soup.
 - Lists render with `.map` and stable keys (id, slug, question text) — never the array index.
-- Tailwind utilities on the design-token scale; responsive shifts via `md:*` / `lg:*`.
+- Tailwind utilities on the design-token scale; **mobile first**, the base classes style the smallest screen and responsive shifts scale up via `md:*` / `lg:*`, never a desktop layout crammed down (rule 17.7, `references/product.md`).
 - Accessibility is part of the contract: visible focus rings, `aria-expanded`/`aria-haspopup` on disclosure triggers, `aria-hidden="true"` on decorative SVGs.
 - Named imports only — no `import * as X` wildcards.
 - `displayName` on every component (and on generated wrappers).

@@ -313,7 +313,7 @@ For throwaway scripts, one-off CLIs, or prototypes with a single integration, a 
 
 ## Testing
 
-Tests are mandatory — TDD is hard rule 11, and the whole eight-gate pipeline (tests, coverage tiers, mutation) assumes they exist:
+Tests are mandatory, TDD is hard rule 11, and the whole gate pipeline (tests, coverage tiers, mutation) assumes they exist:
 
 - Filename convention: `*.test.ts` next to the source.
 - Runner: `bun test`.
@@ -429,7 +429,7 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
     - `cp <skill-path>/assets/mutate-changed.sh scripts/mutate-changed.sh`
     - `chmod +x scripts/*.sh`
     - Add to `.gitignore`: `.stryker-tmp/` and `reports/` (Stryker scratch + output dirs).
-14. Install the git hooks (eight-gate pre-commit + commit-msg):
+14. Install the git hooks (fast-gate pre-commit + commit-msg) and the CI workflow:
     - `cp <skill-path>/assets/check-commit-size.sh scripts/check-commit-size.sh`
     - `cp <skill-path>/assets/check-package-json.sh scripts/check-package-json.sh`
     - `chmod +x scripts/check-commit-size.sh scripts/check-package-json.sh`
@@ -439,7 +439,7 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
     - `chmod +x .githooks/pre-commit .githooks/commit-msg`
     - `git config core.hooksPath .githooks` (picks up both hooks)
     - Optional: `brew install gitleaks` (macOS) or grab a binary from `github.com/gitleaks/gitleaks/releases`. The hook degrades gracefully if missing.
-    - See `references/workflow.md` for the eight-gate breakdown, the commit-message format, and the no-bypass rule.
+    - See `references/workflow.md` for the gate breakdown (fast hook plus CI set), the commit-message format, and the no-bypass rule.
 15. Verify: `bun run lint`, `bun run typecheck`, `bun run coverage`, and `bun run mutate` all clean on a minimal `src/main.ts`. Run `bash scripts/check-package-json.sh` once to confirm no `"latest"` slipped in, and confirm the `commit-msg` hook rejects a junk message (`echo 'nope' | …` or just try a bad commit).
 16. Commit with Conventional Commits (`type(scope): subject`) — once the user confirms (rule 25); the `commit-msg` hook enforces the format. From here, follow the Clean Architecture rules for every new feature.
 
