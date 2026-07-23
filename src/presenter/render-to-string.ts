@@ -47,8 +47,61 @@ type SuccessEnvelope = {
 // this an LLM consumer that doesn't trim is fine.
 const SIZE_HINT_THRESHOLD_BYTES = 50_000;
 
-const buildSizeHint = (bytes: number): string =>
-  `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold). Universal remedy: \`--output-path <file>\` writes bytes to disk and keeps the envelope compact (works on every command). Per-item slimming via \`--select id,subject,...\` and item-count reduction via \`--top N\` work ONLY when the command's \`--help\` advertises those flags — endpoints like \`list-shared-with-me\`, \`microsoft-search-query\`, and the delta family silently ignore them.`;
+/**
+ * Which front end the caller is on. It changes what a remedy can even BE: a
+ * terminal caller can redirect stdout to a file, an MCP client cannot (it has
+ * no shell), and the `--output-path` flag reaches MCP as an `outputPath` tool
+ * param rather than a flag.
+ */
+type RenderSurface = 'cli' | 'mcp';
+
+/**
+ * What the presenter needs in order to name a remedy the caller can actually
+ * use. Built in composition (which owns the command manifest); omitted by the
+ * renders that have no command behind them at all — the 548 KB `list-commands`
+ * manifest, a login summary, a logout status.
+ *
+ * 2026-07-23: the banner used to call `--output-path` a "universal remedy
+ * (works on every command)". It is not. Plain-JSON commands REFUSE the flag,
+ * and the two commands that trip the banner most often (`search-all-files`,
+ * `microsoft-search-query`) advertise only `--query` — so every remedy the
+ * banner named was a dead end there, and an agentic caller following it burned
+ * a call to find out.
+ */
+type SizeHintContext = {
+  readonly commandName: string;
+  /** `meta.producesBytes` — the manifest flag that decides whether --output-path is accepted. */
+  readonly producesBytes: boolean;
+  readonly supportsSelect: boolean;
+  readonly supportsTop: boolean;
+  readonly surface: RenderSurface;
+};
+
+const bytesRemedy = (context: SizeHintContext): string =>
+  context.surface === 'mcp'
+    ? 'Set the `outputPath` param to write the body to a file; the envelope then carries `savedTo` instead of the bytes.'
+    : 'Write the body to a file with `--output-path <file>`; the envelope then carries `savedTo` instead of the bytes.';
+
+const jsonRemedy = (context: SizeHintContext): string =>
+  context.surface === 'mcp'
+    ? `${context.commandName} returns plain JSON, so \`outputPath\` is refused here: there is no body to write.`
+    : `${context.commandName} returns plain JSON, so \`--output-path\` is refused; redirect to a file instead: \`ask-marcel-office ${context.commandName} ... > out.json\`.`;
+
+const slimmingRemedy = (context: SizeHintContext): string => {
+  const levers = [...(context.supportsSelect ? ['`--select id,subject,...` to slim each item'] : []), ...(context.supportsTop ? ['`--top N` to cut the item count'] : [])];
+  if (levers.length === 0) return `${context.commandName} advertises no slimming flags, so narrow the query text itself and re-run.`;
+  return `Then re-run with ${levers.join(' and ')}.`;
+};
+
+// No command behind the render (manifest, login summary, logout status): claim
+// nothing, since every flag-level remedy depends on which command ran.
+const NEUTRAL_REMEDY = 'Narrow the request and re-run; slimming flags apply only where the command advertises them (check `--help`).';
+
+const buildSizeHint = (bytes: number, context?: SizeHintContext): string => {
+  const head = `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold).`;
+  if (context === undefined) return `${head} ${NEUTRAL_REMEDY}`;
+  return `${head} ${context.producesBytes ? bytesRemedy(context) : jsonRemedy(context)} ${slimmingRemedy(context)}`;
+};
 
 const SELECT_HINT =
   "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel-office docs <command>`.";
@@ -113,7 +166,7 @@ const wrap = (data: unknown): SuccessEnvelope => {
   };
 };
 
-const renderJsonToString = (data: unknown): string => {
+const renderJsonToString = (data: unknown, context?: SizeHintContext): string => {
   const envelope = wrap(data);
   const selectHintField = looksLikeBogusSelectResponse(data) ? { selectHint: SELECT_HINT } : {};
   const initial = JSON.stringify({ ...envelope, ...selectHintField });
@@ -122,10 +175,10 @@ const renderJsonToString = (data: unknown): string => {
   // over 50 KB. (The selectHint is small enough not to need the same
   // guard.)
   if (initial.length <= SIZE_HINT_THRESHOLD_BYTES) return `${initial}\n`;
-  return `${JSON.stringify({ ...envelope, ...selectHintField, sizeHint: buildSizeHint(initial.length) })}\n`;
+  return `${JSON.stringify({ ...envelope, ...selectHintField, sizeHint: buildSizeHint(initial.length, context) })}\n`;
 };
 
-const renderTextToString = (data: unknown): string => {
+const renderTextToString = (data: unknown, context?: SizeHintContext): string => {
   const body = renderTextOutput(data);
   const selectHintLine = looksLikeBogusSelectResponse(data) ? `selectHint: ${SELECT_HINT}\n` : '';
   if (body.length <= SIZE_HINT_THRESHOLD_BYTES) return `${selectHintLine}${body}`;
@@ -133,14 +186,19 @@ const renderTextToString = (data: unknown): string => {
   // a 50 KB body — matches the `error:` / `hint:` / `source:` placement
   // convention for the error path. selectHint comes BEFORE sizeHint so the
   // more-actionable signal (you have a typo) is at the very top.
-  return `${selectHintLine}sizeHint: ${buildSizeHint(body.length)}\n${body}`;
+  return `${selectHintLine}sizeHint: ${buildSizeHint(body.length, context)}\n${body}`;
 };
 
 /**
  * Render a use-case success value to its final string, newline included.
  * `output.ts` writes this to stdout; `mcp.ts` returns it as tool content.
+ *
+ * `context` is what makes the oversized-response banner honest — pass it
+ * whenever a registry command produced the data. Omit it for the renders that
+ * have no command behind them; the banner then claims no flag-level remedy.
  */
-const renderToString = (data: unknown, format: OutputFormat): string => (format === 'json' ? renderJsonToString(data) : renderTextToString(data));
+const renderToString = (data: unknown, format: OutputFormat, context?: SizeHintContext): string =>
+  format === 'json' ? renderJsonToString(data, context) : renderTextToString(data, context);
 
 /**
  * Render an error to its final string, newline included. The `hint` / `source`
@@ -191,4 +249,4 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
 };
 
 export { renderErrorToString, renderToString };
-export type { OutputFormat };
+export type { OutputFormat, RenderSurface, SizeHintContext };

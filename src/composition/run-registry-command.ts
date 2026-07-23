@@ -20,6 +20,7 @@
  */
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
+import type { RenderSurface, SizeHintContext } from '../presenter/render-to-string.ts';
 import type { Command } from '../use-cases/commands/command-types.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
@@ -55,9 +56,32 @@ const mediaProducingCommands = Object.entries(cmdRegistry)
   .map(([n]) => n)
   .toSorted((a, b) => a.localeCompare(b));
 
-const formatOutputPathError = (error: OutputPathError, commandName: string): string => {
+const hasOption = (command: Command, name: string): boolean => command.meta.options.some((option) => option.name === name);
+
+/**
+ * The facts the oversized-response banner needs to name a remedy this caller
+ * can actually use. Derived from the manifest, so a new command gets an honest
+ * banner for free. See `SizeHintContext` in the presenter for the why.
+ */
+const buildSizeHintContext = (commandName: string, command: Command, surface: RenderSurface): SizeHintContext => ({
+  commandName,
+  producesBytes: command.meta.producesBytes === true,
+  supportsSelect: hasOption(command, 'select'),
+  supportsTop: hasOption(command, 'top'),
+  surface,
+});
+
+// A shell redirect is the CLI's answer to "this command has no body to write".
+// An MCP client has no shell, so it gets the honest version instead: there is
+// no remedy at this layer, narrow the request.
+const noBodyRemedy = (commandName: string, surface: RenderSurface): string =>
+  surface === 'mcp'
+    ? 'Narrow the request instead (fewer items, a tighter query); there is no body to write.'
+    : `Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel-office ${commandName} ... > out.json\`.`;
+
+const formatOutputPathError = (error: OutputPathError, commandName: string, surface: RenderSurface): string => {
   if (error.type === 'no_inlined_bytes')
-    return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel-office ${commandName} ... > out.json\`.`;
+    return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. ${noBodyRemedy(commandName, surface)}`;
   if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
   // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
   if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
@@ -93,6 +117,8 @@ export type RunRegistryCommandRequest = {
   readonly params: Record<string, string>;
   readonly outputPath?: string;
   readonly outputDir?: string;
+  /** Which front end asked. Decides whether a remedy may mention a shell. */
+  readonly surface: RenderSurface;
 };
 
 /**
@@ -169,7 +195,7 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
   if (persisted.ok) return ok(persisted.value);
   // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
   // `passthrough_extension_mismatch`, `inline_too_large`, `empty_path`, `write_failed`.
-  return err({ message: formatOutputPathError(persisted.error, name), code: persisted.error.type });
+  return err({ message: formatOutputPathError(persisted.error, name, request.surface), code: persisted.error.type });
 };
 
-export { formatOutputDirError, formatOutputPathError };
+export { buildSizeHintContext, formatOutputDirError, formatOutputPathError };

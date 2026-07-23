@@ -161,6 +161,18 @@ describe('running a read command over MCP', () => {
     });
     expect(isError(result)).toBe(false);
   });
+
+  // 2026-07-23 bug report: the CLI's rejection tells the caller to redirect
+  // stdout to a file. An MCP client has no shell, so repeating that advice here
+  // would swap one dead end for another.
+  it('refusing outputPath on a plain-JSON command never tells an MCP client to use a shell redirect', async () => {
+    const graph: GraphClient = fakeGraphClient({ get: async () => ok({ displayName: 'Robin Chen' }) });
+    const client = await connect({ graph });
+    const result = await client.callTool({ name: 'run-command', arguments: { command: 'get-current-user', outputPath: 'out.json' } });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('did not return inlined bytes');
+    expect(textOf(result)).not.toContain('> out.json');
+  });
 });
 
 describe('the read/write boundary the readOnlyHint promises', () => {

@@ -31,7 +31,7 @@ import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
-import { runRegistryCommand } from './run-registry-command.ts';
+import { buildSizeHintContext, runRegistryCommand } from './run-registry-command.ts';
 
 const PACKAGE_NAME = 'ask-marcel-office-cli';
 
@@ -155,9 +155,10 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
       );
     if (!isMutating && wantMutating)
       return errText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
-    const result = await runRegistryCommand({ graph, fs }, { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir });
+    const request = { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir, surface: 'mcp' as const };
+    const result = await runRegistryCommand({ graph, fs }, request);
     if (!result.ok) return errText(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
-    return okText(renderToString(result.value, 'text'));
+    return okText(renderToString(result.value, 'text', buildSizeHintContext(resolved.value.name, resolved.value.command, 'mcp')));
   };
 
   server.registerTool(

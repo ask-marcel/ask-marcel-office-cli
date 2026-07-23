@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { renderTextOutput } from './output-text.ts';
 import { render, renderError } from './output.ts';
+import type { SizeHintContext } from './render-to-string.ts';
+import { renderToString } from './render-to-string.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<void>): Promise<string> => {
   const target = process[stream];
@@ -205,9 +207,10 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
   });
 
   // — sizeHint when the rendered envelope crosses
-  // 50 KB. Generic remedy (presenter has no idea which command produced the
-  // data) — `--select` / `--top` / `--output-path`.
-  it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB and frames the universal remedy (--output-path) ahead of the conditional remedies (--select / --top, which some endpoints ignore)', async () => {
+  // 50 KB. The remedy is command-aware (2026-07-23): a render with no command
+  // behind it — the manifest, a login summary, a logout status — claims no
+  // flag-level remedy at all, because it cannot know one applies.
+  it('adds a `sizeHint` field to the JSON envelope when the rendered envelope exceeds 50 KB, and a render with no command behind it recommends no flag it cannot vouch for', async () => {
     const logger = createLoggerFake();
     // 60 KB of dummy data — well over the 50 KB threshold and the hint
     // itself can't push the borderline case over (additive guard in
@@ -216,15 +219,13 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     const out = await captureStream('stdout', () => render(big, logger, 'json'));
     const parsed = JSON.parse(out.trim()) as { ok: true; sizeHint?: string };
     expect(parsed.sizeHint).toBeDefined();
-    expect(parsed.sizeHint).toContain('--select');
-    expect(parsed.sizeHint).toContain('--output-path');
-    // the hint used to say "Trim with --select"
-    // unconditionally; some endpoints (list-shared-with-me,
-    // microsoft-search-query, delta family) silently drop $select. The
-    // reworded hint puts the universal remedy first and names the
-    // endpoints where the conditional remedies don't apply.
-    expect(parsed.sizeHint).toContain('Universal remedy');
-    expect(parsed.sizeHint).toContain('list-shared-with-me');
+    expect(parsed.sizeHint).toContain('> 50 KB threshold');
+    // The banner used to promise `--output-path` "works on every command" and
+    // to name endpoints that ignore --select/--top. Both were dead ends on the
+    // commands that print it most (search-all-files, microsoft-search-query
+    // advertise only --query), so a context-free render now promises neither.
+    expect(parsed.sizeHint).not.toContain('--output-path');
+    expect(parsed.sizeHint).not.toContain('> out.json');
   });
 
   it('omits `sizeHint` when the rendered envelope fits inside 50 KB (no warning churn on small responses)', async () => {
@@ -242,7 +243,65 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     expect(out.startsWith('sizeHint: Response is ')).toBe(true);
     expect(out).toContain('> 50 KB threshold');
   });
+});
 
+// 2026-07-23 bug report: the banner promised `--output-path` as a "universal
+// remedy (works on every command)", but the commands that trip it most often
+// are plain-JSON ones that REFUSE the flag — so the caller burned a call to
+// learn the banner was wrong. The remedy is now derived from the command that
+// produced the payload and the surface the caller is on.
+describe('presenter output — the oversized-response banner only names remedies the caller can actually use', () => {
+  const oversized = { value: Array.from({ length: 600 }, (_, i) => ({ id: `item-${i}`, payload: 'x'.repeat(100) })) };
+  const hintOf = (context: SizeHintContext): string => {
+    const parsed = JSON.parse(renderToString(oversized, 'json', context).trim()) as { sizeHint?: string };
+    return parsed.sizeHint ?? '';
+  };
+
+  it('an oversized download from the terminal is told to write the body to a file with --output-path', () => {
+    const hint = hintOf({ commandName: 'download-drive-item-content', producesBytes: true, supportsSelect: false, supportsTop: false, surface: 'cli' });
+    expect(hint).toContain('--output-path <file>');
+    expect(hint).not.toContain('> out.json');
+  });
+
+  it('the same download over MCP is told to set the outputPath param, since an MCP client cannot pass a --flag', () => {
+    const hint = hintOf({ commandName: 'download-drive-item-content', producesBytes: true, supportsSelect: false, supportsTop: false, surface: 'mcp' });
+    expect(hint).toContain('`outputPath`');
+    expect(hint).not.toContain('--output-path');
+  });
+
+  it('an oversized search from the terminal is told to redirect to a file, with the command named in the example', () => {
+    const hint = hintOf({ commandName: 'search-all-files', producesBytes: false, supportsSelect: false, supportsTop: false, surface: 'cli' });
+    expect(hint).toContain('ask-marcel-office search-all-files ... > out.json');
+    expect(hint).toContain('refused');
+  });
+
+  it('the same search over MCP is never told to redirect, because an MCP client has no shell', () => {
+    const hint = hintOf({ commandName: 'search-all-files', producesBytes: false, supportsSelect: false, supportsTop: false, surface: 'mcp' });
+    expect(hint).not.toContain('> out.json');
+    expect(hint).toContain('refused');
+  });
+
+  it('a command that advertises neither --select nor --top is told to narrow the query text instead of naming flags it lacks', () => {
+    const hint = hintOf({ commandName: 'microsoft-search-query', producesBytes: false, supportsSelect: false, supportsTop: false, surface: 'cli' });
+    expect(hint).toContain('narrow the query text');
+    expect(hint).not.toContain('--select');
+    expect(hint).not.toContain('--top');
+  });
+
+  it('a command that advertises both slimming flags has both named', () => {
+    const hint = hintOf({ commandName: 'list-mail-folder-messages', producesBytes: false, supportsSelect: true, supportsTop: true, surface: 'cli' });
+    expect(hint).toContain('--select');
+    expect(hint).toContain('--top');
+  });
+
+  it('a command that advertises only --select is not told to pass --top', () => {
+    const hint = hintOf({ commandName: 'list-planner-plans', producesBytes: false, supportsSelect: true, supportsTop: false, surface: 'cli' });
+    expect(hint).toContain('--select');
+    expect(hint).not.toContain('--top');
+  });
+});
+
+describe('presenter output — JSON envelope (opt-in via --output json)', () => {
   // v1.4.0 audit #4: when `--select` is given all unknown field names,
   // Graph silently drops every field and returns `value: [{@odata.etag},
   // {@odata.etag}, ...]` — N entries that look "empty" once the etag is
