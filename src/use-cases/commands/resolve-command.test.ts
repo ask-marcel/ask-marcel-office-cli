@@ -11,25 +11,13 @@ describe('resolving a command name an agent supplied', () => {
     expect(result.value.command.meta.category).toBe('mail');
   });
 
-  it('finds a command asked for by a deprecated name it was renamed from, reporting the canonical name back', () => {
-    // An agent that learned `download-onedrive-file-content` before the rename
-    // still resolves; the CANONICAL name comes back so everything downstream
-    // (docs rendering, the mutates gate) keys off one spelling.
+  // 2026-07-24: one name per command. Deprecated names no longer resolve; a
+  // caller that learned one gets the unknown-command rejection with the list.
+  it('rejects a formerly-deprecated command name like any other unknown name', () => {
     const result = resolveCommand(commands, 'download-onedrive-file-content');
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.name).toBe('download-drive-item-content');
-  });
-
-  it('resolves every deprecated alias the registry advertises, so the manifest never names a spelling that fails to run', () => {
-    const aliasPairs = Object.entries(commands).flatMap(([canonical, cmd]) => (cmd.meta.commandAliases ?? []).map((alias) => ({ canonical, alias })));
-    expect(aliasPairs.length).toBeGreaterThan(0);
-    for (const { canonical, alias } of aliasPairs) {
-      const result = resolveCommand(commands, alias);
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value.name).toBe(canonical);
-    }
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('unknown_command');
   });
 
   it('rejects a name that is neither a command nor an alias, listing the available names so the agent can retry without a second round-trip', () => {
@@ -46,13 +34,6 @@ describe('resolving a command name an agent supplied', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.available).toEqual([...result.error.available].toSorted((a, b) => a.localeCompare(b)));
-  });
-
-  it('offers deprecated aliases among the available names, since an agent may legitimately invoke one', () => {
-    const result = resolveCommand(commands, 'nope');
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.available).toContain('download-onedrive-file-content');
   });
 
   it('prefers a canonical command over any alias that shadows it, so a rename can never hijack a live command name', () => {

@@ -492,7 +492,7 @@ describe('commands', () => {
   });
 
   it('search-onenote-pages filters OneNote pages by title (Graph removed full-text ?search= from v1.0)', async () => {
-    const result = await callCommand('search-onenote-pages', { titleSubstring: 'meeting notes' }, { value: [{ title: 'Meeting notes 2026-04-30' }] });
+    const result = await callCommand('search-onenote-pages', { query: 'meeting notes' }, { value: [{ title: 'Meeting notes 2026-04-30' }] });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toEqual({ value: [{ title: 'Meeting notes 2026-04-30' }] });
   });
@@ -5131,7 +5131,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-all-onenote-sections', params: {} },
   { name: 'list-onenote-section-pages', params: { onenoteSectionId: 's1' } },
   { name: 'get-onenote-page-content', params: { onenotePageId: 'p1' } },
-  { name: 'search-onenote-pages', params: { titleSubstring: 'meeting' } },
+  { name: 'search-onenote-pages', params: { query: 'meeting' } },
   { name: 'get-current-user', params: {} },
   { name: 'get-my-profile-photo', params: {}, responseBody: { contentType: 'image/jpeg', size: 5, base64: 'JVBERi0=' } },
   { name: 'list-calendar-events', params: {} },
@@ -5445,7 +5445,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   // Every remaining single-quoted OData literal escapes the quote AND
   // percent-encodes: a raw `+` in a base64 conversationId decodes back to a
   // SPACE server-side (silently matching nothing), and a raw `&` truncates.
-  { name: 'search-onenote-pages', params: { titleSubstring: "Q3 review & O'Brien" }, expectedPath: "/me/onenote/pages?$filter=contains(title,'Q3%20review%20%26%20O''Brien')" },
+  { name: 'search-onenote-pages', params: { query: "Q3 review & O'Brien" }, expectedPath: "/me/onenote/pages?$filter=contains(title,'Q3%20review%20%26%20O''Brien')" },
   {
     name: 'list-conversation-messages',
     params: { conversationId: 'AAQkAD+x/y=' },
@@ -5460,7 +5460,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-onenote-section-pages', params: { onenoteSectionId: 's1' }, expectedPath: '/me/onenote/sections/s1/pages' },
   { name: 'get-onenote-page-content', params: { onenotePageId: 'p1' }, expectedPath: '/me/onenote/pages/p1/content' },
   { name: 'get-onenote-page-as-markdown', params: { onenotePageId: 'p1' }, expectedPath: '/me/onenote/pages/p1/content' },
-  { name: 'search-onenote-pages', params: { titleSubstring: 'meeting' }, expectedPath: "/me/onenote/pages?$filter=contains(title,'meeting')" },
+  { name: 'search-onenote-pages', params: { query: 'meeting' }, expectedPath: "/me/onenote/pages?$filter=contains(title,'meeting')" },
   {
     name: 'get-current-user',
     params: {},

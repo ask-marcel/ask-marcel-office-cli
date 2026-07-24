@@ -54,7 +54,6 @@ const meta: CommandMeta = {
   summary:
     "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip-to-markdown`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
   category: 'mail',
-  commandAliases: ['convert-mail-attachment-zip'],
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/attachment-get',

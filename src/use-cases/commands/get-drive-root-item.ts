@@ -18,7 +18,6 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: DRIVE_ID_DESCRIPTION,
     },
     ...selectExpandOptions,

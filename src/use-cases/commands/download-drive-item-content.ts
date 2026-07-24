@@ -55,7 +55,6 @@ const meta: CommandMeta = {
   summary:
     'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: "text/plain", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.',
   category: 'drive',
-  commandAliases: ['download-onedrive-file-content'],
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitem-get-content',

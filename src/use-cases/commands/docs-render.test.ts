@@ -136,27 +136,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('rejects `$top` as a query parameter');
   });
 
-  it('appends an _(aliases: ...)_ suffix on options with aliases so the markdown surface matches the manifest', () => {
-    const aliased: CommandManifestEntry = {
-      ...calendarEvent,
-      options: [
-        {
-          name: 'event-id',
-          key: 'eventId',
-          required: true,
-          description: 'The Graph event ID.',
-          aliases: [
-            { name: 'id', key: 'id' },
-            { name: 'evt-id', key: 'evtId' },
-          ],
-        },
-      ],
-    };
-    const md = renderCommandMarkdown(aliased);
-    expect(md).toContain('_(aliases: `--id`, `--evt-id`)_');
-  });
-
-  it('still renders options without aliases unchanged (no suffix) so the format is unambiguous', () => {
+  it('renders options unchanged (no suffix) so the format is unambiguous', () => {
     const md = renderCommandMarkdown(calendarEvent);
     expect(md).toContain('| `--event-id` | The Graph event ID. |');
     expect(md).not.toContain('aliases:');
@@ -224,18 +204,12 @@ describe('renderCommandMarkdown', () => {
     expect(md).not.toContain('## Positional arguments');
   });
 
-  it('renders no alias suffix for an EMPTY aliases array (not just undefined) — guards the `aliases.length === 0` check', () => {
-    const md = renderCommandMarkdown({ ...calendarEvent, options: [{ name: 'event-id', key: 'eventId', required: true, description: 'The Graph event ID.', aliases: [] }] });
+  // 2026-07-24: one name per flag, one per command. The alias-suffix and
+  // commandAliases rendering these two tests covered was deleted with it.
+  it('renders an option row as flag + description, with no alias annotation', () => {
+    const md = renderCommandMarkdown({ ...calendarEvent, options: [{ name: 'event-id', key: 'eventId', required: true, description: 'The Graph event ID.' }] });
     expect(md).toContain('| `--event-id` | The Graph event ID. |');
     expect(md).not.toContain('aliases:');
-  });
-
-  it('renders the back-compat commandAliases on the command name line when present', () => {
-    const renamed: CommandManifestEntry = { ...listDrives, commandAliases: ['list-onedrive-drives'] };
-    const md = renderCommandMarkdown(renamed);
-    // canonical heading first; alias surfaced so an LLM that learned the old name still finds it
-    expect(md).toContain('# `list-drives`');
-    expect(md).toContain('list-onedrive-drives');
   });
 });
 

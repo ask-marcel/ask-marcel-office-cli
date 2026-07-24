@@ -83,7 +83,6 @@ const meta: CommandMeta = {
   summary:
     'Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg (headers + body with the quoted reply chain stripped — `--keep-quoted true` restores it — and inline `cid:` images shown as placeholders, attachments converted recursively), plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.',
   category: 'meta',
-  commandAliases: ['convert-local-file'],
   graphMethod: 'GET',
   graphPathTemplate: '(local) reads {path} from the local filesystem; not a Graph endpoint',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',

@@ -18,7 +18,6 @@ const meta: CommandMeta = {
       name: 'notebook-id',
       key: 'notebookId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'OneNote notebook ID. Returned by `ask-marcel-office list-onenote-notebooks`.',
     },
     ...odataQueryOptions,

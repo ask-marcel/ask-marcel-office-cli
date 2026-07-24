@@ -48,7 +48,6 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     name,
     summary: cmd.meta.summary,
     category: cmd.meta.category,
-    ...(cmd.meta.commandAliases ? { commandAliases: cmd.meta.commandAliases } : {}),
     graphMethod: cmd.meta.graphMethod,
     graphPathTemplate: cmd.meta.graphPathTemplate,
     graphDocsUrl: cmd.meta.graphDocsUrl,

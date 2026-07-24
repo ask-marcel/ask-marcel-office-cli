@@ -33,7 +33,6 @@ const buildManifest = (generatedAt: string): CommandManifest => {
       name,
       summary: m.summary,
       category: m.category,
-      ...(m.commandAliases ? { commandAliases: m.commandAliases } : {}),
       graphMethod: m.graphMethod,
       graphPathTemplate: m.graphPathTemplate,
       graphDocsUrl: m.graphDocsUrl,

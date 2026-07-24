@@ -52,7 +52,6 @@ const meta: CommandMeta = {
       name: 'schedules',
       key: 'schedules',
       required: true,
-      aliases: [{ name: 'emails', key: 'emails' }],
       description:
         'Comma-separated SMTP addresses of the users and/or room resources to check (e.g. `alice@contoso.com,bob@contoso.com,room-4a@contoso.com`). Resolve names to addresses first via `list-relevant-people` or `microsoft-search-query`.',
     },
@@ -60,14 +59,12 @@ const meta: CommandMeta = {
       name: 'start-date-time',
       key: 'startDateTime',
       required: true,
-      aliases: [{ name: 'start', key: 'start' }],
       description: `Window lower bound (interpreted as UTC). ${RELATIVE_DATE_DESCRIPTION}`,
     },
     {
       name: 'end-date-time',
       key: 'endDateTime',
       required: true,
-      aliases: [{ name: 'end', key: 'end' }],
       description: `Window upper bound (interpreted as UTC). Graph caps the span at 62 days. ${RELATIVE_DATE_DESCRIPTION}`,
     },
     {

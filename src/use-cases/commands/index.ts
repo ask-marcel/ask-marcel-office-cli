@@ -1,4 +1,5 @@
 import type { Command } from './command-types.ts';
+import { withUnknownParamRejection } from './reject-unknown-params.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as listAccessibleDrives from './list-accessible-drives.ts';
@@ -184,7 +185,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const commands: Record<string, Command> = {
+const modules: Record<string, Command> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
@@ -370,5 +371,14 @@ const commands: Record<string, Command> = {
   'list-todo-tasks-delta': listTodoTasksDelta,
   'next-page': nextPage,
 };
+
+/*
+ * Every command is wrapped so an undeclared parameter is refused before it runs
+ * (2026-07-24). The wrap lives HERE rather than in composition because a
+ * library consumer reaches `commands[x].execute(...)` directly, never passing
+ * through the CLI or the MCP gateway — wrapping at assembly is the only point
+ * all three surfaces share.
+ */
+const commands: Record<string, Command> = Object.fromEntries(Object.entries(modules).map(([name, command]) => [name, withUnknownParamRejection(command)]));
 
 export { commands };

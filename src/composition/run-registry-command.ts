@@ -113,7 +113,7 @@ export type RunRegistryCommandRequest = {
   /** Canonical registry name — drives the manifest-derived error messages. */
   readonly name: string;
   readonly command: Command;
-  /** Raw params, still possibly keyed by an option ALIAS. */
+  /** Raw params, keyed by the canonical camelCase option keys. */
   readonly params: Record<string, string>;
   readonly outputPath?: string;
   readonly outputDir?: string;
@@ -133,31 +133,11 @@ export type RunRegistryCommandFailure = {
   readonly retryAfterSeconds?: number;
 };
 
-/**
- * Track which alias the user actually typed so a post-validation error message
- * references the flag they typed rather than the canonical schema name (e.g.
- * `--query is empty` not `--title-substring is empty`).
- */
-const normalizeAliases = (command: Command, params: Record<string, string>): { readonly normalized: Record<string, string>; readonly aliasUsedFor: Record<string, string> } => {
-  const normalized: Record<string, string> = { ...params };
-  const aliasUsedFor: Record<string, string> = {};
-  for (const opt of command.meta.options) {
-    for (const alias of opt.aliases ?? []) {
-      const aliasValue = params[alias.key];
-      if (typeof aliasValue === 'string' && !Object.hasOwn(params, opt.key)) {
-        normalized[opt.key] = aliasValue;
-        aliasUsedFor[opt.name] = alias.name;
-      }
-    }
-  }
-  return { normalized, aliasUsedFor };
-};
-
-const toFailure = (command: Command, error: GraphError, aliasUsedFor: Record<string, string>): RunRegistryCommandFailure => {
-  let message = error.message;
-  for (const [canonical, alias] of Object.entries(aliasUsedFor)) {
-    message = message.replaceAll(`--${canonical}`, `--${alias}`);
-  }
+// 2026-07-24: one name per flag. The alias normalizer that used to run here
+// (mapping alias keys onto canonical ones and rewriting error messages to the
+// spelling the caller typed) went with the alias system — params arrive keyed
+// by canonical names on every surface, or they are rejected.
+const toFailure = (command: Command, error: GraphError): RunRegistryCommandFailure => {
   // 2026-06-15 (F-02): a local-filesystem command (convert-local-file-to-markdown,
   // extract-local-file-images) never touches Graph, so its runtime
   // failures must not be stamped `source: graph` (misleading — an LLM
@@ -165,7 +145,7 @@ const toFailure = (command: Command, error: GraphError, aliasUsedFor: Record<str
   // retry). Validation errors still flow through the normal classifier.
   const isLocalCommand = command.executeLocal !== undefined;
   return {
-    message,
+    message: error.message,
     ...(error.code === undefined ? {} : { code: error.code }),
     source: isLocalCommand && error.type !== 'validation_error' ? 'cli' : sourceFromGraphError(error),
     ...(error.type === 'api_error' && error.retryAfterSeconds !== undefined ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
@@ -174,12 +154,11 @@ const toFailure = (command: Command, error: GraphError, aliasUsedFor: Record<str
 
 export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: RunRegistryCommandRequest): Promise<Result<unknown, RunRegistryCommandFailure>> => {
   const { command, name } = request;
-  const { normalized, aliasUsedFor } = normalizeAliases(command, request.params);
   // `convert-local-file-to-markdown` / `extract-local-file-images` are the commands whose
   // input is the local filesystem, not Graph — route them to executeLocal with the
   // composition-selected FileSystem (the same instance --output-path uses).
-  const result = command.executeLocal !== undefined ? await command.executeLocal(deps.fs, normalized) : await command.execute(deps.graph, normalized);
-  if (!result.ok) return err(toFailure(command, result.error, aliasUsedFor));
+  const result = command.executeLocal !== undefined ? await command.executeLocal(deps.fs, request.params) : await command.execute(deps.graph, request.params);
+  if (!result.ok) return err(toFailure(command, result.error));
 
   // --output-dir is checked BEFORE --output-path: a media-producing command
   // paired with both should land the media array, not fall into the

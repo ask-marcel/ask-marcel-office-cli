@@ -68,13 +68,10 @@ describe('buildManifest', () => {
     expect(byName('aaa-write')?.mutates).toBe(true);
   });
 
-  it('serializes commandAliases (back-compat names) when set, and omits the key otherwise', () => {
-    const registry: Readonly<Record<string, Command>> = {
-      'aaa-renamed': fakeCmd({ commandAliases: ['aaa-old-name'] }),
-      'aaa-plain': fakeCmd(),
-    };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
-    expect(manifest.commands.find((c) => c.name === 'aaa-renamed')?.commandAliases).toEqual(['aaa-old-name']);
+  // 2026-07-24: the manifest carries one name per command; commandAliases
+  // serialization was removed with the alias system.
+  it('never serializes a commandAliases key, since a command has exactly one name', () => {
+    const manifest = buildManifest({ 'aaa-plain': fakeCmd() }, 'fake-pkg', '0.0.1');
     expect(manifest.commands.find((c) => c.name === 'aaa-plain')).not.toHaveProperty('commandAliases');
   });
 

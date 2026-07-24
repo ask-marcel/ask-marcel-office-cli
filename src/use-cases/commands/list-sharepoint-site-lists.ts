@@ -29,7 +29,6 @@ const meta: CommandMeta = {
       name: 'site-id',
       key: 'siteId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'SharePoint site ID. Returned by `ask-marcel-office search-sharepoint-sites-by-name`.',
     },
     ...noSkipOptions,

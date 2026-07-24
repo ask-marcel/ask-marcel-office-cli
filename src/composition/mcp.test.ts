@@ -93,10 +93,13 @@ describe('discovering what the CLI can do over MCP', () => {
     expect(text).toContain('/me/messages');
   });
 
-  it('returns docs for a command asked for by a deprecated name, since the manifest still advertises those names', async () => {
+  // 2026-07-24: one name per command. Deprecated names (commandAliases) no
+  // longer resolve anywhere; an old name gets the unknown-command pointer.
+  it('rejects docs for a removed deprecated command name like any other unknown command', async () => {
     const client = await connect();
-    const text = textOf(await client.callTool({ name: 'get-command-docs', arguments: { command: 'download-onedrive-file-content' } }));
-    expect(text).toContain('download-drive-item-content');
+    const result = await client.callTool({ name: 'get-command-docs', arguments: { command: 'download-onedrive-file-content' } });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('list-commands');
   });
 
   it('returns docs for a lifecycle command, which lives outside the registry', async () => {
@@ -152,14 +155,14 @@ describe('running a read command over MCP', () => {
     expect(textOf(result)).toContain('list-commands');
   });
 
-  it('runs a command asked for by its deprecated name', async () => {
-    const graph: GraphClient = fakeGraphClient({ getBinary: async () => ok({ contentType: 'text/plain', size: 2, base64: 'aGk=' }) });
-    const client = await connect({ graph });
+  it('rejects a removed deprecated command name on run-command like any other unknown command', async () => {
+    const client = await connect();
     const result = await client.callTool({
       name: 'run-command',
       arguments: { command: 'download-onedrive-file-content', params: { driveId: 'd1', itemId: 'i1' } },
     });
-    expect(isError(result)).toBe(false);
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('list-commands');
   });
 
   // 2026-07-23 bug report: the CLI's rejection tells the caller to redirect

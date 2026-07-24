@@ -36,7 +36,6 @@ const meta: CommandMeta = {
       name: 'conversation-id',
       key: 'conversationId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`).',
     },
     ...allowedOptions,

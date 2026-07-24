@@ -107,16 +107,14 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
       description:
         'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/update/docs/help-json/mcp).',
       inputSchema: {
-        command: z.string().describe('Command name, e.g. `list-mail-messages`. A deprecated former name also resolves.'),
+        command: z.string().describe('Command name, e.g. `list-mail-messages`.'),
       },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async ({ command }): Promise<CallToolResult> => {
-      // Resolve aliases to the canonical name first; `renderSingleCommand` does
-      // a bare registry lookup and would miss a deprecated spelling. When
-      // resolution fails, pass the raw name through so lifecycle entries (which
-      // are not in the registry) still render and unknown names still get
-      // renderSingleCommand's own `available` list.
+      // When resolution fails, pass the raw name through so lifecycle entries
+      // (which are not in the registry) still render and unknown names still
+      // get renderSingleCommand's own `available` list.
       const resolved = resolveCommand(cmdRegistry, command);
       const result = renderSingleCommand(cmdRegistry, resolved.ok ? resolved.value.name : command);
       if (!result.ok) return errText(`Unknown command "${result.error.name}". Call list-commands to see every command.`, 'cli_unknown_command');

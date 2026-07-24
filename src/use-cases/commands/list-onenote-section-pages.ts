@@ -18,10 +18,6 @@ const meta: CommandMeta = {
       key: 'onenoteSectionId',
       required: true,
       description: 'OneNote section ID. Returned by `ask-marcel-office list-onenote-notebook-sections` or `list-all-onenote-sections`.',
-      aliases: [
-        { name: 'id', key: 'id' },
-        { name: 'section-id', key: 'sectionId' },
-      ],
     },
     ...odataQueryOptions,
   ],

@@ -13,19 +13,12 @@ type CommandCategory = 'drive' | 'excel' | 'sharepoint' | 'tasks' | 'mail' | 'no
 
 type CommandHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
-type CommandOptionAlias = {
-  readonly name: string; // kebab-case (the user-facing flag, without `--`)
-  readonly key: string; // camelCase (commander auto-keyed name)
-};
-
 /*
- * Alias policy: the `--folder-id` alias is only exposed
- * on commands whose path is folder-scoped (e.g. `list-folder-files`,
- * `get-drive-delta` — the item ID MUST point at a folder). Commands like
- * `get-drive-item`, `list-drive-item-versions`, and
- * `download-drive-item-content` accept BOTH files and folders, so they
- * keep `--item-id` as the only name to avoid misleading the LLM into
- * thinking the value must be a folder.
+ * 2026-07-24: one name per flag, one name per command. The alias system
+ * (CommandOptionAlias, `aliases?` on options, `commandAliases?` on meta, the
+ * composition-level normalizer) was removed: it made the same spelling mean
+ * different things across surfaces and blocked uniform unknown-param
+ * rejection. `meta.test.ts` now pins the absence.
  */
 
 /**
@@ -52,13 +45,6 @@ type CommandOptionMeta = {
    * commands accept but do not demand.
    */
   readonly required: boolean;
-  /**
-   * Optional secondary spellings of the same flag. Both the canonical
-   * `name` and every alias name are accepted on the command line; values
-   * passed under an alias are normalized to the canonical `key` before
-   * the schema runs. The canonical name is what `--help` shows first.
-   */
-  readonly aliases?: ReadonlyArray<CommandOptionAlias>;
   /**
    * Structured value-type hint for LLM consumers. Optional.
    */
@@ -97,14 +83,6 @@ type PaginationStrategy =
 type CommandMeta = {
   readonly summary: string;
   readonly category: CommandCategory;
-  /**
-   * Deprecated former command names kept working as commander-level aliases for
-   * back-compat after a rename (e.g. `download-onedrive-file-content` →
-   * `download-drive-item-content`). The canonical registry key is what `--help`
-   * and the manifest list first; each alias here is also accepted on the CLI and
-   * surfaced in the manifest so an LLM that learned the old name still resolves.
-   */
-  readonly commandAliases?: ReadonlyArray<string>;
   readonly graphMethod: CommandHttpMethod;
   readonly graphPathTemplate: string;
   readonly graphDocsUrl: string;
@@ -207,7 +185,6 @@ export type {
   CommandExecute,
   CommandHttpMethod,
   CommandMeta,
-  CommandOptionAlias,
   CommandOptionMeta,
   CommandPositionalArgumentMeta,
   CommandSchema,

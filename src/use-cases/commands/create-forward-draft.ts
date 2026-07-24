@@ -132,8 +132,7 @@ const meta: CommandMeta = {
       name: 'forward-message-id',
       key: 'forwardMessageId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
-      description: 'The message being forwarded. Source from list-mail-folder-messages or search-mail-messages. Accepts `--id` as an alias.',
+      description: 'The message being forwarded. Source from list-mail-folder-messages or search-mail-messages.',
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -153,9 +152,8 @@ const meta: CommandMeta = {
       name: 'comment',
       key: 'comment',
       required: true,
-      aliases: [{ name: 'body-content', key: 'bodyContent' }],
       description:
-        'The comment text, placed above the quoted forwarded message. Named for Graph\'s own createForward payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup. Accepts `--body-content` as a deprecated alias - beware that on update-mail-draft that flag means "replace the ENTIRE body, quote included".',
+        "The comment text, placed above the quoted forwarded message. Named for Graph's own createForward payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
     },
     {
       name: 'subject',

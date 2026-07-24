@@ -263,7 +263,9 @@ describe('buildCli command surface', () => {
     expect(out).toContain('Jordan');
   });
 
-  it('accepts both the canonical and the alias spelling of a command flag (e.g. --task-list-id alongside --todo-task-list-id)', async () => {
+  // 2026-07-24: one name per flag. The alias spellings this block used to
+  // exercise (--task-list-id, --id, --start/--end, --body-content) were removed.
+  it('routes the canonical --todo-task-list-id to the task-list path', async () => {
     let capturedPath = '';
     const captureGraph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
@@ -273,7 +275,7 @@ describe('buildCli command surface', () => {
     });
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--task-list-id', 'AAMkABC']));
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--todo-task-list-id', 'AAMkABC']));
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
 
@@ -297,16 +299,6 @@ describe('buildCli command surface', () => {
     expect(graphCalled).toBe(false);
   });
 
-  it('resolves a deprecated command name via meta.commandAliases — `convert-local-file` still runs after the rename to convert-local-file-to-markdown', async () => {
-    const fs = createFileSystemFake();
-    fs.seed('/work/data.csv', 'name,age\nAlice,30');
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file', '--path', '/work/data.csv']));
-    const parsed = JSON.parse(out.trim()) as { ok: boolean; data: { text: string } };
-    expect(parsed.ok).toBe(true);
-    expect(parsed.data.text).toContain('| Alice | 30 |');
-  });
-
   it('stamps a failed local-only command with source `cli`, not `graph` — it never touched Graph (F-02)', async () => {
     const fs = createFileSystemFake(); // nothing seeded → readBytes returns a not-found error
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
@@ -318,93 +310,34 @@ describe('buildCli command surface', () => {
     expect(parsed.source).toBe('cli');
   });
 
-  it('accepts --id as an alias for --message-id on sole-message-id commands (P3)', async () => {
-    let capturedPath = '';
+  it('sends the --comment text as the Graph reply comment on create-reply-draft', async () => {
+    let captured: unknown;
     const captureGraph: GraphClient = fakeGraphClient({
+      post: async (_path: string, body: unknown) => {
+        captured = (body as { comment?: unknown }).comment;
+        return { ok: true, value: { id: 'AAMkAGI2', isDraft: true } };
+      },
+    });
+    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel-office', 'create-reply-draft', '--reply-to-message-id', 'AAMkAGI2', '--comment', 'Confirmed for Contoso.'])
+    );
+    expect(captured).toBe('Confirmed for Contoso.');
+  });
+
+  it('routes the canonical --start-date-time/--end-date-time window to the calendarView path', async () => {
+    let captured = '';
+    const graph: GraphClient = fakeGraphClient({
       get: async (path: string) => {
-        capturedPath = path;
-        return { ok: true, value: { id: 'AAMkAGI2', subject: 'hi' } };
+        captured = path;
+        return { ok: true, value: { value: [] } };
       },
     });
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-mail-message', '--id', 'AAMkAGI2']));
-    // --id maps to messageId → the message path (a default $select is appended by the command).
-    expect(capturedPath.startsWith('/me/messages/AAMkAGI2')).toBe(true);
-  });
-
-  it('accepts --id as an alias for --message-id on update-mail-draft, matching its read siblings (F-05)', async () => {
-    let capturedPath = '';
-    const captureGraph: GraphClient = fakeGraphClient({
-      patch: async (path: string) => {
-        capturedPath = path;
-        return { ok: true, value: { id: 'AAMkAGI2', subject: 'Updated' } };
-      },
-    });
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update-mail-draft', '--id', 'AAMkAGI2', '--subject', 'Updated']));
-    expect(capturedPath).toBe('/me/messages/AAMkAGI2');
-  });
-
-  // 2026-07-23 bug report: --body-content named the above-the-quote text here
-  // and the WHOLE body on update-mail-draft. --comment is now the canonical
-  // spelling on all three (it is Graph's own field name), with the old flag
-  // kept working so nothing that learned it breaks.
-  it.each([
-    ['create-reply-draft', ['--reply-to-message-id', 'AAMkAGI2']],
-    ['create-forward-draft', ['--forward-message-id', 'AAMkAGI2', '--to-recipients', 'bob@example.com']],
-  ])('sends the same reply text on %s whether the caller writes --comment or the deprecated --body-content', async (command, idArgs) => {
-    const postedComment = async (flag: string): Promise<unknown> => {
-      let captured: unknown;
-      const captureGraph: GraphClient = fakeGraphClient({
-        post: async (_path: string, body: unknown) => {
-          captured = (body as { comment?: unknown }).comment;
-          return { ok: true, value: { id: 'AAMkAGI2', isDraft: true } };
-        },
-      });
-      const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', command, ...idArgs, flag, 'Confirmed for Contoso.']));
-      return captured;
-    };
-    expect(await postedComment('--comment')).toBe('Confirmed for Contoso.');
-    expect(await postedComment('--body-content')).toBe('Confirmed for Contoso.');
-  });
-
-  it('accepts --start/--end as aliases for --start-date-time/--end-date-time on the calendar-view family', async () => {
-    const pathFor = async (args: ReadonlyArray<string>): Promise<string> => {
-      let captured = '';
-      const graph: GraphClient = fakeGraphClient({
-        get: async (path: string) => {
-          captured = path;
-          return { ok: true, value: { value: [] } };
-        },
-      });
-      const cli = buildCli({ auth: okAuth(), graph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-calendar-view', ...args]));
-      return captured;
-    };
-    // The short --start/--end forms agents reach for must produce the identical Graph
-    // call as the canonical --start-date-time/--end-date-time (alias → canonical key).
-    const aliased = await pathFor(['--start', '2026-04-01T00:00:00Z', '--end', '2026-05-01T00:00:00Z']);
-    const canonical = await pathFor(['--start-date-time', '2026-04-01T00:00:00Z', '--end-date-time', '2026-05-01T00:00:00Z']);
-    expect(aliased).toBe(canonical);
-    expect(aliased).toContain('/me/calendarView?startDateTime=');
-  });
-
-  it('rewrites a validation-error message to reference the alias the user typed', async () => {
-    const captureGraph: GraphClient = fakeGraphClient({
-      get: async () => ({ ok: true, value: { value: [] } }),
-    });
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', async () => {
-      try {
-        await cli.parseAsync(['node', 'ask-marcel-office', 'search-onenote-pages', '--query', '']);
-      } catch {
-        /* commander may exit on validation failure */
-      }
-    });
-    expect(out).toContain('--query is empty');
-    expect(out).not.toContain('--title-substring is empty');
+    const cli = buildCli({ auth: okAuth(), graph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    await captureStream('stdout', () =>
+      cli.parseAsync(['node', 'ask-marcel-office', 'list-calendar-view', '--start-date-time', '2026-04-01T00:00:00Z', '--end-date-time', '2026-05-01T00:00:00Z'])
+    );
+    expect(captured).toContain('/me/calendarView?startDateTime=');
   });
 
   it('help-json rejects an explicit --output text (manifest is JSON by contract — audit )', async () => {

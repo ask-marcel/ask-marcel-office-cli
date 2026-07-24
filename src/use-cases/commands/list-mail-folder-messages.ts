@@ -17,7 +17,6 @@ const meta: CommandMeta = {
       name: 'mail-folder-id',
       key: 'mailFolderId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description:
         'mailFolder ID. Returned by `ask-marcel-office list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`. When listing `drafts`, a `conversationId` `$filter` is not a reliable check for whether a draft already exists on a thread: reply and forward drafts can split across several conversationIds, and `$filter` on Drafts is not read-your-writes consistent. Match client-side on subject and recipients instead, or use the `find-mail-drafts` command, which does exactly that.',
     },

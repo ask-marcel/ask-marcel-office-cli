@@ -18,11 +18,6 @@ const meta: CommandMeta = {
       key: 'todoTaskListId',
       required: true,
       description: 'Microsoft To Do task list ID. Returned by `list-todo-task-lists`.',
-      aliases: [
-        { name: 'id', key: 'id' },
-        { name: 'task-list-id', key: 'taskListId' },
-        { name: 'todo-list-id', key: 'todoListId' },
-      ],
     },
   ],
   example: "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",

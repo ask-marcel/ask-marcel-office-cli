@@ -26,8 +26,7 @@ const meta: CommandMeta = {
       key: 'itemId',
       required: true,
       description:
-        'driveItem ID of the folder (Graph identifies folders as driveItems too — there is no separate folder type). Use the root folder ID from `ask-marcel-office get-drive-root-item` to list the top of a drive. Accepts `--folder-id` as an alias since the command name implies "folder".',
-      aliases: [{ name: 'folder-id', key: 'folderId' }],
+        'driveItem ID of the folder (Graph identifies folders as driveItems too — there is no separate folder type). Use the root folder ID from `ask-marcel-office get-drive-root-item` to list the top of a drive.',
     },
     ...noSkipOptions,
     TENANT_ID_OPTION,

@@ -26,7 +26,6 @@ const meta: CommandMeta = {
       key: 'listItemId',
       required: true,
       description: 'listItem ID (typically a small integer). Returned by `ask-marcel-office list-sharepoint-site-list-items`.',
-      aliases: [{ name: 'item-id', key: 'itemId' }],
     },
     ...selectExpandOptions,
   ],

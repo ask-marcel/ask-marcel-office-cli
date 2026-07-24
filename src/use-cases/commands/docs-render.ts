@@ -4,7 +4,6 @@ export type CommandManifestEntry = {
   readonly name: string;
   readonly summary: string;
   readonly category: CommandCategory;
-  readonly commandAliases?: CommandMeta['commandAliases'];
   readonly graphMethod: CommandMeta['graphMethod'];
   readonly graphPathTemplate: string;
   readonly graphDocsUrl: string;
@@ -85,12 +84,6 @@ const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = ['lifecycle', 'drive', 'e
 
 const sortByName = (a: CommandManifestEntry, b: CommandManifestEntry): number => a.name.localeCompare(b.name);
 
-const renderAliasSuffix = (aliases: CommandManifestEntry['options'][number]['aliases']): string => {
-  if (!aliases || aliases.length === 0) return '';
-  const names = aliases.map((a) => `\`--${a.name}\``).join(', ');
-  return ` _(aliases: ${names})_`;
-};
-
 const renderRequiredParams = (entry: CommandManifestEntry): string => {
   const positionals = (entry.positionalArguments ?? []).map((p) => `\`<${p.name}>\``);
   const flags = entry.options.map((o) => `\`--${o.name}\``);
@@ -124,10 +117,6 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
     `- **Graph endpoint:** \`${entry.graphMethod} ${entry.graphPathTemplate}\``,
     `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
   ];
-  if (entry.commandAliases && entry.commandAliases.length > 0) {
-    const aliasNames = entry.commandAliases.map((a) => `\`${a}\``).join(', ');
-    lines.push(`- **Also invokable as (deprecated alias):** ${aliasNames}`);
-  }
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
@@ -152,7 +141,7 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.options.length > 0) {
     lines.push('', '## Options', '');
     lines.push('| Flag | Description |', '|------|-------------|');
-    for (const o of entry.options) lines.push(`| \`--${o.name}\` | ${o.description}${renderAliasSuffix(o.aliases)} |`);
+    for (const o of entry.options) lines.push(`| \`--${o.name}\` | ${o.description} |`);
   }
   if (entry.bodyTemplate) lines.push('', '## Request body', '', '```json', entry.bodyTemplate, '```');
   lines.push('', '## Example', '', '```bash', entry.example, '```');

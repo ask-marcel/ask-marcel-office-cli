@@ -123,17 +123,15 @@ const meta: CommandMeta = {
       name: 'reply-to-message-id',
       key: 'replyToMessageId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
-      description: 'The message being replied to. Source from list-mail-folder-messages or search-mail-messages. Accepts `--id` as an alias.',
+      description: 'The message being replied to. Source from list-mail-folder-messages or search-mail-messages.',
       argumentHint: { kind: 'idOrName' },
     },
     {
       name: 'comment',
       key: 'comment',
       required: true,
-      aliases: [{ name: 'body-content', key: 'bodyContent' }],
       description:
-        'The reply text, placed above the quoted history. Named for Graph\'s own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup. Accepts `--body-content` as a deprecated alias - beware that on update-mail-draft that flag means "replace the ENTIRE body, quote included".',
+        "The reply text, placed above the quoted history. Named for Graph's own createReply payload field, and the same word update-mail-draft uses for the same role. Plain text by default; pass --body-content-type HTML to send it as markup.",
     },
     {
       name: 'body-content-type',

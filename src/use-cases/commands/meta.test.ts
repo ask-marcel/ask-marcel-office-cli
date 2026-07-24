@@ -81,39 +81,22 @@ describe('command meta — invariants on every registered command', () => {
         expect(optionKeys).toEqual(keys);
       });
 
-      it('uses kebab-case `name` matching the camelCase `key` in every option, with non-empty alias name/key pairs', () => {
+      // 2026-07-24: every option has exactly ONE name. The alias invariants that
+      // lived here (--id sole-id convention, --start/--end, commandAliases shape,
+      // all 6-06-16) enforced the aliased world and were deleted with it.
+      it('uses kebab-case `name` matching the camelCase `key` in every option', () => {
         for (const opt of cmd.meta.options) {
           expect(opt.name).toBe(camelToKebab(opt.key));
           expect(opt.description.trim().length).toBeGreaterThan(0);
-          for (const alias of opt.aliases ?? []) {
-            expect(alias.name.trim().length).toBeGreaterThan(0);
-            expect(alias.key.trim().length).toBeGreaterThan(0);
-          }
         }
       });
 
-      it('exposes the short --start/--end aliases on any date-window option (calendar-view family, 6-06-16)', () => {
-        for (const opt of cmd.meta.options) {
-          if (opt.name === 'start-date-time') expect(opt.aliases?.some((a) => a.name === 'start' && a.key === 'start')).toBe(true);
-          if (opt.name === 'end-date-time') expect(opt.aliases?.some((a) => a.name === 'end' && a.key === 'end')).toBe(true);
-        }
-      });
-
-      it('exposes the --id alias on a SOLE required id-option (uniform sole-id convention, 6-06-16)', () => {
-        // When a command has exactly one required `*-id` option, `--id` is unambiguous and
-        // every such command must accept it (matches the mail-message family). Commands with
-        // two required ids deliberately do NOT (—id would be ambiguous).
-        const requiredIdOpts = cmd.meta.options.filter((o) => o.required && /-id$/.test(o.name));
-        if (requiredIdOpts.length === 1) {
-          expect(requiredIdOpts[0]?.aliases?.some((a) => a.name === 'id' && a.key === 'id')).toBe(true);
-        }
-      });
-
-      it('keeps any commandAliases kebab-case and non-colliding with a canonical command name', () => {
-        for (const alias of cmd.meta.commandAliases ?? []) {
-          expect(alias).toMatch(/^[a-z][a-z0-9-]*$/);
-          expect(Object.keys(commands).includes(alias)).toBe(false);
-        }
+      // The fields are gone from the TYPE, so this asserts on the runtime data:
+      // a stale `aliases:` left in a meta literal would be an excess property
+      // the compiler catches, but a spread-built meta could still smuggle one.
+      it('declares no aliases anywhere: one name per flag, one name per command (2026-07-24)', () => {
+        for (const opt of cmd.meta.options) expect(Object.hasOwn(opt, 'aliases')).toBe(false);
+        expect(Object.hasOwn(cmd.meta, 'commandAliases')).toBe(false);
       });
 
       it('references each per-command option at least once across graphPathTemplate + bodyTemplate, and references nothing else (runtime-additive query flags — OData + the chatsvcagg page-size/message-token analogues — are excluded)', () => {
@@ -245,10 +228,7 @@ describe('command meta — invariants on every registered command', () => {
         const flagsInSummary = Array.from(cmd.meta.summary.matchAll(/--([a-z][a-z0-9-]*)/g), (m) => m[1] ?? '');
         if (flagsInSummary.length === 0) return;
         const declared = new Set<string>();
-        for (const opt of cmd.meta.options) {
-          declared.add(opt.name);
-          for (const alias of opt.aliases ?? []) declared.add(alias.name);
-        }
+        for (const opt of cmd.meta.options) declared.add(opt.name);
         for (const flag of flagsInSummary) expect(declared).toContain(flag);
       });
     });
@@ -258,12 +238,9 @@ describe('command meta — invariants on every registered command', () => {
     // Phantom-name guard: a prose hint pointing at a command that
     // does not exist (e.g. the plugin once taught `get-event` for `get-calendar-event`)
     // ships silently — meta.test previously validated only per-command FLAGS. Validate
-    // every command-shaped reference against the registry + lifecycle names + aliases.
+    // every command-shaped reference against the registry + lifecycle names.
     const valid = new Set<string>(['docs', 'help-json', 'login', 'logout', 'update']);
-    for (const [name, cmd] of populated) {
-      valid.add(name);
-      for (const alias of cmd.meta.commandAliases ?? []) valid.add(alias);
-    }
+    for (const [name] of populated) valid.add(name);
     const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
     const phantom: string[] = [];
     for (const [name, cmd] of populated) {

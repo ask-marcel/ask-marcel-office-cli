@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
-import type { WithdrawnFlag } from './delta-withdrawn-flags.ts';
-import { withdrawnFlagRefusal } from './delta-withdrawn-flags.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, pickODataOptions, pickODataShape } from './odata-query.ts';
 
@@ -16,23 +14,11 @@ import { appendOData, pickODataOptions, pickODataShape } from './odata-query.ts'
 //                        `receivedDateTime desc` is accepted, so the flag can
 //                        only ever be a no-op or an error)
 //   $top      POISONOUS (see the header translation below)
-// Only the honoured three are advertised.
+// Only the honoured three are declared; passing `--skip` or `--orderby` is
+// refused by the registry-level unknown-parameter guard.
 const schema = z.object({ mailFolderId: z.string().min(1) }).extend(pickODataShape(['top', 'select', 'filter', 'expand']));
 
-const WITHDRAWN_FLAGS: ReadonlyArray<WithdrawnFlag> = [
-  {
-    key: 'skip',
-    reason: 'Graph ignores `$skip` on this delta endpoint: a `--skip 5` probe returned the same first message and the same page. Page with the returned `nextLink` instead.',
-  },
-  {
-    key: 'orderby',
-    reason: 'Graph rejects `$orderby` here unless it merely restates the default `receivedDateTime desc`, so the flag could only ever be a no-op or an error. Sort client-side.',
-  },
-];
-
 const execute: Command['execute'] = async (graph, params) => {
-  const withdrawn = withdrawnFlagRefusal('list-mail-folder-messages-delta', WITHDRAWN_FLAGS, params);
-  if (withdrawn !== undefined) return err({ type: 'validation_error', message: withdrawn });
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { mailFolderId, top, ...odata } = parsed.data;
@@ -61,7 +47,6 @@ const meta: CommandMeta = {
       name: 'mail-folder-id',
       key: 'mailFolderId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'Mail folder ID or well-known name (`inbox`, `archive`, `sentitems`, `deleteditems`, `junkemail`, `drafts`). Returned by `list-mail-folders`.',
     },
     ...pickODataOptions(['top', 'select', 'filter', 'expand']),

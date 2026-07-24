@@ -168,8 +168,7 @@ const meta: CommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
-      description: 'Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts. Accepts `--id` as an alias.',
+      description: 'Draft message ID to update. Source from create-mail-draft response or list-mail-folder-messages --mail-folder-id drafts.',
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -183,7 +182,7 @@ const meta: CommandMeta = {
       key: 'bodyContent',
       required: false,
       description:
-        'New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft that is almost never what you want, so the command reads the draft first and REFUSES when it still carries a quote - use --comment to revise only your own text and keep the quote, or pass --replace-quoted-history true to drop it deliberately. Note the sibling commands: on create-reply-draft / create-forward-draft, --body-content is a deprecated alias for --comment and means the text ABOVE the quote, not the whole body. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment.',
+        'New email body content. Replaces the ENTIRE body, quoted history included. On a threaded reply or forward draft that is almost never what you want, so the command reads the draft first and REFUSES when it still carries a quote - use --comment to revise only your own text and keep the quote, or pass --replace-quoted-history true to drop it deliberately. Note the sibling commands: create-reply-draft / create-forward-draft name their above-the-quote text --comment; --body-content exists only here. Pass --body-content-type HTML for rich text. Mutually exclusive with --comment.',
     },
     {
       name: 'comment',

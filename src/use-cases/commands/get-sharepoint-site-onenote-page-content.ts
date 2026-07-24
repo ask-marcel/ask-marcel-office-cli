@@ -38,7 +38,6 @@ const meta: CommandMeta = {
       key: 'onenotePageId',
       required: true,
       description: 'OneNote page ID inside the site.',
-      aliases: [{ name: 'page-id', key: 'pageId' }],
     },
   ],
   example: "ask-marcel-office get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",

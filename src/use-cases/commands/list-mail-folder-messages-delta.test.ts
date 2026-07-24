@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { commands } from './index.ts';
 import { execute } from './list-mail-folder-messages-delta.ts';
 
 type Call = { readonly path: string; readonly headers: Record<string, string> | undefined };
@@ -56,29 +57,19 @@ describe('list-mail-folder-messages-delta', () => {
     expect(calls[0]?.path).toContain('$filter=isRead%20eq%20false');
   });
 
-  // Live probe: `--skip 5` returned the same first message and the same page,
-  // so Graph ignores it here. Advertising a lever that does nothing is the
-  // trap this command already sprang once.
-  it('refuses an offset, which this endpoint silently ignores rather than honours', async () => {
+  // Live probes: `--skip 5` returned the same first message and the same page
+  // (Graph ignores it here), and `$orderby=receivedDateTime asc` fails with
+  // ErrorInvalidUrlQuery. Neither is declared, so both are refused. The refusal
+  // now comes from the registry-level unknown-parameter guard rather than a
+  // per-command list, which is why these go through `commands[...]`: the bare
+  // module export is the unwrapped command.
+  it.each(['skip', 'orderby'])('refuses --%s, a flag this endpoint does not honour, before any request goes out', async (flag) => {
     const { graph, calls } = recordingGraph();
 
-    const result = await execute(graph, { mailFolderId: 'inbox', skip: '5' });
+    const result = await commands['list-mail-folder-messages-delta'].execute(graph, { mailFolderId: 'inbox', [flag]: 'x' });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('validation_error');
-    expect(calls).toEqual([]);
-  });
-
-  // Live probe: `$orderby=receivedDateTime asc` fails with ErrorInvalidUrlQuery,
-  // and Graph states only `receivedDateTime desc` is accepted, which is already
-  // the default ordering. The flag can only ever be a no-op or an error.
-  it('refuses a sort order, which this endpoint rejects unless it restates the default', async () => {
-    const { graph, calls } = recordingGraph();
-
-    const result = await execute(graph, { mailFolderId: 'inbox', orderby: 'receivedDateTime asc' });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.type).toBe('validation_error');
+    if (!result.ok) expect(result.error.code).toBe('unknown_parameter');
     expect(calls).toEqual([]);
   });
 });

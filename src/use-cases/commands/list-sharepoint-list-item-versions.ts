@@ -31,7 +31,6 @@ const meta: CommandMeta = {
       key: 'listItemId',
       required: true,
       description: 'List item ID inside the list. Returned by `list-sharepoint-site-list-items`.',
-      aliases: [{ name: 'item-id', key: 'itemId' }],
     },
     ...noSkipOptions,
   ],

@@ -31,7 +31,6 @@ const meta: CommandMeta = {
       name: 'event-id',
       key: 'eventId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'Outlook calendar event ID. Returned by `ask-marcel-office list-calendar-events` or `get-calendar-event`.',
     },
     ...odataQueryOptions,

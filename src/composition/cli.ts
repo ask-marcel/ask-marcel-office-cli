@@ -411,8 +411,6 @@ const buildCli = (deps: BuildCliDeps): Command => {
     program.commandsGroup(`${CATEGORY_LABELS[category]}:`);
     for (const [name, cmd] of entries) {
       const commandDef = program.command(name).description(cmd.meta.summary);
-      // Back-compat: deprecated former names stay invokable as commander aliases.
-      for (const aliasName of cmd.meta.commandAliases ?? []) commandDef.alias(aliasName);
       // Audit round-7 B6: every single-value flag rejects repeated occurrences.
       // Commander.js by default last-wins on `--filter A --filter B` — surprising
       // for an LLM consumer that constructed two filters expecting both to apply.
@@ -426,17 +424,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
           }
           return value;
         };
+      // 2026-07-24: one name per flag. The alias registration branch that used
+      // to live here (and forced plain `option` + schema-enforced requiredness
+      // on aliased canonicals) went with the alias system.
       for (const opt of cmd.meta.options) {
-        if (opt.aliases && opt.aliases.length > 0) {
-          // When aliases exist we can't use `requiredOption` for the canonical
-          // — Commander would reject alias-only invocations (the canonical
-          // long flag would be missing). Schema validation
-          // (z.string().min(1)) enforces required-ness instead.
-          commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
-          for (const alias of opt.aliases) {
-            commandDef.option(`--${alias.name} <value>`, `(alias for --${opt.name})`, noRepeatParser(alias.name));
-          }
-        } else if (opt.required) {
+        if (opt.required) {
           commandDef.requiredOption(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
         } else {
           commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));

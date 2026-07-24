@@ -17,7 +17,6 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description:
         'Microsoft Graph drive ID to search inside. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
     },

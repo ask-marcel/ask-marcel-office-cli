@@ -49,7 +49,6 @@ const meta: CommandMeta = {
       name: 'user-id',
       key: 'userId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description:
         "Azure AD user ID or UPN — typically the user's email address. Discover via `list-relevant-people` (relevance-ranked colleagues) or `microsoft-search-query --query <name>` (federated person search across the tenant directory).",
     },

@@ -123,9 +123,8 @@ const meta: CommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: false,
-      aliases: [{ name: 'id', key: 'id' }],
       description:
-        'Read the signature from THIS message instead of scanning the sent folder. Use when the scan finds nothing (the message was composed in Outlook desktop) or to pin a specific signature. Source from list-mail-folder-messages --mail-folder-id sentitems. Accepts `--id` as an alias.',
+        'Read the signature from THIS message instead of scanning the sent folder. Use when the scan finds nothing (the message was composed in Outlook desktop) or to pin a specific signature. Source from list-mail-folder-messages --mail-folder-id sentitems.',
       argumentHint: { kind: 'idOrName' },
     },
   ],

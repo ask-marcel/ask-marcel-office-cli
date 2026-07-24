@@ -106,7 +106,6 @@ const meta: CommandMeta = {
       name: 'user-id',
       key: 'userId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description:
         'Azure AD user ID, UPN, or email (returns the full profile via the elevated token), OR a display name (returns relevant-people candidates on the basic token). Discover ids via `list-relevant-people` or `microsoft-search-query`.',
     },

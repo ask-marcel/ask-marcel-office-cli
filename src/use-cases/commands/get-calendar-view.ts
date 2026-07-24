@@ -18,8 +18,8 @@ const meta: CommandMeta = {
   graphPathTemplate: '/me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-calendarview',
   options: [
-    { name: 'start-date-time', key: 'startDateTime', required: true, aliases: [{ name: 'start', key: 'start' }], description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
-    { name: 'end-date-time', key: 'endDateTime', required: true, aliases: [{ name: 'end', key: 'end' }], description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
+    { name: 'start-date-time', key: 'startDateTime', required: true, description: `Lower bound. ${RELATIVE_DATE_DESCRIPTION}` },
+    { name: 'end-date-time', key: 'endDateTime', required: true, description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",

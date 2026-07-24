@@ -18,7 +18,6 @@ const meta: CommandMeta = {
       name: 'team-id',
       key: 'teamId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
       description: 'Microsoft Teams team ID. Returned by `list-joined-teams`.',
     },
     ...selectExpandOptions,

@@ -288,8 +288,7 @@ const meta: CommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: true,
-      aliases: [{ name: 'id', key: 'id' }],
-      description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`. Accepts `--id` as an alias.',
+      description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.',
     },
     {
       name: 'inline-images',
