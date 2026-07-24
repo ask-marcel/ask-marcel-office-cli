@@ -2,6 +2,86 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.3.0
+
+> **Read this before upgrading.** This release contains breaking changes to the
+> flag surface despite the minor version number. If you pin `^2.2.0` you will
+> receive it automatically. Anything calling the CLI, the MCP gateway, or the
+> library with an old flag spelling will stop working.
+
+### Removed — every flag alias and every deprecated command name
+
+One name per flag, one name per command. The alias system is gone: 77 flag
+aliases and 4 deprecated command names. Each alias already pointed at a more
+specific canonical, so nothing was renamed to accommodate the removal.
+
+| Gone | Use instead |
+|------|-------------|
+| `--id` (51 commands) | the command's specific id flag (`--message-id`, `--site-id`, …) |
+| `--start` / `--end` (7 date-window commands) | `--start-date-time` / `--end-date-time` |
+| `--body-content` on `create-reply-draft` / `create-forward-draft` | `--comment` |
+| `--task-id` | `--planner-task-id` or `--todo-task-id` |
+| `--folder-id` | `--item-id` |
+| `--item-id` on the SharePoint list commands | `--list-item-id` |
+| `--page-id`, `--section-id` | `--onenote-page-id`, `--onenote-section-id` |
+| `--emails` on `get-schedule` | `--schedules` |
+| `--query` on `search-onenote-pages` | *(now the canonical name, see below)* |
+| `download-onedrive-file-content` | `download-drive-item-content` |
+| `convert-local-file` | `convert-local-file-to-markdown` |
+| `convert-drive-item-zip` | `convert-drive-item-zip-to-markdown` |
+| `convert-mail-attachment-zip` | `convert-mail-attachment-zip-to-markdown` |
+
+Why: the same spelling meant different things on sibling commands. That is how
+`--body-content` came to mean "the text above the quote" on the create-draft
+commands and "replace the ENTIRE body, quote included" on `update-mail-draft`,
+a silent data-loss trap fixed in this same release.
+
+### Changed — `search-onenote-pages --title-substring` is now `--query`
+
+The last flag naming a shared concept differently from its siblings. All eight
+search commands now take `--query`. (`--query` had already been bolted onto this
+command as an alias for exactly this reason; it is now the only name.) The flag
+still matches page TITLES only, which its description states explicitly.
+
+### Changed — a parameter a command does not declare is now refused
+
+Previously the three surfaces disagreed. Commander rejected unknown `--flags` on
+the CLI, but Zod strips unknown keys, so the MCP gateway's `run-command` params
+and direct library `commands[x].execute(...)` calls silently swallowed them and
+returned data that looked like it had obeyed. A live audit found this on 5 of 7
+delta commands. All three surfaces now refuse identically, with
+`errorCode: "unknown_parameter"` and the supported flags named in the message.
+
+### Fixed — `--top` no longer terminates a mail-folder delta sync
+
+`list-mail-folder-messages-delta --top 2` on a 67-message Inbox returned 2
+messages and an `@odata.deltaLink` rather than a `nextLink`. Graph reads a
+*satisfied* `$top` as "this sync is complete", so the other 65 messages were
+never delivered and the caller banked a delta token certifying a sync that never
+happened. `--top` is now sent as `Prefer: odata.maxpagesize`, which pages
+normally. `--skip` and `--orderby` are no longer advertised there (Graph ignores
+the first and rejects the second), and `--filter` / `--orderby` are gone from
+the two drive delta commands for the same reason.
+
+### Fixed — a whole-body draft update can no longer drop quoted history
+
+`update-mail-draft --body-content` on a threaded draft replaced the entire body
+including the quoted thread, with nothing warning at call time. It now reads the
+draft first and refuses when a quote is present, pointing at `--comment`. Pass
+`--replace-quoted-history true` for the deliberate case. The same read refuses
+non-drafts before the write.
+
+### Fixed — the oversized-response banner only names remedies that exist
+
+The `sizeHint` banner called `--output-path` a "universal remedy (works on every
+command)". It is not: plain-JSON commands refuse the flag, and the two commands
+that trip the banner most often (`search-all-files`, `microsoft-search-query`)
+advertise only `--query`, so every remedy it named was a dead end. The banner is
+now derived from the command that produced the payload and the surface asking:
+byte-producing commands keep the `--output-path` wording (`outputPath` on MCP),
+plain-JSON commands on the CLI get a shell redirect, and the same commands on
+MCP get neither, since an MCP client has no shell.
+
 ## 2.2.0
 
 ### Added

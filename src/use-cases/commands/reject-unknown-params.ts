@@ -30,8 +30,8 @@ const allowedKeys = (schema: Command['schema']): ReadonlyArray<string> => {
   // Every registry command is built on a z.object; anything else declares no
   // keys, which would reject every param, so treat a non-object shape as
   // "cannot check" and allow it through to the command's own validation.
-  const shape = schema instanceof z.ZodObject ? (schema.shape as Record<string, unknown>) : undefined;
-  return shape === undefined ? [] : Object.keys(shape);
+  if (!(schema instanceof z.ZodObject)) return [];
+  return Object.keys(schema.shape);
 };
 
 const unknownParamError = (unknown: ReadonlyArray<string>, allowed: ReadonlyArray<string>): GraphError => {
