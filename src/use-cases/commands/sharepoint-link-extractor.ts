@@ -1,3 +1,4 @@
+import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 
 /**
@@ -11,7 +12,10 @@ import type { GraphClient } from '../../infra/graph-client.ts';
  *
  * `buildShareToken(url)` encodes a URL for Graph's `/shares/{token}`
  * resolver per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get):
- * `u!` + base64url(url) with no padding.
+ * `u!` + base64url of the URL's UTF-8 bytes, with no padding. Encoding the
+ * UTF-8 bytes (not the raw string) is what lets non-ASCII paths resolve — a
+ * OneDrive URL with an accented or CJK filename otherwise mints a wrong token
+ * (or throws, above U+00FF).
  *
  * `resolveSharepointUrls(graph, urls)` fans out one `/shares/{token}/driveItem`
  * resolve per URL (capped at `MAX_LINKS`, per-link errors captured in the
@@ -57,7 +61,7 @@ const extractSharepointUrls = (htmlBody: string): ReadonlyArray<string> => {
 };
 
 const buildShareToken = (url: string): string => {
-  const b64 = btoa(url).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  const b64 = bytesToBase64(new TextEncoder().encode(url)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
   return `u!${b64}`;
 };
 

@@ -1,3 +1,4 @@
+import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
@@ -47,12 +48,6 @@ export type InlineBinary = {
   readonly contentType: string;
   readonly size: number;
   readonly base64: string;
-};
-
-const toBase64 = (bytes: Uint8Array): string => {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
 };
 
 export const base64ToBytes = (b64: string): Uint8Array => {
@@ -106,7 +101,7 @@ const toInlineBinary = (blob: Record<string, unknown>): Result<InlineBinary, Gra
   const text = blob['text'];
   if (typeof text === 'string') {
     const bytes = new TextEncoder().encode(text);
-    return ok({ contentType, size: declaredSize ?? bytes.byteLength, base64: toBase64(bytes) });
+    return ok({ contentType, size: declaredSize ?? bytes.byteLength, base64: bytesToBase64(bytes) });
   }
   return err({ type: 'api_error', status: 500, message: 'unexpected envelope: response had no @microsoft.graph.downloadUrl, no base64 bytes, and no text body' });
 };
