@@ -69,3 +69,41 @@ describe('buildShareToken — encode a SharePoint URL for the /shares/{token} re
     expect(atob(padded)).toBe(url);
   });
 });
+
+describe('buildShareToken — non-ASCII URLs encode as UTF-8, not Latin-1', () => {
+  // Independent oracle: base64url of the URL's UTF-8 bytes, via Buffer (not btoa).
+  const referenceToken = (url: string): string => `u!${Buffer.from(url, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')}`;
+  // The old, buggy form: base64 of the Latin-1 code units. Only defined for chars <= U+00FF.
+  const latin1Token = (url: string): string => `u!${btoa(url).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')}`;
+
+  it('encodes a OneDrive path with accented characters (Réunião) as its UTF-8 bytes', () => {
+    const url = 'https://contoso-my.sharepoint.com/personal/ana/Documents/Réunião.pdf';
+    expect(buildShareToken(url)).toBe(referenceToken(url));
+  });
+
+  it('no longer produces the wrong Latin-1 token for an accented path (the bug)', () => {
+    const url = 'https://contoso-my.sharepoint.com/personal/ana/Documents/Réunião.pdf';
+    expect(buildShareToken(url)).not.toBe(latin1Token(url));
+  });
+
+  it('encodes a CJK filename (会議メモ) without throwing', () => {
+    const url = 'https://contoso.sharepoint.com/sites/team/会議メモ.pdf';
+    expect(buildShareToken(url)).toBe(referenceToken(url));
+  });
+
+  it('encodes an emoji filename (🚀) without throwing', () => {
+    const url = 'https://contoso.sharepoint.com/sites/team/notes-🚀.pdf';
+    expect(buildShareToken(url)).toBe(referenceToken(url));
+  });
+
+  it('round-trips a non-ASCII URL back to the original through the UTF-8 decoder', () => {
+    const url = 'https://contoso.sharepoint.com/sites/team/会議メモ.pdf';
+    const token = buildShareToken(url);
+    const stripped = token.slice(2).replaceAll('-', '+').replaceAll('_', '/');
+    const padded = stripped + '='.repeat((4 - (stripped.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    expect(new TextDecoder().decode(bytes)).toBe(url);
+  });
+});
