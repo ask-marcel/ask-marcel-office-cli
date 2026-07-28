@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.3.0",
-  "generatedAt": "2026-08-30T15:20:58.194Z",
+  "generatedAt": "2026-08-31T08:35:25.745Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7115,7 +7115,7 @@
     },
     {
       "name": "next-page",
-      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url '<url>'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands.",
+      "summary": "Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url '<url>'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data[\"@odata.nextLink\"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`.",
       "category": "meta",
       "graphMethod": "GET",
       "graphPathTemplate": "{url}",
@@ -7129,6 +7129,12 @@
           "argumentHint": {
             "kind": "graphSubpath"
           }
+        },
+        {
+          "name": "tenant-id",
+          "key": "tenantId",
+          "required": false,
+          "description": "Tenant GUID of a PARTNER tenant you are a guest in. Pass it only to continue a partner-tenant drive listing (a folder / `*-drive-item` cursor whose file lives in another tenant), using the same `--tenant-id` you gave the originating command (ultimately from `resolve-drive-share-link`). The page is then signed with a guest token for that tenant; without it a partner-tenant cursor 401s with `invalidAudienceUri` on page 2 even though page 1 succeeded. Omit it for your own tenant and for every `/me/...` and chat cursor (the normal case)."
         }
       ],
       "example": "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
