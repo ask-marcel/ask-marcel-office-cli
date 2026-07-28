@@ -4,8 +4,8 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute, meta } from './next-page.ts';
 
-const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 'basic' | 'elevated'; readonly path: string }[] } => {
-  const calls: { via: 'basic' | 'elevated'; path: string }[] = [];
+const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 'basic' | 'elevated' | 'guest'; readonly path: string; readonly tenantId?: string }[] } => {
+  const calls: { via: 'basic' | 'elevated' | 'guest'; path: string; tenantId?: string }[] = [];
   return {
     calls,
     graph: fakeGraphClient({
@@ -15,6 +15,10 @@ const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 
       },
       getElevated: async (path: string) => {
         calls.push({ via: 'elevated', path });
+        return ok({});
+      },
+      getGuest: async (path: string, tenantId: string) => {
+        calls.push({ via: 'guest', path, tenantId });
         return ok({});
       },
     }),
@@ -64,5 +68,39 @@ describe('next-page', () => {
     expect(urlOption?.description).toContain('Example:');
     expect(urlOption?.description).toContain('Loop:');
     expect(urlOption?.description).toContain('deltaLink');
+  });
+
+  it('routes a partner-tenant drive-listing cursor to graph.getGuest when --tenant-id is given', async () => {
+    const { graph, calls } = trackingGraph();
+    const tenantId = '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04';
+    await execute(graph, { url: 'https://graph.microsoft.com/v1.0/drives/b!x/items/01ABC/children?$skiptoken=P', tenantId });
+    expect(calls).toEqual([{ via: 'guest', path: '/drives/b!x/items/01ABC/children?$skiptoken=P', tenantId }]);
+  });
+
+  it('signs the cursor with the guest token even for a path that would otherwise be basic (tenant-id wins)', async () => {
+    const { graph, calls } = trackingGraph();
+    const tenantId = '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04';
+    await execute(graph, { url: 'https://graph.microsoft.com/v1.0/me/drive/root/children?$skiptoken=P', tenantId });
+    expect(calls.map((c) => c.via)).toEqual(['guest']);
+  });
+
+  it('rejects a malformed --tenant-id at the boundary without contacting the graph client', async () => {
+    const { graph, calls } = trackingGraph();
+    const result = await execute(graph, { url: 'https://graph.microsoft.com/v1.0/drives/b!x/items/01ABC/children?$skiptoken=P', tenantId: 'not-a-guid' });
+    expect(calls).toHaveLength(0);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('validation_error');
+    expect(result.error.message).toContain('tenant GUID');
+  });
+
+  it('--tenant-id description documents the partner-tenant guest-token behaviour and is optional', () => {
+    const tenantOption = meta.options.find((o) => o.key === 'tenantId');
+    expect(tenantOption?.required).toBe(false);
+    expect(tenantOption?.description).toContain('PARTNER tenant');
+    expect(tenantOption?.description).toContain('resolve-drive-share-link');
+    expect(tenantOption?.description).toContain('guest token');
+    expect(tenantOption?.description).toContain('invalidAudienceUri');
+    expect(tenantOption?.description).toContain('Omit it');
   });
 });
