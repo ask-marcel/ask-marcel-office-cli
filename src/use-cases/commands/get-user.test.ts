@@ -4,56 +4,56 @@ import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { execute } from './get-user.ts';
 
 describe('get-user', () => {
-  it('fetches the full profile via the elevated /users/{id} path for a GUID', async () => {
-    let elevatedPath = '';
+  it('fetches the full profile via the basic /users/{id} path for a GUID', async () => {
+    let basicPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
-        elevatedPath = p;
+      get: async (p) => {
+        basicPath = p;
         return ok({ id: 'aaaaaaaa-1111-2222-3333-444444444444', displayName: 'Alice Kim', jobTitle: 'Engineer', department: 'IS&T' });
       },
     });
     const result = await execute(graph, { userId: 'aaaaaaaa-1111-2222-3333-444444444444' });
-    expect(elevatedPath).toContain('/users/aaaaaaaa-1111-2222-3333-444444444444');
+    expect(basicPath).toContain('/users/aaaaaaaa-1111-2222-3333-444444444444');
     expect(result.ok).toBe(true);
-    if (result.ok) expect((result.value as { jobTitle?: string }).jobTitle).toBe('Engineer'); // org fields need the elevated token
+    if (result.ok) expect((result.value as { department?: string }).department).toBe('IS&T'); // org fields resolve on the basic token
   });
 
-  it('fetches the full profile via the elevated path for a UPN/email, honouring --select', async () => {
-    let elevatedPath = '';
+  it('fetches the full profile via the basic path for a UPN/email, honouring --select', async () => {
+    let basicPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
-        elevatedPath = p;
+      get: async (p) => {
+        basicPath = p;
         return ok({ id: 'x', mail: 'alice@contoso.com' });
       },
     });
     await execute(graph, { userId: 'alice@contoso.com', select: 'id,displayName,mail' });
-    expect(elevatedPath).toContain('/users/alice%40contoso.com'); // the @ is percent-encoded into the path segment
-    expect(elevatedPath).toContain('$select=id%2CdisplayName%2Cmail'); // appendOData URL-encodes the commas
+    expect(basicPath).toContain('/users/alice%40contoso.com'); // the @ is percent-encoded into the path segment
+    expect(basicPath).toContain('$select=id%2CdisplayName%2Cmail'); // appendOData URL-encodes the commas
   });
 
   it('percent-encodes a guest UPN so the #EXT# fragment marker is not dropped from the path', async () => {
-    let elevatedPath = '';
+    let basicPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
-        elevatedPath = p;
+      get: async (p) => {
+        basicPath = p;
         return ok({ id: 'g1' });
       },
     });
     await execute(graph, { userId: 'alice_contoso.com#EXT#@fabrikam.onmicrosoft.com' });
-    expect(elevatedPath).toContain('/users/alice_contoso.com%23EXT%23%40fabrikam.onmicrosoft.com');
-    expect(elevatedPath).not.toContain('#EXT#'); // a raw # would truncate the path at the URL-fragment boundary
+    expect(basicPath).toContain('/users/alice_contoso.com%23EXT%23%40fabrikam.onmicrosoft.com');
+    expect(basicPath).not.toContain('#EXT#'); // a raw # would truncate the path at the URL-fragment boundary
   });
 
   it('injects a default $select with department on the direct id path when --select is absent (the help text promises the full org card)', async () => {
-    let elevatedPath = '';
+    let basicPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
-        elevatedPath = p;
+      get: async (p) => {
+        basicPath = p;
         return ok({ id: 'x' });
       },
     });
     await execute(graph, { userId: 'aaaaaaaa-1111-2222-3333-444444444444' });
-    expect(elevatedPath).toBe(
+    expect(basicPath).toBe(
       '/users/aaaaaaaa-1111-2222-3333-444444444444?$select=id%2CdisplayName%2CuserPrincipalName%2Cmail%2CjobTitle%2Cdepartment%2CofficeLocation%2CbusinessPhones%2CmobilePhone'
     );
   });
@@ -61,7 +61,7 @@ describe('get-user', () => {
   it('injects the same default $select on the mail-eq fallback path', async () => {
     let filterPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
+      get: async (p) => {
         if (p.includes('$filter=mail eq')) {
           filterPath = p;
           return ok({ value: [{ id: 'g1' }] });
@@ -143,8 +143,42 @@ describe('get-user', () => {
     if (result.ok) expect((result.value as { matches: unknown[] }).matches).toEqual([]);
   });
 
-  it('passes through the elevated fail-fast for an id when the elevated token is cold', async () => {
+  it('resolves an id on the basic token without ever touching the elevated token (no browser login on the common path)', async () => {
+    let elevatedCalls = 0;
     const graph = fakeGraphClient({
+      get: async () => ok({ id: 'u1', displayName: 'Alice Kim', department: 'IS&T' }),
+      getElevated: async () => {
+        elevatedCalls += 1;
+        return ok({});
+      },
+    });
+    const result = await execute(graph, { userId: 'alice@contoso.com' });
+    expect(result.ok).toBe(true);
+    expect(elevatedCalls).toBe(0); // basic answered, so the cold-elevated fail-fast never fires
+  });
+
+  it('falls back to the elevated token when the basic /users read is forbidden (a tenant that restricts basic directory reads)', async () => {
+    const paths: Array<{ token: 'basic' | 'elevated'; path: string }> = [];
+    const graph = fakeGraphClient({
+      get: async (p) => {
+        paths.push({ token: 'basic', path: p });
+        return { ok: false as const, error: { type: 'api_error' as const, status: 403, code: 'Authorization_RequestDenied', message: 'Insufficient privileges' } };
+      },
+      getElevated: async (p) => {
+        paths.push({ token: 'elevated', path: p });
+        return ok({ id: 'u1', displayName: 'Alice Kim', department: 'IS&T' });
+      },
+    });
+    const result = await execute(graph, { userId: 'aaaaaaaa-1111-2222-3333-444444444444' });
+    expect(paths.map((c) => c.token)).toEqual(['basic', 'elevated']); // basic first, elevated only after the 403
+    expect(paths[1].path).toContain('/users/aaaaaaaa-1111-2222-3333-444444444444');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { department?: string }).department).toBe('IS&T');
+  });
+
+  it('passes through the elevated fail-fast when basic is forbidden AND the elevated token is cold', async () => {
+    const graph = fakeGraphClient({
+      get: async () => ({ ok: false as const, error: { type: 'api_error' as const, status: 403, code: 'Authorization_RequestDenied', message: 'Insufficient privileges' } }),
       getElevated: async () => ({
         ok: false as const,
         error: { type: 'api_error' as const, status: 401, code: 'secondary_token_unavailable', message: 'run `ask-marcel-office login`' },
@@ -230,7 +264,7 @@ describe('get-user', () => {
   it('falls back to a mail-eq filter when an email 404s on the direct path (a guest whose mail differs from their UPN)', async () => {
     const paths: string[] = [];
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
+      get: async (p) => {
         paths.push(p);
         if (p.includes('$filter=mail eq')) return ok({ value: [{ id: 'g1', displayName: 'Robin Chen', mail: 'robin.chen@fabrikam.com' }] });
         return notFound; // the direct /users/{email} lookup misses (email is the mail, not the UPN)
@@ -246,7 +280,7 @@ describe('get-user', () => {
   it('carries --select through to the mail-eq fallback query', async () => {
     let filterPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
+      get: async (p) => {
         if (p.includes('$filter=mail eq')) {
           filterPath = p;
           return ok({ value: [{ id: 'g1' }] });
@@ -260,7 +294,7 @@ describe('get-user', () => {
 
   it('surfaces the original 404 when the mail-eq fallback finds nobody', async () => {
     const graph = fakeGraphClient({
-      getElevated: async (p) => (p.includes('$filter=mail eq') ? ok({ value: [] }) : notFound),
+      get: async (p) => (p.includes('$filter=mail eq') ? ok({ value: [] }) : notFound),
     });
     const result = await execute(graph, { userId: 'ghost@nowhere.com' });
     expect(result.ok).toBe(false);
@@ -270,7 +304,7 @@ describe('get-user', () => {
   it('does not fall back when the direct path already resolves the email (mail == UPN)', async () => {
     let calls = 0;
     const graph = fakeGraphClient({
-      getElevated: async () => {
+      get: async () => {
         calls += 1;
         return ok({ id: 'u1', userPrincipalName: 'alice@contoso.com' });
       },
@@ -283,7 +317,7 @@ describe('get-user', () => {
   it('does not fall back for a GUID that 404s (a GUID is never an email)', async () => {
     let calls = 0;
     const graph = fakeGraphClient({
-      getElevated: async () => {
+      get: async () => {
         calls += 1;
         return notFound;
       },
@@ -293,22 +327,28 @@ describe('get-user', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('does not fall back when an email fails with a non-404 (e.g. the cold-elevated fail-fast)', async () => {
-    let calls = 0;
+  it('does not fall back when an email fails on basic with a non-404, non-403 error (returned as-is: no mail-eq, no elevated)', async () => {
+    let basicCalls = 0;
+    let elevatedCalls = 0;
     const graph = fakeGraphClient({
+      get: async () => {
+        basicCalls += 1;
+        return { ok: false as const, error: { type: 'api_error' as const, status: 500, message: 'boom' } };
+      },
       getElevated: async () => {
-        calls += 1;
-        return { ok: false as const, error: { type: 'api_error' as const, status: 401, code: 'secondary_token_unavailable', message: 'run `ask-marcel-office login --force`' } };
+        elevatedCalls += 1;
+        return ok({});
       },
     });
     const result = await execute(graph, { userId: 'alice@contoso.com' });
-    expect(calls).toBe(1); // fallback only on a genuine 404, not on auth failures
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.code).toBe('secondary_token_unavailable');
+    expect(basicCalls).toBe(1); // no mail-eq round-trip: a 500 is not a 404
+    expect(elevatedCalls).toBe(0); // and not a 403, so no elevated fallback either
+    if (!result.ok && result.error.type === 'api_error') expect(result.error.status).toBe(500);
   });
 
   it('surfaces the original 404 when the mail-eq fallback query itself errors', async () => {
     const graph = fakeGraphClient({
-      getElevated: async (p) => (p.includes('$filter=mail eq') ? { ok: false as const, error: { type: 'api_error' as const, status: 500, message: 'filter boom' } } : notFound),
+      get: async (p) => (p.includes('$filter=mail eq') ? { ok: false as const, error: { type: 'api_error' as const, status: 500, message: 'filter boom' } } : notFound),
     });
     const result = await execute(graph, { userId: 'guest@home.com' });
     expect(result.ok).toBe(false);
@@ -318,7 +358,7 @@ describe('get-user', () => {
   it('percent-encodes the mail-eq filter value so a plus-addressed email resolves (a raw + decodes back to a space server-side and matches nobody)', async () => {
     let filterPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
+      get: async (p) => {
         if (p.includes('$filter=mail eq')) {
           filterPath = p;
           return ok({ value: [{ id: 'p1' }] });
@@ -334,7 +374,7 @@ describe('get-user', () => {
   it('doubles a single quote in the mail-eq filter (OData string-literal escaping)', async () => {
     let filterPath = '';
     const graph = fakeGraphClient({
-      getElevated: async (p) => {
+      get: async (p) => {
         if (p.includes('$filter=mail eq')) {
           filterPath = p;
           return ok({ value: [{ id: 'q1' }] });
