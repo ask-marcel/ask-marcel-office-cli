@@ -407,7 +407,7 @@ const buildRichPptx = async (): Promise<Uint8Array> => {
   zip.file('ppt/tags/tag1.xml', `<?xml version="1.0"?><p:tagLst ${PPTX_SLIDE_NS}><p:tag name="REVIEW_STATE" val="confidential-draft"/></p:tagLst>`);
   zip.file(
     'ppt/commentAuthors.xml',
-    `<?xml version="1.0"?><p:cmAuthorLst ${PPTX_SLIDE_NS}><p:cmAuthor id="0" name="Alice Smith" initials="AS" userId="alice@contoso.com" providerId="AD"/></p:cmAuthorLst>`
+    `<?xml version="1.0"?><p:cmAuthorLst ${PPTX_SLIDE_NS}><p:cmAuthor id="0" name="Alice Smith" initials="AS" userId="S::alice@contoso.com::aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa" providerId="AD"/></p:cmAuthorLst>`
   );
   zip.file(
     'ppt/comments/comment1.xml',
@@ -415,7 +415,7 @@ const buildRichPptx = async (): Promise<Uint8Array> => {
   );
   zip.file(
     'ppt/authors.xml',
-    '<?xml version="1.0"?><p188:authorLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main"><p188:author id="{B1}" name="Bob Jones" initials="BJ" userId="bob@contoso.com" providerId="AD"/></p188:authorLst>'
+    '<?xml version="1.0"?><p188:authorLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main"><p188:author id="{B1}" name="Bob Jones" initials="BJ" userId="S::bob@contoso.com::bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb" providerId="AD"/></p188:authorLst>'
   );
   zip.file(
     'ppt/comments/modernComment1.xml',
