@@ -1,18 +1,20 @@
 import { posix } from 'node:path';
 import type { OoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
-import { attrOf, collectText, findAll, parseXml } from './ooxml-xml-walker.ts';
+import { attrOf, collectTextLocal, findAll, findAllLocal, parseXml } from './ooxml-xml-walker.ts';
 import type { XmlObject } from './ooxml-xml-walker.ts';
 
 /**
  * PowerPoint comments come in two formats: legacy (`ppt/commentAuthors.xml`
- * authors by integer id + `ppt/comments/comment*.xml` `<p:cm authorId dt>`
- * with `<p:text>` body) and modern (`ppt/authors.xml` authors by GUID +
- * `ppt/comments/*.xml` `<p188:cm authorId created>` with DrawingML `<a:t>`
- * body). Both are scanned; authors are resolved by id in either scheme.
- * Modern-comment support is best-effort against the p188 (2018/8) schema.
+ * authors by integer id + `ppt/comments/comment*.xml` `<cm authorId dt>` with a
+ * `<text>` body) and modern (`ppt/authors.xml` authors by GUID +
+ * `ppt/comments/*.xml` `<cm authorId created>` with a DrawingML `<t>` body).
+ * Elements are matched by local name, so the prefixes a writer happens to bind
+ * (`p:` / `p188:` / `a:` from PowerPoint, anything else from a third-party tool)
+ * never decide whether a comment is found. Both generations share the local name
+ * `cm`, so one pass reads them all; authors are resolved by id in either scheme.
  */
 
-type CommentAuthor = { readonly id: string; readonly name: string; readonly initials: string };
+type CommentAuthor = { readonly id: string; readonly name: string; readonly initials: string; readonly email: string };
 type PptxComment = { readonly author: string; readonly date: string; readonly text: string; readonly slide?: string };
 
 const SLIDE_RE = /^ppt\/slides\/slide\d+\.xml$/;
@@ -34,19 +36,34 @@ const commentPartToSlide = (zip: OoxmlZip): ReadonlyMap<string, string> => {
   return map;
 };
 
-const toAuthor = (node: XmlObject): CommentAuthor => ({ id: attrOf(node, 'id'), name: attrOf(node, 'name'), initials: attrOf(node, 'initials') });
+// The commenter's directory identity. A modern <author> carries it on the element;
+// a legacy <cmAuthor> carries it only inside a <presenceInfo> extension nested below.
+// PowerPoint writes `S::<UPN>::<Entra object id>`, a third-party writer may store the
+// address bare, and a non-AD provider stamps a display name that is no address at all.
+const emailOf = (node: XmlObject): string => {
+  const raw = attrOf(node, 'userId') || attrOf(findAllLocal(node, 'presenceInfo')[0] ?? {}, 'userId');
+  const parts = raw.split('::');
+  const candidate = parts.length === 3 ? (parts[1] ?? '') : raw;
+  return candidate.includes('@') ? candidate : '';
+};
+
+const toAuthor = (node: XmlObject): CommentAuthor => ({ id: attrOf(node, 'id'), name: attrOf(node, 'name'), initials: attrOf(node, 'initials'), email: emailOf(node) });
 
 const extractCommentAuthors = (zip: OoxmlZip): ReadonlyArray<CommentAuthor> => {
-  const legacy = findAll(parseXml(zip.read('ppt/commentAuthors.xml')), 'p:cmAuthor');
-  const modern = findAll(parseXml(zip.read('ppt/authors.xml')), 'p188:author');
+  const legacy = findAllLocal(parseXml(zip.read('ppt/commentAuthors.xml')), 'cmAuthor');
+  const modern = findAllLocal(parseXml(zip.read('ppt/authors.xml')), 'author');
   return [...legacy, ...modern].map(toAuthor);
 };
 
+// `dt` / `<text>` are the legacy spellings, `created` / `<t>` the modern ones; a
+// given comment carries one pair, so falling through picks the one that is there.
 const commentsInPart = (root: unknown, nameById: Map<string, string>): ReadonlyArray<PptxComment> => {
   const resolve = (id: string): string => nameById.get(id) ?? id;
-  const legacy = findAll(root, 'p:cm').map((cm) => ({ author: resolve(attrOf(cm, 'authorId')), date: attrOf(cm, 'dt'), text: collectText(cm, 'p:text') }));
-  const modern = findAll(root, 'p188:cm').map((cm) => ({ author: resolve(attrOf(cm, 'authorId')), date: attrOf(cm, 'created'), text: collectText(cm, 'a:t') }));
-  return [...legacy, ...modern];
+  return findAllLocal(root, 'cm').map((cm) => ({
+    author: resolve(attrOf(cm, 'authorId')),
+    date: attrOf(cm, 'dt') || attrOf(cm, 'created'),
+    text: collectTextLocal(cm, 'text') || collectTextLocal(cm, 't'),
+  }));
 };
 
 const extractComments = (zip: OoxmlZip, authors: ReadonlyArray<CommentAuthor>): ReadonlyArray<PptxComment> => {

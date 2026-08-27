@@ -46,10 +46,20 @@ const walkVisit = (node: unknown, visit: (key: string, value: unknown) => void):
   }
 };
 
-const findAll = (root: unknown, tagName: string): ReadonlyArray<XmlObject> => {
+/**
+ * An XML namespace prefix (`p:`, `p188:`, `a:`) is a per-document alias for a
+ * namespace URI, not part of the schema: another writer may bind the same URI to
+ * a different prefix. The `*Local` walkers match on the local name alone, so an
+ * element is found whatever prefix its author chose. Use them only where the local
+ * name is unambiguous inside the part being read: `w:t` and `a:t` share the local
+ * name `t` in a .docx, so paragraph text stays on the qualified match.
+ */
+const localNameOf = (key: string): string => key.slice(key.indexOf(':') + 1);
+
+const findAllBy = (root: unknown, matches: (key: string) => boolean): ReadonlyArray<XmlObject> => {
   const out: Array<XmlObject> = [];
   walkVisit(root, (key, value) => {
-    if (key !== tagName) return;
+    if (!matches(key)) return;
     if (Array.isArray(value)) {
       for (const item of value) if (isObject(item)) out.push(item);
       return;
@@ -58,6 +68,10 @@ const findAll = (root: unknown, tagName: string): ReadonlyArray<XmlObject> => {
   });
   return out;
 };
+
+const findAll = (root: unknown, tagName: string): ReadonlyArray<XmlObject> => findAllBy(root, (key) => key === tagName);
+
+const findAllLocal = (root: unknown, localName: string): ReadonlyArray<XmlObject> => findAllBy(root, (key) => localNameOf(key) === localName);
 
 const textOf = (node: unknown): string => {
   if (typeof node === 'string') return node;
@@ -95,10 +109,10 @@ const findAllTexts = (root: unknown, tagName: string): ReadonlyArray<string> => 
  * regardless of nesting depth. Used to flatten a `<w:p>` (or `<w:ins>` / `<w:comment>`)
  * down to its visible text by gathering every `<w:t>` (or `<w:delText>`) descendant.
  */
-const collectText = (node: unknown, tagName: string): string => {
+const collectTextBy = (node: unknown, matches: (key: string) => boolean): string => {
   let result = '';
   walkVisit(node, (key, value) => {
-    if (key !== tagName) return;
+    if (!matches(key)) return;
     if (Array.isArray(value)) {
       for (const item of value) result += textOf(item);
       return;
@@ -108,5 +122,9 @@ const collectText = (node: unknown, tagName: string): string => {
   return result;
 };
 
-export { attrOf, collectText, findAll, findAllTexts, parseXml, textOf };
+const collectText = (node: unknown, tagName: string): string => collectTextBy(node, (key) => key === tagName);
+
+const collectTextLocal = (node: unknown, localName: string): string => collectTextBy(node, (key) => localNameOf(key) === localName);
+
+export { attrOf, collectText, collectTextLocal, findAll, findAllLocal, findAllTexts, parseXml, textOf };
 export type { XmlObject };

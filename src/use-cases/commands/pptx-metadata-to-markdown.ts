@@ -28,8 +28,8 @@ const renderTags = (tags: ReadonlyArray<SlideTag>): string =>
 
 const renderAuthors = (authors: ReadonlyArray<CommentAuthor>): string =>
   renderTable(
-    authors.map((a) => [a.id, a.name, a.initials]),
-    ['id', 'name', 'initials']
+    authors.map((a) => [a.id, a.name, a.initials, a.email]),
+    ['id', 'name', 'initials', 'email']
   );
 
 const renderComments = (comments: ReadonlyArray<PptxComment>): string =>
