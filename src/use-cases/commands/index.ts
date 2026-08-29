@@ -167,6 +167,8 @@ import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
 import * as listSharedMailboxFolderMessages from './list-shared-mailbox-folder-messages.ts';
+import * as listSharedMailboxFolders from './list-shared-mailbox-folders.ts';
+import * as listSharedMailboxChildFolders from './list-shared-mailbox-child-folders.ts';
 import * as getSharedMailboxMessage from './get-shared-mailbox-message.ts';
 import * as listConversationMessages from './list-conversation-messages.ts';
 import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
@@ -317,6 +319,8 @@ const modules: Record<string, Command> = {
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,
   'list-shared-mailbox-folder-messages': listSharedMailboxFolderMessages,
+  'list-shared-mailbox-folders': listSharedMailboxFolders,
+  'list-shared-mailbox-child-folders': listSharedMailboxChildFolders,
   'get-shared-mailbox-message': getSharedMailboxMessage,
   'list-conversation-messages': listConversationMessages,
   'list-focused-inbox-overrides': listFocusedInboxOverrides,

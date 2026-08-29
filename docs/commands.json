@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.3.0",
-  "generatedAt": "2026-08-29T16:06:17.669Z",
+  "generatedAt": "2026-08-29T16:07:54.012Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -5715,6 +5715,80 @@
       "pagination": true
     },
     {
+      "name": "list-shared-mailbox-child-folders",
+      "summary": "List the subfolders of one mail folder in a shared or delegated mailbox. The `/me` sibling is `list-mail-child-folders`. Walk it from the folder IDs `list-shared-mailbox-folders` returns to reach nested custom folders. 403 if the signed-in user does not have shared access to that mailbox.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/mailFolders/{mail-folder-id}/childFolders",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/mailfolder-list-childfolders",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner)."
+        },
+        {
+          "name": "mail-folder-id",
+          "key": "mailFolderId",
+          "required": true,
+          "description": "Mail folder ID or well-known name (`inbox`, `sentitems`, etc.) inside that mailbox. Returned by `ask-marcel-office list-shared-mailbox-folders`."
+        },
+        {
+          "name": "include-hidden-folders",
+          "key": "includeHiddenFolders",
+          "required": false,
+          "description": "Graph HIDES folders flagged as hidden from this listing by default (a mailbox typically hides system folders such as `Social Activity Notifications`, and an Outlook client can hide any folder). Pass `true` to append the plain `includeHiddenFolders=true` query parameter and get them as well; every returned folder then carries `isHidden` to tell the two apart. Omit it for the default visible-only listing.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel-office list-shared-mailbox-child-folders --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
+      "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-shared-mailbox-folder-messages",
       "summary": "List messages in a single folder of a shared / delegated mailbox.",
       "category": "mail",
@@ -5773,6 +5847,74 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-shared-mailbox-folders",
+      "summary": "List the top-level mail folders of a shared or delegated mailbox. The `/me` sibling is `list-mail-folders`. Use it to discover the folder IDs that `list-shared-mailbox-folder-messages` needs: without it only the well-known names (`inbox`, `sentitems`, `drafts`, …) are reachable, so custom folders are invisible. 403 if the signed-in user does not have shared access to that mailbox.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/users/{user-id}/mailFolders",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-list-mailfolders",
+      "options": [
+        {
+          "name": "user-id",
+          "key": "userId",
+          "required": true,
+          "description": "Azure AD user ID or UPN of the shared mailbox or delegated user. The signed-in user must have `Mail.Read.Shared` access (granted by the mailbox owner)."
+        },
+        {
+          "name": "include-hidden-folders",
+          "key": "includeHiddenFolders",
+          "required": false,
+          "description": "Graph HIDES folders flagged as hidden from this listing by default (a mailbox typically hides system folders such as `Social Activity Notifications`, and an Outlook client can hide any folder). Pass `true` to append the plain `includeHiddenFolders=true` query parameter and get them as well; every returned folder then carries `isHidden` to tell the two apart. Omit it for the default visible-only listing.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: maximum number of items to return on this page (positive integer, ≤ 1000). Graph silently caps at 1000 on every collection endpoint, so the CLI rejects larger values with a clear validation error rather than letting the request silently truncate. Combine with `next-page` to paginate beyond the cap."
+        },
+        {
+          "name": "skip",
+          "key": "skip",
+          "required": false,
+          "description": "OData $skip: skip the first N items before returning results (non-negative integer). Useful with $top for offset paging."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        },
+        {
+          "name": "orderby",
+          "key": "orderby",
+          "required": false,
+          "description": "OData $orderby: sort expression with optional asc/desc (e.g. `receivedDateTime desc`). Some Graph filter combinations are rejected; remove $orderby if InefficientFilter occurs."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel-office list-shared-mailbox-folders --user-id 'shared-mailbox@contoso.com'",
+      "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
       "pagination": true
     },
     {

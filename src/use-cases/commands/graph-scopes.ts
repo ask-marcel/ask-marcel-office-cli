@@ -127,6 +127,8 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'extract-sharepoint-links-in-documents': ['Files.Read'],
   'list-shared-mailbox-messages': ['Mail.Read.Shared'],
   'list-shared-mailbox-folder-messages': ['Mail.Read.Shared'],
+  'list-shared-mailbox-folders': ['Mail.Read.Shared'],
+  'list-shared-mailbox-child-folders': ['Mail.Read.Shared'],
   'get-shared-mailbox-message': ['Mail.Read.Shared'],
   'list-conversation-messages': ['Mail.Read'],
 

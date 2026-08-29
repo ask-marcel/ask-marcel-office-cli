@@ -180,6 +180,8 @@ import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
 import * as listSharedMailboxFolderMessages from './list-shared-mailbox-folder-messages.ts';
+import * as listSharedMailboxFolders from './list-shared-mailbox-folders.ts';
+import * as listSharedMailboxChildFolders from './list-shared-mailbox-child-folders.ts';
 import * as getSharedMailboxMessage from './get-shared-mailbox-message.ts';
 import * as listConversationMessages from './list-conversation-messages.ts';
 import * as listFocusedInboxOverrides from './list-focused-inbox-overrides.ts';
@@ -317,6 +319,8 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,
   'list-shared-mailbox-folder-messages': listSharedMailboxFolderMessages,
+  'list-shared-mailbox-folders': listSharedMailboxFolders,
+  'list-shared-mailbox-child-folders': listSharedMailboxChildFolders,
   'get-shared-mailbox-message': getSharedMailboxMessage,
   'list-conversation-messages': listConversationMessages,
   'list-focused-inbox-overrides': listFocusedInboxOverrides,
@@ -5177,6 +5181,8 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' } },
   { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' } },
   { name: 'list-shared-mailbox-folder-messages', params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' } },
+  { name: 'list-shared-mailbox-folders', params: { userId: 'shared@contoso.com' } },
+  { name: 'list-shared-mailbox-child-folders', params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' } },
   { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' } },
   { name: 'list-conversation-messages', params: { conversationId: 'AAQkAD-conv-1' } },
   { name: 'list-focused-inbox-overrides', params: {} },
@@ -5300,6 +5306,9 @@ describe('command schema rejection', () => {
     { name: 'list-mail-folder-messages-delta', params: {} },
     { name: 'list-shared-mailbox-messages', params: {} },
     { name: 'list-shared-mailbox-folder-messages', params: {} },
+    { name: 'list-shared-mailbox-folders', params: {} },
+    { name: 'list-shared-mailbox-child-folders', params: {} },
+    { name: 'list-shared-mailbox-child-folders', params: { userId: 'shared@contoso.com' } },
     { name: 'get-shared-mailbox-message', params: {} },
     { name: 'list-conversation-messages', params: {} },
     { name: 'list-shared-calendar-events', params: {} },
@@ -5554,6 +5563,28 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' },
     expectedPath: '/users/shared%40contoso.com/mailFolders/inbox/messages',
   },
+  { name: 'list-shared-mailbox-folders', params: { userId: 'shared@contoso.com' }, expectedPath: '/users/shared%40contoso.com/mailFolders' },
+  {
+    name: 'list-shared-mailbox-folders',
+    params: { userId: 'shared@contoso.com', includeHiddenFolders: 'true' },
+    expectedPath: '/users/shared%40contoso.com/mailFolders?includeHiddenFolders=true',
+  },
+  { name: 'list-shared-mailbox-folders', params: { userId: 'shared@contoso.com', includeHiddenFolders: 'false' }, expectedPath: '/users/shared%40contoso.com/mailFolders' },
+  {
+    name: 'list-shared-mailbox-child-folders',
+    params: { userId: 'shared@contoso.com', mailFolderId: 'inbox' },
+    expectedPath: '/users/shared%40contoso.com/mailFolders/inbox/childFolders',
+  },
+  {
+    name: 'list-shared-mailbox-child-folders',
+    params: { userId: 'shared@contoso.com', mailFolderId: 'inbox', includeHiddenFolders: 'true' },
+    expectedPath: '/users/shared%40contoso.com/mailFolders/inbox/childFolders?includeHiddenFolders=true',
+  },
+  {
+    name: 'list-shared-mailbox-child-folders',
+    params: { userId: 'shared@contoso.com', mailFolderId: 'inbox', includeHiddenFolders: 'false' },
+    expectedPath: '/users/shared%40contoso.com/mailFolders/inbox/childFolders',
+  },
   { name: 'get-shared-mailbox-message', params: { userId: 'shared@contoso.com', messageId: 'm1' }, expectedPath: '/users/shared%40contoso.com/messages/m1' },
   {
     name: 'list-conversation-messages',
@@ -5656,6 +5687,8 @@ const guestUpnFixtures: Array<{ name: string; params: Record<string, string> }> 
   { name: 'get-shared-mailbox-message', params: { userId: GUEST_UPN, messageId: 'm1' } },
   { name: 'list-shared-mailbox-messages', params: { userId: GUEST_UPN } },
   { name: 'list-shared-mailbox-folder-messages', params: { userId: GUEST_UPN, mailFolderId: 'inbox' } },
+  { name: 'list-shared-mailbox-folders', params: { userId: GUEST_UPN } },
+  { name: 'list-shared-mailbox-child-folders', params: { userId: GUEST_UPN, mailFolderId: 'inbox' } },
   { name: 'list-shared-calendar-events', params: { userId: GUEST_UPN } },
   { name: 'list-user-direct-reports', params: { userId: GUEST_UPN } },
   { name: 'list-shared-calendar-view', params: { userId: GUEST_UPN, startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
