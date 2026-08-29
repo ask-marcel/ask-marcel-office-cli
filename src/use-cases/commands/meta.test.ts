@@ -170,6 +170,12 @@ describe('command meta — invariants on every registered command', () => {
           // processing toggle (skip the quoted-reply-chain strip on the HTML
           // body before turndown); not a URL placeholder.
           'keep-quoted',
+          // `--include-hidden-folders true` on the four mail-folder listings
+          // appends Graph's PLAIN (non-$) `includeHiddenFolders=true` query
+          // param from inside the path function. Runtime-additive like the
+          // OData flags above, so it is a query param rather than a URL
+          // placeholder.
+          'include-hidden-folders',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

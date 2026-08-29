@@ -1,10 +1,16 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
+import { INCLUDE_HIDDEN_FOLDERS_OPTION } from './include-hidden-folders.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
-const baseSchema = z.object({ mailFolderId: z.string().min(1) });
-const { execute, schema } = buildListCommand((p) => `/me/mailFolders/${p.mailFolderId}/childFolders`, baseSchema);
+const baseSchema = z.object({ mailFolderId: z.string().min(1), includeHiddenFolders: z.enum(['true', 'false']).optional() });
+// Plain (non-OData) query param, so it cannot ride appendOData's `$`-prefixed
+// builder and has to be emitted by the path itself.
+const { execute, schema } = buildListCommand(
+  (p) => `/me/mailFolders/${p.mailFolderId}/childFolders${p.includeHiddenFolders === 'true' ? '?includeHiddenFolders=true' : ''}`,
+  baseSchema
+);
 
 const meta: CommandMeta = {
   summary: 'List the subfolders of a single Outlook mail folder (e.g. subfolders of Inbox).',
@@ -19,6 +25,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'mailFolder ID. Returned by `ask-marcel-office list-mail-folders`. Well-known names also work, e.g. `inbox`, `sentitems`, `drafts`.',
     },
+    INCLUDE_HIDDEN_FOLDERS_OPTION,
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-mail-child-folders --mail-folder-id 'inbox'",

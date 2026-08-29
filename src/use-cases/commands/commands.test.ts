@@ -5403,7 +5403,16 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   // explicit --select wins over the slim default.
   { name: 'list-mail-messages', params: { select: 'id,subject' }, expectedPath: '/me/messages?$select=id%2Csubject' },
   { name: 'list-mail-folders', params: {}, expectedPath: '/me/mailFolders' },
+  // Graph omits hidden folders unless the plain (non-$) `includeHiddenFolders`
+  // query param is present, so the flag has to reach the path itself. The
+  // combined row pins appendOData's `?` -> `&` separator against a path that
+  // already carries a query string.
+  { name: 'list-mail-folders', params: { includeHiddenFolders: 'true' }, expectedPath: '/me/mailFolders?includeHiddenFolders=true' },
+  { name: 'list-mail-folders', params: { includeHiddenFolders: 'false' }, expectedPath: '/me/mailFolders' },
+  { name: 'list-mail-folders', params: { includeHiddenFolders: 'true', top: '5' }, expectedPath: '/me/mailFolders?includeHiddenFolders=true&$top=5' },
   { name: 'list-mail-child-folders', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/childFolders' },
+  { name: 'list-mail-child-folders', params: { mailFolderId: 'f1', includeHiddenFolders: 'true' }, expectedPath: '/me/mailFolders/f1/childFolders?includeHiddenFolders=true' },
+  { name: 'list-mail-child-folders', params: { mailFolderId: 'f1', includeHiddenFolders: 'false' }, expectedPath: '/me/mailFolders/f1/childFolders' },
   { name: 'list-mail-folder-messages', params: { mailFolderId: 'f1' }, expectedPath: '/me/mailFolders/f1/messages' },
   {
     name: 'get-mail-message',
