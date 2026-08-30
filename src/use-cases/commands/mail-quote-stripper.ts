@@ -13,7 +13,9 @@ import type { CommandOptionMeta } from './command-types.ts';
  * `<blockquote>`, which legitimate content uses too):
  *   - Outlook desktop / OWA reply+forward header block: `<div id="divRplyFwdMsg">`
  *   - Outlook "type above this line" boundary:           `<div id="appendonsend">`
- *   - Outlook mobile reference container:                `<div id="mail-editor-reference-message-container">`
+ *   - Outlook mobile / new Outlook reference container:
+ *     `<div id="mail-editor-reference-message-container">`, CONFIRMED by a
+ *     header block opening inside it (the id alone wraps authored text too)
  *   - Outlook classic separator:                         `<hr id="stopSpelling">`
  *   - Gmail quote container:                             `<div class="gmail_quote">` / `<blockquote class="gmail_quote">`
  *   - Outlook reply divider (Word renderer / Mac / mobile):
@@ -29,7 +31,6 @@ import type { CommandOptionMeta } from './command-types.ts';
 const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
   /<div[^>]*\bid="divRplyFwdMsg"/i,
   /<div[^>]*\bid="appendonsend"/i,
-  /<div[^>]*\bid="mail-editor-reference-message-container"/i,
   /<hr[^>]*\bid="stopSpelling"/i,
   /<div[^>]*\bclass="[^"]*\bgmail_quote\b/i,
   /<blockquote[^>]*\bclass="[^"]*\bgmail_quote\b/i,
@@ -101,6 +102,35 @@ const widenToBlockStart = (html: string, index: number): number => {
   return cut;
 };
 
+// Outlook mobile and new Outlook wrap a quoted reply in
+// `mail-editor-reference-message-container`, and the id was trusted on its own.
+// It is not evidence of a quote: a message composed on Outlook mobile carried
+// the author's ENTIRE body inside that container with nothing quoted below it,
+// and the rule cut a 5,367-character message down to its 9-character greeting
+// (live-reported 2026-08-30). Across all 16 messages of that thread, every
+// container wrapping a genuine quote opened a confirmed From/Sent header within
+// 229 characters of the container tag, while the false positive carried no
+// header anywhere in the document — so the container cuts only when a header
+// follows it, and an unrecognized locale now costs tokens rather than content.
+//
+// Scanned for every container, not just the first: an author who writes a long
+// message inside the container still quotes below it, and the quote is what we
+// want to cut at.
+const MOBILE_CONTAINER = /<div[^>]*\bid="mail-editor-reference-message-container"[^>]*>/gi;
+const CONTAINER_CONFIRM_WINDOW_CHARS = 600;
+
+const confirmedContainerIndex = (html: string): number => {
+  MOBILE_CONTAINER.lastIndex = 0;
+  for (let match = MOBILE_CONTAINER.exec(html); match !== null; match = MOBILE_CONTAINER.exec(html)) {
+    const windowStart = match.index + match[0].length;
+    // The scan runs one confirmation window PAST the search window so a header
+    // opening at the very end of it can still see its own Sent label.
+    const header = confirmedHeaderIndex(html.slice(windowStart, windowStart + CONTAINER_CONFIRM_WINDOW_CHARS + CONFIRM_WINDOW_CHARS), HTML_FROM_LABEL, HTML_SENT_LABEL);
+    if (header !== -1 && header < CONTAINER_CONFIRM_WINDOW_CHARS) return match.index;
+  }
+  return -1;
+};
+
 const STRIP_MARKER = '<p><em>[Quoted reply chain removed — pass --keep-quoted true to include it]</em></p>';
 
 // Plain-text reply boundaries, for `body.contentType === 'text'` messages where
@@ -127,6 +157,8 @@ const findQuoteBoundary = (html: string): number => {
   const headerCut = confirmedHeaderIndex(html, HTML_FROM_LABEL, HTML_SENT_LABEL);
   const widenedHeaderCut = headerCut === -1 ? -1 : widenToBlockStart(html, headerCut);
   if (widenedHeaderCut !== -1 && (cut === -1 || widenedHeaderCut < cut)) cut = widenedHeaderCut;
+  const containerCut = confirmedContainerIndex(html);
+  if (containerCut !== -1 && (cut === -1 || containerCut < cut)) cut = containerCut;
   return cut;
 };
 

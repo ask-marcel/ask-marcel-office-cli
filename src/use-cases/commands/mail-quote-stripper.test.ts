@@ -94,6 +94,64 @@ describe('locating where a reply body stops being the author’s new text and st
     expect(findQuoteBoundary(`${authorText}${quote}`)).toBe(authorText.length);
   });
 
+  // Outlook mobile and new Outlook wrap a quoted reply in
+  // `mail-editor-reference-message-container`, and the id alone used to cut. It
+  // is not evidence of a quote: a message composed on Outlook mobile carried the
+  // author's ENTIRE body inside that container with nothing quoted below it, and
+  // the rule reduced a 5,367-character message to its 9-character greeting
+  // (live-reported 2026-08-30). Across all 16 messages of that thread, every
+  // container wrapping a genuine quote opened a confirmed From/Sent header
+  // within 229 characters of the container tag, and the false positive carried
+  // no header anywhere in the document.
+  const MOBILE_CONTAINER_TAG = '<div id="mail-editor-reference-message-container">';
+  const MOBILE_HEADER = '<b>From:</b> Robin Chen &lt;robin.chen@contoso.com&gt;<br><b>Sent:</b> Monday, May 5, 2026';
+
+  it('reports no boundary when the Outlook mobile container holds the author’s own message and nothing is quoted below it', () => {
+    const html = `<p>Dear all,</p>${MOBILE_CONTAINER_TAG}<p><b>Target</b></p><p>Ship the tracker by Q4.</p><p>Best regards</p></div>`;
+
+    expect(findQuoteBoundary(html)).toBe(-1);
+  });
+
+  it('cuts at the Outlook mobile container when a header block opens inside it, as every genuine mobile quote does', () => {
+    const authorText = '<p>Confirmed.</p>';
+
+    expect(findQuoteBoundary(`${authorText}${MOBILE_CONTAINER_TAG}<p>${MOBILE_HEADER}</p><p>the quoted original</p></div>`)).toBe(authorText.length);
+  });
+
+  // The window is measured from the END of the container tag; these two sit one
+  // character either side of it. Past the window the header is still a boundary
+  // in its own right, so the cut moves down to it rather than disappearing.
+  const containerWithHeaderAt = (offset: number): string => `${MOBILE_CONTAINER_TAG}${'x'.repeat(offset)}${MOBILE_HEADER}`;
+
+  it('cuts at the container when the header opens on the last character of the confirmation window', () => {
+    const authorText = '<p>Confirmed.</p>';
+
+    expect(findQuoteBoundary(`${authorText}${containerWithHeaderAt(599)}`)).toBe(authorText.length);
+  });
+
+  it('cuts at the header rather than the container when the header opens one character past the confirmation window', () => {
+    const authorText = '<p>Confirmed.</p>';
+    const html = `${authorText}${containerWithHeaderAt(600)}`;
+
+    expect(findQuoteBoundary(html)).toBe(html.indexOf('<b>From:'));
+  });
+
+  it('confirms a container whose header opens inside the window even when that header’s Sent label trails past the window end', () => {
+    const authorText = '<p>Confirmed.</p>';
+    const spacedHeader = `<b>From:</b> Robin Chen${'x'.repeat(350)}<br><b>Sent:</b> Monday, May 5, 2026`;
+
+    expect(findQuoteBoundary(`${authorText}${MOBILE_CONTAINER_TAG}${'x'.repeat(590)}${spacedHeader}`)).toBe(authorText.length);
+  });
+
+  it('keeps scanning past a container whose window holds no header, so a long message above a quoted block still cuts at the quote', () => {
+    const authorText = '<p>Dear all,</p>';
+    const authoredInContainer = `${MOBILE_CONTAINER_TAG}<p>${'Ship the tracker. '.repeat(40)}</p>`;
+
+    expect(findQuoteBoundary(`${authorText}${authoredInContainer}${MOBILE_CONTAINER_TAG}<p>${MOBILE_HEADER}</p><p>the quoted original</p>`)).toBe(
+      authorText.length + authoredInContainer.length
+    );
+  });
+
   // A Chinese Outlook web client styles the colon differently from the label
   // word and so emits them as two separate bold runs
   // (`发件人</span></b><b><span lang=EN-HK>:`). The label-to-colon match tolerated

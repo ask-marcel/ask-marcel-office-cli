@@ -4574,7 +4574,12 @@ describe('mail-quote-stripper', () => {
   const boundaryFixtures = [
     { label: 'Outlook divRplyFwdMsg', html: '<p>reply body</p><div data-x="y" id="divRplyFwdMsg"><b>From:</b> Alice</div><p>old quoted</p>' },
     { label: 'Outlook appendonsend', html: '<p>reply body</p><div data-x="y" id="appendonsend"></div><blockquote>old quoted</blockquote>' },
-    { label: 'Outlook mobile container', html: '<p>reply body</p><div data-x="y" id="mail-editor-reference-message-container"><p>old quoted</p></div>' },
+    // The container is a boundary only once a header block opens inside it: on
+    // Outlook mobile the same id also wraps the author's own text (2026-08-30).
+    {
+      label: 'Outlook mobile container',
+      html: '<p>reply body</p><div data-x="y" id="mail-editor-reference-message-container"><p><b>From:</b> Robin Chen<br><b>Sent:</b> Monday</p><p>old quoted</p></div>',
+    },
     { label: 'Outlook stopSpelling hr', html: '<p>reply body</p><hr data-x="y" id="stopSpelling"><p>old quoted</p>' },
     { label: 'Gmail div quote', html: '<p>reply body</p><div data-x="y" class="im gmail_quote">old quoted</div>' },
     { label: 'Gmail blockquote quote', html: '<p>reply body</p><blockquote data-x="y" class="im gmail_quote">old quoted</blockquote>' },
