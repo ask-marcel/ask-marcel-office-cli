@@ -1,26 +1,33 @@
 #!/usr/bin/env bash
 #
-# atelier pre-commit hook — 8 gates
+# atelier pre-commit hook - the fast gates only
 #
-# Order matters: cheap fast-fail gates first, expensive gates last so a slow
-# mutation run is only paid when everything else is clean.
+# A pre-commit hook earns its keep by staying fast. A multi-minute hook trains
+# `git commit --no-verify` (rule 15.1, and 15.3), so the hook carries only the
+# gates that are fast and stay fast as the repo grows: each is O(staged files)
+# or O(1), and the whole hook targets a few-seconds budget. The full, slow, and
+# repo-scaling gates (the whole test suite, per-tier coverage, and Stryker
+# mutation) run in CI, the line that cannot be skipped. See assets/ci.yml and
+# references/workflow.md.
 #
-#   1. commit size       — ≤10 files AND ≤300 lines (insertions + deletions)
-#   2. package.json      — no "latest" / "*" version strings
-#   3. secret scan       — gitleaks protect --staged (degrades gracefully)
-#   4. tests             — bun test
-#   5. strict lint       — bun run lint:strict (0 errors AND 0 warnings)
-#   6. typecheck         — bun run typecheck
-#   7. coverage          — bun run coverage (per-tier gates)
-#   8. mutation testing  — bun run mutate:staged (≥90% on staged domain/use-case files)
+#   1. commit size   - <=10 files AND <=300 lines (insertions + deletions)
+#   2. package.json  - no "latest" / "*" / bare dist-tag version strings
+#   3. secret scan   - gitleaks protect --staged (degrades gracefully)
+#   4. staged lint   - eslint on the staged TS files only (fast, not type-aware)
+#   5. typecheck     - tsc --noEmit
+#
+# Budget: keep the hook under ~5s. A gate's home is chosen by its speed, not its
+# importance: if a gate here exceeds the budget on your repo (typecheck is the
+# one that grows with the codebase), move it to CI. Never add the test suite,
+# coverage, or mutation to this hook; they are CI-only by design.
 #
 # Install once per clone:
 #
 #   git config core.hooksPath .githooks
 #
-# Bypass with `git commit --no-verify` is reserved for genuine big-bang
-# changes (initial scaffolds, mass-renames, generated-file updates). Justify
-# every bypass in the commit body. Do not normalise bypassing.
+# Bypass with `git commit --no-verify` is reserved for genuine big-bang changes
+# (initial scaffolds, mass-renames, generated-file updates). Justify every
+# bypass in the commit body. Do not normalise bypassing.
 
 set -euo pipefail
 
@@ -29,35 +36,26 @@ if ! command -v bun >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "pre-commit: running 8 gates..."
+echo "pre-commit: running the fast gates..."
 
-echo "[1/8] commit size"
+echo "[1/5] commit size"
 bash scripts/check-commit-size.sh
 
-echo "[2/8] package.json (no latest / *)"
+echo "[2/5] package.json (no latest / *)"
 bash scripts/check-package-json.sh
 
-echo "[3/8] gitleaks protect --staged"
+echo "[3/5] gitleaks protect --staged"
 if command -v gitleaks >/dev/null 2>&1; then
   gitleaks protect --staged --redact --verbose --no-banner
 else
-  echo "  warning: 'gitleaks' not on PATH — skipping secret scan." >&2
+  echo "  warning: 'gitleaks' not on PATH - skipping secret scan." >&2
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
 fi
 
-echo "[4/8] bun test"
-bun test
+echo "[4/5] bun run lint:staged"
+bun run lint:staged
 
-echo "[5/8] bun run lint:strict"
-bun run lint:strict
-
-echo "[6/8] bun run typecheck"
+echo "[5/5] bun run typecheck"
 bun run typecheck
 
-echo "[7/8] bun run coverage"
-bun run coverage
-
-echo "[8/8] bun run mutate:staged"
-bun run mutate:staged
-
-echo "pre-commit: all gates passed"
+echo "pre-commit: fast gates passed. The full suite, coverage, and mutation run in CI (assets/ci.yml)."

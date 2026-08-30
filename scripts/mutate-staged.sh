@@ -26,9 +26,16 @@ fi
 count=$(echo "$files" | wc -l | tr -d ' ')
 echo "mutate:staged: testing ${count} file(s)"
 
-# Stryker's `--mutate` flag takes a single comma-separated pattern list;
-# repeating `--mutate` keeps only the LAST value. Join the file list into
-# one comma-separated argument so all staged files are mutated together.
+# Stryker's --mutate takes ONE comma-separated value; repeated flags
+# overwrite each other (the CLI keeps only the last one), so join the list.
 mutate_arg=$(echo "$files" | paste -sd, -)
 
-bunx stryker run --mutate "$mutate_arg"
+# Run the GATE fresh. Stryker's incremental cache (incremental:true in the
+# config, kept for fast dev `bun run mutate`) keys on source-file hashes, so a
+# test-only change, strengthening an assertion without touching the source,
+# does not invalidate it and the score reports stale. A commit gate must judge
+# the current tree, so --force ignores cached statuses. Prefer it to deleting
+# reports/stryker-incremental.json: that path is owned by stryker.conf.json
+# via `incrementalFile`, so a config change silently turns the delete into a
+# no-op and the stale-score trap returns.
+bunx stryker run --force --mutate "$mutate_arg"
