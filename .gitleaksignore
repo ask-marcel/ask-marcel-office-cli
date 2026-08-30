@@ -1,0 +1,35 @@
+# gitleaks: reviewed historical false positives, one fingerprint per line.
+#
+# The pre-commit hook runs `gitleaks protect --staged` (the staged diff only);
+# CI runs `gitleaks detect` over the FULL history. The full-history scan is the
+# stricter of the two, and because history is immutable it keeps re-reporting
+# any finding that ever existed, including one whose code is long deleted.
+#
+# In the spirit of the no-inline-ignores rule, suppression here is
+# fingerprint-scoped, never a blanket path or rule exclusion. A fingerprint is
+# `commit:file:rule:line`, so each entry silences exactly one line of one blob
+# in one commit. The same string appearing on a new line, in a new commit, or
+# in the working tree still fails the scan.
+#
+# Adding an entry requires all three: the value is provably not a credential,
+# it is already out of the working tree (or is a synthetic fixture), and the
+# reason is written down here. When in doubt, rotate the secret and rewrite the
+# history instead of allowing it.
+
+# 2026-05-20, commit 4a4769b, src/use-cases/commands/commands.test.ts:3400-3401.
+#
+# A chatsvcagg `skipToken` pagination cursor in a test fixture, matched by the
+# generic-api-key rule on entropy alone (3.62). It is a CURSOR, not a
+# credential: it encodes an opaque server-side position in a result set, it
+# cannot authenticate a request, it is worthless without a live bearer token,
+# and it expired within minutes of being issued. `skipToken` is the documented
+# pre-2026-05 chatsvcagg pagination parameter, since superseded by
+# `messageToken`; see the runtimeFlagNames note in meta.test.ts.
+#
+# The fixture is already gone from the working tree, removed in 9e32b23 when
+# the substrate commands moved to teams.microsoft.com/api/csa/<region>/. Only
+# the historical blob remains, which is why `detect` reports it and `protect`
+# does not. Rewriting 500+ commits of public history to delete an expired
+# pagination cursor is not a proportionate response.
+4a4769b69c514d54354c23c0d305a91990ecb7e9:src/use-cases/commands/commands.test.ts:generic-api-key:3400
+4a4769b69c514d54354c23c0d305a91990ecb7e9:src/use-cases/commands/commands.test.ts:generic-api-key:3401
