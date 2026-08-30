@@ -222,3 +222,145 @@ describe('CATEGORY_ORDER', () => {
     expect([...advertised].toSorted((a, b) => a.localeCompare(b))).toEqual(Object.keys(CATEGORY_LABELS).toSorted((a, b) => a.localeCompare(b)));
   });
 });
+
+describe('docs-render — exact output, which is the only thing that pins the blank lines', () => {
+  // Every `it` above asserts with toContain, so the SPACING between sections is
+  // unasserted: the empty-string literals in each `lines.push('', '## X', '')`
+  // can be replaced with junk and every one of those tests still passes. The
+  // rendered markdown is a product (docs/COMMANDS.md, and what `docs <cmd>`
+  // prints), so asserting it whole is the point rather than a coverage trick.
+  const optionOnly: CommandManifestEntry = {
+    name: 'list-things',
+    summary: 'List the things.',
+    category: 'drive',
+    graphMethod: 'GET',
+    graphPathTemplate: '/me/things',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/thing-list',
+    options: [{ name: 'top', key: 'top', required: false, description: 'Page size.' }],
+    example: 'ask-marcel-office list-things',
+  };
+
+  it('renders an options-only command as exactly this markdown, blank lines included', () => {
+    expect(renderCommandMarkdown(optionOnly)).toBe(
+      [
+        '# `list-things`',
+        '',
+        'List the things.',
+        '',
+        `- **Category:** ${CATEGORY_LABELS['drive']}`,
+        '- **Graph endpoint:** `GET /me/things`',
+        '- **Microsoft Learn:** https://learn.microsoft.com/en-us/graph/api/thing-list',
+        '',
+        '## Options',
+        '',
+        '| Flag | Description |',
+        '|------|-------------|',
+        '| `--top` | Page size. |',
+        '',
+        '## Example',
+        '',
+        '```bash',
+        'ask-marcel-office list-things',
+        '```',
+      ].join('\n')
+    );
+  });
+
+  it('renders positional arguments and a request body as exactly this markdown', () => {
+    const withBody: CommandManifestEntry = {
+      name: 'send-thing',
+      summary: 'Send a thing.',
+      category: 'mail',
+      graphMethod: 'POST',
+      graphPathTemplate: '/me/sendThing',
+      graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/thing-send',
+      options: [],
+      positionalArguments: [{ name: 'target', required: true, description: 'Who to send it to.' }],
+      bodyTemplate: '{"a":1}',
+      example: 'ask-marcel-office send-thing bob',
+    };
+
+    expect(renderCommandMarkdown(withBody)).toBe(
+      [
+        '# `send-thing`',
+        '',
+        'Send a thing.',
+        '',
+        `- **Category:** ${CATEGORY_LABELS['mail']}`,
+        '- **Graph endpoint:** `POST /me/sendThing`',
+        '- **Microsoft Learn:** https://learn.microsoft.com/en-us/graph/api/thing-send',
+        '',
+        '## Positional arguments',
+        '',
+        '| Argument | Required | Description |',
+        '|----------|----------|-------------|',
+        '| `<target>` | yes | Who to send it to. |',
+        '',
+        '## Request body',
+        '',
+        '```json',
+        '{"a":1}',
+        '```',
+        '',
+        '## Example',
+        '',
+        '```bash',
+        'ask-marcel-office send-thing bob',
+        '```',
+      ].join('\n')
+    );
+  });
+
+  it('renders the README tables as exactly this markdown, pinning the section join and the required-params separator', () => {
+    const twoParams: CommandManifestEntry = {
+      name: 'get-thing',
+      summary: 'Get a thing.',
+      category: 'drive',
+      graphMethod: 'GET',
+      graphPathTemplate: '/me/things/{id}',
+      graphDocsUrl: 'https://learn.microsoft.com/x',
+      options: [
+        { name: 'drive-id', key: 'driveId', required: true, description: 'Drive.' },
+        { name: 'item-id', key: 'itemId', required: true, description: 'Item.' },
+      ],
+      example: 'ask-marcel-office get-thing',
+    };
+    const mailOne: CommandManifestEntry = { ...twoParams, name: 'list-mail', summary: 'List mail.', category: 'mail', options: [] };
+
+    const rendered = renderReadmeTables({ package: 'p', version: '1', generatedAt: 'now', commands: [twoParams, mailOne] });
+
+    expect(rendered).toBe(
+      [
+        `### ${CATEGORY_LABELS['drive']}`,
+        '',
+        '| Command | Description | Required params | Graph endpoint |',
+        '|---------|-------------|-----------------|----------------|',
+        '| `get-thing` | Get a thing. | `--drive-id`, `--item-id` | `GET /me/things/{id}` |',
+        '',
+        `### ${CATEGORY_LABELS['mail']}`,
+        '',
+        '| Command | Description | Required params | Graph endpoint |',
+        '|---------|-------------|-----------------|----------------|',
+        '| `list-mail` | List mail. | _(none)_ | `GET /me/things/{id}` |',
+      ].join('\n')
+    );
+  });
+
+  it('gives every category its own non-empty label, so none renders as a blank heading', () => {
+    const seen = new Set<string>();
+    for (const category of CATEGORY_ORDER) {
+      const label = CATEGORY_LABELS[category];
+      expect(label.trim().length).toBeGreaterThan(0);
+      expect(seen.has(label)).toBe(false);
+      seen.add(label);
+    }
+    expect(seen.size).toBe(CATEGORY_ORDER.length);
+  });
+
+  it('omits the elevated-token line, and the preferMaxPageSize hint, when the entry does not call for them', () => {
+    const plain = renderCommandMarkdown(optionOnly);
+    expect(plain).not.toContain('Needs elevated token');
+    const paginated = renderCommandMarkdown({ ...optionOnly, pagination: true });
+    expect(paginated).not.toContain('odata.maxpagesize');
+  });
+});
