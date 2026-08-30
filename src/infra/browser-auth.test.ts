@@ -131,6 +131,7 @@ const fastConfig = (overrides: Partial<BrowserAuthConfig> = {}): BrowserAuthConf
     pollIntervalMs: 1,
     pollDeadlineMs: 30,
     navigationTimeoutMs: 100,
+    elevatedPreferenceGraceMs: 1,
     ...overrides,
   };
 };
@@ -287,7 +288,7 @@ describe('browser auth — production wiring', () => {
     expect(captured).not.toContain('[DEBUG]');
   });
 
-  it('acquireElevatedToken captures the first Bearer with an ODSP-elevated appid (M365ChatClient) on Graph audience', async () => {
+  it('acquireElevatedToken captures a Bearer with an ODSP-elevated appid (M365ChatClient) on Graph audience', async () => {
     const elevatedJwt = makeJwt({
       exp: Math.floor(Date.now() / 1000) + 3600,
       aud: 'https://graph.microsoft.com',
@@ -323,6 +324,77 @@ describe('browser auth — production wiring', () => {
     const result = await browser.acquireElevatedToken();
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('sso_timeout');
+  });
+
+  // Both elevated identities emit a Graph bearer on the same page load, ~0.1-0.6s
+  // apart, in a RANDOM order (two live probes 2026-08-30 came back reversed). They
+  // are not interchangeable: M365ChatClient carries Chat.ReadBasic, Sites.ReadWrite.All
+  // and Group.Read.All; OfficeHome carries none of the three, so taking whichever
+  // arrived first made the elevated tier's scope set a coin flip and `list-chats`
+  // fail with a 403 about half the time.
+  const elevatedJwtFor = (appid: string): string => makeJwt({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://graph.microsoft.com', appid });
+  const bearerRequest = (jwt: string): RequestLike => ({ url: () => 'https://graph.microsoft.com/v1.0/me', headers: () => ({ authorization: `Bearer ${jwt}` }) });
+  const OFFICE_HOME = '4765445b-32c6-49b0-83e6-1d93765276ca';
+  const M365_CHAT = 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1';
+
+  it('acquireElevatedToken holds out for the M365ChatClient token when OfficeHome arrives first', async () => {
+    const office = elevatedJwtFor(OFFICE_HOME);
+    const chat = elevatedJwtFor(M365_CHAT);
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[bearerRequest(office), bearerRequest(chat)]] } });
+
+    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedPreferenceGraceMs: 50 })).acquireElevatedToken();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.token)).toBe(chat);
+  });
+
+  it('acquireElevatedToken keeps the M365ChatClient token when it arrives first, without waiting out the grace window', async () => {
+    const chat = elevatedJwtFor(M365_CHAT);
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[bearerRequest(chat), bearerRequest(elevatedJwtFor(OFFICE_HOME))]] } });
+
+    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedPreferenceGraceMs: 50 })).acquireElevatedToken();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.token)).toBe(chat);
+  });
+
+  it('acquireElevatedToken settles for the OfficeHome token when M365ChatClient never arrives, rather than failing', async () => {
+    const office = elevatedJwtFor(OFFICE_HOME);
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[bearerRequest(office)]] } });
+
+    const result = await createBrowserAuthFromApi(api, fastConfig()).acquireElevatedToken();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.token)).toBe(office);
+  });
+
+  it('acquireElevatedToken keeps a fallback that arrived too late for its grace window, rather than reporting a timeout on a capture that worked', async () => {
+    const office = elevatedJwtFor(OFFICE_HOME);
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[bearerRequest(office)]] } });
+
+    // Grace outlives the capture deadline, so the picker never settles and the
+    // deadline path is the only route that can return this token.
+    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedPreferenceGraceMs: 10_000, elevatedRecaptureTimeoutMs: 5 })).acquireElevatedToken();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(String(result.token)).toBe(office);
+  });
+
+  it('acquireBothTokens applies the same preference, so `login --force` cannot land the weaker identity either', async () => {
+    const office = elevatedJwtFor(OFFICE_HOME);
+    const chat = elevatedJwtFor(M365_CHAT);
+    const { api } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())]],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...'],
+        requestsPerGoto: [[bearerRequest(office), bearerRequest(chat)]],
+      },
+    });
+
+    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedPreferenceGraceMs: 50 })).acquireBothTokens('https://teams.microsoft.com');
+
+    expect(result.elevated.ok).toBe(true);
+    if (result.elevated.ok) expect(String(result.elevated.token)).toBe(chat);
   });
 
   it('acquireElevatedToken ignores tokens whose audience is not Graph (even if appid is on the elevated list)', async () => {

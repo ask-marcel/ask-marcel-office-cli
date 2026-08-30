@@ -217,6 +217,12 @@ type BrowserAuthConfig = {
   readonly initialSettleMs?: number;
   readonly postReloginSettleMs?: number;
   readonly pollIntervalMs?: number;
+  /**
+   * How long to keep listening for the PREFERRED elevated identity after an
+   * acceptable-but-weaker one has already been captured. See
+   * `PREFERRED_ELEVATED_APP_ID`.
+   */
+  readonly elevatedPreferenceGraceMs?: number;
   readonly pollDeadlineMs?: number;
   readonly navigationTimeoutMs?: number;
   /**
@@ -258,6 +264,51 @@ const ELEVATED_APP_IDS: ReadonlyArray<string> = [
   'c0ab8ce9-e9a0-42e7-b064-33d422df41f1', // M365ChatClient
   '4765445b-32c6-49b0-83e6-1d93765276ca', // OfficeHome (Graph audience also has the right scopes)
 ];
+
+/**
+ * Both entries of `ELEVATED_APP_IDS` emit a Graph-audience bearer on the SAME
+ * m365.cloud.microsoft page load, 0.1-0.6s apart, in a random order — two live
+ * probes on 2026-08-30 came back reversed. They are not interchangeable:
+ * M365ChatClient carries `Chat.ReadBasic`, `Sites.ReadWrite.All` and
+ * `Group.Read.All`; OfficeHome carries none of them and adds `Contacts.Read`
+ * instead. Taking whichever bearer arrived first therefore made the elevated
+ * tier's scope set a coin flip, and `list-chats` / `get-chat` failed with a
+ * scope 403 on roughly half of all captures.
+ *
+ * So the capture HOLDS a weaker match and keeps listening for this one, giving
+ * up the wait after `elevatedPreferenceGraceMs`. OfficeHome remains a genuine
+ * fallback: a tenant where M365ChatClient never emits still gets a token, which
+ * is what it got before.
+ */
+const PREFERRED_ELEVATED_APP_ID = 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1';
+
+type ElevatedPicker = {
+  readonly offer: (appid: string, token: AccessToken) => void;
+  /** The token to accept NOW: the preferred one, or a weaker one whose grace has run out. */
+  readonly settled: () => AccessToken | null;
+  /** The best token held, whether or not its grace has elapsed. For deadline expiry. */
+  readonly held: () => AccessToken | null;
+};
+
+const createElevatedPicker = (graceMs: number): ElevatedPicker => {
+  let preferred: AccessToken | null = null;
+  let fallback: AccessToken | null = null;
+  let fallbackAt = 0;
+  return {
+    offer: (appid, token) => {
+      if (appid === PREFERRED_ELEVATED_APP_ID) {
+        preferred ??= token;
+        return;
+      }
+      if (fallback === null) {
+        fallback = token;
+        fallbackAt = Date.now();
+      }
+    },
+    settled: () => preferred ?? (fallback !== null && Date.now() - fallbackAt >= graceMs ? fallback : null),
+    held: () => preferred ?? fallback,
+  };
+};
 
 const M365_CLOUD_URL = 'https://m365.cloud.microsoft/search';
 
@@ -387,6 +438,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const pollDeadlineMs = config.pollDeadlineMs ?? 5 * 60 * 1000;
   const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
   const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
+  const elevatedPreferenceGraceMs = config.elevatedPreferenceGraceMs ?? 3000;
   const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? 15_000;
   const freshCachedToken = config.freshCachedToken ?? (async () => null);
   const onProgress = config.onProgress ?? (() => {});
@@ -477,7 +529,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const acquireElevatedToken = async (): Promise<ElevatedTokenResult> => {
     await cleanupSingletonLocks(profileDir, fs);
 
-    let captured: AccessToken | null = null;
+    const picker = createElevatedPicker(elevatedPreferenceGraceMs);
 
     // Headless flakiness with Microsoft anti-automation has been
     // observed on m365.cloud.microsoft — the SPA sometimes refuses to
@@ -518,7 +570,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     elevatedPage.on('request', (req) => {
-      if (captured) return;
+      if (picker.settled()) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -530,7 +582,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       if (aud !== 'https://graph.microsoft.com') return;
       const validated = accessToken(raw);
       if (!validated.ok) return;
-      captured = validated.value;
+      picker.offer(appid, validated.value);
       logger.info('elevated_token_captured', { appid, len: validated.value.length });
       trace(`[DEBUG] elevated token captured  appid=${appid}  len=${validated.value.length}\n`);
     });
@@ -555,12 +607,22 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // retry (after wiping the profile) or surface the error.
     const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < elevatedDeadline) {
-      if (captured) {
+      const settled = picker.settled();
+      if (settled) {
         trace('[DEBUG] elevated capture: token found, closing\n');
         await closeBrowserSession(elevatedPage, elevatedCtx);
-        return { ok: true, token: captured };
+        return { ok: true, token: settled };
       }
       await sleep(pollIntervalMs);
+    }
+
+    // A weaker token that landed just before the deadline never got its grace
+    // window; keep it rather than report a timeout on a capture that worked.
+    const held = picker.held();
+    if (held) {
+      trace('[DEBUG] elevated capture: deadline reached holding a fallback, keeping it\n');
+      await closeBrowserSession(elevatedPage, elevatedCtx);
+      return { ok: true, token: held };
     }
 
     await closeBrowserSession(elevatedPage, elevatedCtx);
@@ -599,7 +661,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
 
     let capturedAccess: AccessToken | null = null;
     let capturedRefresh: string | null = null;
-    let capturedElevated: AccessToken | null = null;
+    const elevatedPicker = createElevatedPicker(elevatedPreferenceGraceMs);
     let capturedChatsvcagg: AccessToken | null = null;
     let capturedChatsvcaggRegion: string | null = null;
     let capturedIc3: AccessToken | null = null;
@@ -686,7 +748,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // rides on so the next substrate migration is self-diagnosable.
     const seenChatsvcaggRoutes = new Set<string>();
     activePage.on('request', (req) => {
-      if (capturedElevated && capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3) return;
+      if (elevatedPicker.settled() && capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3) return;
       const auth = req.headers()['authorization'];
       if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
       const raw = auth.slice('Bearer '.length);
@@ -694,10 +756,10 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
       const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
       if (!appid || !aud) return;
-      if (!capturedElevated && ELEVATED_APP_IDS.includes(appid) && aud === 'https://graph.microsoft.com') {
+      if (ELEVATED_APP_IDS.includes(appid) && aud === 'https://graph.microsoft.com') {
         const validated = accessToken(raw);
         if (validated.ok) {
-          capturedElevated = validated.value;
+          elevatedPicker.offer(appid, validated.value);
           logger.info('elevated_token_captured', { appid, len: validated.value.length });
           trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
         }
@@ -855,9 +917,12 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
 
     const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
-    while (Date.now() < elevatedDeadline && !capturedElevated) {
+    while (Date.now() < elevatedDeadline && !elevatedPicker.settled()) {
       await sleep(pollIntervalMs);
     }
+    // `held`, not `settled`: a fallback captured inside the grace window at the
+    // deadline is still a working token.
+    const capturedElevated = elevatedPicker.held();
 
     await cleanup();
     onProgress('Sign-in complete — browser closed.');
