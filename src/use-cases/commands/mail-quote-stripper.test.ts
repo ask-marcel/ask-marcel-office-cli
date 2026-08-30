@@ -70,6 +70,12 @@ describe('locating where a reply body stops being the author’s new text and st
     expect(findQuoteBoundary(`${authorText}<p class=MsoNormal>${header}</p><p>the quoted original</p>`)).toBe(authorText.length);
   });
 
+  it('reads a Sent label whatever its capitalisation, since Outlook clients do not agree on it', () => {
+    const authorText = '<p>Confirmed.</p>';
+
+    expect(findQuoteBoundary(`${authorText}<p><b>From:</b> Robin Chen<br><b>SENT:</b> Monday, May 5, 2026</p>`)).toBe(authorText.length);
+  });
+
   it('still refuses to cut on a bold From label whose only companion is an unrelated bold label', () => {
     // The From + (Sent|Date) pair is the whole false-positive guard. Widening the
     // date vocabulary must not weaken it into "any bold From cuts".
@@ -146,6 +152,13 @@ describe('locating where a reply body stops being the author’s new text and st
     const authorText = '<p>Confirmed.</p>';
 
     expect(findQuoteBoundary(`${authorText}${MOBILE_CONTAINER_TAG}<p>${MOBILE_HEADER}</p><p>the quoted original</p></div>`)).toBe(authorText.length);
+  });
+
+  it('finds the container tag whatever attributes surround the id, since new Outlook writes several', () => {
+    const authorText = '<p>Confirmed.</p>';
+    const tag = '<div data-x="y" id="mail-editor-reference-message-container" dir="ltr">';
+
+    expect(findQuoteBoundary(`${authorText}${tag}<p>${MOBILE_HEADER}</p><p>the quoted original</p></div>`)).toBe(authorText.length);
   });
 
   // The window is measured from the END of the container tag; these two sit one
@@ -249,6 +262,21 @@ describe('locating where a reply body stops being the author’s new text and st
 
   it('reports no boundary for a plain-text note that mentions From: without a companion Sent line, so ordinary prose is never truncated', () => {
     expect(findPlainTextQuoteBoundary('Note to self.\nFrom: the spec, all requests need auth.\nMore notes follow here.')).toBe(-1);
+  });
+
+  // Every plain-text marker is anchored at BOTH ends of its line. Dropping
+  // either anchor turns prose that merely mentions a banner into a boundary,
+  // and the mid-sentence case above only exercises one end of one marker.
+  const unanchoredMentions = [
+    { label: 'an Original Message banner that ends a line without starting one', text: 'Reply.\nSee the -----Original Message-----' },
+    { label: 'an underscore rule that does not start its line', text: 'Reply.\nThe divider looks like ________' },
+    { label: 'an underscore rule that starts a line but carries text after it', text: 'Reply.\n_______ is a rule I drew by hand' },
+    { label: 'an attribution line quoted mid-sentence', text: 'Reply.\nAs I said On Monday Alex Kim wrote:' },
+    { label: 'an attribution line that keeps going past wrote:', text: 'Reply.\nOn Monday Alex Kim wrote: and then carried on typing' },
+  ];
+
+  it.each(unanchoredMentions)('reports no boundary for $label', ({ text }) => {
+    expect(findPlainTextQuoteBoundary(text)).toBe(-1);
   });
 
   it('strips an HTML reply at exactly the boundary the finder reports, and leaves a quote-free body whole', () => {

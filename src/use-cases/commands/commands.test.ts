@@ -4761,6 +4761,18 @@ describe('convert-mail-to-markdown — quoted-text stripping', () => {
     expect((result.value as { note?: string }).note).toBe('quoted reply chain stripped (removed 90% of the body text) — pass --keep-quoted true to include it');
   });
 
+  // Pins how the readable text is measured, which the percentage above cannot:
+  // tags separate words rather than fusing them, `&nbsp;` counts as one space,
+  // and a run of whitespace collapses to one. 12 readable characters kept
+  // ("abc de fghij"), 60 in the whole body.
+  it('counts a tag as a word separator and folds &nbsp; and whitespace runs into one space', async () => {
+    const content = `<p>abc&nbsp;de</p><p>fghij</p><div id="divRplyFwdMsg">${'x'.repeat(47)}</div>`;
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg(content)), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    expect((result.value as { note?: string }).note).toBe('quoted reply chain stripped (removed 80% of the body text) — pass --keep-quoted true to include it');
+  });
+
   it('reports the removed share for a plain-text body too, not only an HTML one', async () => {
     const content = `0123456789\n\nOn Mon Alice wrote:\n${'x'.repeat(69)}`;
     const fetchFn: FetchFn = async () => Response.json({ subject: 'Re: Q3', body: { contentType: 'text', content }, hasAttachments: false });
