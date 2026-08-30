@@ -156,4 +156,24 @@ describe('scopes-check (every tier reads the same way)', () => {
       expect(v.basic.expiresInSeconds).toBe(120); // raw runway still reported
     }
   });
+
+  it('keeps basic unavailable at exactly the buffer boundary', async () => {
+    const tokenInfo: TokenInfo = {
+      scopes: ['Mail.Read'],
+      audience: 'https://graph.microsoft.com',
+      expiresAt: '2026-12-31T00:00:00.000Z',
+      expiresInSeconds: 300,
+      elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+      chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+    };
+    const result = await execute(fakeGraphWithTokenInfo(ok(tokenInfo)), {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { basic: { available: boolean } };
+      // auth.ts drops a tier when now >= expires_on - 300, so available needs
+      // runway STRICTLY above 300; `>=` here would disagree at this exact point.
+      expect(v.basic.available).toBe(false);
+    }
+  });
 });
