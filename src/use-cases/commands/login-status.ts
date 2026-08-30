@@ -28,7 +28,15 @@ type LoginSummaryInput = {
 
 const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office scopes-check`. To re-capture every token, run `ask-marcel-office login --force`.";
 
-const RECAPTURE_REMEDY = 're-capture with `ask-marcel-office login --force`';
+// Per tier, because they do not fail the same way. Elevated is browser-only and
+// simply was not captured. The two substrate tiers are only ever reported missing
+// AFTER `login` has already redeemed the shared refresh token for them, so their
+// absence means that headless attempt failed, not that nothing was tried.
+const RECAPTURE_REMEDY: Readonly<Record<OptionalTier, string>> = {
+  elevated: 're-capture with `ask-marcel-office login --force`',
+  chatsvcagg: 'still unavailable after a headless refresh; re-capture with `ask-marcel-office login --force`',
+  ic3: 'still unavailable after a headless refresh; re-capture with `ask-marcel-office login --force`',
+};
 
 const isPresent = (tier: OptionalTier, input: LoginSummaryInput): boolean => {
   if (tier === 'elevated') return input.elevatedAvailable;
@@ -45,7 +53,7 @@ const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => {
   for (const tier of present) unlocked[tier] = TIER_CAPABILITY[tier];
 
   const missing: Record<string, string> = {};
-  for (const tier of absent) missing[tier] = `${TIER_CAPABILITY[tier]} — unavailable, ${RECAPTURE_REMEDY}`;
+  for (const tier of absent) missing[tier] = `${TIER_CAPABILITY[tier]} — unavailable, ${RECAPTURE_REMEDY[tier]}`;
 
   return {
     status: 'authenticated',

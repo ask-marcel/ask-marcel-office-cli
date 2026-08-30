@@ -131,6 +131,14 @@ type AuthManager = {
    * paginated chat-message history beyond the 200-message chatsvcagg cap.
    */
   getIc3AccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  /**
+   * Redeem the shared refresh token for any COLD substrate tier, over HTTP, with
+   * no browser on any path. `login` calls this so a warm-cache sign-in leaves all
+   * four tiers usable; without it the two substrate tiers stay cold until some
+   * Teams-chat command pays for them, and `login` reports them missing while
+   * having done nothing about it.
+   */
+  warmSubstrateTokens?: () => Promise<void>;
   logout: () => Promise<Result<void, AuthError>>;
   /**
    * Inspect the elevated-capture outcome from the most recent
@@ -796,13 +804,15 @@ const createAuthManagerFromApi = (
       logger.info('auth.chatsvcagg.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
+    // Headless FIRST, on every manager. The shared RT mints this audience over
+    // HTTP, so a browser is never the cheaper route; when this sat inside the
+    // fail-fast branch below, a manager that was ALLOWED a browser skipped the
+    // refresh entirely and opened a window for a token an HTTP call could mint.
+    if (cached?.refresh_token) {
+      const refreshed = await refreshSubstrateToken(cached, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.refresh');
+      if (refreshed.ok) return refreshed;
+    }
     if (!recaptureSecondaryViaBrowser) {
-      // Command path: self-heal via a headless refresh of the shared RT before
-      // giving up. Only fail fast when there's no RT or the refresh is rejected.
-      if (cached?.refresh_token) {
-        const refreshed = await refreshSubstrateToken(cached, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.refresh');
-        if (refreshed.ok) return refreshed;
-      }
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('chatsvcagg (Teams chat)', commandList(secondaryTokenCommands.chatsvcagg), RECAPTURE_VIA_LOGIN),
@@ -891,11 +901,12 @@ const createAuthManagerFromApi = (
       logger.info('auth.ic3.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
+    // Headless first, same reasoning as chatsvcagg above.
+    if (cached?.refresh_token) {
+      const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
+      if (refreshed.ok) return refreshed;
+    }
     if (!recaptureSecondaryViaBrowser) {
-      if (cached?.refresh_token) {
-        const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
-        if (refreshed.ok) return refreshed;
-      }
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('ic3 (Teams chat history)', commandList(secondaryTokenCommands.ic3), RECAPTURE_VIA_LOGIN),
@@ -928,6 +939,14 @@ const createAuthManagerFromApi = (
     }
   };
 
+  // `redeemMissedSubstrateAtLogin` only ever ran INSIDE the browser dance, so a
+  // plain `login` on a warm cache never reached it. Same redemption, callable on
+  // its own and keyed on what is actually stale.
+  const warmSubstrateTokens = async (): Promise<void> => {
+    const cached = await readCache();
+    await redeemMissedSubstrateAtLogin(freshChatsvcaggToken(cached) !== undefined, freshIc3Token(cached) !== undefined);
+  };
+
   const getLastElevatedOutcome = (): ElevatedOutcome | null => lastElevatedOutcome;
   const getLastChatsvcaggOutcome = (): ElevatedOutcome | null => lastChatsvcaggOutcome;
 
@@ -938,6 +957,7 @@ const createAuthManagerFromApi = (
     getChatsvcaggAccessToken,
     getChatsvcaggRegion,
     getIc3AccessToken,
+    warmSubstrateTokens,
     logout,
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,

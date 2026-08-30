@@ -156,6 +156,39 @@ describe('login command', () => {
     expect(silentCalls).toBe(0);
   });
 
+  // The two substrate tiers carry no browser dependency: the shared refresh token
+  // mints both over HTTP. Warming them here is what makes `login`'s `missing` map
+  // honest — before this, a warm-cache login reported them missing having made no
+  // attempt at all, and pointed the user at `--force`, whose cookie wipe destroys
+  // the 90-day KMSI session.
+  it('warms the substrate tiers so a warm-cache login leaves every tier usable', async () => {
+    let warmed = 0;
+    const fakeAuth = fakeAuthManager({
+      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 3600, scopes: [] }),
+      warmSubstrateTokens: async () => {
+        warmed += 1;
+      },
+    });
+
+    await login(fakeAuth);
+
+    expect(warmed).toBe(1);
+  });
+
+  it('leaves the substrate warming to the dance under --force, which already redeems what it missed', async () => {
+    let warmed = 0;
+    const fakeAuth = fakeAuthManager({
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      warmSubstrateTokens: async () => {
+        warmed += 1;
+      },
+    });
+
+    await login(fakeAuth, { force: true });
+
+    expect(warmed).toBe(0);
+  });
+
   it('does not dance twice when --force was passed explicitly', async () => {
     const calls: Array<{ force?: boolean } | undefined> = [];
     const fakeAuth = fakeAuthManager({

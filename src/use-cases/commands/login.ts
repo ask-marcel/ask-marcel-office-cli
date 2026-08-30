@@ -41,6 +41,12 @@ const execute = async (auth: AuthManager, options?: { force?: boolean }): Promis
   // federated tenant whose capture failed), escalating again would open a
   // second browser for nothing.
   if (!authenticated.ok || options?.force === true) return authenticated;
+  // The two substrate tiers self-heal from the shared refresh token over HTTP, so
+  // warming them costs one round trip each and no browser. Without it a warm-cache
+  // `login` reported them missing having attempted nothing, and its remedy pointed
+  // at `--force`, whose cookie wipe destroys the 90-day KMSI session. Under
+  // `--force` we never get here: the dance redeems whatever it missed itself.
+  await auth.warmSubstrateTokens?.();
   // `getCachedElevatedInfo` is an optional capability; when a manager does not
   // expose it we cannot know, so we leave the result alone rather than guess.
   const elevated = await auth.getCachedElevatedInfo?.();

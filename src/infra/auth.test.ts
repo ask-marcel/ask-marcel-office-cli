@@ -1789,6 +1789,61 @@ describe('auth manager — substrate token headless refresh (command path)', () 
     return decodeURIComponent(raw.replace(/\+/g, '%20'));
   };
 
+  it('warmSubstrateTokens redeems BOTH cold substrate tiers over HTTP, opening no browser even on a manager allowed one', async () => {
+    const chat = futureChatsvcagg();
+    const ic3 = futureIc3();
+    let call = 0;
+    mock = installFetchMock([
+      {
+        match: (url) => url.includes('/oauth2/v2.0/token'),
+        respond: () => {
+          call += 1;
+          return new Response(JSON.stringify({ access_token: call === 1 ? chat : ic3, expires_in: 3600 }));
+        },
+      },
+    ]);
+    const fs = createFileSystemFake();
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({ access_token: 'unused', expires_on: stalePast(), refresh_token: 'shared-rt', chatsvcagg_expires_on: stalePast(), ic3_expires_on: stalePast() })
+    );
+    // Default flag = browser ALLOWED, and the fake browser throws on every substrate
+    // capture: reaching a browser here would fail the test rather than pass it quietly.
+    const auth = createAuthManagerFromApi(noBrowser(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+    await auth.warmSubstrateTokens?.();
+
+    const cached = await fs.readJson<{ chatsvcagg_access_token?: string; ic3_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(chat);
+    expect(cached.ok && cached.value.ic3_access_token).toBe(ic3);
+  });
+
+  it('warmSubstrateTokens leaves a still-fresh substrate token alone rather than spending a refresh on it', async () => {
+    mock = installFetchMock([{ match: (url) => url.includes('/oauth2/v2.0/token'), respond: () => new Response(JSON.stringify({ access_token: futureIc3(), expires_in: 3600 })) }]);
+    const warm = futureChatsvcagg();
+    const fs = createFileSystemFake();
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    fs.seed(
+      CACHE_PATH,
+      JSON.stringify({
+        access_token: 'unused',
+        expires_on: stalePast(),
+        refresh_token: 'shared-rt',
+        chatsvcagg_access_token: warm,
+        chatsvcagg_expires_on: future,
+        ic3_expires_on: stalePast(),
+      })
+    );
+    const auth = createAuthManagerFromApi(noBrowser(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+
+    await auth.warmSubstrateTokens?.();
+
+    // One redemption, for ic3 only; chatsvcagg kept its warm token untouched.
+    expect(mock.calls.length).toBe(1);
+    const cached = await fs.readJson<{ chatsvcagg_access_token?: string }>(CACHE_PATH);
+    expect(cached.ok && cached.value.chatsvcagg_access_token).toBe(warm);
+  });
+
   it('self-heals a stale chatsvcagg token by redeeming the shared refresh_token over HTTP — no browser', async () => {
     const refreshed = futureChatsvcagg();
     mock = installFetchMock([

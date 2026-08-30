@@ -38,6 +38,23 @@ describe('login summary (plain-language tier capabilities)', () => {
     expect(s.missing).toEqual({});
   });
 
+  // The remedy differs by tier and getting it wrong is not cosmetic: `login` now
+  // redeems the shared refresh token for the two substrate tiers before reporting,
+  // so their presence here means that headless attempt FAILED. Saying only
+  // "re-capture with --force" for them, as one shared string used to, sent users
+  // into a browser dance whose cookie wipe destroys the 90-day KMSI session.
+  it('distinguishes the substrate remedy from the browser-only one, since login already tried the headless route', () => {
+    const s = buildLoginSummary({ elevatedAvailable: true, chatsvcaggAvailable: false, ic3Available: false });
+    expect(Object.keys(s.missing)).toEqual(['chatsvcagg', 'ic3']);
+    for (const tier of ['chatsvcagg', 'ic3']) {
+      expect(s.missing[tier]).toContain('headless refresh');
+      expect(s.missing[tier]).toContain('login --force');
+    }
+    // Elevated is browser-only, so its remedy must NOT claim a headless attempt.
+    const withElevatedMissing = buildLoginSummary({ elevatedAvailable: false, chatsvcaggAvailable: true, ic3Available: true });
+    expect(withElevatedMissing.missing['elevated']).not.toContain('headless refresh');
+  });
+
   it('names what a missing token costs and how to get it back', () => {
     const s = buildLoginSummary({ elevatedAvailable: false, chatsvcaggAvailable: true, ic3Available: false });
     expect(Object.keys(s.unlocked)).toEqual(['basic', 'chatsvcagg']);
