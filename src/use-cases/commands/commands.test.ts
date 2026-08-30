@@ -4747,6 +4747,36 @@ describe('convert-mail-to-markdown — quoted-text stripping', () => {
     expect(v.note).toContain('quoted reply chain stripped');
   });
 
+  // The note used to fire identically whether one line or a hundred went, so a
+  // caller could not tell a correct strip from a body the heuristic had
+  // destroyed without refetching with --keep-quoted (reported 2026-08-30). The
+  // share is measured on VISIBLE text: an Outlook quote is mostly style
+  // attributes, and HTML length overstates what survives several times over.
+  it('reports the share of the body the strip removed, so a caller can tell a normal strip from a destroyed one', async () => {
+    // 10 visible characters kept, 100 in the whole body.
+    const content = `<p>0123456789</p><div id="divRplyFwdMsg">${'x'.repeat(89)}</div>`;
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg(content)), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    expect((result.value as { note?: string }).note).toBe('quoted reply chain stripped (removed 90% of the body text) — pass --keep-quoted true to include it');
+  });
+
+  it('reports the removed share for a plain-text body too, not only an HTML one', async () => {
+    const content = `0123456789\n\nOn Mon Alice wrote:\n${'x'.repeat(69)}`;
+    const fetchFn: FetchFn = async () => Response.json({ subject: 'Re: Q3', body: { contentType: 'text', content }, hasAttachments: false });
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    expect((result.value as { note?: string }).note).toBe('quoted reply chain stripped (removed 90% of the body text) — pass --keep-quoted true to include it');
+  });
+
+  it('reports 100% for a body that is nothing but the quote marker, rather than dividing by an empty body', async () => {
+    const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg('<div id="appendonsend"></div>')), { messageId: 'm1' });
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    expect((result.value as { note?: string }).note).toBe('quoted reply chain stripped (removed 100% of the body text) — pass --keep-quoted true to include it');
+  });
+
   it('preserves the quoted reply chain with --keep-quoted true and sets no note', async () => {
     const content = '<p>My reply.</p><div id="divRplyFwdMsg"><b>From:</b> Alice</div><p>Original message text.</p>';
     const result = await cmdMap['convert-mail-to-markdown']?.execute(createGraphClient(fakeAuth(), htmlMsg(content)), { messageId: 'm1', keepQuoted: 'true' });

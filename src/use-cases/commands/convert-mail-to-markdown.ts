@@ -6,7 +6,7 @@ import type { CommandMeta } from './command-types.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, replaceUnresolvedCidImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary, stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 
 // `--inline-images true` opts INTO the per-image bytes-fetch + base64
 // embedding. The default is text-first: an LLM that just wants the body of
@@ -178,6 +178,34 @@ const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>, i
   return ['**Attachments:**', ...items, '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._'].join('\n');
 };
 
+// Tags out. Split on `<` rather than matched with `<[^>]+>`: that pattern
+// backtracks super-linearly on an unterminated `<` (sonarjs/slow-regex), and
+// bounding the quantifier is not an option because one inline image's base64
+// `src` makes a single tag megabytes long. Text before the first `<` is kept
+// whole, and an unterminated tag keeps its text rather than swallowing the rest
+// of the body.
+const withoutTags = (body: string): string => {
+  const [leadingText, ...afterTagOpen] = body.split('<');
+  return [leadingText, ...afterTagOpen.map((part) => part.slice(part.indexOf('>') + 1))].join(' ');
+};
+
+// Visible-text length: tags out, entity and whitespace runs normalized. An
+// Outlook quote is mostly style attributes, so raw HTML length reports a body as
+// largely intact when nearly all of its readable text has gone.
+const visibleLength = (body: string): number => withoutTags(body).replaceAll('&nbsp;', ' ').replaceAll(/\s+/g, ' ').trim().length;
+
+// How much of the body the strip took, as a percentage of its readable text.
+// The note used to fire identically whether one line or a hundred went, so a
+// caller had no way to tell a correct strip from a body a heuristic had
+// destroyed except by refetching with --keep-quoted (reported 2026-08-30).
+const removedSharePercent = (body: string, boundary: number): number => {
+  const total = visibleLength(body);
+  // A body that is nothing but the marker has no readable text at all. All of
+  // it is quote, so the honest answer is 100 rather than a division by zero.
+  if (total === 0) return 100;
+  return Math.round(((total - visibleLength(body.slice(0, boundary))) / total) * 100);
+};
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -244,12 +272,19 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const inlined = replaceUnresolvedCidImages(embedded, labelByContentId);
   let bodyMd: string;
   let quotedStripped = false;
+  // The removed share is measured from the boundary, never from the stripped
+  // output: that output carries the strip marker, whose own text would make a
+  // short body look like it had GROWN. Locating the boundary a second time is a
+  // regex scan over a string already in memory, cheaper than widening the
+  // strippers' return type for this one caller.
+  let quotedBoundary: number;
   if (m.body?.contentType === 'html') {
     // Strip quoted reply chains before turndown (the Outlook / Gmail markers
     // are still HTML at this point). v1 covers HTML bodies only — plain-text
     // reply detection is a separate heuristic.
     const stripped = keepQuoted ? { html: inlined, stripped: false } : stripQuotedReplies(inlined);
     quotedStripped = stripped.stripped;
+    quotedBoundary = findQuoteBoundary(inlined);
     const converted = htmlToMarkdown(stripped.html);
     if (!converted.ok) return converted;
     bodyMd = converted.value;
@@ -258,6 +293,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     // plain-text markers (Original Message / "On … wrote:" / leading `>`).
     const stripped = keepQuoted ? { text: inlined, stripped: false } : stripQuotedPlainText(inlined);
     quotedStripped = stripped.stripped;
+    quotedBoundary = findPlainTextQuoteBoundary(inlined);
     bodyMd = stripped.text;
   }
   const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled);
@@ -271,7 +307,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   };
   const notes: string[] = [];
   if (attachmentsListNote !== undefined) notes.push(attachmentsListNote);
-  if (quotedStripped) notes.push('quoted reply chain stripped — pass --keep-quoted true to include it');
+  if (quotedStripped) notes.push(`quoted reply chain stripped (removed ${removedSharePercent(inlined, quotedBoundary)}% of the body text) — pass --keep-quoted true to include it`);
   if (notes.length > 0) envelope.note = notes.join('; ');
   return ok(envelope);
 };
@@ -302,13 +338,13 @@ const meta: CommandMeta = {
       key: 'keepQuoted',
       required: false,
       description:
-        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`, the Outlook reply border separator (`#E1E1E1` on desktop, `#B5C4DF` on Mac/mobile), and a bold `From:`/`Sent:` header-label pair (localized variants recognized: 发件人/发送时间, De/Envoyé, Von/Gesendet, Da/Inviato, De/Enviado, Van/Verzonden, 差出人/送信日時, 보낸 사람/보낸 날짜 — a lone bolded "From:" without its companion label never cuts); in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, leading `>` quote lines, and the same localized `From:`+`Sent:` line pairs.',
+        'Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`, the Outlook reply border separator (`#E1E1E1` on desktop, `#B5C4DF` on Mac/mobile), and a bold `From:`/`Sent:` header-label pair (localized variants recognized: 发件人/发送时间, De/Envoyé, Von/Gesendet, Da/Inviato, De/Enviado, Van/Verzonden, 差出人/送信日時, 보낸 사람/보낸 날짜 — a lone bolded "From:" without its companion label never cuts); in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, leading `>` quote lines, and the same localized `From:`+`Sent:` line pairs. When a chain is stripped the `note` reports what share of the body\u2019s readable text went with it (`removed 62% of the body text`), so a caller can tell a normal strip from one that swallowed the message without refetching to compare.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
   example: "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
   responseShape:
-    '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).',
+    '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped, carrying the share of the body\u2019s readable text that went with it (`quoted reply chain stripped (removed 62% of the body text) \u2014 pass --keep-quoted true to include it`). A share near 100% on a message that should have had a real reply above the quote is the signature of a mis-detected boundary: refetch with `--keep-quoted true` to confirm.',
   producesBytes: true,
 };
 

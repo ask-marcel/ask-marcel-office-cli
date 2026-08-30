@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.3.0",
-  "generatedAt": "2026-08-30T08:24:19.975Z",
+  "generatedAt": "2026-08-30T15:13:01.623Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -362,7 +362,7 @@
           "name": "keep-quoted",
           "key": "keepQuoted",
           "required": false,
-          "description": "Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`, the Outlook reply border separator (`#E1E1E1` on desktop, `#B5C4DF` on Mac/mobile), and a bold `From:`/`Sent:` header-label pair (localized variants recognized: 发件人/发送时间, De/Envoyé, Von/Gesendet, Da/Inviato, De/Enviado, Van/Verzonden, 差出人/送信日時, 보낸 사람/보낸 날짜 — a lone bolded \"From:\" without its companion label never cuts); in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, leading `>` quote lines, and the same localized `From:`+`Sent:` line pairs.",
+          "description": "Quoted reply chains and forwarded-message blocks are stripped by default (they duplicate content already present in earlier messages and inflate the context budget). The stripped tail is replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to preserve the full body. Only well-known structural markers are cut: in HTML bodies Outlook `divRplyFwdMsg` / `appendonsend` / `stopSpelling`, Gmail `gmail_quote`, the Outlook reply border separator (`#E1E1E1` on desktop, `#B5C4DF` on Mac/mobile), and a bold `From:`/`Sent:` header-label pair (localized variants recognized: 发件人/发送时间, De/Envoyé, Von/Gesendet, Da/Inviato, De/Enviado, Van/Verzonden, 差出人/送信日時, 보낸 사람/보낸 날짜 — a lone bolded \"From:\" without its companion label never cuts); in plain-text bodies the `Original Message` banner, the `On … wrote:` attribution line, leading `>` quote lines, and the same localized `From:`+`Sent:` line pairs. When a chain is stripped the `note` reports what share of the body’s readable text went with it (`removed 62% of the body text`), so a caller can tell a normal strip from one that swallowed the message without refetching to compare.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [
@@ -373,7 +373,7 @@
         }
       ],
       "example": "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
-      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped (use `--keep-quoted true` to include it).",
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped, carrying the share of the body’s readable text that went with it (`quoted reply chain stripped (removed 62% of the body text) — pass --keep-quoted true to include it`). A share near 100% on a message that should have had a real reply above the quote is the signature of a mis-detected boundary: refetch with `--keep-quoted true` to confirm.",
       "producesBytes": true
     },
     {
