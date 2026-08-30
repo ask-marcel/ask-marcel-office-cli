@@ -94,6 +94,36 @@ describe('locating where a reply body stops being the author’s new text and st
     expect(findQuoteBoundary(`${authorText}${quote}`)).toBe(authorText.length);
   });
 
+  // New Outlook writes those same two reply rules in longhand: the colour moves
+  // to `border-color` in rgb() and the side is selected by `border-style: solid
+  // none none`, so neither hex spelling above can match it (observed across a
+  // 16-message thread, 2026-08-30).
+  const longhandDividers = [
+    { label: '#B5C4DF written as rgb(181,196,223)', color: 'rgb(181,196,223)' },
+    { label: '#E1E1E1 written as rgb(225,225,225)', color: 'rgb(225,225,225)' },
+  ];
+
+  it.each(longhandDividers)('cuts at the reply rule when new Outlook writes its colour in rgb() longhand: $label', ({ color }) => {
+    const authorText = '<p>Confirmed.</p>';
+    const quote = `<div style="padding:3pt 0in 0in; border-width:1pt medium medium; border-style:solid none none; border-color:${color} currentcolor currentcolor"><p>the quoted original</p></div>`;
+
+    expect(findQuoteBoundary(`${authorText}${quote}`)).toBe(authorText.length);
+  });
+
+  // `<(?:b|strong)[^>]*>` also matches `<br>`, `<body>` and `<blockquote>`, so
+  // the "must be bold" half of the From-label guard was never a bold check: a
+  // line break in front of a De:/Da:/Van: word, with any Date label in the next
+  // 400 characters, was enough to truncate a body that quoted nothing.
+  const tagsStartingWithB = ['<br>', '<br/>', '<body>', '<blockquote>'];
+
+  it.each(tagsStartingWithB)('refuses to read a From label as bold merely because %s starts with the letter b', (tag) => {
+    expect(findQuoteBoundary(`<p>Dear all,${tag}De: ops</p><p><b>Date:</b> Sept</p>`)).toBe(-1);
+  });
+
+  it('refuses to bridge a label to its colon across a line break, so a bolded word and a later colon are not a header', () => {
+    expect(findQuoteBoundary('<p><b>De</b><br>: ops</p><p><b>Date:</b> Sept</p>')).toBe(-1);
+  });
+
   // Outlook mobile and new Outlook wrap a quoted reply in
   // `mail-editor-reference-message-container`, and the id alone used to cut. It
   // is not evidence of a quote: a message composed on Outlook mobile carried the

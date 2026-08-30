@@ -19,8 +19,9 @@ import type { CommandOptionMeta } from './command-types.ts';
  *   - Outlook classic separator:                         `<hr id="stopSpelling">`
  *   - Gmail quote container:                             `<div class="gmail_quote">` / `<blockquote class="gmail_quote">`
  *   - Outlook reply divider (Word renderer / Mac / mobile):
- *     `<div style="…border-top:solid #E1E1E1|#B5C4DF 1.0pt…">`
- *     (the hex constants are locale-independent across Outlook UI languages;
+ *     `<div style="…border-top:solid #E1E1E1|#B5C4DF 1.0pt…">`, and the same
+ *     two hues in new Outlook's `border-color:rgb(…)` longhand
+ *     (the colour constants are locale-independent across Outlook UI languages;
  *     #E1E1E1 is the desktop Word renderer, #B5C4DF the Mac / mobile reply rule)
  *   - Outlook desktop bold header block without any container marker:
  *     a `<b>`/`<strong>`-wrapped From label (localized) CONFIRMED by a
@@ -35,6 +36,12 @@ const QUOTE_BOUNDARIES: ReadonlyArray<RegExp> = [
   /<div[^>]*\bclass="[^"]*\bgmail_quote\b/i,
   /<blockquote[^>]*\bclass="[^"]*\bgmail_quote\b/i,
   /<div[^>]*border-top:\s*solid #(?:E1E1E1|B5C4DF)/i,
+  // The same two rules in new Outlook's longhand: the colour moves to
+  // `border-color` in rgb() with the side chosen by `border-style: solid none
+  // none`, which neither hex spelling above can match. Only these two hues are
+  // recognized here; Word's generic `windowtext` border is deliberately left
+  // out, since it draws ordinary bordered paragraphs and tables too.
+  /<div[^>]*border-color:\s*rgb\((?:181,\s*196,\s*223|225,\s*225,\s*225)\)/i,
 ];
 
 // Localized Outlook header labels. From-labels anchor a candidate cut; a
@@ -69,9 +76,16 @@ const CONFIRM_WINDOW_CHARS = 400;
 // alternative is a tag or whitespace token, so the run still stops at the first
 // character of real text: a bolded word followed by prose never reaches a later
 // colon, keeping the From + (Sent|Date) false-positive guard intact.
-const LABEL_COLON_GAP = '(?:\\s|&nbsp;|</span>|</b>|</strong>|<span[^>]*>|<(?:b|strong)[^>]*>)*';
-const HTML_FROM_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${FROM_LABELS})${LABEL_COLON_GAP}[:：]`, 'gi');
-const HTML_SENT_LABEL = new RegExp(`<(?:b|strong)[^>]*>(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${SENT_LABELS})${LABEL_COLON_GAP}[:：]`, 'i');
+//
+// `<(?:b|strong)[^>]*>` also matched `<br>`, `<body>` and `<blockquote>`, so the
+// "must be bold" half of the guard was never a bold check at all: a line break
+// in front of a De:/Da:/Van: word, with any Date label in the next 400
+// characters, truncated a body that quoted nothing. The lookahead requires the
+// tag NAME to end where the match does (found 2026-08-30).
+const BOLD_TAG = '<(?:b|strong)(?=[\\s>])[^>]*>';
+const LABEL_COLON_GAP = `(?:\\s|&nbsp;|</span>|</b>|</strong>|<span[^>]*>|${BOLD_TAG})*`;
+const HTML_FROM_LABEL = new RegExp(`${BOLD_TAG}(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${FROM_LABELS})${LABEL_COLON_GAP}[:：]`, 'gi');
+const HTML_SENT_LABEL = new RegExp(`${BOLD_TAG}(?:<span[^>]*>)?(?:\\s|&nbsp;)*(?:${SENT_LABELS})${LABEL_COLON_GAP}[:：]`, 'i');
 
 const TEXT_FROM_LABEL = new RegExp(`^(?:${FROM_LABELS})\\s?[:：]`, 'gim');
 const TEXT_SENT_LABEL = new RegExp(`^(?:${SENT_LABELS})\\s?[:：]`, 'im');
