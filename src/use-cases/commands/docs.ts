@@ -97,7 +97,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     ],
     example: 'ask-marcel-office login --force',
     responseShape:
-      '{ status: "authenticated", available: string[], hint } on success. `available` lists the token tiers currently cached and fresh — always "basic", plus "elevated" / "chatsvcagg" / "ic3" when present. `hint` points to `scopes-check` (each token\'s scopes + expiry) and `login --force` (refresh). The detailed per-token status lives in `scopes-check`, not here. Envelope error on cancel/failure.',
+      '{ status: "authenticated", available: string[], unlocked: Record<string,string>, missing: Record<string,string>, hint } on success. `available` lists the token tiers currently cached and fresh — always "basic", plus "elevated" / "chatsvcagg" / "ic3" when present. `unlocked` maps each AVAILABLE tier to a plain-language description of what it lets you read (e.g. `chatsvcagg` -> "Teams chat message content"), so a caller need not know what a tier codename means. `missing` maps each ABSENT tier the same way, with the re-capture remedy appended — an empty object means every tier was captured. Read `missing` to learn what a partial login costs BEFORE a command fails for it. `hint` points to `scopes-check` (each token\'s scopes + expiry) and `login --force` (refresh). The detailed per-token status lives in `scopes-check`, not here. Envelope error on cancel/failure.',
   },
   {
     name: 'logout',

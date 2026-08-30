@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { TIER_CAPABILITY } from './token-tier-capability.ts';
 
 const schema = z.object({}).strict();
 
@@ -12,12 +13,41 @@ const schema = z.object({}).strict();
 const REFRESH_HINT =
   'To refresh: run `ask-marcel-office login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token. Run `ask-marcel-office login --force` to re-capture every tier unconditionally.';
 
+// Every tier reports the same way: one named block carrying availability, runway,
+// scopes, refresh route and a plain-language `reads` line. The basic token used to
+// have no block at all — its data sat loose at the top level — which made the four
+// tiers look like three-plus-an-exception. The loose top-level fields are still
+// emitted unchanged for back-compat (see responseShape); `basic` mirrors them.
+//
+// Same 300s freshness buffer the secondary tiers apply, so `available` means the
+// same thing in every block rather than "not literally expired yet" in one of them.
+const FRESHNESS_BUFFER_SECONDS = 300;
+
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const info = await graph.getCachedTokenInfo();
   if (!info.ok) return info;
-  return ok({ ...info.value, hint: REFRESH_HINT });
+  // Destructured so the three tier keys are rebuilt rather than spread-then-overridden:
+  // spreading TokenInfo first makes TS contextually type the overrides against the old
+  // per-tier shape, which has no `reads`.
+  const { elevated, chatsvcagg, ic3, ...basicFields } = info.value;
+  // `expiresInSeconds` is optional on the wire; treat a missing runway as expired.
+  const runwaySeconds = basicFields.expiresInSeconds ?? 0;
+  return ok({
+    ...basicFields,
+    basic: {
+      available: runwaySeconds > FRESHNESS_BUFFER_SECONDS,
+      expiresInSeconds: basicFields.expiresInSeconds,
+      scopes: basicFields.scopes,
+      refresh: 'automatic' as const,
+      reads: TIER_CAPABILITY['basic'],
+    },
+    elevated: { ...elevated, reads: TIER_CAPABILITY['elevated'] },
+    chatsvcagg: { ...chatsvcagg, reads: TIER_CAPABILITY['chatsvcagg'] },
+    ic3: { ...ic3, reads: TIER_CAPABILITY['ic3'] },
+    hint: REFRESH_HINT,
+  });
 };
 
 const meta: CommandMeta = {
@@ -30,7 +60,7 @@ const meta: CommandMeta = {
   options: [],
   example: 'ask-marcel-office scopes-check',
   responseShape:
-    '`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }` where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: "automatic" | "interactive", reason?: string }`. Top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds` describe the basic Teams token (back-compat). Each tier block also carries that token\'s OWN `scopes` (decoded from its `scp` claim: elevated ~20 Graph scopes, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, re-captured only by a browser login). `available` is `true` only when the token is present and beyond the 5-minute buffer; `expiresInSeconds` is the raw remaining seconds (negative when expired) and is omitted when the token is absent. `reason` is present ONLY when `available` is `false` — a plain-language note on why the tier is missing and how to restore it (so an empty `scopes: []` on an absent token is not mistaken for "no scopes"); it is omitted when the token is available. `hint` names `login --force` as the single refresh action.',
+    '`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }` where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: "automatic" | "interactive", reason?: string }`. Top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds` describe the basic Teams token (back-compat). Each tier block also carries that token\'s OWN `scopes` (decoded from its `scp` claim: elevated ~20 Graph scopes, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, re-captured only by a browser login). `available` is `true` only when the token is present and beyond the 5-minute buffer; `expiresInSeconds` is the raw remaining seconds (negative when expired) and is omitted when the token is absent. `reason` is present ONLY when `available` is `false` — a plain-language note on why the tier is missing and how to restore it (so an empty `scopes: []` on an absent token is not mistaken for "no scopes"); it is omitted when the token is available. `hint` names `login --force` as the single refresh action. EVERY tier — `basic` included — is reported as its own block with the SAME shape, and each block carries a `reads` line: a plain-language description of what that tier lets you read (e.g. `chatsvcagg` -> "Teams chat message content"), so a caller never has to know what a tier codename means. The `basic` block mirrors the loose top-level `scopes`/`expiresAt`/`expiresInSeconds` fields, which are still emitted unchanged for back-compat; prefer the block. `basic.available` applies the same 300-second freshness buffer as the other tiers, so `available` means the same thing everywhere.',
 };
 
 export { execute, meta, schema };

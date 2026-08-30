@@ -2,8 +2,23 @@
 // which tokens are currently available, and where to go next. The full per-token
 // detail (scopes, expiry, refresh route) lives in `scopes-check`, so login does not
 // duplicate it; it just points there and to `login --force` for a refresh.
+//
+// `available` is the machine-readable tier list and is part of the documented
+// contract (see docs.ts), so it stays a plain string[]. `unlocked` and `missing`
+// are additive, human-facing companions: the tier NAMES alone ("chatsvcagg") say
+// nothing about what a caller can actually read, and an absent tier is otherwise
+// invisible until a command fails later for reasons the output never mentioned.
 
-type LoginSummary = { status: 'authenticated'; available: ReadonlyArray<string>; hint: string };
+import type { OptionalTier } from './token-tier-capability.ts';
+import { OPTIONAL_TIERS, TIER_CAPABILITY } from './token-tier-capability.ts';
+
+type LoginSummary = {
+  status: 'authenticated';
+  available: ReadonlyArray<string>;
+  unlocked: Readonly<Record<string, string>>;
+  missing: Readonly<Record<string, string>>;
+  hint: string;
+};
 
 type LoginSummaryInput = {
   readonly elevatedAvailable: boolean;
@@ -13,12 +28,33 @@ type LoginSummaryInput = {
 
 const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office scopes-check`. To re-capture every token, run `ask-marcel-office login --force`.";
 
-const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => ({
-  status: 'authenticated',
+const RECAPTURE_REMEDY = 're-capture with `ask-marcel-office login --force`';
+
+const isPresent = (tier: OptionalTier, input: LoginSummaryInput): boolean => {
+  if (tier === 'elevated') return input.elevatedAvailable;
+  if (tier === 'chatsvcagg') return input.chatsvcaggAvailable;
+  return input.ic3Available;
+};
+
+const buildLoginSummary = (input: LoginSummaryInput): LoginSummary => {
   // basic is always present once authenticated; the other tiers appear only when cached + fresh.
-  available: ['basic', ...(input.elevatedAvailable ? ['elevated'] : []), ...(input.chatsvcaggAvailable ? ['chatsvcagg'] : []), ...(input.ic3Available ? ['ic3'] : [])],
-  hint: LOGIN_HINT,
-});
+  const present = OPTIONAL_TIERS.filter((tier) => isPresent(tier, input));
+  const absent = OPTIONAL_TIERS.filter((tier) => !isPresent(tier, input));
+
+  const unlocked: Record<string, string> = { basic: TIER_CAPABILITY['basic'] };
+  for (const tier of present) unlocked[tier] = TIER_CAPABILITY[tier];
+
+  const missing: Record<string, string> = {};
+  for (const tier of absent) missing[tier] = `${TIER_CAPABILITY[tier]} — unavailable, ${RECAPTURE_REMEDY}`;
+
+  return {
+    status: 'authenticated',
+    available: ['basic', ...present],
+    unlocked,
+    missing,
+    hint: LOGIN_HINT,
+  };
+};
 
 export { buildLoginSummary };
 export type { LoginSummary, LoginSummaryInput };
