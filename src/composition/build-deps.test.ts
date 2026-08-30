@@ -52,6 +52,28 @@ describe('buildDeps composition root', () => {
     expect(calls[1]?.acquireBasicViaBrowser).toBe(true);
   });
 
+  it('gates the command-path elevated re-capture on the session, so a TTY user refreshes transparently and an agent still fails fast', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+
+    // Non-interactive (an agent / MCP over stdio): no browser mid-command, so a
+    // lapsed elevated token still fails fast with a message naming the fix.
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: false, createAuth: recordingCreateAuth });
+    expect(calls[0]?.recaptureElevatedViaBrowser).toBe(false);
+
+    // Interactive (a real TTY): silent SSO against the persistent profile refreshes
+    // elevated in place, so the command succeeds instead of telling the user to log in.
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: true, createAuth: recordingCreateAuth });
+    expect(calls[1]?.recaptureElevatedViaBrowser).toBe(true);
+    // The SHARED flag stays off in both cases: chatsvcagg / ic3 self-heal from the
+    // refresh token inside its false branch, so enabling it would cost them that.
+    expect(calls[1]?.recaptureSecondaryViaBrowser).toBe(false);
+  });
+
   it('injects registry-derived secondary-token command lists into BOTH auth managers so the fail-fast messages track the manifest instead of a hardcoded list', () => {
     const fs = createFileSystemFake();
     const calls: Array<Parameters<typeof createAuthManager>[0]> = [];

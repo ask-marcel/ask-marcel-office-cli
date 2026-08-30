@@ -86,7 +86,19 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // available through the explicit `login` command (`makeLoginAuth` leaves
   // `acquireBasicViaBrowser` at its `true` default).
   const interactive = config.interactive ?? process.stdin.isTTY === true;
-  const auth = makeAuth({ cachePath, logger, fs, recaptureSecondaryViaBrowser: false, acquireBasicViaBrowser: interactive, secondaryTokenCommands });
+  // Elevated rides the SESSION gate too, but on its own flag: silent SSO against the
+  // persistent profile refreshes it in ~17s with no prompt, so a TTY user gets the
+  // command they asked for instead of "run login". An agent / MCP run keeps the
+  // instant, self-explaining error rather than waiting on a browser it cannot see.
+  const auth = makeAuth({
+    cachePath,
+    logger,
+    fs,
+    recaptureSecondaryViaBrowser: false,
+    recaptureElevatedViaBrowser: interactive,
+    acquireBasicViaBrowser: interactive,
+    secondaryTokenCommands,
+  });
   const graph = createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };

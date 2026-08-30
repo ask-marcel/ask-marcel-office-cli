@@ -15,15 +15,25 @@ const schema = z.object({}).strict();
  * loop with no exit: the command that needs elevated says "run login", login
  * says "authenticated", the command fails identically, forever.
  *
- * When elevated is confirmed missing we escalate through the SAME
- * `{ force: true }` rung the `--force` flag uses. That matters: the browser
- * adapter has its own `freshCachedToken` probe that short-circuits the dance
- * when a valid token is on disk, and only the forced path suppresses it — a
- * hand-rolled re-capture here would silently no-op (LESSONS 2026-07-13).
+ * When elevated is confirmed missing we try `getElevatedAccessToken` FIRST. It
+ * drives a silent SSO against the persistent browser profile and leaves cookies
+ * untouched, so the tenant's 90-day ESTSAUTHPERSISTENT session survives and the
+ * user sees a window flash rather than a sign-in page. The `{ force: true }`
+ * dance calls `context.clearCookies()` to make the OAuth grant re-fire for the
+ * BASIC token, and that wipe deletes ESTSAUTHPERSISTENT — which is why routing
+ * every elevated expiry through it produced a credential prompt each time, and
+ * then destroyed the very session the prompt had just established.
  *
- * Supersedes the 2026-07-13 decision that `login` is a slim confirmation and
- * `--force` the only re-capture mechanism: correct about the mechanism, but it
- * left the signpost pointing at a command that could not do the job.
+ * The silent route is not always available (expired profile cookies, a failed
+ * launch, a blocked navigation), so any failure falls back to the forced dance:
+ * it can prompt, but it polls for five minutes and a human can finish it.
+ *
+ * Supersedes the 2026-07-16 decision to escalate straight to `{ force: true }`.
+ * That entry feared a hand-rolled re-capture would no-op against the browser
+ * adapter's `freshCachedToken` probe; the probe lives in `acquireBothTokens`,
+ * not in `acquireElevatedToken`, and elevated freshness is decided upstream by
+ * `freshElevatedToken`. Verified live 2026-08-30: silent capture in 17s with no
+ * prompt, and the same call failing against a profile a forced login had wiped.
  */
 const execute = async (auth: AuthManager, options?: { force?: boolean }): Promise<Result<string, import('../../infra/auth.ts').AuthError>> => {
   const authenticated = await auth.getAccessToken(options);
@@ -35,6 +45,12 @@ const execute = async (auth: AuthManager, options?: { force?: boolean }): Promis
   // expose it we cannot know, so we leave the result alone rather than guess.
   const elevated = await auth.getCachedElevatedInfo?.();
   if (elevated?.available !== false) return authenticated;
+  // Silent SSO against the persistent profile: no cookie wipe, so the
+  // 90-day ESTSAUTHPERSISTENT session survives and no prompt appears.
+  const silent = await auth.getElevatedAccessToken();
+  if (silent.ok) return authenticated;
+  // Silent capture failed (expired profile cookies, launch or nav failure):
+  // fall back to the full dance, which can prompt but has a 5-minute poll.
   return auth.getAccessToken({ force: true });
 };
 

@@ -277,7 +277,16 @@ const createAuthManagerFromApi = (
   fs: FileSystem,
   recaptureSecondaryViaBrowser: boolean = true,
   secondaryTokenCommands: SecondaryTokenCommands = DEFAULT_SECONDARY_TOKEN_COMMANDS,
-  acquireBasicViaBrowser: boolean = true
+  acquireBasicViaBrowser: boolean = true,
+  // Elevated gets its OWN browser gate, separate from chatsvcagg / ic3. Those two
+  // self-heal by redeeming the shared refresh token from INSIDE the
+  // `!recaptureSecondaryViaBrowser` branch below, so turning the shared flag on
+  // would skip that headless refresh and open a browser instead — strictly worse.
+  // Elevated carries no refresh token, so its only question is whether a browser is
+  // permitted; an interactive session answers yes and refreshes it in ~17s of silent
+  // SSO against the persistent profile. Defaults to the shared flag so every existing
+  // caller keeps the behaviour it had.
+  recaptureElevatedViaBrowser: boolean = recaptureSecondaryViaBrowser
 ): AuthManager => {
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
@@ -707,7 +716,7 @@ const createAuthManagerFromApi = (
       return ok(validated.value);
     }
     // Elevated absent, expired, or malformed; need to re-capture.
-    if (!recaptureSecondaryViaBrowser)
+    if (!recaptureElevatedViaBrowser)
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('Elevated (M365)', commandList(secondaryTokenCommands.elevated), RECAPTURE_ELEVATED_VIA_LOGIN),
@@ -980,6 +989,7 @@ const createAuthManager = (deps: {
   recaptureSecondaryViaBrowser?: boolean;
   secondaryTokenCommands?: SecondaryTokenCommands;
   acquireBasicViaBrowser?: boolean;
+  recaptureElevatedViaBrowser?: boolean;
 }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
@@ -997,7 +1007,8 @@ const createAuthManager = (deps: {
     fs,
     deps.recaptureSecondaryViaBrowser,
     deps.secondaryTokenCommands,
-    deps.acquireBasicViaBrowser
+    deps.acquireBasicViaBrowser,
+    deps.recaptureElevatedViaBrowser
   );
 };
 

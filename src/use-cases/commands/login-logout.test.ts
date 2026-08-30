@@ -40,9 +40,9 @@ describe('login command', () => {
   // A plain `login` that found a valid basic token used to return "authenticated"
   // with elevated still missing, which put the user in a loop: the command that
   // needs elevated says "run login", login says authenticated, the command fails
-  // again, forever. Escalating through the SAME `{force:true}` path the dance
-  // already uses is what breaks the loop (a hand-rolled re-capture would trip the
-  // browser's freshCachedToken short-circuit — LESSONS 2026-07-13).
+  // again, forever. Trying the silent re-capture and falling back to the forced
+  // dance is what breaks the loop; this case pins the fallback leg, since the
+  // shared fake's default `getElevatedAccessToken` is a cancelled capture.
   it('re-captures the elevated token when a login finds it missing, instead of reporting success without it', async () => {
     const calls: Array<{ force?: boolean } | undefined> = [];
     const fakeAuth = fakeAuthManager({
@@ -73,6 +73,87 @@ describe('login command', () => {
     await login(fakeAuth);
 
     expect(calls.length).toBe(1);
+  });
+
+  // The elevated token is re-captured by a browser either way, but the two routes
+  // differ in what they cost the user. `getElevatedAccessToken` drives a silent SSO
+  // against the persistent profile and leaves cookies alone; the `{force:true}` dance
+  // calls `context.clearCookies()`, which deletes the tenant's 90-day
+  // ESTSAUTHPERSISTENT session and so guarantees a sign-in page on the next expiry.
+  // Verified live 2026-08-30: silent capture succeeded in 17s with no prompt, and the
+  // same call failed against a profile the previous forced login had wiped.
+  it('re-captures elevated silently, without the cookie-wiping force dance', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    let silentCalls = 0;
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return ok(accessTokenUnsafe('tok'));
+      },
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      getElevatedAccessToken: async () => {
+        silentCalls += 1;
+        return ok(accessTokenUnsafe('elevated-tok'));
+      },
+    });
+
+    const result = await login(fakeAuth);
+
+    expect(result).toEqual(ok(accessTokenUnsafe('tok')));
+    expect(silentCalls).toBe(1);
+    // One call only, and never the forced one: the silent route did the job.
+    expect(calls).toEqual([undefined]);
+  });
+
+  it('falls back to the force dance when the silent re-capture fails', async () => {
+    const calls: Array<{ force?: boolean } | undefined> = [];
+    let silentCalls = 0;
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async (options?: { force?: boolean }) => {
+        calls.push(options);
+        return ok(accessTokenUnsafe('tok'));
+      },
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      getElevatedAccessToken: async () => {
+        silentCalls += 1;
+        return err({ type: 'auth_failed' as const, message: 'silent SSO timed out' });
+      },
+    });
+
+    await login(fakeAuth);
+
+    expect(silentCalls).toBe(1);
+    expect(calls).toEqual([undefined, { force: true }]);
+  });
+
+  it('does not attempt a silent re-capture when elevated is already available', async () => {
+    let silentCalls = 0;
+    const fakeAuth = fakeAuthManager({
+      getCachedElevatedInfo: async () => ({ available: true, expiresInSeconds: 3600, scopes: [] }),
+      getElevatedAccessToken: async () => {
+        silentCalls += 1;
+        return ok(accessTokenUnsafe('elevated-tok'));
+      },
+    });
+
+    await login(fakeAuth);
+
+    expect(silentCalls).toBe(0);
+  });
+
+  it('does not attempt a silent re-capture under --force, which has already danced', async () => {
+    let silentCalls = 0;
+    const fakeAuth = fakeAuthManager({
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      getElevatedAccessToken: async () => {
+        silentCalls += 1;
+        return ok(accessTokenUnsafe('elevated-tok'));
+      },
+    });
+
+    await login(fakeAuth, { force: true });
+
+    expect(silentCalls).toBe(0);
   });
 
   it('does not dance twice when --force was passed explicitly', async () => {

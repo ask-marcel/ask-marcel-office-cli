@@ -171,6 +171,38 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
+  // Elevated is gated SEPARATELY from chatsvcagg / ic3. Those two self-heal by
+  // redeeming the shared refresh token from INSIDE their
+  // `!recaptureSecondaryViaBrowser` branch, so switching the shared flag on would
+  // SKIP the headless refresh and open a browser instead — strictly worse. Elevated
+  // carries no refresh token, so its only question is whether a browser is allowed,
+  // and an interactive session answers yes (silent SSO, ~17s, verified 2026-08-30).
+  it('re-captures elevated via the browser when its own flag is on, while chatsvcagg / ic3 stay fail-fast under the shared flag', async () => {
+    const fs = createFileSystemFake();
+    const tok = futureElevated();
+    const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, undefined, true);
+
+    const elevated = await auth.getElevatedAccessToken();
+    expect(elevated.ok).toBe(true);
+    if (elevated.ok) expect(elevated.value).toBe(tok);
+
+    // Shared flag still false: these two must not reach the browser, whose captures
+    // would succeed if called.
+    for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
+      const result = await getToken();
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('defaults the elevated browser gate to the shared secondary flag, so a caller that passes only the shared flag keeps failing fast', async () => {
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ elevatedResult: futureElevated() });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+
+    expect((await auth.getElevatedAccessToken()).ok).toBe(false);
+  });
+
   // The three secondary tiers do NOT share a remedy, though they shared a message.
   // Every secondary tier now points at a plain `login`. chatsvcagg / ic3 ride
   // the shared refresh token and self-heal headlessly. Elevated has no refresh
