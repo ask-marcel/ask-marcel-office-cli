@@ -104,8 +104,14 @@ type BrowserAuth = {
    * cached elevated token expires and the Teams session is already in
    * the cache (no fresh sign-in needed). On `login`, use
    * `acquireBothTokens` instead so the user sees only one browser.
+   *
+   * `awaitSignIn` says a human asked for this and is watching. It only
+   * matters when the tenant serves a sign-in form instead of completing
+   * silently: set, the deadline extends to `pollDeadlineMs` so the form can
+   * be filled in; unset, the window closes at once rather than offering a
+   * prompt nobody is there to complete.
    */
-  acquireElevatedToken: () => Promise<ElevatedTokenResult>;
+  acquireElevatedToken: (options?: { readonly awaitSignIn?: boolean }) => Promise<ElevatedTokenResult>;
   /**
    * Capture a chatsvcagg-audience bearer (Teams basic identity, but the
    * `chatsvcagg.teams.microsoft.com` resource instead of Graph) by
@@ -234,6 +240,12 @@ type BrowserAuthConfig = {
    * the LLM tool-call window. With a tight cap, the flow either yields
    * a token quickly or fails with `auth_failed: elevated token capture
    * timed out — run `ask-marcel-office login` to refresh.`
+   *
+   * The cap applies to a SILENT attempt. When the page turns out to be a
+   * sign-in form the capture is interactive whether we planned it or not, and
+   * the caller's `awaitSignIn` decides: extend to `pollDeadlineMs` for a human,
+   * or close immediately so a command fails fast instead of showing a prompt
+   * nobody will answer.
    */
   readonly elevatedRecaptureTimeoutMs?: number;
   /**
@@ -249,6 +261,10 @@ type BrowserAuthConfig = {
 };
 
 const TOKEN_HOSTS = ['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com'];
+
+// AAD serves its interactive sign-in UI from the same hosts it mints tokens
+// on, so one list drives both checks rather than two that can drift.
+const isSignInUrl = (url: string): boolean => TOKEN_HOSTS.some((host) => url.includes(host));
 
 /**
  * App identities first-party Microsoft web apps use against Graph that
@@ -526,7 +542,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
   };
 
-  const acquireElevatedToken = async (): Promise<ElevatedTokenResult> => {
+  const acquireElevatedToken = async (options?: { readonly awaitSignIn?: boolean }): Promise<ElevatedTokenResult> => {
     await cleanupSingletonLocks(profileDir, fs);
 
     const picker = createElevatedPicker(elevatedPreferenceGraceMs);
@@ -605,13 +621,29 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // we don't drive. Use a SHORT deadline (default 20s) and fail fast with
     // a clear discriminated failure so the caller can decide whether to
     // retry (after wiping the profile) or surface the error.
-    const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
+    let elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
+    let signInSeen = false;
     while (Date.now() < elevatedDeadline) {
       const settled = picker.settled();
       if (settled) {
         trace('[DEBUG] elevated capture: token found, closing\n');
         await closeBrowserSession(elevatedPage, elevatedCtx);
         return { ok: true, token: settled };
+      }
+      // The tenant answered with a sign-in form, so this capture is not silent
+      // after all and the 20s cap is now a window that closes under whoever is
+      // typing into it (reported 2026-08-31). Which way to resolve that depends
+      // entirely on whether a human is there.
+      if (!signInSeen && isSignInUrl(elevatedPage.url())) {
+        signInSeen = true;
+        if (options?.awaitSignIn !== true) {
+          trace('[DEBUG] elevated capture: sign-in page with nobody waiting, closing\n');
+          logger.info('elevated_token_sign_in_required');
+          await closeBrowserSession(elevatedPage, elevatedCtx);
+          return { ok: false, reason: 'sso_timeout' };
+        }
+        elevatedDeadline = Date.now() + pollDeadlineMs;
+        onProgress(`Sign-in required for the elevated token — complete it in the browser window (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`);
       }
       await sleep(pollIntervalMs);
     }

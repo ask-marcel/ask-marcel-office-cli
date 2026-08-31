@@ -366,7 +366,13 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   // All four token tiers (basic / elevated / chatsvcagg / ic3) share the same
   // "fetch a bearer, map an auth failure to a GraphError" shape — only the
   // AuthManager getter differs. One helper, four thin bindings.
-  const authHeadersFrom = async (getToken: AuthManager['getAccessToken']): Promise<Result<{ Authorization: string }, GraphError>> => {
+  // Typed as a zero-arg getter rather than `AuthManager['getAccessToken']`: the
+  // helper never forwards options, and borrowing the basic getter's signature
+  // meant every tier had to accept `{ force }` it would never receive. The
+  // elevated getter now takes `{ awaitSignIn }` instead, and the call sites here
+  // deliberately pass nothing, so a background command fails fast rather than
+  // parking on a sign-in form.
+  const authHeadersFrom = async (getToken: () => ReturnType<AuthManager['getAccessToken']>): Promise<Result<{ Authorization: string }, GraphError>> => {
     const tokenResult = await getToken();
     if (!tokenResult.ok) {
       const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;

@@ -82,6 +82,28 @@ describe('login command', () => {
   // ESTSAUTHPERSISTENT session and so guarantees a sign-in page on the next expiry.
   // Verified live 2026-08-30: silent capture succeeded in 17s with no prompt, and the
   // same call failed against a profile the previous forced login had wiped.
+  // That silent route opens a VISIBLE window. When the profile cookies have
+  // lapsed the tenant serves a sign-in form in it rather than completing
+  // silently, and the capture's 20-second cap then closed the window mid
+  // password (reported 2026-08-31). A human ran `login` and is watching it, so
+  // this call says so and the deadline extends; a command auto-refreshing in
+  // the background passes nothing and still fails fast.
+  it('tells the silent re-capture that a human is waiting, so a sign-in form is not closed under them', async () => {
+    const elevatedOptions: Array<{ awaitSignIn?: boolean } | undefined> = [];
+    const fakeAuth = fakeAuthManager({
+      getAccessToken: async () => ok(accessTokenUnsafe('tok')),
+      getCachedElevatedInfo: async () => ({ available: false, expiresInSeconds: undefined, scopes: [] }),
+      getElevatedAccessToken: async (options?: { awaitSignIn?: boolean }) => {
+        elevatedOptions.push(options);
+        return ok(accessTokenUnsafe('elevated-tok'));
+      },
+    });
+
+    await login(fakeAuth);
+
+    expect(elevatedOptions).toEqual([{ awaitSignIn: true }]);
+  });
+
   it('re-captures elevated silently, without the cookie-wiping force dance', async () => {
     const calls: Array<{ force?: boolean } | undefined> = [];
     let silentCalls = 0;

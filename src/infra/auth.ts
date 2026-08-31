@@ -98,7 +98,7 @@ type AuthManager = {
    * `logicalPermissions` allow-list. Falls through cache → re-capture
    * via headless Playwright. Used by the 3 historical-version commands.
    */
-  getElevatedAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  getElevatedAccessToken: (options?: { readonly awaitSignIn?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Returns a Graph token issued by a PARTNER tenant's authority, for a user
    * who is a guest there. Without it, every call against that tenant's
@@ -686,9 +686,9 @@ const createAuthManagerFromApi = (
     return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${elevatedCommands}.)`;
   };
 
-  const recaptureElevated = async (): Promise<Result<AccessToken, AuthError>> => {
+  const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     try {
-      const captured = await browserAuth.acquireElevatedToken();
+      const captured = await browserAuth.acquireElevatedToken(options);
       if (!captured.ok) {
         return err({ type: 'auth_failed', message: recoverableElevatedFailureMessage(captured.reason) });
       }
@@ -704,19 +704,22 @@ const createAuthManagerFromApi = (
   // Same in-flight serialization for the elevated path — concurrent callers
   // share one Playwright instance instead of racing.
   let inFlightElevatedRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
-  const recaptureElevatedShared = (): Promise<Result<AccessToken, AuthError>> => {
+  const recaptureElevatedShared = (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+    // A caller willing to wait for a sign-in that JOINS a fail-fast capture
+    // already in flight inherits the fail-fast behaviour. Deliberate: the
+    // browser is already open and driving it twice is worse than one retry.
     if (inFlightElevatedRecapture !== null) {
       logger.info('auth.elevated.shared_in_flight');
       return inFlightElevatedRecapture;
     }
-    const launched = recaptureElevated();
+    const launched = recaptureElevated(options);
     inFlightElevatedRecapture = launched.finally(() => {
       inFlightElevatedRecapture = null;
     });
     return inFlightElevatedRecapture;
   };
 
-  const getElevatedAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
+  const getElevatedAccessToken = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     const fresh = freshElevatedToken(await readCache());
     const validated = fresh !== undefined ? accessToken(fresh) : null;
     if (validated?.ok) {
@@ -730,8 +733,10 @@ const createAuthManagerFromApi = (
         message: failFastSecondaryMessage('Elevated (M365)', commandList(secondaryTokenCommands.elevated), RECAPTURE_ELEVATED_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
-    // The persistent profile cookies do the silent SSO, no UI prompt.
-    return recaptureElevatedShared();
+    // Normally the persistent profile cookies do the silent SSO with no UI
+    // prompt. When they have lapsed the tenant serves a sign-in form instead,
+    // and `awaitSignIn` decides whether we wait for it to be filled in.
+    return recaptureElevatedShared(options);
   };
 
   // chatsvcagg shares the elevated expiry buffer. The token itself carries no

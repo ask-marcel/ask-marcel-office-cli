@@ -53,7 +53,13 @@ const execute = async (auth: AuthManager, options?: { force?: boolean }): Promis
   if (elevated?.available !== false) return authenticated;
   // Silent SSO against the persistent profile: no cookie wipe, so the
   // 90-day ESTSAUTHPERSISTENT session survives and no prompt appears.
-  const silent = await auth.getElevatedAccessToken();
+  //
+  // `awaitSignIn` because a human ran `login` and is watching the window. If
+  // the profile cookies have lapsed the tenant serves a sign-in form here, and
+  // without this the window closed after 20 seconds, mid-password (reported
+  // 2026-08-31). Commands that auto-refresh in the background pass nothing and
+  // still fail fast, since nobody is there to type.
+  const silent = await auth.getElevatedAccessToken({ awaitSignIn: true });
   if (silent.ok) return authenticated;
   // Silent capture failed (expired profile cookies, launch or nav failure):
   // fall back to the full dance, which can prompt but has a 5-minute poll.
