@@ -2,6 +2,83 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## 2.4.0
+
+Two community fixes from [@a-tokyo](https://github.com/a-tokyo). Nothing breaks:
+the new flag is optional, and every existing invocation routes exactly as before.
+
+### Fixed — share links whose filename is not ASCII
+
+`buildShareToken` fed the raw URL string to `btoa`, which only accepts Latin-1.
+A sharing URL with an accented filename minted a token that resolved to nothing,
+and one with a CJK or emoji filename threw `InvalidCharacterError`, which crashed
+the command from inside `Promise.all`. The URL's UTF-8 bytes are now encoded
+before base64url, which is what Graph's `/shares/{token}` resolver expects.
+
+Six commands build that token and all six were affected:
+
+| Command | How it reaches the token |
+|---------|--------------------------|
+| `resolve-drive-share-link` | encodes the sharing URL directly |
+| `convert-mail-attachment-to-markdown` | resolves an attachment's source URL |
+| `convert-mail-attachment-to-pdf` | resolves an attachment's source URL |
+| `extract-mail-attachment-images` | resolves an attachment's source URL |
+| `extract-sharepoint-links-in-mail` | one resolve per link found in the body |
+| `extract-sharepoint-links-in-documents` | one resolve per link found in the text |
+
+The byte-to-base64 step moved into a shared `bytesToBase64` codec under
+`domain/utilities`, replacing the private copy that lived in `fetch-raw-bytes`.
+
+### Added — `next-page --tenant-id`
+
+`next-page` re-signs a cursor to match the identity its originating command used,
+but it knew only two: the home basic token and the elevated chat token. A
+partner-tenant drive listing signs page 1 with a guest token, and the
+`@odata.nextLink` it emits carries no tenant, so page 2 was re-signed with the
+home token and Graph answered `401 invalidAudienceUri`. Anything longer than one
+page in a partner tenant was unreadable past page 1.
+
+Pass the same `--tenant-id` you gave the originating command (ultimately from
+`resolve-drive-share-link`) and the cursor is re-signed with a guest token for
+that tenant. The flag reuses the existing `tenant-option` branding, so a
+malformed GUID is rejected at the boundary before any Graph call.
+
+The footer carries the flag for you. `next:` and `delta:` both render
+`--tenant-id <guid>` whenever the call that produced the cursor used one, so the
+line stays copy-pasteable rather than becoming a 401 one step later. This is the
+line an MCP agent reads to build its next call, not just a terminal convenience.
+
+### Added — docx tracked changes report replacements as one edit
+
+OOXML has no "replace" revision: Word records replacing a span as a deletion
+sitting next to an insertion. Reported as two loose halves, one edit read as an
+unrelated cut plus an unrelated addition somewhere else, with nothing linking
+them. A deletion and an insertion that are adjacent siblings by the same author
+now come back as a single `replacements` entry carrying `before` and `after`,
+and the two halves leave `insertions` / `deletions` so nothing is counted twice.
+The markdown output gains a `### Tracked changes — replacements` section above
+the two existing ones.
+
+Adjacency is real document order, not a guess. The default XML parse groups
+same-named siblings per tag, which cannot distinguish del, ins, del, ins from
+del, del, ins, ins, so revisions are re-read through a second order-preserving
+parser. Pairing is scoped to siblings of one parent, requires the same author on
+both halves, and treats Word's glyph-free markers (`w:proofErr`, bookmark and
+comment anchors) as not separating a pair, while any untouched run of prose does.
+
+Still unreported, unchanged by this: `w:moveFrom` / `w:moveTo`, `w:rPrChange`,
+`w:pPrChange`, and the table-structure revisions. A document whose only tracked
+edit is a formatting change still reports no tracked changes at all.
+
+### Added — an `invalidAudienceUri` error hint
+
+The one 401 that re-authenticating cannot fix now says so. Graph cannot mint a
+SharePoint token for a tenant you are only a guest in, so an agent told to run
+`login` here loops forever. The hint names `--tenant-id`, points at
+`resolve-drive-share-link` for the GUID, and covers the paginated case where the
+cursor carries no tenant of its own. It sits above the token-expiry rule, which
+would otherwise claim the same 401 and give the wrong advice.
+
 ## 2.3.0
 
 > **Read this before upgrading.** This release contains breaking changes to the
