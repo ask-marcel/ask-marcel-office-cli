@@ -386,8 +386,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
   const authHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getAccessToken);
   const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getElevatedAccessToken);
-  const chatsvcaggAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getChatsvcaggAccessToken);
-  const ic3AuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getIc3AccessToken);
+  const chatsvcaggAuthHeaders = (options?: { ignoreCache?: boolean }): Promise<Result<{ Authorization: string }, GraphError>> =>
+    authHeadersFrom(() => auth.getChatsvcaggAccessToken(options));
+  const ic3AuthHeaders = (options?: { ignoreCache?: boolean }): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(() => auth.getIc3AccessToken(options));
   // Fifth binding, and the only parameterised one: the guest tier is per-tenant,
   // so the getter closes over which tenant is being asked.
   const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(() => auth.getGuestAccessToken(tenantId));
@@ -446,53 +447,58 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
 
   // Teams chat substrate. Same Teams web client identity as `get`, but the
-  // bearer is issued for `chatsvcagg.teams.microsoft.com` (audience claim
-  // only — the actual API now lives on `teams.microsoft.com/api/csa/<region>/`
-  // since the 2026-05 substrate move). We piggy-back the captured bearer to
-  // read chat message bodies — Graph's `Chat.Read*`-gated endpoints can't
-  // reach them with the scopes the basic Teams token carries.
-  const teamsChat = async (path: string): Promise<Result<unknown, GraphError>> => {
-    const headers = await chatsvcaggAuthHeaders();
-    if (!headers.ok) return headers;
+  // bearer is issued for `chatsvcagg.teams.microsoft.com` (audience claim only
+  // — the actual API lives on `teams.microsoft.com/api/csa/<region>/` since the
+  // 2026-05 substrate move) or for `https://ic3.teams.office.com` on the IC3
+  // path prefix. We piggy-back the captured bearer to read chat message bodies:
+  // Graph's `Chat.Read*`-gated endpoints cannot reach them with the scopes the
+  // basic Teams token carries. IC3 is the one Teams web actually uses for
+  // scrollback, since it supports `syncState` + `startTime` pagination that
+  // chatsvcagg lacks. See `gotcha_chatsvcagg_substrate_moved` in memory.
+  //
+  // A 401 here is read as "this token is DEAD", not as an answer. A substrate
+  // token can be revoked server-side while still inside its expiry window — a
+  // second sign-in invalidates the previous session's — and nothing in the
+  // cache records that, so the tier keeps reporting available while every chat
+  // command 401s, and `login` cannot recover it because the token is not
+  // missing (observed live 2026-08-31: a token minted at 07:18 was rejected at
+  // 13:47 with hours of stated life left, while a freshly redeemed one worked
+  // instantly). So: drop it, redeem a fresh one from the shared refresh token
+  // over HTTP, replay ONCE. A second 401 is real and is surfaced. Any other
+  // status returns as-is, because no amount of fresh token fixes a 404.
+  const substrateGet = async (
+    kind: 'chatsvcagg' | 'ic3',
+    prefix: 'csa' | 'chatsvc',
+    path: string,
+    headersFor: (options?: { ignoreCache?: boolean }) => Promise<Result<{ Authorization: string }, GraphError>>
+  ): Promise<Result<unknown, GraphError>> => {
     const region = await auth.getChatsvcaggRegion();
-    const url = `https://teams.microsoft.com/api/csa/${region}${path}`;
+    const url = `https://teams.microsoft.com/api/${prefix}/${region}${path}`;
+    const send = async (ignoreCache: boolean): Promise<Result<Response, GraphError>> => {
+      const headers = await headersFor(ignoreCache ? { ignoreCache: true } : undefined);
+      if (!headers.ok) return headers;
+      return ok(
+        await fetchFn(url, {
+          method: 'GET',
+          headers: { ...headers.value, accept: 'application/json' },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      );
+    };
     try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: { ...headers.value, accept: 'application/json' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!res.ok) return err(asSubstrateError(await apiErrorFrom(res, url), 'chatsvcagg'));
-      return ok(await res.json());
+      const first = await send(false);
+      if (!first.ok) return first;
+      const res = first.value.status === 401 ? await send(true) : first;
+      if (!res.ok) return res;
+      if (!res.value.ok) return err(asSubstrateError(await apiErrorFrom(res.value, url), kind));
+      return ok(await res.value.json());
     } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (chatsvcagg)`, 'json'));
+      return err(wrapNetworkError(e, 'GET', `${path} (${kind})`, 'json'));
     }
   };
 
-  // IC3 substrate — same host as teamsChat (teams.microsoft.com) but a
-  // different path prefix (`/api/chatsvc/<region>/` vs `/api/csa/<region>/`)
-  // and a different bearer audience (`https://ic3.teams.office.com` vs
-  // `https://chatsvcagg.teams.microsoft.com`). The IC3 substrate is the one
-  // Teams web actually uses for chat-message scrollback — it supports
-  // `syncState` + `startTime` pagination that chatsvcagg lacks. See
-  // `gotcha_chatsvcagg_substrate_moved` in memory for the discovery.
-  const teamsChatIc3 = async (path: string): Promise<Result<unknown, GraphError>> => {
-    const headers = await ic3AuthHeaders();
-    if (!headers.ok) return headers;
-    const region = await auth.getChatsvcaggRegion();
-    const url = `https://teams.microsoft.com/api/chatsvc/${region}${path}`;
-    try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: { ...headers.value, accept: 'application/json' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!res.ok) return err(asSubstrateError(await apiErrorFrom(res, url), 'ic3'));
-      return ok(await res.json());
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (ic3)`, 'json'));
-    }
-  };
+  const teamsChat = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('chatsvcagg', 'csa', path, chatsvcaggAuthHeaders);
+  const teamsChatIc3 = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('ic3', 'chatsvc', path, ic3AuthHeaders);
 
   const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
     const url = `https://graph.microsoft.com/v1.0${path}`;

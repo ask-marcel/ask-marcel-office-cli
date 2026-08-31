@@ -1165,6 +1165,78 @@ describe('graph client', () => {
     expect(captured!.auth).toBe('Bearer test-chatsvcagg-token');
   });
 
+  // A substrate token can be REVOKED server-side while still inside its expiry
+  // window — a second sign-in invalidates the previous session's tokens, and
+  // nothing in the cache records that. The tier keeps reporting available, every
+  // chat command 401s, and `login` cannot fix it because the token is not
+  // missing, only dead. Observed live 2026-08-31. A 401 is therefore treated as
+  // proof the cached token is dead rather than as an answer to return.
+  const revocationFetch =
+    (freshToken: string, seen: Array<string | undefined>): FetchFn =>
+    async (_url, init) => {
+      const auth = (init?.headers as Record<string, string> | undefined)?.['Authorization'];
+      seen.push(auth);
+      return auth === `Bearer ${freshToken}` ? Response.json({ chats: [] }) : new Response(null, { status: 401 });
+    };
+
+  it('teamsChat treats a 401 as a revoked token: re-acquires ignoring the cache, then replays once', async () => {
+    const seen: Array<string | undefined> = [];
+    const asked: Array<{ ignoreCache?: boolean } | undefined> = [];
+    const auth = fakeAuthManager({
+      getChatsvcaggAccessToken: async (options?: { ignoreCache?: boolean }) => {
+        asked.push(options);
+        return ok(accessTokenUnsafe(options?.ignoreCache === true ? 'fresh' : 'revoked'));
+      },
+    });
+
+    const result = await createGraphClient(auth, revocationFetch('fresh', seen)).teamsChat('/api/v2/users/me/chats');
+
+    expect(result.ok).toBe(true);
+    expect(seen).toEqual(['Bearer revoked', 'Bearer fresh']);
+    // The second ask must bypass the cache, or it hands back the same dead token.
+    expect(asked).toEqual([undefined, { ignoreCache: true }]);
+  });
+
+  it('teamsChatIc3 retries a 401 the same way, so both substrates share the recovery', async () => {
+    const seen: Array<string | undefined> = [];
+    const auth = fakeAuthManager({
+      getIc3AccessToken: async (options?: { ignoreCache?: boolean }) => ok(accessTokenUnsafe(options?.ignoreCache === true ? 'fresh-ic3' : 'revoked-ic3')),
+    });
+
+    const result = await createGraphClient(auth, revocationFetch('fresh-ic3', seen)).teamsChatIc3('/v1/users/ME/conversations');
+
+    expect(result.ok).toBe(true);
+    expect(seen).toEqual(['Bearer revoked-ic3', 'Bearer fresh-ic3']);
+  });
+
+  it('teamsChat surfaces the failure when even a freshly acquired token is rejected, rather than retrying forever', async () => {
+    let calls = 0;
+    const fetchFn: FetchFn = async () => {
+      calls += 1;
+      return new Response(null, { status: 401 });
+    };
+    const auth = fakeAuthManager({ getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('any')) });
+
+    const result = await createGraphClient(auth, fetchFn).teamsChat('/api/v2/users/me/chats');
+
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(2); // once, then once more with a fresh token. Never a third.
+  });
+
+  it('teamsChat does not retry a 404, which no amount of fresh token would fix', async () => {
+    let calls = 0;
+    const fetchFn: FetchFn = async () => {
+      calls += 1;
+      return new Response(null, { status: 404 });
+    };
+    const auth = fakeAuthManager({ getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('any')) });
+
+    const result = await createGraphClient(auth, fetchFn).teamsChat('/api/v2/users/me/chats');
+
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(1);
+  });
+
   it('teamsChat returns auth_failed with "Auth cancelled" when chatsvcagg auth was cancelled (covers the cancel branch of chatsvcaggAuthHeaders)', async () => {
     const fetchFn = fakeFetch([{ match: () => true, body: {} }]);
     const client = createGraphClient(fakeAuth(), fetchFn);

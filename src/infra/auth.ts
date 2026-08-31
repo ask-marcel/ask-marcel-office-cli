@@ -113,7 +113,7 @@ type AuthManager = {
    * through cache → re-capture via headless Playwright. Used by the
    * `list-teams-chats-with-messages` family of commands.
    */
-  getChatsvcaggAccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  getChatsvcaggAccessToken: (options?: { readonly ignoreCache?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Returns the regional segment used to construct chatsvcagg substrate
    * URLs (`teams.microsoft.com/api/csa/<region>/api/...`). Captured at
@@ -130,7 +130,7 @@ type AuthManager = {
    * via headless Playwright. Used by `list-teams-chat-history` to walk
    * paginated chat-message history beyond the 200-message chatsvcagg cap.
    */
-  getIc3AccessToken: () => Promise<Result<AccessToken, AuthError>>;
+  getIc3AccessToken: (options?: { readonly ignoreCache?: boolean }) => Promise<Result<AccessToken, AuthError>>;
   /**
    * Redeem the shared refresh token for any COLD substrate tier, over HTTP, with
    * no browser on any path. `login` calls this so a warm-cache sign-in leaves all
@@ -801,14 +801,22 @@ const createAuthManagerFromApi = (
     return inFlightChatsvcaggRecapture;
   };
 
-  const getChatsvcaggAccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
+  // `ignoreCache` is how a caller says the cached token is DEAD rather than
+  // stale. A substrate token can be revoked server-side while still inside its
+  // expiry window (a second sign-in invalidates the previous session's), and
+  // nothing in the cache records that — so the freshness check happily returns
+  // a token the service will 401. The substrate request path sets this after a
+  // 401 to force a redemption from the shared refresh token. Observed live
+  // 2026-08-31: a token minted at 07:18 was rejected at 13:47 with hours of
+  // stated life left, while a freshly redeemed one worked instantly.
+  const getChatsvcaggAccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // chatsvcagg tokens carry `aud=https://chatsvcagg.teams.microsoft.com`,
     // not Graph — the `accessToken()` validator's `isGraphToken` check
     // would reject every cached chatsvcagg token and force a recapture on
     // every call. `freshChatsvcaggToken` already validates expiry from the
     // JWT payload, which is the only thing we need at this boundary.
     const cached = await readCache();
-    const fresh = freshChatsvcaggToken(cached);
+    const fresh = options?.ignoreCache === true ? undefined : freshChatsvcaggToken(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.chatsvcagg.cache_hit');
       return ok(accessTokenUnsafe(fresh));
@@ -898,14 +906,15 @@ const createAuthManagerFromApi = (
     return inFlightIc3Recapture;
   };
 
-  const getIc3AccessToken = async (): Promise<Result<AccessToken, AuthError>> => {
+  /** `ignoreCache` as on `getChatsvcaggAccessToken`: the cached token is dead, not stale. */
+  const getIc3AccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // IC3 tokens carry `aud=https://ic3.teams.office.com`, not Graph — the
     // `accessToken()` validator's `isGraphToken` check would reject every
     // cached IC3 token and force a recapture on every call. `freshIc3Token`
     // validates expiry from the JWT payload, which is the only thing we
     // need at this boundary.
     const cached = await readCache();
-    const fresh = freshIc3Token(cached);
+    const fresh = options?.ignoreCache === true ? undefined : freshIc3Token(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.ic3.cache_hit');
       return ok(accessTokenUnsafe(fresh));
