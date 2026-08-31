@@ -368,55 +368,54 @@ describe('browser auth — production wiring', () => {
     if (result.ok) expect(String(result.token)).toBe(office);
   });
 
-  // The elevated capture opens a VISIBLE window and polls for 20s, expecting
-  // silent SSO. When the KMSI cookie has lapsed the tenant serves a sign-in
-  // form instead, and the user got 20 seconds to type before the window closed
-  // under them (reported 2026-08-31). The short deadline itself is deliberate:
-  // an audit set it because reusing the 5-minute interactive poll made
-  // `list-chats` hang for minutes on stale cookies.
-  const SIGN_IN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x';
+  // Two budgets, chosen by who is waiting. On this tenant a SUCCESSFUL silent
+  // capture measured LONGER than the 20s cap: it failed there, `login`
+  // escalated to the forced dance, and that dance's cookie wipe destroyed the
+  // 90-day sign-in session, so the next run had to prompt for real. Measured
+  // 2026-08-31, and it is the loop behind "even nothing looks expired, I still
+  // get the login page". Nothing keys on the page URL: a silent SSO redirects
+  // THROUGH the AAD sign-in hosts, so acting on that closed captures that were
+  // about to succeed.
+  it('acquireElevatedToken keeps its short deadline when nobody is waiting, so a background command fails fast', async () => {
+    const { api } = makeFakeApi();
+    // The interactive budget is enormous: applying it here would hang the call.
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 5, pollDeadlineMs: 10_000 }));
 
-  it('acquireElevatedToken closes at once when a sign-in page appears and no human is waiting for it', async () => {
-    const { api, state } = makeFakeApi({ pageOpts: { urlsAfterGoto: [SIGN_IN_URL] } });
-
-    // A generous recapture deadline: without the early close this call sits on
-    // a form nobody can complete until the test runner gives up.
-    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 10_000 })).acquireElevatedToken();
-
-    expect(result).toEqual({ ok: false, reason: 'sso_timeout' });
-    expect(state.page.closed).toBe(true);
+    expect(await browser.acquireElevatedToken()).toEqual({ ok: false, reason: 'sso_timeout' });
   });
 
-  it('acquireElevatedToken waits past its short deadline for a human when the caller asked to await sign-in', async () => {
-    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: [SIGN_IN_URL] } });
+  it('acquireElevatedToken waits the interactive deadline for a caller who is there, so a merely slow capture is not abandoned', async () => {
+    const { api } = makeFakeApi();
     const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 5, pollDeadlineMs: 200 }));
 
     const startedAt = Date.now();
     const result = await browser.acquireElevatedToken({ awaitSignIn: true });
 
-    // Lower bound only: a loaded machine can make this slower, never faster.
+    // Lower bound only: a loaded machine makes this slower, never faster.
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(100);
     expect(result).toEqual({ ok: false, reason: 'sso_timeout' });
   });
 
-  it('acquireElevatedToken says the window is the user’s to complete, rather than waiting in silence', async () => {
+  it('acquireElevatedToken speaks up once the silent route has plainly not worked, and only once', async () => {
     const lines: string[] = [];
-    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: [SIGN_IN_URL] } });
-    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 5, pollDeadlineMs: 30, onProgress: (l) => lines.push(l) }));
+    const { api } = makeFakeApi();
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 5, pollDeadlineMs: 60, onProgress: (l) => lines.push(l) }));
 
     await browser.acquireElevatedToken({ awaitSignIn: true });
 
-    expect(lines.some((l) => l.includes('Sign-in required'))).toBe(true);
+    // Once, not once per poll: the line is a latch, not a heartbeat.
+    expect(lines.filter((l) => l.includes('taking longer than usual'))).toHaveLength(1);
   });
 
-  it('acquireElevatedToken keeps its short deadline when no sign-in page appears, even for a caller willing to wait', async () => {
-    const { api } = makeFakeApi({ pageOpts: { urlsAfterGoto: ['https://m365.cloud.microsoft/'] } });
+  it('acquireElevatedToken returns the moment the token lands, holding the window for neither deadline', async () => {
+    const lines: string[] = [];
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[bearerRequest(elevatedJwtFor(M365_CHAT))]] } });
+    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 10_000, pollDeadlineMs: 10_000, onProgress: (l) => lines.push(l) }));
 
-    // pollDeadlineMs is enormous: extending on a page that never prompted would
-    // hang here, which is the regression the 20s cap exists to prevent.
-    const browser = createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 5, pollDeadlineMs: 10_000 }));
+    const result = await browser.acquireElevatedToken({ awaitSignIn: true });
 
-    expect(await browser.acquireElevatedToken({ awaitSignIn: true })).toEqual({ ok: false, reason: 'sso_timeout' });
+    expect(result.ok).toBe(true);
+    expect(lines).toEqual([]); // a capture that worked says nothing at all
   });
 
   it('acquireElevatedToken keeps a fallback that arrived too late for its grace window, rather than reporting a timeout on a capture that worked', async () => {
