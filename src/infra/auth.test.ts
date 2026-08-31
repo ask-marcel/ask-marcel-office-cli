@@ -32,6 +32,16 @@ const cachedIc3Info = async (m: AuthManager): Promise<{ available: boolean; expi
   return read ? read() : { available: false, expiresInSeconds: undefined, scopes: [] };
 };
 
+// These tests reach the refresh-token redemption, the ONE network call auth.ts
+// makes. Without an injected fetch they POST a bogus refresh token to
+// login.microsoftonline.com for real, and then pass or time out at the 5s limit
+// depending on Microsoft's latency — the suite's result became a property of
+// the network (2026-08-31). This refuses exactly as AAD does for a dead token,
+// so the fall-through to browser re-capture is exercised deterministically and
+// offline.
+const refusingTokenEndpoint = async (): Promise<Response> =>
+  new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400, headers: { 'content-type': 'application/json' } });
+
 const CACHE_PATH = '/virtual/token-cache.json';
 const BROWSER_PROFILE_DIR = '/virtual/browser-profile';
 
@@ -1428,7 +1438,18 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     const fs = createFileSystemFake();
     fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'warm-cookies');
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: past }));
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggResult: fresh }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      refusingTokenEndpoint
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result).toEqual(ok(fresh));
     const cached = await fs.readJson<{ chatsvcagg_access_token?: string }>(CACHE_PATH);
@@ -1572,7 +1593,18 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
       CACHE_PATH,
       JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: past, chatsvcagg_region: 'emea' })
     );
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh, chatsvcaggRegion: 'apac' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggResult: fresh, chatsvcaggRegion: 'apac' }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      refusingTokenEndpoint
+    );
     expect(await auth.getChatsvcaggRegion()).toBe('apac');
   });
 
@@ -1606,7 +1638,18 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
       CACHE_PATH,
       JSON.stringify({ access_token: 'unused', expires_on: almostExpired, refresh_token: 'r', chatsvcagg_access_token: 'stale', chatsvcagg_expires_on: almostExpired })
     );
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggResult: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ chatsvcaggResult: fresh }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      refusingTokenEndpoint
+    );
     const result = await auth.getChatsvcaggAccessToken();
     expect(result).toEqual(ok(fresh));
   });
@@ -1641,7 +1684,18 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
     const fs = createFileSystemFake();
     fs.seed(`${BROWSER_PROFILE_DIR}/Default/Cookies`, 'warm-cookies');
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: past, refresh_token: 'r', ic3_access_token: 'stale', ic3_expires_on: past }));
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Result: fresh }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      refusingTokenEndpoint
+    );
     const result = await auth.getIc3AccessToken();
     expect(result).toEqual(ok(fresh));
     const cached = await fs.readJson<{ ic3_access_token?: string; chatsvcagg_region?: string }>(CACHE_PATH);
@@ -1748,7 +1802,18 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
     const fresh = futureIc3();
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'unused', expires_on: almostExpired, refresh_token: 'r', ic3_access_token: 'stale', ic3_expires_on: almostExpired }));
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Result: fresh }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth({ ic3Result: fresh }),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      refusingTokenEndpoint
+    );
     const result = await auth.getIc3AccessToken();
     expect(result).toEqual(ok(fresh));
   });

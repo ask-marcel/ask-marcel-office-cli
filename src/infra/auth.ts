@@ -281,6 +281,8 @@ const NOT_AUTHENTICATED_CODE = 'not_authenticated';
 const NOT_AUTHENTICATED_MESSAGE =
   'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';
 
+type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
+
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
   cachePath: string,
@@ -298,7 +300,14 @@ const createAuthManagerFromApi = (
   // permitted; an interactive session answers yes and refreshes it in ~17s of silent
   // SSO against the persistent profile. Defaults to the shared flag so every existing
   // caller keeps the behaviour it had.
-  recaptureElevatedViaBrowser: boolean = recaptureSecondaryViaBrowser
+  recaptureElevatedViaBrowser: boolean = recaptureSecondaryViaBrowser,
+  // The token endpoint is the ONE network call this module makes. Injectable so
+  // a test can exercise the refresh path without POSTing a bogus refresh token
+  // to login.microsoftonline.com for real: five did, and passed or timed out at
+  // the 5s test limit depending on Microsoft's latency (2026-08-31), which made
+  // the suite's result a property of the network. Defaults to the global, so
+  // every existing caller is unchanged.
+  fetchFn: FetchFn = globalThis.fetch
 ): AuthManager => {
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
@@ -387,7 +396,7 @@ const createAuthManagerFromApi = (
     const body = new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'refresh_token', refresh_token: refreshTokenValue, scope });
     let res: Response;
     try {
-      res = await fetch(`https://login.microsoftonline.com/${authority}/oauth2/v2.0/token`, {
+      res = await fetchFn(`https://login.microsoftonline.com/${authority}/oauth2/v2.0/token`, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded', Origin: SPA_ORIGIN },
         body,
