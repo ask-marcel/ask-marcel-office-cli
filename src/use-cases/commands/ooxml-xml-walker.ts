@@ -194,6 +194,29 @@ const orderedSiblingGroups = (root: unknown): ReadonlyArray<ReadonlyArray<Ordere
   return groups;
 };
 
+/**
+ * Every element in true document order, pre-order (an element, then what it
+ * contains). Unlike `orderedSiblingGroups`, which reports a whole sibling level
+ * before descending, this is the order the start tags appear in the file, which
+ * is what reading flat range markers requires: `<w:moveFromRangeStart>` opens a
+ * span that a later element sits inside without being its child.
+ */
+const orderedElements = (root: unknown): ReadonlyArray<OrderedNode> => {
+  const out: Array<OrderedNode> = [];
+  const visit = (siblings: unknown): void => {
+    if (!Array.isArray(siblings)) return;
+    for (const item of siblings) {
+      if (!isObject(item)) continue;
+      const tag = orderedTagOf(item);
+      if (tag === undefined || tag === '#text') continue;
+      out.push({ tag, node: item });
+      visit(item[tag]);
+    }
+  };
+  visit(root);
+  return out;
+};
+
 const orderedAttrOf = (node: XmlObject, name: string): string => {
   const attrs = node[':@'];
   if (!isObject(attrs)) return '';
@@ -220,5 +243,19 @@ const collectOrderedText = (node: XmlObject, tagName: string): string => {
   return out;
 };
 
-export { attrOf, collectOrderedText, collectText, collectTextLocal, findAll, findAllLocal, findAllTexts, orderedAttrOf, orderedSiblingGroups, parseXml, parseXmlOrdered, textOf };
+export {
+  attrOf,
+  collectOrderedText,
+  collectText,
+  collectTextLocal,
+  findAll,
+  findAllLocal,
+  findAllTexts,
+  orderedAttrOf,
+  orderedElements,
+  orderedSiblingGroups,
+  parseXml,
+  parseXmlOrdered,
+  textOf,
+};
 export type { OrderedNode, XmlObject };

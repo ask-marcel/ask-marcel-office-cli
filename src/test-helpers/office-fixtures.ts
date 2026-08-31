@@ -616,8 +616,7 @@ const buildTrackedChangesDocx = async (): Promise<Uint8Array> => {
   zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
   const del = (id: string, author: string, text: string): string =>
     `<w:del w:id="${id}" w:author="${author}" w:date="2026-04-01T00:00:00Z"><w:r><w:delText>${text}</w:delText></w:r></w:del>`;
-  const ins = (id: string, author: string, text: string): string =>
-    `<w:ins w:id="${id}" w:author="${author}" w:date="2026-04-01T00:00:01Z"><w:r><w:t>${text}</w:t></w:r></w:ins>`;
+  const ins = (id: string, author: string, text: string): string => `<w:ins w:id="${id}" w:author="${author}" w:date="2026-04-01T00:00:01Z"><w:r><w:t>${text}</w:t></w:r></w:ins>`;
   const body =
     `<w:p>${del('1', 'Robin Chen', 'Q3')}${ins('2', 'Robin Chen', 'Q4')}</w:p>` +
     `<w:p>${ins('3', 'Robin Chen', 'new-first')}${del('4', 'Robin Chen', 'old-first')}</w:p>` +
@@ -625,6 +624,51 @@ const buildTrackedChangesDocx = async (): Promise<Uint8Array> => {
     `<w:p>${del('7', 'Robin Chen', 'hers-del')}${ins('8', 'Alex Kim', 'theirs-ins')}</w:p>` +
     `<w:p>${del('9', 'Robin Chen', 'marked-del')}<w:bookmarkStart w:id="99" w:name="BM_mid"/><w:bookmarkEnd w:id="99"/>${ins('10', 'Robin Chen', 'marked-ins')}</w:p>` +
     `<w:p>${ins('11', 'Robin Chen', 'lonely-ins')}</w:p>`;
+  zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`);
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/**
+ * A docx carrying the revision types that are NOT insertions or deletions:
+ * two moves and three property changes.
+ *
+ * The two moves carry identical text on purpose. Word guarantees a move's two
+ * halves match, so pairing them by content looks free and is wrong the moment a
+ * document moves the same sentence twice: only the `w:name` on the range-start
+ * markers says which half belongs to which move.
+ *
+ * The recolour is the other trap. Its property tag (`w:color`) is present both
+ * before and after, and only the attribute moves, so a comparison that comes
+ * down to tag names alone reports that paragraph as unchanged.
+ */
+const buildMoveAndFormatDocx = async (): Promise<Uint8Array> => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const WHO = 'w:author="Robin Chen" w:date="2026-04-02T00:00:00Z"';
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  const movedOut = (rangeId: string, name: string, id: string, text: string): string =>
+    `<w:p><w:moveFromRangeStart w:id="${rangeId}" w:name="${name}"/><w:moveFrom w:id="${id}" ${WHO}><w:r><w:delText>${text}</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="${rangeId}"/></w:p>`;
+  const movedIn = (rangeId: string, name: string, id: string, text: string): string =>
+    `<w:p><w:moveToRangeStart w:id="${rangeId}" w:name="${name}"/><w:moveTo w:id="${id}" ${WHO}><w:r><w:t>${text}</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="${rangeId}"/></w:p>`;
+  const body =
+    `${
+      movedOut('50', 'move-alpha', '51', 'the same sentence') +
+      movedIn('52', 'move-alpha', '53', 'the same sentence') +
+      movedOut('60', 'move-beta', '61', 'the same sentence') +
+      movedIn('62', 'move-beta', '63', 'the same sentence') +
+      // a moved-out half whose destination never arrives (the move was later cut)
+      movedOut('70', 'move-orphan', '71', 'orphaned sentence')
+      // bold swapped for italic: one tag leaves, another arrives
+    }<w:p><w:r><w:rPr><w:i/><w:rPrChange w:id="80" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:b/></w:rPr></w:rPrChange></w:rPr><w:t>styled words</w:t></w:r></w:p>` +
+    // same tag on both sides, only the value moved
+    '<w:p><w:r><w:rPr><w:color w:val="00FF00"/><w:rPrChange w:id="81" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:color w:val="FF0000"/></w:rPr></w:rPrChange></w:rPr><w:t>recoloured words</w:t></w:r></w:p>' +
+    // both sides carry the SAME tag with TWO attributes each: the only case that
+    // orders more than one attribute when the two sides are compared
+    '<w:p><w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:rPrChange w:id="83" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr></w:rPrChange></w:rPr><w:t>refonted words</w:t></w:r></w:p>' +
+    // paragraph-level: alignment changed
+    '<w:p><w:pPr><w:jc w:val="center"/><w:pPrChange w:id="82" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:pPr><w:jc w:val="left"/></w:pPr></w:pPrChange></w:pPr><w:r><w:t>realigned paragraph</w:t></w:r></w:p>' +
+    // untouched, to prove neither walk invents a revision
+    '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>plain bold text</w:t></w:r></w:p>';
   zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`);
   return zip.generateAsync({ type: 'uint8array' });
 };
@@ -816,6 +860,7 @@ export {
   buildSampleZipArchive,
   buildGbkNameZip,
   buildOversizedZipArchive,
+  buildMoveAndFormatDocx,
   buildSideChannelDocx,
   buildTrackedChangesDocx,
   buildMacroDocm,
