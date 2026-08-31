@@ -868,6 +868,18 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     if (!capturedAccess && !currentUrl.includes('login.microsoftonline.com') && !currentUrl.includes('login.live.com')) {
       trace('[DEBUG] acquireBothTokens: already signed in — clearing session to force fresh login\n');
       logger.info('browser_force_relogin', { url: currentUrl });
+      // Said out loud because it is expensive and invisible. The wipe is needed
+      // (the BASIC token is read off the grant RESPONSE, so the grant has to
+      // re-fire with the listener attached), but it also takes
+      // ESTSAUTHPERSISTENT, the ~90-day "Stay signed in" cookie, so the NEXT
+      // capture has no session to SSO with and serves a real sign-in page. A
+      // user who reached for `--force` on every prompt was re-arming the prompt
+      // each time (2026-08-31). Emitted here rather than in the CLI flag
+      // description so MCP and library callers hear it too, and so it can only
+      // fire when a session is actually being destroyed.
+      onProgress(
+        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office login` refreshes the elevated token without clearing it.'
+      );
       await context.clearCookies();
       try {
         await activePage.evaluate(() => {

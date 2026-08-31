@@ -92,7 +92,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
         key: 'force',
         required: false,
         description:
-          'Ignore the cache and re-capture every token via the browser. The only way to refresh the elevated (M365) token while the basic token is still valid; the persistent browser profile is reused, so you are usually not re-prompted for credentials.',
+          'Ignore the cache and re-capture every token via the browser. Rarely needed, and NOT free: it clears the browser session first so the token grant re-fires, which deletes the 90-day "Stay signed in" cookie and usually means entering a password again. A plain `login` already re-captures the elevated (M365) token when it is missing and leaves that session intact, so use `--force` only when a tier is still stuck after one.',
       },
     ],
     example: 'ask-marcel-office login --force',

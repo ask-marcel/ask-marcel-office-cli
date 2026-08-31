@@ -714,6 +714,47 @@ describe('browser auth — single-session acquireBothTokens', () => {
     expect(result.elevated.ok).toBe(true);
   });
 
+  // That wipe is not free. It also deletes ESTSAUTHPERSISTENT, the ~90-day
+  // "Stay signed in" cookie, so the NEXT capture has no session to SSO with and
+  // serves a real sign-in page. Paying that silently is what kept a user in a
+  // prompt-every-time loop (reported 2026-08-31), while the flag's own help
+  // text claimed the opposite: "you are usually not re-prompted for
+  // credentials". The cost is now stated where it is paid, so it reaches every
+  // surface rather than only the CLI flag description.
+  it('says what the session wipe costs, rather than deleting the 90-day sign-in silently', async () => {
+    const progress: string[] = [];
+    const { api, state } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[], [tokenResponse(graphTokenJwt())], []],
+        requestsPerGoto: [[], [], [elevatedRequest()]],
+        urlsAfterGoto: ['https://teams.microsoft.com/...', 'https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+
+    await createBrowserAuthFromApi(api, fastConfig({ onProgress: (line) => progress.push(line) })).acquireBothTokens('https://teams.microsoft.com');
+
+    expect(state.cookiesCleared).toBe(true);
+    expect(progress.filter((line) => line.includes('Stay signed in'))).toHaveLength(1);
+  });
+
+  it('stays quiet about the wipe when there was no session to wipe', async () => {
+    const progress: string[] = [];
+    // First goto lands on the sign-in host: nothing is signed in, so nothing is
+    // cleared, and warning here would be a lie told on every fresh login.
+    const { api, state } = makeFakeApi({
+      pageOpts: {
+        responsesPerGoto: [[tokenResponse(graphTokenJwt())], []],
+        requestsPerGoto: [[], [elevatedRequest()]],
+        urlsAfterGoto: ['https://login.microsoftonline.com/...', 'https://m365.cloud.microsoft/search'],
+      },
+    });
+
+    await createBrowserAuthFromApi(api, fastConfig({ onProgress: (line) => progress.push(line) })).acquireBothTokens('https://teams.microsoft.com');
+
+    expect(state.cookiesCleared).toBe(false);
+    expect(progress.filter((line) => line.includes('Stay signed in'))).toHaveLength(0);
+  });
+
   it('skips non-graph tokens in the response listener (e.g. Skype audience) and keeps polling for the Graph one', async () => {
     const { api } = makeFakeApi({
       pageOpts: {

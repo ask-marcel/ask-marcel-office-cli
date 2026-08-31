@@ -292,7 +292,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     )
     .option(
       '--force',
-      'Ignore the cache and re-capture every token via the browser. Rarely needed now: a plain `login` already re-captures the elevated (M365) token by itself when it is missing. Use this to refresh every tier unconditionally. The persistent browser profile is reused, so you are usually not re-prompted for credentials.'
+      'Ignore the cache and re-capture every token via the browser. Rarely needed, and NOT free: it clears the browser session first so the token grant re-fires, which deletes the 90-day "Stay signed in" cookie and usually means entering your password again. A plain `login` already re-captures the elevated (M365) token when it is missing and leaves that session intact, so reach for `--force` only when a tier is stuck and a plain `login` has not fixed it.'
     )
     .action(async () => {
       const force = loginCmd.opts<{ force?: boolean }>().force ?? false;

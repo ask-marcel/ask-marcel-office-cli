@@ -194,7 +194,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
           .boolean()
           .optional()
           .describe(
-            'Ignore the cache and re-capture every token via the browser. A plain login already recaptures the elevated token when it is missing; use force to refresh every tier unconditionally.'
+            'Ignore the cache and re-capture every token via the browser. A plain login already recaptures the elevated token when it is missing and leaves the browser session alone; force clears that session first, which deletes the 90-day "Stay signed in" cookie and usually forces the user to enter their password. Use it only when a tier is stuck after a plain login.'
           ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
