@@ -1,4 +1,4 @@
-import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, TrackedChange } from './docx-metadata.ts';
+import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, Replacement, TrackedChange } from './docx-metadata.ts';
 import { escapeCell, NONE, renderBullets, renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 
 /**
@@ -43,6 +43,15 @@ const renderTracked = (changes: ReadonlyArray<TrackedChange>): string =>
     ['id', 'author', 'date', 'text']
   );
 
+// `before` and `after` rather than deleted/inserted: the pair is one edit, and
+// naming the halves after the revision elements they came from would invite the
+// same "two separate changes" reading that pairing exists to remove.
+const renderReplacements = (replacements: ReadonlyArray<Replacement>): string =>
+  renderTable(
+    replacements.map((r) => [r.deletionId, r.insertionId, r.author, r.date, r.before, r.after]),
+    ['deletionId', 'insertionId', 'author', 'date', 'before', 'after']
+  );
+
 const renderFields = (fields: ReadonlyArray<Field>): string =>
   renderTable(
     fields.map((f) => [f.source, f.instruction]),
@@ -69,6 +78,7 @@ const formatDocxMetadata = (meta: DocxMetadata): string => {
     ['People registry', renderPeople(meta.people)],
     ['External relationships', renderRels(meta.externalRels)],
     ['Comments', renderComments(meta.comments)],
+    ['Tracked changes — replacements', renderReplacements(meta.replacements)],
     ['Tracked changes — insertions', renderTracked(meta.insertions)],
     ['Tracked changes — deletions', renderTracked(meta.deletions)],
     ['Hidden-formatted text (w:vanish)', renderBullets(meta.hiddenText)],

@@ -598,6 +598,37 @@ const buildDocxWithHeaderFooterTextbox = async (): Promise<Uint8Array> => {
 // whitespace-padded + whitespace-only text boxes, a two-digit header (header10 — the
 // `\d+` quantifier), a whitespace-only header (filtered after trim), and two decoy
 // parts that only match a regex with its ^/$ anchors removed.
+/**
+ * A docx whose only content is tracked revisions, laid out to pin every branch
+ * of del/ins pairing. Hand-rolled rather than built with the `docx` package
+ * because the cases turn on the EXACT sibling order of `w:ins` / `w:del` inside
+ * one `w:p`, which the builder API does not let you state directly.
+ *
+ * Paragraph by paragraph: a del-then-ins replacement, the ins-then-del order
+ * Word writes when the cursor sat before the selection, a pair separated by a
+ * visible run (two edits, not one), a pair by two different authors (two
+ * people, not one replacement), a pair separated only by a bookmark marker
+ * (still one replacement), and a lone insertion with nothing to pair with.
+ */
+const buildTrackedChangesDocx = async (): Promise<Uint8Array> => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  const del = (id: string, author: string, text: string): string =>
+    `<w:del w:id="${id}" w:author="${author}" w:date="2026-04-01T00:00:00Z"><w:r><w:delText>${text}</w:delText></w:r></w:del>`;
+  const ins = (id: string, author: string, text: string): string =>
+    `<w:ins w:id="${id}" w:author="${author}" w:date="2026-04-01T00:00:01Z"><w:r><w:t>${text}</w:t></w:r></w:ins>`;
+  const body =
+    `<w:p>${del('1', 'Robin Chen', 'Q3')}${ins('2', 'Robin Chen', 'Q4')}</w:p>` +
+    `<w:p>${ins('3', 'Robin Chen', 'new-first')}${del('4', 'Robin Chen', 'old-first')}</w:p>` +
+    `<w:p>${del('5', 'Robin Chen', 'far-del')}<w:r><w:t>untouched prose</w:t></w:r>${ins('6', 'Robin Chen', 'far-ins')}</w:p>` +
+    `<w:p>${del('7', 'Robin Chen', 'hers-del')}${ins('8', 'Alex Kim', 'theirs-ins')}</w:p>` +
+    `<w:p>${del('9', 'Robin Chen', 'marked-del')}<w:bookmarkStart w:id="99" w:name="BM_mid"/><w:bookmarkEnd w:id="99"/>${ins('10', 'Robin Chen', 'marked-ins')}</w:p>` +
+    `<w:p>${ins('11', 'Robin Chen', 'lonely-ins')}</w:p>`;
+  zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`);
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 const buildSideChannelDocx = async (): Promise<Uint8Array> => {
   const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   const zip = new JSZip();
@@ -786,6 +817,7 @@ export {
   buildGbkNameZip,
   buildOversizedZipArchive,
   buildSideChannelDocx,
+  buildTrackedChangesDocx,
   buildMacroDocm,
   buildMalformedDocx,
   buildMalformedPptx,

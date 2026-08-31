@@ -6,12 +6,14 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { extractCommentAnchors } from './docx-comment-anchors.ts';
-import { attrOf, collectText, findAll, findAllTexts, parseXml } from './ooxml-xml-walker.ts';
+import type { OrderedNode } from './ooxml-xml-walker.ts';
+import { attrOf, collectOrderedText, collectText, findAll, findAllTexts, orderedAttrOf, orderedSiblingGroups, parseXml, parseXmlOrdered } from './ooxml-xml-walker.ts';
 
 /**
  * Pulls the side-channel content out of a .docx zip — every text-bearing
  * surface mammoth drops on the floor: core / app / custom doc properties,
- * people registry, external hyperlinks, comments, tracked changes (ins + del),
+ * people registry, external hyperlinks, comments, tracked changes (replacements,
+ * then the insertions and deletions that pair with nothing),
  * hidden text (w:vanish), text-box / shape text (w:txbxContent), header/footer
  * body prose, field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks.
  *
@@ -28,6 +30,7 @@ type AppProps = Readonly<Record<string, string>>;
 type Person = { readonly author: string; readonly providerId: string; readonly userId: string };
 type Comment = { readonly id: string; readonly author: string; readonly initials: string; readonly date: string; readonly text: string; readonly anchor?: string };
 type TrackedChange = { readonly id: string; readonly author: string; readonly date: string; readonly text: string };
+type Replacement = { readonly deletionId: string; readonly insertionId: string; readonly author: string; readonly date: string; readonly before: string; readonly after: string };
 type Field = { readonly source: string; readonly instruction: string };
 type Bookmark = { readonly id: string; readonly name: string };
 type HeaderFooter = { readonly part: string; readonly text: string };
@@ -41,6 +44,8 @@ type DocxMetadata = {
   readonly comments: ReadonlyArray<Comment>;
   readonly insertions: ReadonlyArray<TrackedChange>;
   readonly deletions: ReadonlyArray<TrackedChange>;
+  /** A deletion and the insertion beside it, reported as the one edit they are. */
+  readonly replacements: ReadonlyArray<Replacement>;
   readonly hiddenText: ReadonlyArray<string>;
   readonly textBoxes: ReadonlyArray<string>;
   readonly headersFooters: ReadonlyArray<HeaderFooter>;
@@ -70,6 +75,59 @@ const extractComments = (root: unknown, anchors: ReadonlyMap<string, string>): R
     return anchor === undefined ? base : { ...base, anchor };
   });
 };
+
+// OOXML has no "replace" revision. Word records replacing a span as a deletion
+// sitting next to an insertion, so reported as two loose halves one edit reads
+// as an unrelated cut plus an unrelated addition, and nothing links them.
+//
+// Pairing needs document order, which the default parse cannot express (see
+// `orderedParser`), so this walks the order-preserving tree instead. Scoped to
+// siblings inside one parent: a deletion closing a paragraph and an insertion
+// opening the next are adjacent in a flat walk and unrelated on the page.
+const REVISION_TEXT_TAG: Readonly<Record<string, string>> = { 'w:ins': 'w:t', 'w:del': 'w:delText' };
+
+// Between the two halves of one edit Word may write markers that render no
+// glyph: its spell-check hints, and bookmark / comment range anchors. None of
+// them separates the halves. An untouched run of prose does.
+const TRANSPARENT_TAGS: ReadonlySet<string> = new Set(['w:proofErr', 'w:bookmarkStart', 'w:bookmarkEnd', 'w:commentRangeStart', 'w:commentRangeEnd']);
+
+type Revision = { readonly kind: string; readonly id: string; readonly author: string; readonly date: string; readonly text: string };
+
+const revisionOf = (entry: OrderedNode): Revision | undefined => {
+  const textTag = REVISION_TEXT_TAG[entry.tag];
+  if (textTag === undefined) return undefined;
+  const text = collectOrderedText(entry.node, textTag);
+  if (text === '') return undefined;
+  return { kind: entry.tag, id: orderedAttrOf(entry.node, 'w:id'), author: orderedAttrOf(entry.node, 'w:author'), date: orderedAttrOf(entry.node, 'w:date'), text };
+};
+
+// Same author on both halves is required: one person deleting and another
+// inserting beside it is two people disagreeing, not one person replacing a
+// span, and reporting it as a replacement would misattribute both edits.
+const pairInGroup = (group: ReadonlyArray<OrderedNode>): ReadonlyArray<Replacement> => {
+  const out: Array<Replacement> = [];
+  let pending: Revision | undefined;
+  for (const entry of group) {
+    if (TRANSPARENT_TAGS.has(entry.tag)) continue;
+    const revision = revisionOf(entry);
+    if (revision === undefined) {
+      pending = undefined;
+      continue;
+    }
+    if (pending !== undefined && pending.kind !== revision.kind && pending.author === revision.author) {
+      const deletion = pending.kind === 'w:del' ? pending : revision;
+      const insertion = pending.kind === 'w:ins' ? pending : revision;
+      out.push({ deletionId: deletion.id, insertionId: insertion.id, author: deletion.author, date: deletion.date, before: deletion.text, after: insertion.text });
+      pending = undefined;
+      continue;
+    }
+    pending = revision;
+  }
+  return out;
+};
+
+const extractReplacements = (documentXml: string | undefined): ReadonlyArray<Replacement> =>
+  orderedSiblingGroups(parseXmlOrdered(documentXml)).flatMap((group) => pairInGroup(group));
 
 const extractTracked = (root: unknown, kind: 'w:ins' | 'w:del'): ReadonlyArray<TrackedChange> => {
   const nodes = findAll(root, kind);
@@ -158,6 +216,9 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
   const documentXml = zip.read('word/document.xml');
   const document = parseXml(documentXml);
   const anchors = extractCommentAnchors(documentXml);
+  const replacements = extractReplacements(documentXml);
+  // Kind-prefixed so a deletion id can never mask an insertion id sharing it.
+  const paired = new Set(replacements.flatMap((r) => [`del:${r.deletionId}`, `ins:${r.insertionId}`]));
   return ok({
     core: extractCoreProps(zip),
     app: extractAppProps(zip),
@@ -165,8 +226,9 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
     people: extractPeople(parseXml(zip.read('word/people.xml'))),
     externalRels: extractExternalRels(zip),
     comments: extractComments(parseXml(zip.read('word/comments.xml')), anchors),
-    insertions: extractTracked(document, 'w:ins'),
-    deletions: extractTracked(document, 'w:del'),
+    insertions: extractTracked(document, 'w:ins').filter((t) => !paired.has(`ins:${t.id}`)),
+    deletions: extractTracked(document, 'w:del').filter((t) => !paired.has(`del:${t.id}`)),
+    replacements,
     hiddenText: extractHidden(document),
     textBoxes: extractTextBoxes(zip),
     headersFooters: extractHeadersFooters(zip),
@@ -177,4 +239,4 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
 };
 
 export { extractDocxMetadata };
-export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, TrackedChange };
+export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, Replacement, TrackedChange };

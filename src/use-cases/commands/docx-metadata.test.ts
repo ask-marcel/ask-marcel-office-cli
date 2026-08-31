@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildDocxWithHeaderFooterTextbox, buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx, buildSideChannelDocx } from '../../test-helpers/office-fixtures.ts';
+import { buildDocxWithHeaderFooterTextbox, buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx, buildSideChannelDocx, buildTrackedChangesDocx } from '../../test-helpers/office-fixtures.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 
@@ -73,8 +73,15 @@ describe('extractDocxMetadata', () => {
     expect(m.comments[0]?.text).toContain('Please double-check');
     // the comment is anchored to its commentRange span in document.xml
     expect(m.comments[0]?.anchor).toBe('the Q4 revenue figure');
-    expect(m.insertions.some((i) => i.text.includes('inserted-phrase'))).toBe(true);
-    expect(m.deletions.some((d) => d.text.includes('deleted-phrase'))).toBe(true);
+    // The fixture's insertion and deletion are adjacent siblings by the same
+    // author, which is a replacement: they land paired rather than as two loose
+    // halves, and the loose lists are empty because that is the only revision.
+    expect(m.replacements).toHaveLength(1);
+    expect(m.replacements[0]?.before).toBe('deleted-phrase');
+    expect(m.replacements[0]?.after).toBe('inserted-phrase');
+    expect(m.replacements[0]?.author).toBe('Jordan Avery');
+    expect(m.insertions).toEqual([]);
+    expect(m.deletions).toEqual([]);
     expect(m.hiddenText.some((h) => h.includes('This is hidden.'))).toBe(true);
     expect(m.externalRels.some((r) => r.target === 'https://example.com/secret-portal')).toBe(true);
     expect(m.fields.some((f) => f.instruction.includes('CustomerName'))).toBe(true);
@@ -201,5 +208,80 @@ describe('VBA macro detection (shared across docx / xlsx / pptx)', () => {
     if (!result.ok) return;
     expect(result.value.macros).toEqual([]);
     expect(formatDocxMetadata(result.value)).toContain('### Macros (VBA)\n\n_(none)_');
+  });
+});
+
+describe('extractDocxMetadata — replacement pairing', () => {
+  // OOXML has no "replace" revision: Word records one as a deletion next to an
+  // insertion. Reported as two loose halves, a single edit reads as an unrelated
+  // cut plus an unrelated addition, and nothing says the two are the same edit.
+  it('pairs a deletion immediately followed by an insertion into one replacement, and takes both halves out of the loose lists', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements).toContainEqual({
+      deletionId: '1',
+      insertionId: '2',
+      author: 'Robin Chen',
+      date: '2026-04-01T00:00:00Z',
+      before: 'Q3',
+      after: 'Q4',
+    });
+    expect(result.value.deletions.some((d) => d.id === '1')).toBe(false);
+    expect(result.value.insertions.some((i) => i.id === '2')).toBe(false);
+  });
+
+  it('pairs the insertion-then-deletion order too, which is what Word writes when the cursor sat before the selection', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements).toContainEqual({
+      deletionId: '4',
+      insertionId: '3',
+      author: 'Robin Chen',
+      date: '2026-04-01T00:00:00Z',
+      before: 'old-first',
+      after: 'new-first',
+    });
+  });
+
+  it('refuses to pair across untouched prose: a cut here and an addition later in the paragraph are two edits, not one replacement', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements.some((r) => r.before === 'far-del' || r.after === 'far-ins')).toBe(false);
+    expect(result.value.deletions.some((d) => d.text === 'far-del')).toBe(true);
+    expect(result.value.insertions.some((i) => i.text === 'far-ins')).toBe(true);
+  });
+
+  it('refuses to pair two authors, since one person deleting and another inserting is not one person replacing a span', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements.some((r) => r.before === 'hers-del')).toBe(false);
+    expect(result.value.deletions.some((d) => d.text === 'hers-del')).toBe(true);
+    expect(result.value.insertions.some((i) => i.text === 'theirs-ins')).toBe(true);
+  });
+
+  it('still pairs across a bookmark marker, which carries no visible text and so does not separate the two halves', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements).toContainEqual({
+      deletionId: '9',
+      insertionId: '10',
+      author: 'Robin Chen',
+      date: '2026-04-01T00:00:00Z',
+      before: 'marked-del',
+      after: 'marked-ins',
+    });
+  });
+
+  it('leaves an insertion with nothing beside it in the insertions list', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.insertions.some((i) => i.text === 'lonely-ins')).toBe(true);
+    expect(result.value.replacements.some((r) => r.after === 'lonely-ins')).toBe(false);
   });
 });

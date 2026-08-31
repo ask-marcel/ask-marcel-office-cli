@@ -78,11 +78,15 @@ describe('docxToMarkdown — with --include-metadata true', () => {
     expect(text).toContain('Jordan Avery');
     expect(text).toContain('Please double-check this figure.');
 
-    // Tracked changes — insertion + deletion text both appear under their own sections
-    expect(text).toContain('### Tracked changes — insertions');
-    expect(text).toContain('inserted-phrase');
-    expect(text).toContain('### Tracked changes — deletions');
-    expect(text).toContain('deleted-phrase');
+    // Tracked changes — the fixture's ins and del are adjacent and same-author,
+    // so they render as ONE replacement row carrying both halves, and the loose
+    // sections stay empty. Asserting the row (not just the two phrases) is the
+    // point: both strings appear either way, so a looser check would still pass
+    // if pairing silently stopped working.
+    expect(text).toContain('### Tracked changes — replacements');
+    expect(text).toMatch(/\|\s*Jordan Avery\s*\|[^|]*\|\s*deleted-phrase\s*\|\s*inserted-phrase\s*\|/u);
+    expect(text).toContain('### Tracked changes — insertions\n\n_(none)_');
+    expect(text).toContain('### Tracked changes — deletions\n\n_(none)_');
 
     // Hidden text (w:vanish) — surfaced verbatim, even though mammoth strips it from the rendered body
     expect(text).toContain('### Hidden-formatted text (w:vanish)');
@@ -110,6 +114,7 @@ describe('docxToMarkdown — with --include-metadata true', () => {
     expect(text).toContain('## DOCX metadata');
     // No comments, tracked changes, hidden text, bookmarks, or external rels in the simple fixture
     expect(text).toContain('### Comments\n\n_(none)_');
+    expect(text).toContain('### Tracked changes — replacements\n\n_(none)_');
     expect(text).toContain('### Tracked changes — insertions\n\n_(none)_');
     expect(text).toContain('### Tracked changes — deletions\n\n_(none)_');
     expect(text).toContain('### Hidden-formatted text (w:vanish)\n\n_(none)_');
