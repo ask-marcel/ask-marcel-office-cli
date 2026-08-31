@@ -22,7 +22,10 @@
 #   3. No full `bun run mutate` sweep on main. The mutation scope here is 266
 #      files; at the documented 1-3 min/file a full sweep is 4-13 hours against
 #      a 6-hour job limit, so it would time out and sit permanently red. Main
-#      pushes mutate the merged change (BASE=HEAD~1) instead. Run the full
+#      pushes mutate the WHOLE PUSHED RANGE instead (BASE=github.event.before),
+#      not BASE=HEAD~1: a push of several commits mutated only the last one's
+#      files, so on 2026-08-30 two of three commits were never mutated at all
+#      and the survivors they added surfaced a push later. Run the full
 #      `bun run mutate` as a periodic manual audit, not per push.
 name: ci
 on:
@@ -64,10 +67,19 @@ jobs:
       - name: coverage (per-tier thresholds)
         run: bun run coverage
       - name: mutation (changed files; see deviation 3 in the header)
+        env:
+          # The branch tip BEFORE this push. Read via env rather than inlined,
+          # so the shell never interpolates a ref name into its own source.
+          PUSHED_FROM: ${{ github.event.before }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             bun run mutate:changed
+          elif [ -n "$PUSHED_FROM" ] \
+            && [ "$PUSHED_FROM" != "0000000000000000000000000000000000000000" ] \
+            && git rev-parse --verify --quiet "$PUSHED_FROM^{commit}" >/dev/null; then
+            BASE="$PUSHED_FROM" bun run mutate:changed
           else
+            # First push to the branch, or a force-push whose old tip is gone.
             BASE=HEAD~1 bun run mutate:changed
           fi
       - name: dependency CVEs (fails on high)

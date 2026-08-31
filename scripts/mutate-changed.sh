@@ -38,19 +38,33 @@ echo "mutate:changed: base ${BASE} $(git rev-parse --short "$BASE")" \
      "($(git log -1 --format=%cr "$BASE")), HEAD +$(git rev-list --count "$BASE"..HEAD)"
 
 # Files that differ from BASE, plus uncommitted and staged edits, plus
-# untracked files, intersected with the mutation scope. Untracked matters: a
-# brand-new source file appears in NO diff, so without it a new domain or
-# use-case file is never mutated and the run still exits 0.
-files=$( {
+# untracked files. Untracked matters: a brand-new source file appears in NO
+# diff, so without it a new domain or use-case file is never mutated and the run
+# still exits 0.
+changed=$( {
   git diff --name-only --diff-filter=ACMR "$BASE"...HEAD
   git diff --name-only --diff-filter=ACMR HEAD
   git diff --cached --name-only --diff-filter=ACMR
   git ls-files --others --exclude-standard
-} | sort -u \
+} | sort -u)
+
+# A changed test file pulls in the source it covers. Test files carry no
+# mutants, so a commit touching ONLY tests used to present zero files: the gate
+# printed "no files in mutation scope changed" and passed having run nothing.
+# That hides the one change mutation testing exists to catch, a test WEAKENED
+# against production code nobody edited, and it hid a real 89.14 behind a green
+# run on 2026-08-30. Partial by construction: a shared test file with no sibling
+# source (commands.test.ts covers ~180 command modules) still maps to nothing.
+covered=$(echo "$changed" | grep -E '\.test\.ts$' | sed -E 's/\.test\.ts$/.ts/' || true)
+
+# `-f` filters the mapping's misses (a test whose sibling source does not
+# exist); the diffs themselves are already ACMR, so nothing deleted reaches it.
+files=$( { echo "$changed"; echo "$covered"; } | sort -u \
   | grep -E '^src/(domain|use-cases)/' \
   | grep -E '\.ts$' \
   | grep -vE '\.test\.ts$' \
   | grep -vE '/ports/' \
+  | while IFS= read -r f; do [ -f "$f" ] && echo "$f"; done \
   || true)
 
 if [ -z "$files" ]; then
@@ -65,9 +79,21 @@ echo "mutate:changed: testing ${count} file(s)"
 # overwrite each other (the CLI keeps only the last one), so join the list.
 mutate_arg=$(echo "$files" | paste -sd, -)
 
-# --force rather than deleting the incremental file: the cache keys on source
-# hashes, so a test-only change (a stronger assertion, same source) replays
-# stale verdicts. --force ignores cached statuses and rebuilds the file, and
-# unlike `rm -f reports/stryker-incremental.json` it does not hardcode a path
-# that `stryker.conf.json` owns via `incrementalFile`.
-bunx stryker run --force --mutate "$mutate_arg"
+# Stryker's `--incremental` is a VALUELESS flag (`.option('--incremental', ...)`
+# in stryker-cli.js), so there is no `--incremental false` and no
+# `--no-incremental` to override `incremental: true` in stryker.conf.json:
+# passing a value makes Stryker read it as a config-file path and abort with
+# `Invalid config file "false"`. Point the cache at a throwaway file instead. A
+# file that does not exist has nothing to replay, so the run tests every mutant
+# AND the reported score covers only the files this run mutated.
+#
+# `--force` was not enough: it re-tests every mutant but still READS the shared
+# cache, and the score is computed over that ENTIRE report, folding in results
+# for files the run never touched. That inflated a real 89.14 to 95.77 on
+# 2026-08-30 and is why a local run and CI disagreed. The configured
+# `incrementalFile` is left untouched, so a full `bun run mutate` keeps its
+# cache and its speed.
+incremental_dir=$(mktemp -d "${TMPDIR:-/tmp}/stryker-inc.XXXXXX")
+trap 'rm -rf "$incremental_dir"' EXIT
+
+bunx stryker run --incrementalFile "$incremental_dir/incremental.json" --mutate "$mutate_arg"
