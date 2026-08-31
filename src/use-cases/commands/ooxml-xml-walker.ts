@@ -28,6 +28,31 @@ const parser = new XMLParser({
   trimValues: false,
 });
 
+/**
+ * The order-preserving twin of `parser`.
+ *
+ * The default parse groups same-named siblings into one array per tag, which
+ * destroys the interleaving BETWEEN tags: a paragraph holding del, ins, del,
+ * ins parses to `{'w:del': [d1, d3], 'w:ins': [i2, i4]}`, indistinguishable
+ * from del, del, ins, ins. Anything that has to know which element followed
+ * which — pairing a tracked deletion with the insertion that replaced it —
+ * cannot be answered from that shape at any cost.
+ *
+ * `preserveOrder` answers it, at the price of a different shape: every element
+ * becomes a single-key object inside an ordered sibling array, with attributes
+ * under `:@` instead of inline. That is why it is a SECOND parser rather than a
+ * flag on the first: every existing walker here reads the grouped shape, and
+ * switching them all over to buy one feature would be a rewrite.
+ */
+const orderedParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  parseAttributeValue: false,
+  parseTagValue: false,
+  trimValues: false,
+  preserveOrder: true,
+});
+
 const parseXml = (xml: string | undefined): unknown => {
   if (xml === undefined || xml === '') return undefined;
   return parser.parse(xml) as unknown;
@@ -126,5 +151,74 @@ const collectText = (node: unknown, tagName: string): string => collectTextBy(no
 
 const collectTextLocal = (node: unknown, localName: string): string => collectTextBy(node, (key) => localNameOf(key) === localName);
 
-export { attrOf, collectText, collectTextLocal, findAll, findAllLocal, findAllTexts, parseXml, textOf };
-export type { XmlObject };
+/**
+ * One element in the `preserveOrder` shape: its tag name, and the node itself
+ * (whose `[tag]` holds the ordered children and whose `:@` holds attributes).
+ */
+type OrderedNode = { readonly tag: string; readonly node: XmlObject };
+
+const parseXmlOrdered = (xml: string | undefined): unknown => {
+  if (xml === undefined || xml === '') return undefined;
+  return orderedParser.parse(xml) as unknown;
+};
+
+const orderedTagOf = (node: XmlObject): string | undefined => Object.keys(node).find((k) => k !== ':@');
+
+const orderedChildrenOf = (node: XmlObject, tag: string): ReadonlyArray<unknown> => {
+  const value = node[tag];
+  return Array.isArray(value) ? value : [];
+};
+
+/**
+ * Every sibling list in the tree, each in document order, elements only.
+ *
+ * Sibling lists rather than one flat stream: adjacency only means anything
+ * WITHIN a parent. A deletion ending one paragraph and an insertion opening the
+ * next are consecutive in a flat walk and unrelated in the document.
+ */
+const orderedSiblingGroups = (root: unknown): ReadonlyArray<ReadonlyArray<OrderedNode>> => {
+  const groups: Array<ReadonlyArray<OrderedNode>> = [];
+  const visit = (siblings: unknown): void => {
+    if (!Array.isArray(siblings)) return;
+    const group: Array<OrderedNode> = [];
+    for (const item of siblings) {
+      if (!isObject(item)) continue;
+      const tag = orderedTagOf(item);
+      if (tag === undefined || tag === '#text') continue;
+      group.push({ tag, node: item });
+    }
+    if (group.length > 0) groups.push(group);
+    for (const entry of group) visit(entry.node[entry.tag]);
+  };
+  visit(root);
+  return groups;
+};
+
+const orderedAttrOf = (node: XmlObject, name: string): string => {
+  const attrs = node[':@'];
+  if (!isObject(attrs)) return '';
+  const value = attrs[`@_${name}`];
+  return typeof value === 'string' ? value : '';
+};
+
+/** The `collectText` of the ordered shape: flatten every `tagName` descendant to one string. */
+const collectOrderedText = (node: XmlObject, tagName: string): string => {
+  let out = '';
+  const visit = (current: XmlObject): void => {
+    const tag = orderedTagOf(current);
+    if (tag === undefined) return;
+    const children = orderedChildrenOf(current, tag);
+    if (tag === tagName) {
+      for (const child of children) {
+        if (isObject(child) && typeof child['#text'] === 'string') out += child['#text'];
+      }
+      return;
+    }
+    for (const child of children) if (isObject(child)) visit(child);
+  };
+  visit(node);
+  return out;
+};
+
+export { attrOf, collectOrderedText, collectText, collectTextLocal, findAll, findAllLocal, findAllTexts, orderedAttrOf, orderedSiblingGroups, parseXml, parseXmlOrdered, textOf };
+export type { OrderedNode, XmlObject };
