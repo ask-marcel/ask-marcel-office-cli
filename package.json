@@ -6,12 +6,12 @@
   "author": "Vincent Delacourt <vincent.delacourt@adama-development.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vdelacou/ask-marcel-office-cli.git"
+    "url": "git+https://github.com/ask-marcel/ask-marcel-office-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/vdelacou/ask-marcel-office-cli/issues"
+    "url": "https://github.com/ask-marcel/ask-marcel-office-cli/issues"
   },
-  "homepage": "https://github.com/vdelacou/ask-marcel-office-cli#readme",
+  "homepage": "https://github.com/ask-marcel/ask-marcel-office-cli#readme",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

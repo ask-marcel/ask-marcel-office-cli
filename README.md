@@ -237,7 +237,7 @@ Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Gra
 
 ## Roadmap
 
-Read-only stays the default forever. Coverage grows out of real LLM workflows as they come up: suggestions, requests, and pull requests welcome on the [issues page](https://github.com/vdelacou/ask-marcel-office-cli/issues).
+Read-only stays the default forever. Coverage grows out of real LLM workflows as they come up: suggestions, requests, and pull requests welcome on the [issues page](https://github.com/ask-marcel/ask-marcel-office-cli/issues).
 
 ## Built with
 
