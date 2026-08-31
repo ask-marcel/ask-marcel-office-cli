@@ -1,4 +1,6 @@
 [test]
+# Fails any test that reaches the real network. See scripts/no-network-preload.ts.
+preload = ["./scripts/no-network-preload.ts"]
 coverage = true
 coverageSkipTestFiles = true
 coverageReporter = ["text"]
