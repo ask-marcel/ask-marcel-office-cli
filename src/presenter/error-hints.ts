@@ -275,6 +275,18 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     matchCode: (c) => c === 'invalidArgument',
     hint: 'A request argument has the wrong shape. The most common case is an Excel `--address` that is not A1-style — valid forms are `A1`, `A1:C5`, `Sheet1!A1:C5`, or a defined-name from `ask-marcel-office list-excel-defined-names`. For other endpoints, the Graph message text names the offending parameter — read past the `invalidArgument:` prefix for the specifics.',
   },
+  // ─── Graph: partner-tenant audience ──────────────────────────────────────
+  // Placed ABOVE the token-expiry rule on purpose. Both are 401s and both look
+  // like an auth problem, but re-authenticating cannot fix this one: no home
+  // tier can read a foreign tenant's SharePoint. An agent told to `login` here
+  // loops. Matches the code (what the CLI itself emits) OR the message (a
+  // pasted error, where the code is gone).
+  {
+    source: 'graph',
+    matchCode: (c) => c === 'invalidAudienceUri',
+    matchMessage: (m) => /invalidAudienceUri/i.test(m),
+    hint: 'The file lives in a PARTNER tenant you are only a guest in. Graph cannot mint a SharePoint token for a foreign tenant, so no home token reaches it and `login` will not help — re-authenticating just loops. Pass `--tenant-id <guid>` to sign the call with a guest token for the owning tenant; `resolve-drive-share-link` returns that GUID as `tenantId` for any sharing URL whose file lives elsewhere. If this was a paginated follow-up, the cursor carries no tenant at all: pass `next-page` the SAME `--tenant-id` the originating command used.',
+  },
   // ─── Graph: auth token expired ───────────────────────────────────────────
   {
     source: 'graph',

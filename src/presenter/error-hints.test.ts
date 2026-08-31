@@ -401,6 +401,22 @@ describe('findErrorHint — no match', () => {
     expect(result).toBeUndefined();
   });
 
+  // A guest-tenant read is the one 401 that no home-tier token can fix, so the
+  // hint has to name the flag rather than suggest re-authenticating. It fires
+  // on the message alone (all `matchMessage` sees), which is why the text has
+  // to serve both the first call and the paginated follow-up.
+  it('maps `invalidAudienceUri` to a --tenant-id hint, since no home token can read a partner tenant no matter how fresh', () => {
+    const result = findErrorHint("invalidAudienceUri: Invalid audience Uri '00000003-0000-0ff1-ce00-000000000000'.", undefined);
+    expect(result?.source).toBe('graph');
+    expect(result?.hint).toContain('--tenant-id');
+    expect(result?.hint).toContain('resolve-drive-share-link');
+  });
+
+  it('tells a paginating caller to carry the same --tenant-id onto next-page, the case the cursor itself cannot express', () => {
+    const result = findErrorHint('401 invalidAudienceUri', undefined);
+    expect(result?.hint).toContain('next-page');
+  });
+
   it('returns undefined for a free-text error with no code and no recognisable pattern', () => {
     const result = findErrorHint('some unstructured failure', undefined);
     expect(result).toBeUndefined();
