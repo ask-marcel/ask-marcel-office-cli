@@ -70,6 +70,29 @@ Still unreported, unchanged by this: `w:moveFrom` / `w:moveTo`, `w:rPrChange`,
 `w:pPrChange`, and the table-structure revisions. A document whose only tracked
 edit is a formatting change still reports no tracked changes at all.
 
+### Added — docx moves and formatting changes are reported at all
+
+A docx whose only tracked edits were a moved paragraph or a reformat reported
+no tracked changes whatsoever, which reads as a clean document rather than an
+unreviewed one. `w:moveFrom` / `w:moveTo` and `w:rPrChange` / `w:pPrChange` are
+now extracted into two new sections.
+
+`moves` joins the two ends of a move through the `w:name` on the range-start
+markers that bracket them, not by matching their text: Word does guarantee the
+halves carry identical content, so text-matching looks free right up to a
+document that moves the same sentence twice and silently cross-pairs four halves
+into two moves that never happened. A half whose partner is missing still gets a
+row, marked `from-only` or `to-only`.
+
+`formatChanges` names which properties a reviewer altered, comparing attributes
+as well as tag names. `w:color` sits on both sides of a recolour with only its
+`w:val` moving, so a comparison of tag names alone calls that run unchanged.
+Run-level and paragraph-level changes share one list, separated by `scope`.
+
+Table-structure revisions (cell insert / delete / merge, numbering, section and
+table properties) remain unreported, and the `--include-metadata` docs now say
+so rather than leaving it to be discovered.
+
 ### Added — an `invalidAudienceUri` error hint
 
 The one 401 that re-authenticating cannot fix now says so. Graph cannot mint a
