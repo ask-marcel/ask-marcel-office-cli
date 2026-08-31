@@ -176,7 +176,11 @@ type AuthManager = {
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const SCOPES = 'https://graph.microsoft.com/.default openid profile offline_access';
 const SPA_ORIGIN = 'https://teams.microsoft.com';
-const TEAMS_URL = 'https://teams.microsoft.com/';
+// Microsoft moved the Teams web app here; `teams.microsoft.com` now 302s to it.
+// Navigating straight to the destination drops a redirect hop from every
+// capture, and keeps the whole session on the host the substrate calls use
+// (probed live 2026-08-31).
+const TEAMS_URL = 'https://teams.cloud.microsoft/';
 /**
  * Fallback region when no `chatsvcagg_region` is persisted (pre-2026-05
  * caches, or a chatsvcagg capture that never saw a `/api/csa/<region>/`
@@ -764,7 +768,7 @@ const createAuthManagerFromApi = (
       return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry. (Commands that need this token: ${chatsvcaggCommands}.)`;
     }
     if (reason === 'navigation_failed') {
-      return 'chatsvcagg capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
+      return 'chatsvcagg capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
     }
     return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${chatsvcaggCommands}.)`;
   };
@@ -861,7 +865,7 @@ const createAuthManagerFromApi = (
       return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry. (Commands that need this token: ${ic3Commands}.)`;
     }
     if (reason === 'navigation_failed') {
-      return 'ic3 capture failed: navigation to teams.microsoft.com did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
+      return 'ic3 capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
     }
     return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${ic3Commands}.)`;
   };

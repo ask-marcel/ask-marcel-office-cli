@@ -372,10 +372,20 @@ const DEFAULT_CHATSVCAGG_REGION = 'emea';
  */
 const parseChatsvcaggRegion = (url: string): string | null => {
   // Matches both substrate path prefixes — chatsvcagg uses `/api/csa/<region>/`
-  // and IC3 uses `/api/chatsvc/<region>/`. Both ride on `teams.microsoft.com`
-  // and emit the same regional segment per tenant, so a single match unlocks
-  // region resolution for both.
-  const match = /^https:\/\/teams\.microsoft\.com\/api\/(?:csa|chatsvc)\/([a-z0-9-]+)\//i.exec(url);
+  // and IC3 uses `/api/chatsvc/<region>/` — on either Teams host. Both emit the
+  // same regional segment per tenant, so a single match unlocks region
+  // resolution for both.
+  //
+  // `teams.cloud.microsoft` is where Microsoft moved the web app, and
+  // `teams.microsoft.com` now redirects there; probed live 2026-08-31, after
+  // that redirect EVERY substrate call goes to the new host. Anchored to the
+  // old host alone this returned null, and a null region is expensive twice
+  // over: the capture waits out its full deadline hoping for one, then ships
+  // the `emea` fallback, so an APAC or AMER tenant queries the wrong region
+  // with every command still reporting success. The host list stays explicit
+  // rather than becoming a wildcard: the region steers real request URLs, so a
+  // lookalike host must not be able to set it.
+  const match = /^https:\/\/(?:teams\.microsoft\.com|teams\.cloud\.microsoft)\/api\/(?:csa|chatsvc)\/([a-z0-9-]+)\//i.exec(url);
   return match ? match[1].toLowerCase() : null;
 };
 
@@ -387,7 +397,7 @@ const parseChatsvcaggRegion = (url: string): string | null => {
  * the cached token has expired but the basic Teams session is still
  * valid.
  */
-const TEAMS_WEB_URL = 'https://teams.microsoft.com/v2/';
+const TEAMS_WEB_URL = 'https://teams.cloud.microsoft/v2/';
 
 const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
 

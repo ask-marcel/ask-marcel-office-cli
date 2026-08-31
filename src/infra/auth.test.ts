@@ -1447,13 +1447,13 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
     }
   });
 
-  it('reports the navigation_failed-specific message when the chatsvcagg re-capture cannot reach teams.microsoft.com', async () => {
+  it('reports the navigation_failed-specific message when the chatsvcagg re-capture cannot reach teams.cloud.microsoft', async () => {
     const fs = createFileSystemFake();
     const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
-      expect(result.error.message).toContain('navigation to teams.microsoft.com did not complete');
+      expect(result.error.message).toContain('navigation to teams.cloud.microsoft did not complete');
       expect(result.error.message).toContain('corp-proxy');
     }
   });
@@ -1660,13 +1660,13 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
     }
   });
 
-  it('reports the navigation_failed-specific message when the IC3 re-capture cannot reach teams.microsoft.com', async () => {
+  it('reports the navigation_failed-specific message when the IC3 re-capture cannot reach teams.cloud.microsoft', async () => {
     const fs = createFileSystemFake();
     const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'navigation_failed' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
-      expect(result.error.message).toContain('navigation to teams.microsoft.com did not complete');
+      expect(result.error.message).toContain('navigation to teams.cloud.microsoft did not complete');
       expect(result.error.message).toContain('corp-proxy');
     }
   });

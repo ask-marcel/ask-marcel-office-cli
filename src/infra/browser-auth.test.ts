@@ -1231,6 +1231,49 @@ describe('browser auth — chatsvcagg capture (Teams substrate audience)', () =>
     }
   });
 
+  // Microsoft moved the Teams web app to `teams.cloud.microsoft`, and
+  // `teams.microsoft.com` now redirects there. Probed live 2026-08-31: after
+  // the redirect EVERY substrate call goes to the new host. A parser anchored
+  // to the old one returns null, the region silently defaults to `emea`, and an
+  // APAC or AMER tenant queries the wrong region while every command still
+  // reports success. Today it only keeps working because one early call beats
+  // the redirect, which is a race we are winning by accident.
+  it('captures the regional segment when the substrate call rides on teams.cloud.microsoft instead', async () => {
+    const apacJwt = makeJwt({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aud: 'https://chatsvcagg.teams.microsoft.com',
+      appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346',
+    });
+    const csaRequest: RequestLike = {
+      url: () => 'https://teams.cloud.microsoft/api/csa/apac/api/v3/teams/users/me?isPrefetch=false',
+      headers: () => ({ authorization: `Bearer ${apacJwt}` }),
+    };
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[csaRequest]], urlsAfterGoto: ['https://teams.cloud.microsoft/v2/'] } });
+
+    const result = await createBrowserAuthFromApi(api, fastConfig()).acquireChatsvcaggToken();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.region).toBe('apac');
+  });
+
+  it('refuses to read a region off a host that merely looks like the substrate', async () => {
+    const jwt = makeJwt({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://chatsvcagg.teams.microsoft.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' });
+    const spoofed: RequestLike = {
+      url: () => 'https://teams.microsoft.com.evil.example/api/csa/amer/api/v3/x',
+      headers: () => ({ authorization: `Bearer ${jwt}` }),
+    };
+    const { api } = makeFakeApi({ pageOpts: { requestsPerGoto: [[spoofed]], urlsAfterGoto: ['https://teams.cloud.microsoft/v2/'] } });
+
+    // Short budget on purpose: with no region parsed the capture waits out the
+    // FULL recapture deadline before falling back, so an unparsed region costs
+    // 20 real seconds on top of querying the wrong region.
+    const result = await createBrowserAuthFromApi(api, fastConfig({ elevatedRecaptureTimeoutMs: 30 })).acquireChatsvcaggToken();
+
+    // Token still captured (the audience is what proves it); region is not.
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.region).toBe('emea');
+  });
+
   it('falls back to "emea" when the chatsvcagg bearer was captured but no `/api/csa/<region>/` URL was observed within the deadline', async () => {
     // The bearer can ride on a non-substrate URL during early sign-in
     // (e.g. a token-endpoint probe). When that happens we still want to
