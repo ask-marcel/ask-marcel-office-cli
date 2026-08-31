@@ -138,6 +138,37 @@ describe('running a read command over MCP', () => {
     expect(capturedUrl).toContain('$top=5');
   });
 
+  // The footer is what an MCP agent reads to build its next call, and a
+  // partner-tenant cursor carries no tenant of its own. Without the flag on
+  // that line the agent's page 2 dies at `401 invalidAudienceUri`.
+  it('carries --tenant-id into the next: footer when the call was made against a partner tenant', async () => {
+    const graph: GraphClient = fakeGraphClient({
+      getGuest: async () => ok({ value: [{ id: 'f1', name: 'Report.docx' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' }),
+    });
+    const client = await connect({ graph });
+    const result = await client.callTool({
+      name: 'run-command',
+      arguments: { command: 'list-folder-files', params: { driveId: 'd1', itemId: 'i1', tenantId: '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04' } },
+    });
+    expect(textOf(result)).toContain('--tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
+  });
+
+  // The footer prints `--tenant-id <value>` unquoted, so it matters that the
+  // value can never be arbitrary caller text. This is the upstream half of that
+  // guarantee: a param the command does not declare is refused before it runs,
+  // so it never reaches the render at all. (The other half is `routeGet`, which
+  // brands the declared flag before the first Graph call.)
+  it('refuses a tenantId on a command that does not declare it, so caller text cannot reach the footer', async () => {
+    const graph: GraphClient = fakeGraphClient({
+      get: async () => ok({ value: [{ id: 'm1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' }),
+    });
+    const client = await connect({ graph });
+    const result = await client.callTool({ name: 'run-command', arguments: { command: 'list-mail-messages', params: { tenantId: 'not-a-guid; rm -rf /' } } });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('not a parameter of this command');
+    expect(textOf(result)).not.toContain('next: ask-marcel-office next-page');
+  });
+
   it('surfaces a Graph failure as a tool error carrying the curated hint, so the agent can self-correct', async () => {
     const graph: GraphClient = fakeGraphClient({
       get: async () => ({ ok: false, error: { type: 'api_error', status: 404, message: 'itemNotFound', code: 'itemNotFound' } }) as never,

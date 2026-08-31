@@ -98,12 +98,22 @@ const extractCursors = (record: Record<string, unknown>): { readonly stripped: R
 // cursors are skiptoken/skip/deltatoken URLs that never contain a `'`, so
 // single-quoting is safe without escaping. Both nextLink and deltaLink resume
 // through the same `next-page` command.
-const asFollowCommand = (url: string): string => `ask-marcel-office next-page --url '${url}'`;
+//
+// `tenantId` is appended when the originating call carried `--tenant-id`. A
+// partner-tenant cursor is signed with a guest token for that tenant, and the
+// `@odata.nextLink` Graph returns carries no tenant at all, so a footer without
+// the flag re-signs page 2 with the home token and dies at `401
+// invalidAudienceUri`. Copy-pasteable is the whole point of this line; a line
+// that 401s is worse than no line.
+const asFollowCommand = (url: string, tenantId?: string): string => {
+  const tenantFlag = tenantId === undefined ? '' : ` --tenant-id ${tenantId}`;
+  return `ask-marcel-office next-page --url '${url}'${tenantFlag}`;
+};
 
-const renderFooter = (cursors: Cursors, extraParts: ReadonlyArray<string> = []): string => {
+const renderFooter = (cursors: Cursors, extraParts: ReadonlyArray<string> = [], tenantId?: string): string => {
   const parts: string[] = [];
-  if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink)}`);
-  if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink)}`);
+  if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink, tenantId)}`);
+  if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink, tenantId)}`);
   if (cursors.count !== undefined) parts.push(`count: ${cursors.count}`);
   appendLines(parts, extraParts);
   return parts.length === 0 ? '' : `--- ${parts.join(' · ')}`;
@@ -119,7 +129,7 @@ const renderCollection = (items: ReadonlyArray<unknown>, footer: string): string
 
 const isScalar = (value: unknown): boolean => value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
-const renderEnveloped = (data: Record<string, unknown>): string => {
+const renderEnveloped = (data: Record<string, unknown>, tenantId?: string): string => {
   if (isTextPayload(data)) return `${data.text as string}\n`;
   if (isBinaryPayload(data)) return `binary: ${data.contentType as string}, ${data.size as number} bytes — use --output-path to save\n`;
   if (isUnsavedMediaPayload(data)) return mediaHintLine(data.media as ReadonlyArray<unknown>);
@@ -133,14 +143,14 @@ const renderEnveloped = (data: Record<string, unknown>): string => {
     const siblings = Object.entries(stripped).filter(([key, value]) => key !== 'value' && value !== undefined);
     if (siblings.every(([, value]) => isScalar(value))) {
       const siblingParts = siblings.map(([key, value]) => `${key}: ${encodeScalar(value)}`);
-      return renderCollection(stripped.value, renderFooter(cursors, siblingParts));
+      return renderCollection(stripped.value, renderFooter(cursors, siblingParts, tenantId));
     }
   }
-  return appendFooter(renderRecordLines(stripped, '').join('\n'), renderFooter(cursors));
+  return appendFooter(renderRecordLines(stripped, '').join('\n'), renderFooter(cursors, [], tenantId));
 };
 
-const renderTextOutput = (data: unknown): string => {
-  if (isRecord(data)) return renderEnveloped(data);
+const renderTextOutput = (data: unknown, tenantId?: string): string => {
+  if (isRecord(data)) return renderEnveloped(data, tenantId);
   if (Array.isArray(data)) return `${data.map((v) => (isRecord(v) ? renderRecordLines(v, '').join('\n') : encodeScalar(v))).join('\n')}\n`;
   return `${encodeScalar(data)}\n`;
 };

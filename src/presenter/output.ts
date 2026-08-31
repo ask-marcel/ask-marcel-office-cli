@@ -10,10 +10,10 @@
  */
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ErrorSource } from './error-hints.ts';
-import type { OutputFormat, SizeHintContext } from './render-to-string.ts';
+import type { OutputFormat, RenderContext } from './render-to-string.ts';
 import { renderErrorToString, renderToString } from './render-to-string.ts';
 
-const render = (data: unknown, logger: Logger, format: OutputFormat, context?: SizeHintContext): void => {
+const render = (data: unknown, logger: Logger, format: OutputFormat, context?: RenderContext): void => {
   logger.info('output_rendered', {});
   process.stdout.write(renderToString(data, format, context));
 };

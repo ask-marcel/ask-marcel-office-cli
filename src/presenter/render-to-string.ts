@@ -57,9 +57,10 @@ type RenderSurface = 'cli' | 'mcp';
 
 /**
  * What the presenter needs in order to name a remedy the caller can actually
- * use. Built in composition (which owns the command manifest); omitted by the
- * renders that have no command behind them at all — the 548 KB `list-commands`
- * manifest, a login summary, a logout status.
+ * use, and to render a follow-up command the caller can actually run. Built in
+ * composition (which owns the command manifest AND the invoked params); omitted
+ * by the renders that have no command behind them at all — the 548 KB
+ * `list-commands` manifest, a login summary, a logout status.
  *
  * 2026-07-23: the banner used to call `--output-path` a "universal remedy
  * (works on every command)". It is not. Plain-JSON commands REFUSE the flag,
@@ -68,26 +69,33 @@ type RenderSurface = 'cli' | 'mcp';
  * banner named was a dead end there, and an agentic caller following it burned
  * a call to find out.
  */
-type SizeHintContext = {
+type RenderContext = {
   readonly commandName: string;
   /** `meta.producesBytes` — the manifest flag that decides whether --output-path is accepted. */
   readonly producesBytes: boolean;
   readonly supportsSelect: boolean;
   readonly supportsTop: boolean;
   readonly surface: RenderSurface;
+  /**
+   * The `--tenant-id` the call was made with, when it carried one. Unlike every
+   * field above it comes from the INVOCATION, not the manifest: a Graph cursor
+   * carries no tenant, so the footer is the only place the next call can learn
+   * which identity signed this page.
+   */
+  readonly tenantId?: string;
 };
 
-const bytesRemedy = (context: SizeHintContext): string =>
+const bytesRemedy = (context: RenderContext): string =>
   context.surface === 'mcp'
     ? 'Set the `outputPath` param to write the body to a file; the envelope then carries `savedTo` instead of the bytes.'
     : 'Write the body to a file with `--output-path <file>`; the envelope then carries `savedTo` instead of the bytes.';
 
-const jsonRemedy = (context: SizeHintContext): string =>
+const jsonRemedy = (context: RenderContext): string =>
   context.surface === 'mcp'
     ? `${context.commandName} returns plain JSON, so \`outputPath\` is refused here: there is no body to write.`
     : `${context.commandName} returns plain JSON, so \`--output-path\` is refused; redirect to a file instead: \`ask-marcel-office ${context.commandName} ... > out.json\`.`;
 
-const slimmingRemedy = (context: SizeHintContext): string => {
+const slimmingRemedy = (context: RenderContext): string => {
   const levers = [...(context.supportsSelect ? ['`--select id,subject,...` to slim each item'] : []), ...(context.supportsTop ? ['`--top N` to cut the item count'] : [])];
   if (levers.length === 0) return `${context.commandName} advertises no slimming flags, so narrow the query text itself and re-run.`;
   return `Then re-run with ${levers.join(' and ')}.`;
@@ -97,7 +105,7 @@ const slimmingRemedy = (context: SizeHintContext): string => {
 // nothing, since every flag-level remedy depends on which command ran.
 const NEUTRAL_REMEDY = 'Narrow the request and re-run; slimming flags apply only where the command advertises them (check `--help`).';
 
-const buildSizeHint = (bytes: number, context?: SizeHintContext): string => {
+const buildSizeHint = (bytes: number, context?: RenderContext): string => {
   const head = `Response is ${Math.round(bytes / 1024)} KB (> 50 KB threshold).`;
   if (context === undefined) return `${head} ${NEUTRAL_REMEDY}`;
   return `${head} ${context.producesBytes ? bytesRemedy(context) : jsonRemedy(context)} ${slimmingRemedy(context)}`;
@@ -166,7 +174,7 @@ const wrap = (data: unknown): SuccessEnvelope => {
   };
 };
 
-const renderJsonToString = (data: unknown, context?: SizeHintContext): string => {
+const renderJsonToString = (data: unknown, context?: RenderContext): string => {
   const envelope = wrap(data);
   const selectHintField = looksLikeBogusSelectResponse(data) ? { selectHint: SELECT_HINT } : {};
   const initial = JSON.stringify({ ...envelope, ...selectHintField });
@@ -178,8 +186,8 @@ const renderJsonToString = (data: unknown, context?: SizeHintContext): string =>
   return `${JSON.stringify({ ...envelope, ...selectHintField, sizeHint: buildSizeHint(initial.length, context) })}\n`;
 };
 
-const renderTextToString = (data: unknown, context?: SizeHintContext): string => {
-  const body = renderTextOutput(data);
+const renderTextToString = (data: unknown, context?: RenderContext): string => {
+  const body = renderTextOutput(data, context?.tenantId);
   const selectHintLine = looksLikeBogusSelectResponse(data) ? `selectHint: ${SELECT_HINT}\n` : '';
   if (body.length <= SIZE_HINT_THRESHOLD_BYTES) return `${selectHintLine}${body}`;
   // Prepend (not append) so the LLM sees the hint before scrolling through
@@ -197,7 +205,7 @@ const renderTextToString = (data: unknown, context?: SizeHintContext): string =>
  * whenever a registry command produced the data. Omit it for the renders that
  * have no command behind them; the banner then claims no flag-level remedy.
  */
-const renderToString = (data: unknown, format: OutputFormat, context?: SizeHintContext): string =>
+const renderToString = (data: unknown, format: OutputFormat, context?: RenderContext): string =>
   format === 'json' ? renderJsonToString(data, context) : renderTextToString(data, context);
 
 /**
@@ -249,4 +257,4 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
 };
 
 export { renderErrorToString, renderToString };
-export type { OutputFormat, RenderSurface, SizeHintContext };
+export type { OutputFormat, RenderContext, RenderSurface };

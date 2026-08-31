@@ -20,7 +20,7 @@
  */
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
-import type { RenderSurface, SizeHintContext } from '../presenter/render-to-string.ts';
+import type { RenderContext, RenderSurface } from '../presenter/render-to-string.ts';
 import type { Command } from '../use-cases/commands/command-types.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
@@ -61,15 +61,30 @@ const hasOption = (command: Command, name: string): boolean => command.meta.opti
 /**
  * The facts the oversized-response banner needs to name a remedy this caller
  * can actually use. Derived from the manifest, so a new command gets an honest
- * banner for free. See `SizeHintContext` in the presenter for the why.
+ * banner for free. See `RenderContext` in the presenter for the why.
  */
-const buildSizeHintContext = (commandName: string, command: Command, surface: RenderSurface): SizeHintContext => ({
-  commandName,
-  producesBytes: command.meta.producesBytes === true,
-  supportsSelect: hasOption(command, 'select'),
-  supportsTop: hasOption(command, 'top'),
-  surface,
-});
+// `tenantId` is the one context field that comes from the INVOCATION rather
+// than the manifest: a Graph cursor carries no tenant, so the footer is the
+// only place the next call can learn which identity signed this page.
+//
+// Taken as-is, deliberately. It reaches the footer UNQUOTED, which would matter
+// if it were arbitrary caller text — but it cannot be. A param no command
+// declares is refused before it runs, and all twelve commands that DO declare
+// `--tenant-id` brand it through `routeGet` before their first Graph call, so a
+// value only survives to a rendered success by already being a valid GUID.
+// Re-branding here would be unreachable code guarding an invariant the command
+// layer already holds; `mcp.test.ts` pins both halves of that.
+const buildRenderContext = (commandName: string, command: Command, surface: RenderSurface, params: Record<string, unknown>): RenderContext => {
+  const raw = params['tenantId'];
+  return {
+    commandName,
+    producesBytes: command.meta.producesBytes === true,
+    supportsSelect: hasOption(command, 'select'),
+    supportsTop: hasOption(command, 'top'),
+    surface,
+    ...(typeof raw === 'string' ? { tenantId: raw } : {}),
+  };
+};
 
 // A shell redirect is the CLI's answer to "this command has no body to write".
 // An MCP client has no shell, so it gets the honest version instead: there is
@@ -177,4 +192,4 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
   return err({ message: formatOutputPathError(persisted.error, name, request.surface), code: persisted.error.type });
 };
 
-export { buildSizeHintContext, formatOutputDirError, formatOutputPathError };
+export { buildRenderContext, formatOutputDirError, formatOutputPathError };

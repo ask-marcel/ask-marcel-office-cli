@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { renderTextOutput } from './output-text.ts';
 import { render, renderError } from './output.ts';
-import type { SizeHintContext } from './render-to-string.ts';
+import type { RenderContext } from './render-to-string.ts';
 import { renderToString } from './render-to-string.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<void>): Promise<string> => {
@@ -252,7 +252,7 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
 // produced the payload and the surface the caller is on.
 describe('presenter output — the oversized-response banner only names remedies the caller can actually use', () => {
   const oversized = { value: Array.from({ length: 600 }, (_, i) => ({ id: `item-${i}`, payload: 'x'.repeat(100) })) };
-  const hintOf = (context: SizeHintContext): string => {
+  const hintOf = (context: RenderContext): string => {
     const parsed = JSON.parse(renderToString(oversized, 'json', context).trim()) as { sizeHint?: string };
     return parsed.sizeHint ?? '';
   };
@@ -484,6 +484,71 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const data = { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
     expect(out).toBe("(no items)\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+  });
+
+  // A partner-tenant listing signs page 1 with a guest token, and the cursor
+  // Graph hands back carries no tenant. The footer's whole promise is that the
+  // line can be copied verbatim, so it has to carry the flag that re-signs the
+  // next page — otherwise the copy lands on `401 invalidAudienceUri`.
+  it('appends --tenant-id to the next: command when the originating call carried one, so the copied line resolves in the partner tenant', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'f1', name: 'Report.docx' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' };
+    const context: RenderContext = {
+      commandName: 'list-folder-files',
+      producesBytes: false,
+      supportsSelect: false,
+      supportsTop: false,
+      surface: 'cli',
+      tenantId: '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04',
+    };
+    const out = await captureStream('stdout', () => render(data, logger, 'text', context));
+    expect(out).toBe(
+      "id: f1\nname: Report.docx\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
+    );
+  });
+
+  it('appends --tenant-id to the delta: command too, since a delta cursor is re-signed through the same next-page path', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'f1' }], '@odata.deltaLink': 'https://graph.microsoft.com/v1.0/drives/d1/root/delta?$dt=X' };
+    const context: RenderContext = {
+      commandName: 'list-folder-files',
+      producesBytes: false,
+      supportsSelect: false,
+      supportsTop: false,
+      surface: 'cli',
+      tenantId: '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04',
+    };
+    const out = await captureStream('stdout', () => render(data, logger, 'text', context));
+    expect(out).toBe(
+      "id: f1\n\n--- delta: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/root/delta?$dt=X' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
+    );
+  });
+
+  it('leaves the footer untouched when the call carried no tenant, which is every home-tenant listing', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'm1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
+    const context: RenderContext = { commandName: 'list-mail-messages', producesBytes: false, supportsSelect: true, supportsTop: true, surface: 'cli' };
+    const out = await captureStream('stdout', () => render(data, logger, 'text', context));
+    expect(out).toBe("id: m1\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+    expect(out).not.toContain('--tenant-id');
+  });
+
+  // MCP renders the same text footer, and an MCP client cannot run a shell
+  // line — but it reads the flag names off it to build its own params, so the
+  // tenant has to be visible there too.
+  it('carries the tenant on the MCP surface as well, where the footer is what the agent reads to build its next call', async () => {
+    const logger = createLoggerFake();
+    const data = { value: [{ id: 'f1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' };
+    const context: RenderContext = {
+      commandName: 'list-folder-files',
+      producesBytes: false,
+      supportsSelect: false,
+      supportsTop: false,
+      surface: 'mcp',
+      tenantId: '6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04',
+    };
+    const out = await captureStream('stdout', () => render(data, logger, 'text', context));
+    expect(out).toContain('--tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');
   });
 
   it('renders a 20,000-item aggregated collection with a plain count sibling (search-all-files shape) as flat blocks with the >50KB sizeHint prepended', async () => {

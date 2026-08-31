@@ -31,7 +31,7 @@ import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
-import { buildSizeHintContext, runRegistryCommand } from './run-registry-command.ts';
+import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
 
 const PACKAGE_NAME = 'ask-marcel-office-cli';
 
@@ -156,7 +156,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     const request = { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir, surface: 'mcp' as const };
     const result = await runRegistryCommand({ graph, fs }, request);
     if (!result.ok) return errText(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
-    return okText(renderToString(result.value, 'text', buildSizeHintContext(resolved.value.name, resolved.value.command, 'mcp')));
+    return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params ?? {})));
   };
 
   server.registerTool(

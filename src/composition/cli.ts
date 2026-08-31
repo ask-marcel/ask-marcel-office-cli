@@ -4,7 +4,7 @@ import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
-import type { SizeHintContext } from '../presenter/render-to-string.ts';
+import type { RenderContext } from '../presenter/render-to-string.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
@@ -14,7 +14,7 @@ import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import * as update from '../use-cases/commands/update.ts';
-import { buildSizeHintContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
+import { buildRenderContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
@@ -48,7 +48,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     const raw = program.opts<{ output?: string }>().output;
     return raw === 'json' ? 'json' : 'text';
   };
-  const renderOut = (data: unknown, sizeHintContext?: SizeHintContext): void => render(data, logger, getFormat(), sizeHintContext);
+  const renderOut = (data: unknown, sizeHintContext?: RenderContext): void => render(data, logger, getFormat(), sizeHintContext);
   const fail = (message: string, code?: string, source?: ErrorSource, retryAfterSeconds?: number): void => {
     renderError(message, getFormat(), code, source, retryAfterSeconds);
     deps.onCommandError?.();
@@ -451,7 +451,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         const globals = program.opts<{ outputPath?: string; outputDir?: string }>();
         const result = await runRegistryCommand({ graph, fs }, { name, command: cmd, params: opts, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli' });
         if (result.ok) {
-          renderOut(result.value, buildSizeHintContext(name, cmd, 'cli'));
+          renderOut(result.value, buildRenderContext(name, cmd, 'cli', opts));
           return;
         }
         fail(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
