@@ -1,4 +1,4 @@
-import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, Replacement, TrackedChange } from './docx-metadata.ts';
+import type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, FormatChange, HeaderFooter, Move, Person, Replacement, TrackedChange } from './docx-metadata.ts';
 import { escapeCell, NONE, renderBullets, renderKv, renderMacros, renderTable } from './ooxml-metadata-to-markdown.ts';
 
 /**
@@ -52,6 +52,21 @@ const renderReplacements = (replacements: ReadonlyArray<Replacement>): string =>
     ['deletionId', 'insertionId', 'author', 'date', 'before', 'after']
   );
 
+const renderMoves = (moves: ReadonlyArray<Move>): string =>
+  renderTable(
+    moves.map((m) => [m.name, m.author, m.date, m.text, m.halves]),
+    ['name', 'author', 'date', 'text', 'halves']
+  );
+
+// Properties joined rather than one row each: the edit is "these three things
+// changed on this run", and splitting it into three rows would report one edit
+// as three, which is the reading this whole section exists to prevent.
+const renderFormatChanges = (changes: ReadonlyArray<FormatChange>): string =>
+  renderTable(
+    changes.map((c) => [c.scope, c.author, c.date, c.text, c.properties.join(', ')]),
+    ['scope', 'author', 'date', 'text', 'properties']
+  );
+
 const renderFields = (fields: ReadonlyArray<Field>): string =>
   renderTable(
     fields.map((f) => [f.source, f.instruction]),
@@ -81,6 +96,8 @@ const formatDocxMetadata = (meta: DocxMetadata): string => {
     ['Tracked changes — replacements', renderReplacements(meta.replacements)],
     ['Tracked changes — insertions', renderTracked(meta.insertions)],
     ['Tracked changes — deletions', renderTracked(meta.deletions)],
+    ['Tracked changes — moves', renderMoves(meta.moves)],
+    ['Tracked changes — formatting', renderFormatChanges(meta.formatChanges)],
     ['Hidden-formatted text (w:vanish)', renderBullets(meta.hiddenText)],
     ['Text boxes / shapes', renderBullets(meta.textBoxes)],
     ['Headers & footers', renderHeadersFooters(meta.headersFooters)],

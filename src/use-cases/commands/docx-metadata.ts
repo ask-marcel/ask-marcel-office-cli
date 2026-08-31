@@ -6,14 +6,26 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import { extractAppProps, extractCoreProps, extractCustomProps, extractExternalRels, extractMacros } from './ooxml-metadata.ts';
 import type { CustomProp, ExternalRel } from './ooxml-metadata.ts';
 import { extractCommentAnchors } from './docx-comment-anchors.ts';
-import type { OrderedNode } from './ooxml-xml-walker.ts';
-import { attrOf, collectOrderedText, collectText, findAll, findAllTexts, orderedAttrOf, orderedSiblingGroups, parseXml, parseXmlOrdered } from './ooxml-xml-walker.ts';
+import type { OrderedNode, XmlObject } from './ooxml-xml-walker.ts';
+import {
+  attrOf,
+  collectOrderedText,
+  collectText,
+  findAll,
+  findAllTexts,
+  orderedAttrOf,
+  orderedElements,
+  orderedSiblingGroups,
+  parseXml,
+  parseXmlOrdered,
+} from './ooxml-xml-walker.ts';
 
 /**
  * Pulls the side-channel content out of a .docx zip — every text-bearing
  * surface mammoth drops on the floor: core / app / custom doc properties,
  * people registry, external hyperlinks, comments, tracked changes (replacements,
- * then the insertions and deletions that pair with nothing),
+ * the insertions and deletions that pair with nothing, moves, and run /
+ * paragraph formatting changes),
  * hidden text (w:vanish), text-box / shape text (w:txbxContent), header/footer
  * body prose, field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks.
  *
@@ -31,6 +43,8 @@ type Person = { readonly author: string; readonly providerId: string; readonly u
 type Comment = { readonly id: string; readonly author: string; readonly initials: string; readonly date: string; readonly text: string; readonly anchor?: string };
 type TrackedChange = { readonly id: string; readonly author: string; readonly date: string; readonly text: string };
 type Replacement = { readonly deletionId: string; readonly insertionId: string; readonly author: string; readonly date: string; readonly before: string; readonly after: string };
+type Move = { readonly name: string; readonly author: string; readonly date: string; readonly text: string; readonly halves: 'both' | 'from-only' | 'to-only' };
+type FormatChange = { readonly scope: 'run' | 'paragraph'; readonly author: string; readonly date: string; readonly text: string; readonly properties: ReadonlyArray<string> };
 type Field = { readonly source: string; readonly instruction: string };
 type Bookmark = { readonly id: string; readonly name: string };
 type HeaderFooter = { readonly part: string; readonly text: string };
@@ -46,6 +60,10 @@ type DocxMetadata = {
   readonly deletions: ReadonlyArray<TrackedChange>;
   /** A deletion and the insertion beside it, reported as the one edit they are. */
   readonly replacements: ReadonlyArray<Replacement>;
+  /** Text moved elsewhere, joined by the range name that brackets both halves. */
+  readonly moves: ReadonlyArray<Move>;
+  /** Run or paragraph properties changed under revision marking. */
+  readonly formatChanges: ReadonlyArray<FormatChange>;
   readonly hiddenText: ReadonlyArray<string>;
   readonly textBoxes: ReadonlyArray<string>;
   readonly headersFooters: ReadonlyArray<HeaderFooter>;
@@ -209,6 +227,110 @@ const extractTextBoxes = (zip: OoxmlZip): ReadonlyArray<string> => {
   return out;
 };
 
+// A move is two halves in two places, and neither `w:moveFrom` nor `w:moveTo`
+// carries anything linking them. The link is the `w:name` on the range-start
+// markers that BRACKET them: flat elements opening a span the halves sit inside
+// without being their children, which is why this reads document order rather
+// than structure.
+//
+// Not paired by matching text, though Word does guarantee the halves match: a
+// document that moves the same sentence twice then cross-pairs four halves into
+// two wrong moves, and nothing in the output would show it happened.
+type MoveHalf = { readonly author: string; readonly date: string; readonly text: string };
+
+const moveHalfOf = (node: XmlObject, textTag: string): MoveHalf => ({
+  author: orderedAttrOf(node, 'w:author'),
+  date: orderedAttrOf(node, 'w:date'),
+  text: collectOrderedText(node, textTag),
+});
+
+const halvesOf = (from: MoveHalf | undefined, to: MoveHalf | undefined): Move['halves'] => {
+  if (from !== undefined && to !== undefined) return 'both';
+  return from === undefined ? 'to-only' : 'from-only';
+};
+
+const extractMoves = (documentXml: string | undefined): ReadonlyArray<Move> => {
+  const froms = new Map<string, MoveHalf>();
+  const tos = new Map<string, MoveHalf>();
+  let openFrom: string | undefined;
+  let openTo: string | undefined;
+  for (const element of orderedElements(parseXmlOrdered(documentXml))) {
+    if (element.tag === 'w:moveFromRangeStart') openFrom = orderedAttrOf(element.node, 'w:name');
+    else if (element.tag === 'w:moveFromRangeEnd') openFrom = undefined;
+    else if (element.tag === 'w:moveToRangeStart') openTo = orderedAttrOf(element.node, 'w:name');
+    else if (element.tag === 'w:moveToRangeEnd') openTo = undefined;
+    else if (element.tag === 'w:moveFrom' && openFrom !== undefined) froms.set(openFrom, moveHalfOf(element.node, 'w:delText'));
+    else if (element.tag === 'w:moveTo' && openTo !== undefined) tos.set(openTo, moveHalfOf(element.node, 'w:t'));
+  }
+  const names = [...new Set([...froms.keys(), ...tos.keys()])];
+  const moves: Array<Move> = [];
+  for (const name of names) {
+    const from = froms.get(name);
+    const to = tos.get(name);
+    // A half whose partner never arrives still gets a row. Dropping it would
+    // put that text back where this whole change started: reported as nothing.
+    const half = from ?? to;
+    if (half === undefined || half.text === '') continue;
+    moves.push({ name, author: half.author, date: half.date, text: half.text, halves: halvesOf(from, to) });
+  }
+  return moves;
+};
+
+// `w:rPrChange` / `w:pPrChange` hold the properties as they were BEFORE the
+// edit; the properties as they are now are its siblings in the enclosing
+// `w:rPr` / `w:pPr`. So a real before/after is available, and what makes it
+// useful is naming which properties moved.
+//
+// Compared by attributes as well as tag name: `w:color` is present on both
+// sides of a recolour and only its `w:val` moves, so a comparison of tag names
+// alone reports a recoloured run as unchanged.
+const attrSignature = (value: unknown): string => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return '';
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => key.startsWith('@_'))
+    .map(([key, attr]) => `${key}=${String(attr)}`)
+    .toSorted((a, b) => a.localeCompare(b))
+    .join(';');
+};
+
+const propertiesOf = (props: unknown, exclude: string): ReadonlyMap<string, string> => {
+  const out = new Map<string, string>();
+  if (props === null || typeof props !== 'object' || Array.isArray(props)) return out;
+  for (const [key, value] of Object.entries(props as Record<string, unknown>)) {
+    if (key.startsWith('@_') || key === '#text' || key === exclude) continue;
+    out.set(key, attrSignature(value));
+  }
+  return out;
+};
+
+const changedProperties = (before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): ReadonlyArray<string> =>
+  [...new Set([...before.keys(), ...after.keys()])].filter((name) => before.get(name) !== after.get(name)).toSorted((a, b) => a.localeCompare(b));
+
+const changesIn = (root: unknown, container: string, propsTag: string, changeTag: string, scope: 'run' | 'paragraph'): ReadonlyArray<FormatChange> => {
+  const out: Array<FormatChange> = [];
+  for (const node of findAll(root, container)) {
+    const props = node[propsTag];
+    if (!props || typeof props !== 'object') continue;
+    const change = (props as XmlObject)[changeTag];
+    if (!change || typeof change !== 'object') continue;
+    const text = collectText(node, 'w:t');
+    if (text === '') continue;
+    out.push({
+      scope,
+      author: attrOf(change as XmlObject, 'w:author'),
+      date: attrOf(change as XmlObject, 'w:date'),
+      text,
+      properties: changedProperties(propertiesOf((change as XmlObject)[propsTag], changeTag), propertiesOf(props, changeTag)),
+    });
+  }
+  return out;
+};
+
+const extractFormatChanges = (root: unknown): ReadonlyArray<FormatChange> => [
+  ...changesIn(root, 'w:r', 'w:rPr', 'w:rPrChange', 'run'),
+  ...changesIn(root, 'w:p', 'w:pPr', 'w:pPrChange', 'paragraph'),
+];
+
 const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetadata, GraphError>> => {
   const zipR = await openOoxmlZip(bytes);
   if (!zipR.ok) return zipR;
@@ -229,6 +351,8 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
     insertions: extractTracked(document, 'w:ins').filter((t) => !paired.has(`ins:${t.id}`)),
     deletions: extractTracked(document, 'w:del').filter((t) => !paired.has(`del:${t.id}`)),
     replacements,
+    moves: extractMoves(documentXml),
+    formatChanges: extractFormatChanges(document),
     hiddenText: extractHidden(document),
     textBoxes: extractTextBoxes(zip),
     headersFooters: extractHeadersFooters(zip),
@@ -239,4 +363,4 @@ const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetada
 };
 
 export { extractDocxMetadata };
-export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, HeaderFooter, Person, Replacement, TrackedChange };
+export type { Bookmark, Comment, CustomProp, DocxMetadata, ExternalRel, Field, FormatChange, HeaderFooter, Move, Person, Replacement, TrackedChange };

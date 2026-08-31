@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildDocxWithHeaderFooterTextbox, buildMacroDocm, buildMalformedDocx, buildRichDocx, buildSampleDocx, buildSideChannelDocx, buildTrackedChangesDocx } from '../../test-helpers/office-fixtures.ts';
+import {
+  buildDocxWithHeaderFooterTextbox,
+  buildMacroDocm,
+  buildMalformedDocx,
+  buildMoveAndFormatDocx,
+  buildRichDocx,
+  buildSampleDocx,
+  buildSideChannelDocx,
+  buildTrackedChangesDocx,
+} from '../../test-helpers/office-fixtures.ts';
 import { formatDocxMetadata } from './docx-metadata-to-markdown.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
 
@@ -283,5 +292,87 @@ describe('extractDocxMetadata — replacement pairing', () => {
     if (!result.ok) return;
     expect(result.value.insertions.some((i) => i.text === 'lonely-ins')).toBe(true);
     expect(result.value.replacements.some((r) => r.after === 'lonely-ins')).toBe(false);
+  });
+});
+describe('extractDocxMetadata — moves and format changes', () => {
+  it('joins a move by its range name rather than its text, so two moves of the same sentence stay two moves', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const joined = result.value.moves.filter((m) => m.halves === 'both');
+    expect(joined).toHaveLength(2);
+    expect(joined.map((m) => m.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['move-alpha', 'move-beta']);
+    expect(joined.every((m) => m.text === 'the same sentence')).toBe(true);
+    expect(joined.every((m) => m.author === 'Robin Chen')).toBe(true);
+  });
+
+  it('still reports a move whose destination never arrived, marked as the half it is', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.moves).toContainEqual({
+      name: 'move-orphan',
+      author: 'Robin Chen',
+      date: '2026-04-02T00:00:00Z',
+      text: 'orphaned sentence',
+      halves: 'from-only',
+    });
+  });
+
+  it('names the properties that changed when one formatting tag replaces another', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const styled = result.value.formatChanges.find((f) => f.text === 'styled words');
+    expect(styled?.scope).toBe('run');
+    expect(styled?.author).toBe('Alex Kim');
+    expect(styled?.properties.toSorted((a, b) => a.localeCompare(b))).toEqual(['w:b', 'w:i']);
+  });
+
+  // The case a tag-name comparison misses: w:color is on both sides and only
+  // the value moved, so the paragraph reads as unchanged unless attributes count.
+  it('catches a property whose tag is unchanged and whose value moved', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const recoloured = result.value.formatChanges.find((f) => f.text === 'recoloured words');
+    expect(recoloured?.properties).toEqual(['w:color']);
+  });
+
+  // Two attributes per side is what makes the comparison order them at all. It
+  // is also the shape a real font change takes, where ascii and hAnsi move together.
+  it('compares a property carrying several attributes as one value, so a font swap is one changed property', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const refonted = result.value.formatChanges.find((f) => f.text === 'refonted words');
+    expect(refonted?.properties).toEqual(['w:rFonts']);
+  });
+
+  it('reports a paragraph-property change against the paragraph text, scoped apart from run formatting', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const realigned = result.value.formatChanges.find((f) => f.text === 'realigned paragraph');
+    expect(realigned?.scope).toBe('paragraph');
+    expect(realigned?.properties).toEqual(['w:jc']);
+  });
+
+  it('invents no revision for a run that was simply formatted and never edited', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.formatChanges.some((f) => f.text === 'plain bold text')).toBe(false);
+  });
+
+  // Guard on the pairing rule next door: a moveTo carries w:t like an insertion
+  // does, so a del/ins pairing that keyed on "opposite kind" would swallow it.
+  it('keeps moves out of the insertion, deletion and replacement lists entirely', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.insertions).toEqual([]);
+    expect(result.value.deletions).toEqual([]);
+    expect(result.value.replacements).toEqual([]);
   });
 });
