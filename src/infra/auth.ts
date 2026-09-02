@@ -162,6 +162,16 @@ type AuthManager = {
    * Optional: only the real manager implements it; a minimal fake omits it
    * and callers treat that as unavailable. Never captures or refreshes.
    */
+  /**
+   * The cached BASIC token, decoded by `scopes-check` and never acquired: no
+   * refresh, no browser. The acquiring getter heals a dead session by opening
+   * a browser and, when the persistent profile is already signed in, wiping it
+   * so the grant re-fires (2026-09-02: a diagnostic did exactly that). A stale
+   * token comes back as-is so its expiry can be reported; no cache at all is
+   * `undefined`. Optional: a bring-your-own-token manager omits it and callers
+   * fall back to `getAccessToken`, which is then the caller's own function.
+   */
+  getCachedBasicToken?: () => Promise<AccessToken | undefined>;
   getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
   /**
    * Same decode-only preflight as `getCachedElevatedInfo`, for the chatsvcagg /
@@ -678,6 +688,12 @@ const createAuthManagerFromApi = (
   // with what `getElevatedAccessToken` would decide — but it never captures or
   // refreshes. `expiresInSeconds` is the raw exp − now (negative once past), so a
   // caller sees the runway even when the token is inside the buffer.
+  const getCachedBasicToken = async (): Promise<AccessToken | undefined> => {
+    const cached = await readCache();
+    const token = cached?.access_token;
+    return token === undefined || token === '' ? undefined : accessTokenUnsafe(token);
+  };
+
   const getCachedElevatedInfo = async (): Promise<CachedTierInfo> => {
     const cached = await readCache();
     const exp = cached?.elevated_expires_on;
@@ -988,6 +1004,7 @@ const createAuthManagerFromApi = (
     logout,
     getLastElevatedOutcome,
     getLastChatsvcaggOutcome,
+    getCachedBasicToken,
     getCachedElevatedInfo,
     getCachedChatsvcaggInfo,
     getCachedIc3Info,

@@ -1003,6 +1003,50 @@ describe('graph client', () => {
     }
   });
 
+  // scopes-check reaches the basic token through this method, and in a terminal
+  // the acquiring getter heals a dead session by opening a browser and wiping
+  // the persistent sign-in (seen 2026-09-02). A diagnostic must never do that:
+  // with the decode-only reader present, the acquiring getter is not consulted.
+  it('getCachedTokenInfo reads the basic tier from the decode-only cache reader and never consults the acquiring getter', async () => {
+    const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    const expiredAnHourAgo = Math.floor(Date.now() / 1000) - 3600;
+    const jwt = `${segment('{"alg":"none"}')}.${segment(JSON.stringify({ scp: 'Mail.Read', aud: 'https://graph.microsoft.com', exp: expiredAnHourAgo }))}.sig`;
+    let acquiringGetterCalls = 0;
+    const tokenAuth: AuthManager = fakeAuthManager({
+      getAccessToken: async () => {
+        acquiringGetterCalls += 1;
+        return ok(accessTokenUnsafe('a-token-that-came-from-a-browser'));
+      },
+      getCachedBasicToken: async () => accessTokenUnsafe(jwt),
+    });
+    const result = await createGraphClient(tokenAuth).getCachedTokenInfo();
+    expect(acquiringGetterCalls).toBe(0);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual(['Mail.Read']);
+      // Expired is reported as expired: a negative runway, not a re-captured token.
+      expect(result.value.expiresInSeconds).toBeLessThan(0);
+    }
+  });
+
+  it('getCachedTokenInfo reports not-signed-in when the cache reader finds nothing, without reaching for a browser', async () => {
+    let acquiringGetterCalls = 0;
+    const tokenAuth: AuthManager = fakeAuthManager({
+      getAccessToken: async () => {
+        acquiringGetterCalls += 1;
+        return ok(accessTokenUnsafe('a-token-that-came-from-a-browser'));
+      },
+      getCachedBasicToken: async () => undefined,
+    });
+    const result = await createGraphClient(tokenAuth).getCachedTokenInfo();
+    expect(acquiringGetterCalls).toBe(0);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('auth_failed');
+      expect(result.error.message).toContain('login');
+    }
+  });
+
   it('getCachedTokenInfo returns empty scopes / undefined audience+expiry when the token has none of those claims', async () => {
     const segment = (s: string): string => Buffer.from(s, 'utf-8').toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
     const jwt = `${segment('{"alg":"none"}')}.${segment('{"sub":"me"}')}.sig`;

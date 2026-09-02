@@ -1,3 +1,4 @@
+import type { AccessToken } from '../domain/access-token.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
@@ -734,12 +735,25 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     }
   };
 
-  const getCachedTokenInfo = async (): Promise<Result<TokenInfo, GraphError>> => {
-    const tokenResult = await auth.getAccessToken();
-    if (!tokenResult.ok) {
-      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      return err({ type: 'auth_failed', message: msg });
+  // Decode-only: the basic tier is read off the cache when the manager can do
+  // that, never acquired. The acquiring getter would heal a dead session by
+  // opening a browser and wiping the persistent sign-in, which is the one thing
+  // a diagnostic must not do. A manager without the reader is a bring-your-own
+  // token one, whose `getAccessToken` is the caller's own function.
+  const basicTokenForInspection = async (): Promise<Result<AccessToken, GraphError>> => {
+    if (auth.getCachedBasicToken) {
+      const cached = await auth.getCachedBasicToken();
+      return cached === undefined ? err({ type: 'auth_failed', message: 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.' }) : ok(cached);
     }
+    const tokenResult = await auth.getAccessToken();
+    if (tokenResult.ok) return tokenResult;
+    const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
+    return err({ type: 'auth_failed', message: msg });
+  };
+
+  const getCachedTokenInfo = async (): Promise<Result<TokenInfo, GraphError>> => {
+    const tokenResult = await basicTokenForInspection();
+    if (!tokenResult.ok) return tokenResult;
     const claims = decodeJwtPayload(tokenResult.value);
     const scpRaw = claims['scp'];
     const scopes = typeof scpRaw === 'string' ? scpRaw.split(' ').filter((s) => s.length > 0) : [];

@@ -18,6 +18,35 @@ const cachedElevatedInfo = async (m: AuthManager): Promise<{ available: boolean;
   return read ? read() : { available: false, expiresInSeconds: undefined, scopes: [] };
 };
 
+describe('getCachedBasicToken', () => {
+  // A dead session in a terminal makes the acquiring getter open a browser and
+  // wipe the persistent sign-in. The reader hands back whatever the cache holds,
+  // stale included, and touches nothing: the browser fake here throws on launch.
+  it('returns the cached basic token as-is, even expired, without refreshing or launching a browser', async () => {
+    const fs = createFileSystemFake();
+    const past = Math.floor(Date.now() / 1000) - 3600;
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'stale-basic-token', expires_on: past, refresh_token: 'old-refresh' }));
+    const browser = fakeBrowserAuth({ acquireError: new Error('a decode-only read must never launch the browser') });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+    expect(auth.getCachedBasicToken).toBeDefined();
+    expect(await auth.getCachedBasicToken?.()).toBe(accessTokenUnsafe('stale-basic-token'));
+  });
+
+  it('treats an empty access_token in the cache as nothing to inspect', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: '', expires_on: 0, refresh_token: 'old-refresh' }));
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({}), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+    expect(await auth.getCachedBasicToken?.()).toBeUndefined();
+  });
+
+  it('answers undefined when nothing is cached, rather than acquiring', async () => {
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ acquireError: new Error('a decode-only read must never launch the browser') });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+    expect(await auth.getCachedBasicToken?.()).toBeUndefined();
+  });
+});
+
 // The chatsvcagg / ic3 substrate tokens share the same decode-only preflight
 // contract as elevated; `login`'s four-token status and `scopes-check` read them.
 const cachedChatsvcaggInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined; scopes: ReadonlyArray<string> }> => {

@@ -102,6 +102,18 @@ misses: `signature_not_found` when the scanned or pinned message carries no
 OWA signature block, and `no_sent_messages` when there is nothing to scan at
 all. The messages are unchanged.
 
+### Fixed — `scopes-check` never opens a browser
+
+`scopes-check` obtained the basic token through the same acquiring getter as
+every other command, and in a terminal that getter heals an expired session by
+opening a browser; when the persistent profile is already signed in it also
+clears the session so the OAuth grant can re-fire, which drops the 90-day
+"Stay signed in" cookie. A diagnostic did all of that on 2026-09-02. The basic
+tier is now read straight off the cache like the elevated and Teams tiers
+already were: an expired token reports a negative `expiresInSeconds`, an empty
+cache reports not-signed-in, and `login` remains the command that refreshes.
+Bring-your-own-token managers built with `createGraphClient` are unaffected.
+
 ### Added — an `invalidAudienceUri` error hint
 
 The one 401 that re-authenticating cannot fix now says so. Graph cannot mint a
