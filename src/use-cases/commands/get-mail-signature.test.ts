@@ -101,10 +101,14 @@ describe('get-mail-signature', () => {
 
     expect(result.ok).toBe(false);
     // Reporting "the last 1 sent message" here would be a lie: nothing was scanned.
-    if (!result.ok)
+    if (!result.ok) {
+      // Same code as the scan miss: what an agent routes on is "no signature
+      // here", and which of the two paths found nothing is in the message.
+      expect(result.error.code).toBe('signature_not_found');
       expect(result.error.message).toBe(
         'Message pinned-1 carries no OWA signature block (`<div id="Signature">`). Mail composed in Outlook desktop does not carry the marker; pin a message sent from Outlook on the web instead.'
       );
+    }
   });
 
   it('counts a single scanned message in the singular when it reports finding no signature', async () => {
