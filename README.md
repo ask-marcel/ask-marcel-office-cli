@@ -74,19 +74,23 @@ Reading one email with its attachments in raw Graph: GET the message, GET the at
 ```console
 $ ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
 
-# Q3 budget review: action needed
+**Subject:** Q3 budget review: action needed
 **From:** Robin Chen <robin.chen@contoso.com>
+**To:** Alex Kim <alex.kim@contoso.com>
+**Date:** 2026-09-02T08:14:22Z
 
 Before Friday's review, the forecast tab still shows last quarter's
 headcount. Can you sanity-check the attached numbers?
 
 Robin
-[inline image: contoso-signature.png]
 
-[Quoted reply chain removed — pass --keep-quoted true to include it]
+\[inline image: contoso-signature.png\]
 
-## Attachments
-- Q3-forecast.xlsx (48 KB) · id AAMkAD...
+_\[Quoted reply chain removed — pass --keep-quoted true to include it\]_
+
+**Attachments:**
+- Q3-forecast.xlsx (49.2 KB, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, id: AAMkAD...)
+_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._
 ```
 
 Those two bracketed lines are the entire cost of a 40-message thread and a signature logo. Attachments arrive with their ids ready for the follow-up call:
