@@ -57,7 +57,7 @@ And against the tools you already know:
 
 ### 🔑 Sign in like a human, not like an app
 
-Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `scopes-check` reports per-token scopes and expiry with zero side effects.
+Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `scopes-check` reports per-token scopes and expiry without a Graph call and without ever opening a browser: an expired session is reported as expired, not re-captured.
 
 ### 🛡️ Safe to hand to an autonomous agent
 
