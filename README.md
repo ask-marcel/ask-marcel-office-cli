@@ -4,12 +4,10 @@
 
 ### The Microsoft 365 command line built for AI agents
 
-**One sign-in. 182 read-only commands. Every document as clean markdown.**
+**One sign-in. No Azure app registration. Every document as clean markdown.**
 
 [![npm version](https://img.shields.io/npm/v/ask-marcel-office-cli.svg?logo=npm&color=cb3837)](https://www.npmjs.com/package/ask-marcel-office-cli)
 [![license: MIT](https://img.shields.io/npm/l/ask-marcel-office-cli.svg?color=blue)](LICENSE)
-[![node ≥20](https://img.shields.io/node/v/ask-marcel-office-cli?logo=node.js&color=339933)](https://nodejs.org)
-[![bun ≥1.0](https://img.shields.io/badge/bun-%E2%89%A51.0-14151a?logo=bun)](https://bun.sh)
 [![types included](https://img.shields.io/npm/types/ask-marcel-office-cli?logo=typescript&color=3178c6)](docs/USAGE.md)
 
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
@@ -32,6 +30,29 @@ ask-marcel-office list-mail-messages --top 5
 
 That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And nothing for a runaway agent to break: the command surface is read-only by design.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ask-marcel/ask-marcel-office-cli/main/docs/demo.gif" alt="ask-marcel-office converting an Outlook .msg file into clean markdown in one command, offline" width="880">
+</p>
+
+## The difference in practice
+
+| You need | Raw Microsoft Graph | ask-marcel-office |
+|---|---|---|
+| Access | App registration, admin consent, secret rotation | `login`: one browser sign-in with your own account |
+| An email + attachments | 6+ round trips, HTML-to-text is your problem | `convert-mail-to-markdown`: one call, markdown out |
+| A pptx / pdf / legacy .doc as text | Raw bytes, bring your own converter | `download-drive-item-as-markdown`: one call |
+| A useful error | `BadRequest: Invalid filter clause` | `hint: "string literals MUST use single quotes; embed one by doubling it"` |
+| A 5 MB PDF | Base64 flooding the context window | `--output-path` writes it to disk; the model reads 3 lines |
+| Throttling | HTTP 429, guess the backoff | `retryAfterSeconds` surfaced in the error envelope |
+
+And against the tools you already know:
+
+| | Microsoft Graph SDKs | CLI for Microsoft 365 (PnP) | ask-marcel-office |
+|---|---|---|---|
+| Sign-in | An Entra app registration, always: every auth flow needs a client id | An Entra app registration; its `setup` command creates one, and the permissions it requests can need admin consent | Your own account, in a browser, once. No app registration |
+| Built for | Backend services | Admins and scripts | Tool-calling LLMs: markdown out, lean fields, a repair hint on every error |
+| Can it break things | Whatever your app's permissions allow | Yes: it creates, changes, and deletes across the tenant | No: read-only by design; the four writes only leave unsent drafts |
+
 ## The three walls it removes
 
 ### 🔑 Sign in like a human, not like an app
@@ -40,7 +61,7 @@ Microsoft Graph normally means registering an Azure app, chasing tenant-admin co
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 186 commands break down as 178 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call.
+The 186 commands break down as 178 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft Graph and a periodic npm version check.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -59,11 +80,16 @@ $ ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
 Before Friday's review, the forecast tab still shows last quarter's
 headcount. Can you sanity-check the attached numbers?
 
+Robin
+[inline image: contoso-signature.png]
+
+[Quoted reply chain removed — pass --keep-quoted true to include it]
+
 ## Attachments
 - Q3-forecast.xlsx (48 KB) · id AAMkAD...
 ```
 
-The quoted chain below the reply is replaced by a one-line marker (restore it with `--keep-quoted true`), inline images become named placeholders, and attachments arrive with the ids ready for the follow-up call:
+Those two bracketed lines are the entire cost of a 40-message thread and a signature logo. Attachments arrive with their ids ready for the follow-up call:
 
 ```console
 $ ask-marcel-office convert-mail-attachment-to-markdown \
@@ -77,22 +103,11 @@ $ ask-marcel-office microsoft-search-query --query "Q3 budget filetype:pptx"
 $ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item-id "01BYE..."
 ```
 
-## The difference in practice
-
-| You need | Raw Microsoft Graph | ask-marcel-office |
-|---|---|---|
-| Access | App registration, admin consent, secret rotation | `login`: one browser sign-in with your own account |
-| An email + attachments | 6+ round trips, HTML-to-text is your problem | `convert-mail-to-markdown`: one call, markdown out |
-| A pptx / pdf / legacy .doc as text | Raw bytes, bring your own converter | `download-drive-item-as-markdown`: one call |
-| A useful error | `BadRequest: Invalid filter clause` | `hint: "string literals MUST use single quotes; embed one by doubling it"` |
-| A 5 MB PDF | Base64 flooding the context window | `--output-path` writes it to disk; the model reads 3 lines |
-| Throttling | HTTP 429, guess the backoff | `retryAfterSeconds` surfaced in the error envelope |
-
 ## What your agent can reach
 
 | Surface | Commands | In practice |
 |---|---:|---|
-| 📧 Outlook Mail | 36 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
+| 📧 Outlook Mail | 38 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
 | 📁 OneDrive + SharePoint | 49 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history, share links resolved even into partner tenants where you're a guest |
 | 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
 | 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
@@ -184,7 +199,7 @@ You get **five gateway tools**, not one per command — a schema per command wou
 |:--|:--|
 | `list-commands` | The terse manifest. Start here; `category` narrows it. |
 | `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 180 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-command` | The 182 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 
