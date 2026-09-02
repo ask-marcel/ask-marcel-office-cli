@@ -178,7 +178,7 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-ma
 
 > **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
 
-You get **five gateway tools**, not one per command — 184 tool schemas would bloat every session, the opposite of the point:
+You get **five gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
 
 | Tool | Does |
 |:--|:--|

@@ -18,7 +18,7 @@ bun add -g ask-marcel-office-cli
 ask-marcel-office login
 
 # the rest is discoverable
-ask-marcel-office --help                                # ~38 KB, one-sentence summaries
+ask-marcel-office --help                                # ~34 KB, one-sentence summaries
 ask-marcel-office help-json --terse --category mail     # ~6 KB JSON for one category
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
@@ -306,7 +306,7 @@ Environment variables read at composition time:
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun test           # full suite (4800+ tests)
+bun test           # full suite (4,700+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)

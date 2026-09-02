@@ -62,8 +62,10 @@ const errText = (message: string, code?: string, source?: Parameters<typeof rend
   isError: true,
 });
 
-// Derived, never hardcoded. The ADR said 182/3; the registry says 180/4. Any
-// literal here would be stale the next time a command lands.
+// Derived, never hardcoded — and that goes for prose about it too. This comment
+// used to name the split as a pair of literals, and those literals were stale
+// within two releases: exactly the failure the derivation below exists to
+// prevent. Read the counts off the registry, never off a sentence.
 const readCommandNames = Object.entries(cmdRegistry)
   .filter(([, c]) => c.meta.mutates !== true)
   .map(([n]) => n);
@@ -122,9 +124,9 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     }
   );
 
-  // The read/write split exists so the 180 read commands keep an honest
+  // The read/write split exists so the read commands keep an honest
   // `readOnlyHint: true` (which lets a client auto-approve them) instead of
-  // losing it to the 4 draft commands sharing one tool.
+  // losing it to the handful of draft commands sharing one tool.
   const runToolInput = {
     command: z.string().describe('Command name from list-commands.'),
     params: z.record(z.string(), z.string()).optional().describe('Command options WITHOUT the `--` prefix, e.g. {"top":"10","folderId":"inbox"}. See get-command-docs.'),

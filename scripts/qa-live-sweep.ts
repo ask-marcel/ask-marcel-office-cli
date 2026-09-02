@@ -146,7 +146,17 @@ const pickPair = (cmd: string): any => (/zip/.test(cmd) ? undefined : EXCEL.test
 const argFor = (cmd: string, opt: string): string[] | null => {
   const pr = pickPair(cmd);
   // command-aware special cases first
-  if (opt === 'path') return LOCAL.has(cmd) ? ['--path', 'src/test-helpers/assets/sample.msg'] : siteUrl ? ['--path', siteUrl.pathname] : null;
+  // Both local commands take --path, but not the same kind of file: a .msg has
+  // no embedded images, so feeding it to extract-local-file-images produced an
+  // `unsupported_document` ERR on every run. That false failure was written off
+  // as a harvest artifact twice (2026-07-20, 2026-08-31), which left the command
+  // effectively unaudited — a real regression in it would have looked identical.
+  if (opt === 'path')
+    return LOCAL.has(cmd)
+      ? ['--path', cmd === 'extract-local-file-images' ? 'src/test-helpers/assets/image-sample.docx' : 'src/test-helpers/assets/sample.msg']
+      : siteUrl
+        ? ['--path', siteUrl.pathname]
+        : null;
   if (opt === 'url') return cmd === 'next-page' ? (nextLink ? ['--url', nextLink] : null)
     : cmd === 'resolve-drive-share-link' ? ['--url', site?.webUrl || 'https://example.sharepoint.com/x']
     : cmd === 'resolve-mail-link' ? ['--url', 'https://outlook.office.com/mail/inbox/id/AAQkAGnope']
