@@ -93,6 +93,15 @@ Table-structure revisions (cell insert / delete / merge, numbering, section and
 table properties) remain unreported, and the `--include-metadata` docs now say
 so rather than leaving it to be discovered.
 
+### Added — `get-mail-signature` empty states carry an `errorCode`
+
+Finding no signature used to come back as a validation error with a good
+message and no code, so an agent routing on `errorCode` saw nothing and the
+live QA sweep logged it as `ERR:err`. Two codes now name the two distinct
+misses: `signature_not_found` when the scanned or pinned message carries no
+OWA signature block, and `no_sent_messages` when there is nothing to scan at
+all. The messages are unchanged.
+
 ### Added — an `invalidAudienceUri` error hint
 
 The one 401 that re-authenticating cannot fix now says so. Graph cannot mint a
