@@ -134,7 +134,7 @@ The in-memory fakes in `src/test-helpers/` must model the boundary, or use-case 
 
 ## Executable tripwire
 
-`assets/check-isolation-tests.sh` refuses a newly staged route/resource file with no nearby test mentioning a 404 (globs configurable at the top of the script; `*public*`/`*health*` paths exempt by convention). It is deliberately the weakest of the four guards: it proves a cross-tenant test exists near the route, not that it asserts the right thing. The per-endpoint test above remains the contract; the wire just refuses the common failure of landing a route with no isolation test at all.
+`assets/check-isolation-tests.sh` refuses a newly staged route/resource file with no nearby test mentioning a 404 (globs configurable at the top of the script; `*public*`/`*health*`/`*to-response*` paths exempt by convention, the last because a response mapper is a presenter, not a route). It is deliberately the weakest of the four guards: it proves a cross-tenant test exists near the route, not that it asserts the right thing. The per-endpoint test above remains the contract; the wire just refuses the common failure of landing a route with no isolation test at all.
 
 ## Review checklist (changes in a multi-user code path)
 

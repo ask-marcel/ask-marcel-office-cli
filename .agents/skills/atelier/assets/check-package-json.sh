@@ -17,7 +17,13 @@
 
 set -euo pipefail
 
-if [ ! -f package.json ]; then
+# Every manifest in the repo, not just the root one: in a monorepo the
+# dependencies live in apps/* and packages/*, so a root-only read passes a
+# repo whose workspaces pin "latest" (found in a real consumer repo,
+# 2026-08-30 field test). node_modules and .git are excluded.
+manifests=$(find . -name package.json -not -path '*/node_modules/*' -not -path '*/.git/*' | sort)
+
+if [ -z "$manifests" ]; then
   exit 0
 fi
 
@@ -28,14 +34,14 @@ fi
 # "next" is fine; the version "next" is not).
 # Catches:  "any-pkg": "latest",   "x": "*",   "plugin": "beta"
 # Permits:  "x": "^1.2.3" / "~1.2.3" / ">=1.0.0" / "^4.0.0-beta.0",  "next": "16.1.1"
-violations=$(grep -nE ':[[:space:]]*"(\*|latest|beta|alpha|next|canary|rc)"' package.json || true)
+violations=$(echo "$manifests" | tr '\n' '\0' | xargs -0 grep -nHE ':[[:space:]]*"(\*|latest|beta|alpha|next|canary|rc)"' || true)
 
 if [ -z "$violations" ]; then
   exit 0
 fi
 
 cat <<EOF >&2
-  ╳ package.json contains a forbidden version string ("latest", "*", or a bare dist-tag):
+  ╳ a package.json declares a forbidden version string ("latest", "*", or a bare dist-tag):
 
 $(echo "$violations" | sed 's/^/      /')
 

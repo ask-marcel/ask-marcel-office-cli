@@ -58,4 +58,4 @@ bun run lint:staged
 echo "[5/5] bun run typecheck"
 bun run typecheck
 
-echo "pre-commit: fast gates passed. The full suite, coverage, and mutation run in CI (assets/ci.yml)."
+echo "pre-commit: fast gates passed. The full suite, coverage, and mutation run in CI (.github/workflows/ci.yml)."

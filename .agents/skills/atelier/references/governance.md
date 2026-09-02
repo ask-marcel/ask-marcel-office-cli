@@ -23,12 +23,33 @@ jobs:
 
 The atelier repo's own `scripts/smoke-test.sh` is the reference implementation: it follows this README's install steps verbatim into a scratch repo and fails if any of them break, which is exactly a docs-check for a project whose product is its instructions.
 
+## A vendored standard is a dependency (5.3, 12.1)
+
+A repo that vendors or pins this skill (a `skills-lock.json` hash, a copied `.claude/skills/`
+tree, a submodule) has taken a dependency on doctrine, and it goes stale exactly like a
+library does: silently, while every gate stays green. A 2026-08-30 field test found a real
+consumer running a 49-day-old pin, so its hook still ran the pre-split eight gates and its
+rule 26 still read the superseded wording. Nothing was broken; the repo was faithfully
+following a standard that had moved.
+
+Treat it as the dependency it is. Pin it (never float), re-check the pin on the same cadence
+as the dependency scan, and re-sync deliberately: read what changed between the pinned
+version and current, then bring the gates and their prose across in one commit, because the
+doctrine and the assets that enforce it move together. Vendor it ONCE per repo: two copies
+of the standard in one tree is 12.1 drift with extra steps.
+
+The re-check is mechanical, not a memory exercise: `assets/check-skill-pin.sh` compares the
+vendored `SKILL.md` against upstream and fails when it has fallen behind, and it rides in
+`assets/audit.yml` beside the CVE scan rather than blocking commits, because upstream doctrine
+changes independently of your diff. It degrades when it cannot reach upstream, and says so:
+unverified is not the same as current.
+
 ## Decision records (why is it like this)
 
 Two tiers, one rule: the record changes in the same commit as the code it explains, so it cannot drift.
 
 - **Every significant decision** gets a one-line `[decision]` entry in `.claude/LESSONS.md` (append-only; superseded by a newer entry when it changes). This is the index and stays the default (`references/lessons.md`).
-- **Decisions with rejected alternatives and a reversal path worth keeping** (a vendor, a storage engine, a deliberate lock-in, a security tradeoff) additionally get a full decision record: `docs/adr/NNNN-title.md`, committed with the change. The atelier-grill-me interview output is the natural draft.
+- **Decisions with rejected alternatives and a reversal path worth keeping** (a vendor, a storage engine, a deliberate lock-in, a security tradeoff) additionally get a full decision record: `docs/adr/NNNN-title.md`, committed with the change. The atelier-grill-me interview output is the natural draft. One trap in the standard MADR template: its `Deciders` field invites a person's name into a tracked file, which rule 26 forbids. Put the accountable ROLE or team handle there (the same string CODEOWNERS uses); who typed it is already in the commit metadata, permanently and for free.
 
 ```markdown
 # 0007: Encrypt state client-side

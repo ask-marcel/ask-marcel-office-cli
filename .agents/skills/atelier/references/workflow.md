@@ -354,7 +354,7 @@ To also remap the author and committer fields, add `--mailmap` with `Intended Na
 
 The gate set has two homes, split by speed and not by importance (rule 15.1). The pre-commit hook runs the **fast gates** only, because a multi-minute hook trains `git commit --no-verify` (rule 15.3). Every gate, fast and slow, also runs in **CI**, the line that cannot be skipped and the required merge check (rule 4.6). The full test suite, per-tier coverage, and Stryker mutation are slow and grow with the codebase, so they live in CI and only in CI.
 
-This is the **Bun-script variant's** mechanism. The Next.js monorepo uses `simple-git-hooks` (staged lint + typecheck + commitlint) instead, see `references/nextjs-monorepo.md`. Never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other.
+This is the **Bun-script variant's** mechanism. The Next.js monorepo uses `simple-git-hooks` (pre-commit runs each package's test + lint; commit-msg runs commitlint) instead, see `references/nextjs-monorepo.md`. Never install both: `core.hooksPath` and `simple-git-hooks` overwrite each other.
 
 **The pre-commit hook (fast gates, target under ~5s):**
 
@@ -368,7 +368,7 @@ This is the **Bun-script variant's** mechanism. The Next.js monorepo uses `simpl
 
 Every gate here is O(staged files) or O(1). Typecheck is the one that grows with the whole codebase; if it exceeds the hook budget on your repo, move it to CI too. Never add the test suite, coverage, or mutation to the hook.
 
-**CI (`assets/ci.yml`, the authoritative merge gate):** install on a frozen lockfile, then `check-package-json.sh`, `gitleaks detect` (full history), `lint:strict` (type-aware, zero warnings, ~25s), `typecheck`, `bun test` (the whole suite), `bun run coverage` (per-tier), `bun run mutate:changed` on a pull request or `bun run mutate` on main (1-3 min per file), and `bun audit`. Make it a required status check in branch protection (rule 13.2) so a bypassed hook is still caught.
+**CI (`assets/ci.yml`, the authoritative merge gate):** `check-commit-messages.sh` and `check-commit-range.sh` straight after checkout (both need only git history), then install on a frozen lockfile, `check-package-json.sh`, `gitleaks detect` (full history; the workflow installs its own pinned gitleaks), `lint:strict` (type-aware, zero warnings, ~25s), `typecheck`, `bun test` (the whole suite), `bun run coverage` (per-tier), `bun run mutate:changed` on a pull request or `bun run mutate` on main (1-3 min per file). Make it a required status check in branch protection (rule 13.2) so a bypassed hook is still caught. The CVE scan is deliberately NOT in this job; it ships as its own workflow, `assets/audit.yml` (see Dependency scanning below).
 
 A ready-to-copy hook lives in the skill at `assets/pre-commit`, the CI workflow at `assets/ci.yml`, and the staged-lint helper at `assets/lint-staged.sh`. The companion scripts (`check-commit-size.sh`, `check-package-json.sh`, `mutate-staged.sh`, `mutate-changed.sh`, `regenerate-coverage-preload.ts`) live alongside, plus `assets/commit-msg`, a separate git hook documented under *Commit message format* below.
 
@@ -382,6 +382,7 @@ cp <skill>/assets/ci.yml .github/workflows/ci.yml
 cp <skill>/assets/lint-staged.sh scripts/lint-staged.sh
 cp <skill>/assets/check-commit-size.sh scripts/check-commit-size.sh
 cp <skill>/assets/check-package-json.sh scripts/check-package-json.sh
+cp <skill>/assets/check-commit-messages.sh scripts/check-commit-messages.sh
 cp <skill>/assets/check-coverage.ts scripts/check-coverage.ts
 cp <skill>/assets/regenerate-coverage-preload.ts scripts/regenerate-coverage-preload.ts
 cp <skill>/assets/mutate-staged.sh scripts/mutate-staged.sh
@@ -442,7 +443,7 @@ Workflow:
 - **Bumping one specific dep.** `bun update <pkg>` for a constrained bump, or `bun add <pkg>@latest` to force the absolute current latest into the same `^X.Y.Z` slot. Either way, no `"latest"` ends up in the file.
 - **Initial scaffold.** When using the skill's `package.json` skeleton (in `references/bun-typescript.md`), the version ranges are samples. Run `bun install` to resolve them, then `bun update` to pull each dep to its current latest, then commit both files together. Verify with `bash scripts/check-package-json.sh`.
 
-The gate runs `grep -nE '"\*"|"latest"' package.json`. It catches the two bare strings only — version ranges like `^1.2.3` and `>=4.0.0` pass.
+The gate greps the version strings themselves (colon-anchored), catching `"*"`, `"latest"`, and bare dist-tags (`beta`, `alpha`, `next`, `canary`, `rc`); real ranges like `^1.2.3` and `>=4.0.0` pass.
 
 ### Secret scanning with gitleaks (gate 3)
 
@@ -457,7 +458,7 @@ Run `gitleaks detect` once before the first push to GitHub to catch anything tha
 
 [Stryker](https://stryker-mutator.io/) generates small "mutants" of the production code (e.g. `>` becomes `>=`, `&&` becomes `||`, `return x` becomes `return undefined`) and runs the test suite against each. A mutant that survives means your tests don't actually pin the behaviour they appear to.
 
-The atelier policy: **every staged file under `src/domain/**` or `src/use-cases/**` must score ≥90% mutation score** before commit. The threshold is the `break` value in `stryker.conf.json`.
+The atelier policy: **every file under `src/domain/**` or `src/use-cases/**` must score ≥90% mutation score** before it merges. CI is the enforcing home (`mutate:changed` on a pull request, full `mutate` on main); `bun run mutate:staged` is the optional local pre-check. The threshold is the `break` value in `stryker.conf.json`.
 
 ```jsonc
 {
@@ -490,8 +491,18 @@ There is no first-party `@stryker-mutator` Bun runner today (community plugins e
 **Three commands, three scopes:**
 
 - **`bun run mutate`** — full run on `src/domain/**` + `src/use-cases/**`. Slow (1–2 hr on ~150 files). Periodic audit.
-- **`bun run mutate:changed`** — files differing from `origin/main` plus uncommitted edits. Run during iteration. Override base ref with `BASE=HEAD~3 bun run mutate:changed`.
+- **`bun run mutate:changed`**: files differing from `origin/main`, plus uncommitted edits, plus **untracked files**. Run during iteration. Override the base ref with `BASE=HEAD~3 bun run mutate:changed`.
 - **`bun run mutate:staged`**: files staged for the next commit. An optional local pre-push check; CI is the enforcing home, running `mutate:changed` on a pull request and `mutate` on main. Skips with exit 0 when no relevant files are staged, so commits to docs, tests, or scripts are unaffected.
+
+**What `mutate:changed` guarantees, and the one thing it cannot.** Each guarantee exists because its absence produced a green run over unmeasured code:
+
+- **Untracked files are in scope.** A brand-new `src/domain/order.ts` that was never `git add`-ed appears in no diff, so a scope built from diffs alone reports "nothing changed" and exits 0. The script unions in `git ls-files --others --exclude-standard`. (`mutate:staged` deliberately does not: a file must be staged to be committed, so the staged variant has no equivalent hole.)
+- **An unresolvable base ref fails loudly.** `BASE` that does not exist makes every diff fail, and the `|| true` guarding the scope pipeline turns that into "no files changed" plus exit 0. The script now resolves `BASE` up front and exits 1. In CI this matters more than locally: `assets/ci.yml` checks out with `fetch-depth: 0`, but a consumer repo on a shallow checkout has no `origin/main` and would otherwise get a vacuously passing mutation gate on every pull request.
+- **The base ref is refreshed and printed.** `origin/main` is a *local cache* of the remote, moved only by a fetch. Against a stale one, `$BASE...HEAD` still contains long-pushed commits, so the scope fills with files nobody touched. The script fetches when `BASE` is a remote-tracking ref (`|| true`, so offline degrades gracefully; `MUTATE_NO_FETCH=1` opts out) and prints the resolved base as short SHA, relative date, and ahead count, which is what makes staleness visible when you override `BASE` or opt out.
+- **Verdicts are fresh.** The run passes `--force`. Stryker's incremental cache keys on source-file hashes, so a test-only change (a stronger assertion, same source) replays a stale score. Prefer `--force` to deleting the incremental file: `incrementalFile` is owned by `stryker.conf.json`, so a config change would silently turn a hardcoded `rm -f reports/stryker-incremental.json` into a no-op.
+- **Greenfield, before the first push:** there is no `origin/main` yet, so pass a local base (`BASE=$(git rev-list --max-parents=0 HEAD)`) or skip the command until the remote exists. Failing loudly is the point; do not paper over it by restoring a silent exit 0.
+
+**The part no script can encode:** `mutate:changed` output is only a statement about push scope if the ref behind it is current. Fetch before reading any `origin/main`-relative output that way, and confirm what is actually unpushed with `git log --oneline origin/main..HEAD` rather than inferring it from a file list.
 
 **Mutation scope is exactly `src/domain/**` + `src/use-cases/**`, with only two structural exclusions:**
 
@@ -527,6 +538,14 @@ Why a hook and not just a guideline: the commit log is the project's changelog a
 
 The shipped `assets/commit-msg` is a **dependency-free shell validator** — it matches the hand-rolled style of the other gate scripts and adds nothing to `package.json`. The Next.js monorepo variant enforces the identical grammar through `@commitlint/config-conventional` (already in its root toolchain) wired as a `simple-git-hooks` `commit-msg` step; see `references/nextjs-monorepo.md`. Either way the grammar is the same — only the validator differs.
 
+**The hook is the first line, CI is the one that cannot be skipped.** `git commit --no-verify`
+walks straight past the hook, so `assets/check-commit-messages.sh` re-runs the identical grammar
+in CI over every commit in the pushed range (the PR's base branch by default, `HEAD~1..HEAD` when
+that ref does not resolve, never the whole history, so a repo adopting the standard is not failed
+on commits nobody can rewrite). It delegates to the hook script rather than restating the pattern,
+so local and CI cannot drift apart. Merge commits are excluded; the hook's own Revert / fixup! /
+squash! / amend! exemptions still apply.
+
 For Husky, copy `assets/commit-msg`'s body into `.husky/commit-msg`.
 
 ### Periodic audit: surface dead code in `test-helpers`
@@ -549,7 +568,7 @@ Four shipped guards move the mechanical slices of the production disciplines int
 | `assets/check-pii-channels.sh` | 27 | a natural identifier in a query string (literal or via `new URLSearchParams`), a logger message interpolation, a Java `@QueryParam` |
 | `assets/check-io-deadlines.sh` | 29 | an infra `fetch` / Java `HttpClient` with no deadline marker in the file |
 | `assets/check-data-lifecycle.sh` | 30 | a hard delete in app code (erasure/retention paths exempt); destructive DDL outside a `*contract*` migration |
-| `assets/check-isolation-tests.sh` | 28 | a new route file with no nearby test mentioning 404 (`*public*`/`*health*` exempt) |
+| `assets/check-isolation-tests.sh` | 28 | a new route file with no nearby test mentioning 404 (`*public*`/`*health*`/`*to-response*` exempt) |
 
 They are not part of the core gate set: wire them as pre-commit pre-flight steps or CI checks **in repos where the concern exists** (personal data, network IO, a schema, tenants). They are tripwires, not proofs; the discipline references keep the full review duty. The repo smoke test exercises all four so a regression in a guard fails CI here first.
 
@@ -569,12 +588,12 @@ Gate 2 pins every dependency to a concrete version for supply-chain safety, but 
 
 **Tool: `bun audit`.** Bun-native, no new dependency, reads the resolved tree from `bun.lock`, and exits non-zero when it lists a vulnerability. `--audit-level=high` filters to high/critical; an unfixable advisory is allow-listed with `--ignore <id>` **at the workflow level, with a reason** — never inline, the same rule as a project-level ESLint severity change.
 
-**It is a CI job, not a ninth gate.** CVE feeds change daily, independent of your diff. Blocking a 10-file commit because a new advisory dropped overnight in an *untouched* dependency fails in the wrong place. So the scan runs in CI on two triggers, each doing a different job:
+**It is a CI job, not a hook gate.** CVE feeds change daily, independent of your diff. Blocking a 10-file commit because a new advisory dropped overnight in an *untouched* dependency fails in the wrong place. So the scan runs in CI on two triggers, each doing a different job:
 
 - **A scheduled daily run** is the real watchdog — it is the only thing that catches a newly-disclosed CVE in a dependency *nobody touched*. A red scheduled run is the signal; wire it to an issue or chat alert if you want (out of scope here).
 - **A pull-request run scoped to `package.json` / `bun.lock`** blocks vulnerabilities a PR *deliberately introduces*, while never red-flagging PRs that don't change dependencies.
 
-`.github/workflows/audit.yml`:
+`.github/workflows/audit.yml` (ships ready to copy as `assets/audit.yml`):
 
 ```yaml
 name: audit
@@ -591,7 +610,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile   # also fails on lockfile drift — a supply-chain check in itself
+      - run: bun install --frozen-lockfile   # also fails on lockfile drift, a supply-chain check in itself
       - run: bun audit --audit-level=high
       # An advisory with no upstream fix is allow-listed here, project-level, with a reason:
       # - run: bun audit --audit-level=high --ignore GHSA-xxxx-xxxx-xxxx  # no patched release as of YYYY-MM-DD; tracking <link>
@@ -664,7 +683,7 @@ A session usually contains several back-to-back tasks. Each one might pass its t
 Two guardrails prevent Prettier ↔ VS Code TS-formatter drift:
 
 1. `source.fixAll.eslint` on save applies the ESLint-with-Prettier rules **after** whatever formatter handled the file, so the lint rules always have the last word. TS/TSX files format with `vscode.typescript-language-features` (its output is then normalised by the ESLint fix pass); everything else defaults to `dbaeumer.vscode-eslint`. The canonical per-variant `.vscode/settings.json` blocks live in `references/bun-typescript.md` and `references/nextjs-monorepo.md`.
-2. The pre-commit hook runs the full four-check loop, catching any drift at commit time.
+2. The pre-commit hook catches staged-lint and typecheck drift at commit time; the full suite, coverage, and mutation catch the rest in CI.
 
 ```json
 // .vscode/settings.json (excerpt — full blocks in the variant references)
@@ -700,7 +719,7 @@ After the change, restart the TS server in VS Code (Cmd/Ctrl + Shift + P → "Ty
 - **Zero warnings, zero inline ignores.** Refactor or change severity at the project level; never suppress per-line.
 - **Coverage gates per-tier:** 100% on `domain` + `use-cases`, 80% on `composition` + `infra` + `presenter`, skip `test-helpers` and `main.ts` only. `build-deps.ts` is now in scope (testable via optional config DI).
 - **SonarLint parity at lint time** via `eslint-plugin-sonarjs` + type-aware `@typescript-eslint` rules.
-- **Pre-commit hook runs the fast gates** (commit size, package.json, gitleaks protect, lint:staged, typecheck); **CI (`assets/ci.yml`) runs the full set** and is the required merge check: strict lint, typecheck, the whole test suite, coverage, and mutation, on a frozen lockfile, plus `bun audit`.
+- **Pre-commit hook runs the fast gates** (commit size, package.json, gitleaks protect, lint:staged, typecheck); **CI (`assets/ci.yml`) runs the full set** and is the required merge check: commit messages over the pushed range, strict lint, typecheck, the whole test suite, coverage, and mutation, on a frozen lockfile; the CVE scan is its own scoped workflow (`assets/audit.yml`).
 - **Commit identity** (rule 26): contributor identity in commit metadata is normal and never a finding; file contents never name a person, an employer, or a client. Scrubbing a mention from pushed history takes a gated `git filter-repo` rewrite plus a force-push, and the host may keep the old commits cached.
 - **Dependency CVE scanning lives in CI, not the gate** (`bun audit --audit-level=high`): a daily scheduled watchdog for new CVEs in untouched deps, plus a PR run scoped to `package.json` / `bun.lock` for deliberately-introduced ones.
 - **Mutation testing on staged files** (Stryker, ≥90% break threshold) makes "tests don't actually pin behaviour" findable in CI.

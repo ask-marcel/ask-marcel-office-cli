@@ -31,6 +31,8 @@ Minimal skeleton:
     "start": "bun run src/main.ts",
     "lint": "eslint --cache --max-warnings=0",
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
+    "lint:staged": "bash scripts/lint-staged.sh",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "coverage": "bun run scripts/check-coverage.ts",
     "mutate": "stryker run",
@@ -146,7 +148,7 @@ export default [
     rules: { 'no-console': 'off' },
   },
   // Type-aware rules — slow (~25s on full repo), enabled only by
-  // `bun run lint:strict` (which sets LINT_STRICT=1) and the pre-commit hook.
+  // `bun run lint:strict` (which sets LINT_STRICT=1), CI's lint step.
   // Inner-loop `bun run lint` does NOT run them.
   ...(process.env['LINT_STRICT']
     ? [
@@ -209,6 +211,16 @@ export default [
       'sonarjs/no-unused-vars': 'off',          // duplicates @typescript-eslint/no-unused-vars
       'sonarjs/no-empty-test-file': 'off',      // false positives on `describe` test layout
       'sonarjs/cognitive-complexity': 'off',    // we already cap function size; this is noise
+      // 2026-08-29, sonarjs 4.2.0: flags the PRIMITIVE side of every branded type
+      // (`string & { __brand }` reported at the `string`, same for `number`), which is
+      // hard rule 12. Object-object intersections are unaffected, so the rule is only
+      // wrong about the nominal-typing idiom. Re-probed weekly by canary.yml.
+      'sonarjs/no-useless-intersection': 'off',
+      // 2026-08-29, sonarjs 4.2.0: its flow analysis ignores declared types AND explicit
+      // narrowing, reporting `(v: string) => v.trim()` and even
+      // `v === undefined ? 0 : v.trim()`. No correct code satisfies it, and `strict: true`
+      // already owns this bug class at typecheck. Re-probed weekly by canary.yml.
+      'sonarjs/null-dereference': 'off',
     },
   },
   // Non-source paths must not be linted: Stryker copies the tree into .stryker-tmp/
@@ -224,8 +236,8 @@ export default [
 
 Notes on the config:
 
-- **One config file, two modes.** Both scripts carry `--max-warnings=0`, so warnings fail either run (the zero-warning rule, hard rule 15) — the modes differ only in depth. The inner-loop `bun run lint` runs the fast non-type-aware rules (~2 s cached / ~7 s cold); `bun run lint:strict` sets `LINT_STRICT=1` and the conditional block adds `parserOptions.projectService: true` plus the type-aware `@typescript-eslint` rules (~25 s on a full repo). Pre-commit gate 5 runs the strict version. There is no separate `eslint.strict.config.js` — keeping one config eliminates drift.
-- **`sonarjsPlugin.configs.recommended`** catches SonarLint findings at lint time so they no longer escape the IDE. See `references/workflow.md` for the common ones (S4325, S6594, S4123, S6551, S6671). Three rules are turned off as always-on noise: `sonarjs/no-unused-vars` (duplicate), `sonarjs/no-empty-test-file` (false-positive on `describe` blocks), `sonarjs/cognitive-complexity` (we already cap function size).
+- **One config file, two modes.** Both scripts carry `--max-warnings=0`, so warnings fail either run (the zero-warning rule, hard rule 15); the modes differ only in depth. The inner-loop `bun run lint` runs the fast non-type-aware rules (~2 s cached / ~7 s cold); `bun run lint:strict` sets `LINT_STRICT=1` and the conditional block adds `parserOptions.projectService: true` plus the type-aware `@typescript-eslint` rules (~25 s on a full repo). CI runs the strict version (`assets/ci.yml`); the pre-commit hook's gate 4 lints only the staged files, fast and non-type-aware (`scripts/lint-staged.sh`), and gate 5 is the typecheck. There is no separate `eslint.strict.config.js`; keeping one config eliminates drift.
+- **`sonarjsPlugin.configs.recommended`** catches SonarLint findings at lint time so they no longer escape the IDE. See `references/workflow.md` for the common ones (S4325, S6594, S4123, S6551, S6671). Five rules are turned off, each justified in a comment beside it: `sonarjs/no-unused-vars` (duplicate), `sonarjs/no-empty-test-file` (false-positive on `describe` blocks), `sonarjs/cognitive-complexity` (we already cap function size), and two that fire only in the type-aware lane and contradict the standard itself, `sonarjs/no-useless-intersection` (reports every branded type, i.e. hard rule 12) and `sonarjs/null-dereference` (reports non-nullable and explicitly narrowed values, a class `strict: true` already owns). The last two are dated 2026-08-29 against sonarjs 4.2.0 and re-probed weekly by `canary.yml`, which turns them back on and reports if upstream has fixed them. Holding sonarjs at an older version is not an option: 4.1.0 does not load under ESLint 10 at all.
 - **`no-console` is `error`** under `src/**`. Always use the logger port (see below), never `console.*`. The one carve-out is `scripts/**` — the gate scripts shipped in `assets/` are terminal tools whose output *is* their interface; the config turns the rule off there at the project level rather than sprinkling inline ignores (rule 15).
 - **`security/detect-object-injection`, `detect-unsafe-regex`, and `detect-non-literal-fs-filename`** are disabled at the project level because they only false-positive on this codebase's idioms (branded-type `Record<K, V>` lookups, bounded regexes, `chmodSync(mkdtempSync(...))` in tests). Comments in the config explain why each is off. Never inline-ignore them per-line.
 - **`no-restricted-imports`** blocks `mock` from `bun:test` (the entire namespace) — see hard rule 13.
@@ -404,7 +416,7 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
 ## Bootstrap checklist (fresh Bun repo)
 
 1. `mkdir <new-repo> && cd <new-repo> && bun init -y`.
-2. Replace `package.json` with the skeleton above (devDependencies include `eslint-plugin-sonarjs`; scripts include `lint`, `lint:strict`, `typecheck`, `coverage`, `mutate`, `mutate:changed`, `mutate:staged`, `start`). **No `"latest"` or `"*"` anywhere** — the skeleton's `^X.Y.Z` ranges are samples; bump them in step 7 below.
+2. Replace `package.json` with the skeleton above (devDependencies include `eslint-plugin-sonarjs`; scripts include `test`, `lint`, `lint:strict`, `lint:staged`, `typecheck`, `coverage`, `mutate`, `mutate:changed`, `mutate:staged`, `start`. Keep `test` as bare `bun test`: `--pass-with-no-tests` turns a suite that has vanished into a green run, the gate-that-cannot-fail canon 15.10 rejects). **No `"latest"` or `"*"` anywhere**; the skeleton's `^X.Y.Z` ranges are samples; bump them in step 7 below.
 3. Create `tsconfig.json` with the block above (includes `"types": ["bun"]`).
 4. Create `eslint.config.js` with the flat config above (includes `sonarjs.configs.recommended` and type-aware `@typescript-eslint` rules behind `LINT_STRICT=1`).
 5. Create `.vscode/settings.json` and `.vscode/extensions.json`.
@@ -434,6 +446,13 @@ The shared `formatError(err: unknown): string` helper lives in `src/domain/utili
     - `cp <skill-path>/assets/check-package-json.sh scripts/check-package-json.sh`
     - `chmod +x scripts/check-commit-size.sh scripts/check-package-json.sh`
     - `mkdir -p .githooks`
+    - `cp <skill-path>/assets/lint-staged.sh scripts/lint-staged.sh` (hook gate 4 runs it via the `lint:staged` script)
+    - `cp <skill-path>/assets/check-commit-messages.sh scripts/check-commit-messages.sh` (CI re-runs the message check over the pushed range, so `--no-verify` cannot slip one past)
+    - `cp <skill-path>/assets/check-commit-range.sh scripts/check-commit-range.sh` (the same for commit SIZE: the hook sees one staged diff, CI walks every commit in the range)
+    - `chmod +x scripts/lint-staged.sh scripts/check-commit-messages.sh`
+    - `mkdir -p .github/workflows && cp <skill-path>/assets/ci.yml .github/workflows/ci.yml` (the authoritative gate set: strict lint, tests, coverage, mutation, secret scan on a frozen lockfile)
+    - `cp <skill-path>/assets/audit.yml .github/workflows/audit.yml` (the CVE watchdog: daily schedule plus dependency-scoped PR runs; deliberately not a gate on unrelated commits)
+    - `cp <skill-path>/assets/check-skill-pin.sh scripts/check-skill-pin.sh` (only if this repo vendors or pins the skill: the audit workflow uses it to fail when the vendored standard falls behind upstream)
     - `cp <skill-path>/assets/pre-commit .githooks/pre-commit`
     - `cp <skill-path>/assets/commit-msg .githooks/commit-msg` (Conventional Commits validator, hard rule 23 — dependency-free, no `package.json` change)
     - `chmod +x .githooks/pre-commit .githooks/commit-msg`
@@ -473,7 +492,7 @@ Four things keep it conforming — and they are exactly where a copied-from-a-bl
 - **Entry is `src/main.ts`**, never `src/index.ts` — the atelier's named entry (rule 5, `"module": "src/main.ts"`).
 - **Copy `bun.lock`, not `bun.lockb`** — Bun's lockfile is text now; the binary `bun.lockb` is legacy.
 - **No `EXPOSE`** for the CLI/batch archetype — it runs and `process.exit`s; there is no port to bind. Add `EXPOSE <port>` only for an actual server whose `src/main.ts` calls `Bun.serve`.
-- **No `bun run lint` or tests inside the build.** Quality is already owned by the eight pre-commit gates and CI; linting in the image duplicates the gate and couples building with checking. If you want a build-time backstop anyway, run `bun run lint:strict` (the full type-aware gate) rather than bare `bun run lint` (which runs only the fast non-type-aware rules — both already fail on warnings).
+- **No `bun run lint` or tests inside the build.** Quality is already owned by the five fast pre-commit gates and CI; linting in the image duplicates the gate and couples building with checking. If you want a build-time backstop anyway, run `bun run lint:strict` (the full type-aware gate) rather than bare `bun run lint` (which runs only the fast non-type-aware rules; both already fail on warnings).
 
 Add a `.dockerignore` so the build context stays small and the image never ships local cruft:
 

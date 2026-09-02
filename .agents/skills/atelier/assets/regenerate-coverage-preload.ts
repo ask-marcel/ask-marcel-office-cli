@@ -28,7 +28,7 @@
  *     # exits non-zero if the on-disk file is out of sync with the glob;
  *     # use this in CI or pre-commit so a missing import blocks the merge.
  *
- * Wire it into pre-commit as an unnumbered pre-flight (the gates stay 1..8):
+ * Wire it into pre-commit as an unnumbered pre-flight (the five fast gates keep their numbers):
  *
  *   echo "[pre-flight] coverage-preload sync" >&2
  *   bun run scripts/regenerate-coverage-preload.ts --check

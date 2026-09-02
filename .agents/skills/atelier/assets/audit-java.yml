@@ -1,0 +1,34 @@
+# .github/workflows/audit-java.yml - the watchdogs that are not gate material
+# (references/workflow.md, Dependency scanning; governance.md, a vendored
+# standard is a dependency).
+#
+# Both checks here change independently of your diff: a CVE lands in a
+# dependency nobody touched, and upstream doctrine moves while your pinned
+# copy stays put. Blocking an unrelated commit on either fails in the wrong
+# place, so they run on a schedule plus the pull requests that actually change
+# what they watch.
+name: audit-java
+on:
+  schedule:
+    - cron: '0 6 * * *'        # daily watchdog: new CVEs in untouched deps
+  pull_request:
+    paths:                      # PR run fires only when the watched things change
+      - pom.xml
+      - '**/pom.xml'
+      - .claude/skills/**       # a re-sync of the standard is a dependency change
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: dependency CVEs (OWASP dependency-check, fails on high CVSS)
+        run: ./mvnw -q org.owasp:dependency-check-maven:check
+      # A vendored standard goes stale silently while every other gate stays
+      # green; this fails when the pinned copy falls behind upstream.
+      - name: vendored standard is current
+        run: bash scripts/check-skill-pin.sh

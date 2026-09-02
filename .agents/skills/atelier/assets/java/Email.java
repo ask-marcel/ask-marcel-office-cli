@@ -7,13 +7,15 @@
 package com.example.app.domain;
 
 public record Email(String value) {
+  private static final java.util.regex.Pattern SHAPE = java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+$");
+
   public Email {
-    if (!value.matches("^[^@\\s]+@[^@\\s]+$")) {
+    if (!SHAPE.matcher(value).matches()) {
       throw new IllegalArgumentException("email");
     }
   }
 
   public static Result<Email, String> parse(String raw) {
-    return raw.matches("^[^@\\s]+@[^@\\s]+$") ? new Ok<>(new Email(raw)) : new Err<>("invalid_email");
+    return SHAPE.matcher(raw).matches() ? new Ok<>(new Email(raw)) : new Err<>("invalid_email");
   }
 }

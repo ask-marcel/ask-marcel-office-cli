@@ -56,6 +56,21 @@ This is where design happens. Look for:
 2. No more test code than sufficient to fail (compilation failures count).
 3. No more production code than sufficient to pass the one failing test.
 
+## Bug fixes: the regression test comes first
+
+A bug is a missing test: the suite said green while the behaviour was wrong, so the suite has a hole exactly bug-shaped. Fixing the code without first filling the hole leaves you with no proof the fix addresses the actual defect, and nothing to stop the same regression returning.
+
+The loop is RED-GREEN-REFACTOR with a sharper RED:
+
+1. **Reproduce as a failing test.** Write the smallest test that fails for the bug's reason, named as the business scenario that went wrong (`'when a refund is issued twice, the second attempt is rejected'`, not `'fix double refund'`). Propose it and get confirmation first (hard rule 24), like any test.
+2. **Watch it fail, and read WHY.** The red run must fail with the bug's symptom. A test that fails for a setup error, or passes immediately, does not capture the bug; fix the test, not the code, until the failure is the bug.
+3. **Fix to green.** The smallest production change that makes the regression test pass without breaking the rest of the suite.
+4. **Refactor**, then look sideways: the same hole often exists in sibling paths (the other branch, the other adapter, the plural endpoint). Each one found gets its own failing test first.
+
+This applies mid-implementation too. When you are building feature A and trip over broken behaviour B, do not silently patch B on the way past: stop, reproduce B as its own failing test (confirmation-gated), fix it, and keep the fix in its own commit, then return to A. The temptation to fold a drive-by fix into an unrelated diff is how untested fixes ship.
+
+The only sanctioned inversion is a live incident where mitigation cannot wait for a test. Mitigate, say so in the commit body, and make the regression test the first act of the follow-up; the incident is not closed while the hole is open.
+
 ## The Rule of Three
 
 Only extract duplication when you see it THREE times.
