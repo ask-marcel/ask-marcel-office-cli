@@ -286,6 +286,32 @@ describe('extractDocxMetadata — replacement pairing', () => {
     });
   });
 
+  it('pairs across the other glyph-free markers too, not only the bookmark pair', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements.some((r) => r.before === 'proofed-del' && r.after === 'proofed-ins')).toBe(true);
+    expect(result.value.replacements.some((r) => r.before === 'ranged-del' && r.after === 'ranged-ins')).toBe(true);
+  });
+
+  it('refuses to pair two deletions in a row, since a replacement needs one half of each kind', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements.some((r) => r.before === 'first-cut' || r.after === 'second-cut')).toBe(false);
+    expect(result.value.deletions.map((d) => d.text)).toContain('first-cut');
+    expect(result.value.deletions.map((d) => d.text)).toContain('second-cut');
+  });
+
+  it('treats a textless insertion as breaking the run rather than as a replacement half', async () => {
+    const result = await extractDocxMetadata(await buildTrackedChangesDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.replacements.some((r) => r.before === 'split-del')).toBe(false);
+    expect(result.value.deletions.map((d) => d.text)).toContain('split-del');
+    expect(result.value.insertions.map((i) => i.text)).toContain('split-ins');
+  });
+
   it('leaves an insertion with nothing beside it in the insertions list', async () => {
     const result = await extractDocxMetadata(await buildTrackedChangesDocx());
     expect(result.ok).toBe(true);
@@ -326,7 +352,12 @@ describe('extractDocxMetadata — moves and format changes', () => {
     const styled = result.value.formatChanges.find((f) => f.text === 'styled words');
     expect(styled?.scope).toBe('run');
     expect(styled?.author).toBe('Alex Kim');
-    expect(styled?.properties.toSorted((a, b) => a.localeCompare(b))).toEqual(['w:b', 'w:i']);
+    // NOT sorted here on purpose. The fixture's italic-to-bold direction means
+    // the properties arrive in the order w:i, w:b, so asserting the sorted
+    // ['w:b', 'w:i'] is what pins the production sort. Sorting test-side, as
+    // this assertion first did, made that sort invisible and let a mutant that
+    // deleted it survive.
+    expect(styled?.properties).toEqual(['w:b', 'w:i']);
   });
 
   // The case a tag-name comparison misses: w:color is on both sides and only
@@ -336,6 +367,7 @@ describe('extractDocxMetadata — moves and format changes', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const recoloured = result.value.formatChanges.find((f) => f.text === 'recoloured words');
+    // `w:b` is on both sides untouched and must be absent; only the recolour counts.
     expect(recoloured?.properties).toEqual(['w:color']);
   });
 
@@ -356,6 +388,37 @@ describe('extractDocxMetadata — moves and format changes', () => {
     const realigned = result.value.formatChanges.find((f) => f.text === 'realigned paragraph');
     expect(realigned?.scope).toBe('paragraph');
     expect(realigned?.properties).toEqual(['w:jc']);
+  });
+
+  it('reports an arrival whose origin has left the document, the mirror of a departure with no destination', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.moves).toContainEqual({
+      name: 'move-arrival',
+      author: 'Robin Chen',
+      date: '2026-04-02T00:00:00Z',
+      text: 'arrived sentence',
+      halves: 'to-only',
+    });
+  });
+
+  // The range markers are what make a half part of a move. A half with no
+  // brackets, or one sitting after its range closed, belongs to no move, and
+  // reporting it as one would invent an edit nobody made.
+  it('ignores a moved half that no range brackets, and one that follows a closed range', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.moves.some((m) => m.text === 'unbracketed')).toBe(false);
+    expect(result.value.moves.some((m) => m.text === 'after the range closed')).toBe(false);
+  });
+
+  it('skips a bracketed move that carries no text, since a move of nothing is not a move', async () => {
+    const result = await extractDocxMetadata(await buildMoveAndFormatDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.moves.some((m) => m.name === 'move-empty')).toBe(false);
   });
 
   it('invents no revision for a run that was simply formatted and never edited', async () => {

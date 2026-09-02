@@ -623,7 +623,18 @@ const buildTrackedChangesDocx = async (): Promise<Uint8Array> => {
     `<w:p>${del('5', 'Robin Chen', 'far-del')}<w:r><w:t>untouched prose</w:t></w:r>${ins('6', 'Robin Chen', 'far-ins')}</w:p>` +
     `<w:p>${del('7', 'Robin Chen', 'hers-del')}${ins('8', 'Alex Kim', 'theirs-ins')}</w:p>` +
     `<w:p>${del('9', 'Robin Chen', 'marked-del')}<w:bookmarkStart w:id="99" w:name="BM_mid"/><w:bookmarkEnd w:id="99"/>${ins('10', 'Robin Chen', 'marked-ins')}</w:p>` +
-    `<w:p>${ins('11', 'Robin Chen', 'lonely-ins')}</w:p>`;
+    `<w:p>${ins('11', 'Robin Chen', 'lonely-ins')}</w:p>` +
+    // The other two glyph-free markers Word writes between the halves of one
+    // edit. Each is listed as transparent, and only the bookmark pair above was
+    // ever exercised, so the rest of that list went unproven.
+    `<w:p>${del('12', 'Robin Chen', 'proofed-del')}<w:proofErr w:type="spellStart"/>${ins('13', 'Robin Chen', 'proofed-ins')}</w:p>` +
+    `<w:p>${del('14', 'Robin Chen', 'ranged-del')}<w:commentRangeStart w:id="5"/><w:commentRangeEnd w:id="5"/>${ins('15', 'Robin Chen', 'ranged-ins')}</w:p>` +
+    // Two deletions in a row are two deletions. Pairing keys on the halves being
+    // of OPPOSITE kinds, and without this nothing proves it.
+    `<w:p>${del('16', 'Robin Chen', 'first-cut')}${del('17', 'Robin Chen', 'second-cut')}</w:p>` +
+    // An insertion carrying no text sits between a deletion and a real
+    // insertion: it is not a replacement half, and it breaks the run.
+    `<w:p>${del('18', 'Robin Chen', 'split-del')}<w:ins w:id="19" w:author="Robin Chen" w:date="2026-04-01T00:00:01Z"><w:r><w:t></w:t></w:r></w:ins>${ins('20', 'Robin Chen', 'split-ins')}</w:p>`;
   zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`);
   return zip.generateAsync({ type: 'uint8array' });
 };
@@ -652,16 +663,28 @@ const buildMoveAndFormatDocx = async (): Promise<Uint8Array> => {
     `<w:p><w:moveToRangeStart w:id="${rangeId}" w:name="${name}"/><w:moveTo w:id="${id}" ${WHO}><w:r><w:t>${text}</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="${rangeId}"/></w:p>`;
   const body =
     `${
-      movedOut('50', 'move-alpha', '51', 'the same sentence') +
-      movedIn('52', 'move-alpha', '53', 'the same sentence') +
-      movedOut('60', 'move-beta', '61', 'the same sentence') +
-      movedIn('62', 'move-beta', '63', 'the same sentence') +
-      // a moved-out half whose destination never arrives (the move was later cut)
-      movedOut('70', 'move-orphan', '71', 'orphaned sentence')
+      `${
+        movedOut('50', 'move-alpha', '51', 'the same sentence') +
+        movedIn('52', 'move-alpha', '53', 'the same sentence') +
+        movedOut('60', 'move-beta', '61', 'the same sentence') +
+        movedIn('62', 'move-beta', '63', 'the same sentence') +
+        // a moved-out half whose destination never arrives (the move was later cut)
+        movedOut('70', 'move-orphan', '71', 'orphaned sentence') +
+        // the mirror case: an arrival whose origin is no longer in the document
+        movedIn('72', 'move-arrival', '73', 'arrived sentence')
+        // no range brackets this half at all, and the next one sits AFTER its
+        // range closed. Neither belongs to a move, and reading either as one
+        // would invent an edit nobody made.
+      }<w:p><w:moveFrom w:id="74" ${WHO}><w:r><w:delText>unbracketed</w:delText></w:r></w:moveFrom></w:p>` +
+      `<w:p><w:moveFromRangeStart w:id="75" w:name="move-closed"/><w:moveFromRangeEnd w:id="75"/><w:moveFrom w:id="76" ${WHO}><w:r><w:delText>after the range closed</w:delText></w:r></w:moveFrom></w:p>` +
+      // bracketed, but carrying no text: a move of nothing is not a move
+      `<w:p><w:moveFromRangeStart w:id="77" w:name="move-empty"/><w:moveFrom w:id="78" ${WHO}><w:r><w:delText></w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="77"/></w:p>`
       // bold swapped for italic: one tag leaves, another arrives
-    }<w:p><w:r><w:rPr><w:i/><w:rPrChange w:id="80" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:b/></w:rPr></w:rPrChange></w:rPr><w:t>styled words</w:t></w:r></w:p>` +
-    // same tag on both sides, only the value moved
-    '<w:p><w:r><w:rPr><w:color w:val="00FF00"/><w:rPrChange w:id="81" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:color w:val="FF0000"/></w:rPr></w:rPrChange></w:rPr><w:t>recoloured words</w:t></w:r></w:p>' +
+    }<w:p><w:r><w:rPr><w:b/><w:rPrChange w:id="80" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:i/></w:rPr></w:rPrChange></w:rPr><w:t>styled words</w:t></w:r></w:p>` +
+    // same tag on both sides, only the value moved. `w:b` rides along UNCHANGED
+    // on both sides and must NOT be reported: that is what proves the comparison
+    // reads attributes rather than simply listing every property it finds.
+    '<w:p><w:r><w:rPr><w:b/><w:color w:val="00FF00"/><w:rPrChange w:id="81" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:b/><w:color w:val="FF0000"/></w:rPr></w:rPrChange></w:rPr><w:t>recoloured words</w:t></w:r></w:p>' +
     // both sides carry the SAME tag with TWO attributes each: the only case that
     // orders more than one attribute when the two sides are compared
     '<w:p><w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:rPrChange w:id="83" w:author="Alex Kim" w:date="2026-04-03T00:00:00Z"><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr></w:rPrChange></w:rPr><w:t>refonted words</w:t></w:r></w:p>' +

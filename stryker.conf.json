@@ -22,7 +22,7 @@
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
   "concurrency": 4,
-  "timeoutMS": 30000,
+  "timeoutMS": 10000,
   "reporters": ["clear-text", "progress", "html"],
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
