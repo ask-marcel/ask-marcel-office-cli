@@ -61,7 +61,7 @@ const noSignatureFound = (messageId: string | undefined, scanned: number): Graph
   const plural = scanned === 1 ? '' : 's';
   const scanMessage = `No OWA signature block (\`<div id="Signature">\`) was found in the last ${scanned} sent message${plural}. Mail composed in Outlook desktop does not carry the marker, so a signature may exist without being findable this way - pass --message-id to pin a message you know was sent from Outlook on the web.`;
   const pinnedMessage = `Message ${messageId} carries no OWA signature block (\`<div id="Signature">\`). Mail composed in Outlook desktop does not carry the marker; pin a message sent from Outlook on the web instead.`;
-  return { type: 'validation_error', message: messageId === undefined ? scanMessage : pinnedMessage };
+  return { type: 'validation_error', message: messageId === undefined ? scanMessage : pinnedMessage, code: 'signature_not_found' };
 };
 
 const buildEnvelope = (messageId: string, block: string, sentDateTime: string | undefined, inlined: InlineResult): Record<string, unknown> => ({
@@ -82,7 +82,11 @@ const readCandidates = async (graph: GraphClient, messageId: string | undefined)
   const parsed = sentListSchema.safeParse(listed.value);
   const ids = (parsed.success ? (parsed.data.value ?? []) : []).map((m) => m.id);
   if (ids.length === 0)
-    return err({ type: 'validation_error', message: 'Found no sent messages to read a signature from. Send one from Outlook on the web first, or pass --message-id.' });
+    return err({
+      type: 'validation_error',
+      message: 'Found no sent messages to read a signature from. Send one from Outlook on the web first, or pass --message-id.',
+      code: 'no_sent_messages',
+    });
   return ok(ids);
 };
 

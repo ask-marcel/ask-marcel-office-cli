@@ -85,6 +85,10 @@ describe('get-mail-signature', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
+      // The code is what an agent routes on; the message is for a human. The
+      // 2026-08-31 audit found this rejection reaching the envelope with no
+      // errorCode at all, so the sweep logged it as `ERR:err`.
+      expect(result.error.code).toBe('signature_not_found');
       expect(result.error.message).toContain('Outlook desktop does not carry the marker');
       expect(result.error.message).toContain('--message-id');
     }
@@ -121,6 +125,7 @@ describe('get-mail-signature', () => {
     // it to tell "your mailbox has no signature" from "Graph is down".
     if (!result.ok) {
       expect(result.error.type).toBe('validation_error');
+      expect(result.error.code).toBe('no_sent_messages');
       expect(result.error.message).toContain('no sent messages');
     }
   });
