@@ -39,7 +39,7 @@ const inlineSignatureImages = async (graph: GraphClient, messageId: string, bloc
   if (!parsed.success) return { html: block, count: 0, note: 'the inline-image list came back in an unreadable shape, so any cid: references are unresolved' };
 
   const referenced = (parsed.data.value ?? []).filter(isInlineImage).filter((a) => block.includes(`cid:${a.contentId}`));
-  const fetched = await Promise.all(referenced.map((meta) => fetchInlineImageBytes(graph, messageId, meta)));
+  const fetched = await Promise.all(referenced.map((meta) => fetchInlineImageBytes(graph, `/me/messages/${messageId}`, meta)));
   const embeddable = fetched.flatMap((f) => (f.inline === undefined ? [] : [f.inline]));
   const skipped = fetched.filter((f) => f.inline === undefined);
 

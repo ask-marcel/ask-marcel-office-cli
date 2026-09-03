@@ -59,6 +59,20 @@ const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v !== '';
 
 type Recipient = { readonly emailAddress?: { readonly name?: string; readonly address?: string } };
 
+// The mail-shaped resource the pipeline renders: an Outlook `message` or a
+// group `post`. A post carries no subject or recipients, and its `sender` is
+// the person who wrote it while `from` is the group's address.
+type MailLikeResource = {
+  readonly subject?: string;
+  readonly from?: Recipient;
+  readonly sender?: Recipient;
+  readonly toRecipients?: ReadonlyArray<Recipient>;
+  readonly ccRecipients?: ReadonlyArray<Recipient>;
+  readonly receivedDateTime?: string;
+  readonly body?: { readonly contentType?: string; readonly content?: string };
+  readonly hasAttachments?: boolean;
+};
+
 const formatAddress = (a: { readonly name?: string; readonly address?: string } | undefined): string | undefined => {
   if (!nonEmpty(a?.address)) return undefined;
   return nonEmpty(a?.name) ? `${a.name} <${a.address}>` : a.address;
@@ -70,13 +84,7 @@ const formatRecipients = (rs: ReadonlyArray<Recipient> | undefined): string | un
   return parts.length > 0 ? parts.join(', ') : undefined;
 };
 
-const renderHeaders = (m: {
-  readonly subject?: string;
-  readonly from?: Recipient;
-  readonly toRecipients?: ReadonlyArray<Recipient>;
-  readonly ccRecipients?: ReadonlyArray<Recipient>;
-  readonly receivedDateTime?: string;
-}): string => {
+const renderHeaders = (m: MailLikeResource): string => {
   const lines: string[] = [];
   if (m.subject !== undefined) lines.push(`**Subject:** ${m.subject}`);
   const from = formatAddress(m.from?.emailAddress);
@@ -137,10 +145,12 @@ const isInlineImage = (a: AttachmentMeta): a is InlineImageCandidate =>
 
 type EmbedFetchResult = { readonly meta: InlineImageCandidate; readonly inline?: InlineAttachment; readonly oversize: boolean };
 
-const fetchInlineImageBytes = async (graph: GraphClient, messageId: string, meta: InlineImageCandidate): Promise<EmbedFetchResult> => {
+// `resourcePath` is the message or post the image hangs off (`/me/messages/{id}`,
+// `/groups/{g}/threads/{t}/posts/{p}`); its attachments live one segment below.
+const fetchInlineImageBytes = async (graph: GraphClient, resourcePath: string, meta: InlineImageCandidate): Promise<EmbedFetchResult> => {
   if ((meta.size ?? 0) > INLINE_IMAGE_SIZE_LIMIT_BYTES) return { meta, oversize: true };
   if (!nonEmpty(meta.id)) return { meta, oversize: false };
-  const fetched = await graph.get(`/me/messages/${messageId}/attachments/${meta.id}`);
+  const fetched = await graph.get(`${resourcePath}/attachments/${meta.id}`);
   if (!fetched.ok) return { meta, oversize: false };
   const body = fetched.value as { readonly contentBytes?: string };
   if (!nonEmpty(body.contentBytes)) return { meta, oversize: false };
@@ -166,7 +176,7 @@ const renderOversizePlaceholders = (html: string, embeds: ReadonlyArray<EmbedFet
 // caller would lose visibility of inline images entirely if the attachment
 // list still filtered them out. Surface them alongside regular file
 // attachments so the LLM can decide whether to fetch the bytes separately.
-const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>, includeInlineImages: boolean = false): string => {
+const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>, includeInlineImages: boolean, fetchHint: string): string => {
   const fileAttachments = attachments.filter((a) => (includeInlineImages || !isInlineImage(a)) && nonEmpty(a.name));
   if (fileAttachments.length === 0) return '';
   const items = fileAttachments.map((a) => {
@@ -175,7 +185,7 @@ const renderFileAttachmentsList = (attachments: ReadonlyArray<AttachmentMeta>, i
     const id = nonEmpty(a.id) ? `, id: ${a.id}` : '';
     return `- ${a.name ?? ''}${size}${type}${id})`;
   });
-  return ['**Attachments:**', ...items, '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._'].join('\n');
+  return ['**Attachments:**', ...items, fetchHint].join('\n');
 };
 
 // Tags out. Split on `<` rather than matched with `<[^>]+>`: that pattern
@@ -206,36 +216,31 @@ const removedSharePercent = (body: string, boundary: number): number => {
   return Math.round(((total - visibleLength(body.slice(0, boundary))) / total) * 100);
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId } = parsed.data;
-  // Embedding is opt-in (`--inline-images true`): the default skips the
-  // per-image bytes fetch entirely and renders placeholders instead, which
-  // is what an LLM consumer wants from a text command.
-  const embedInlineImagesEnabled = parsed.data.inlineImages === 'true';
-  // Quoted reply chains / forwarded-message blocks are stripped by default
-  // (they duplicate content already in earlier messages and blow the context
-  // budget). Pass `--keep-quoted true` to preserve the full body.
-  const keepQuoted = parsed.data.keepQuoted === 'true';
+type MarkdownRenderOptions = {
+  readonly inlineImages: boolean;
+  readonly keepQuoted: boolean;
+  /** Closing line of the attachments list, naming the command that fetches their bytes. */
+  readonly attachmentHint: string;
+  readonly renderHeaders: (m: MailLikeResource) => string;
+};
 
-  const fetched = await graph.get(`/me/messages/${messageId}`);
+// The pipeline behind `convert-mail-to-markdown` and
+// `convert-group-post-to-markdown`. `resourcePath` is the message or post
+// (`/me/messages/{id}`, `/groups/{g}/threads/{t}/posts/{p}`) and its attachments
+// always live one segment below it, so the only things that differ between the
+// two are the header line-up and the fetch hint, which arrive as options.
+const renderMessageAsMarkdown = async (graph: GraphClient, resourcePath: string, options: MarkdownRenderOptions): Promise<Result<unknown, GraphError>> => {
+  const { inlineImages: embedInlineImagesEnabled, keepQuoted } = options;
+
+  const fetched = await graph.get(resourcePath);
   if (!fetched.ok) return fetched;
 
-  const m = fetched.value as {
-    readonly subject?: string;
-    readonly from?: Recipient;
-    readonly toRecipients?: ReadonlyArray<Recipient>;
-    readonly ccRecipients?: ReadonlyArray<Recipient>;
-    readonly receivedDateTime?: string;
-    readonly body?: { readonly contentType?: string; readonly content?: string };
-    readonly hasAttachments?: boolean;
-  };
+  const m = fetched.value as MailLikeResource;
 
   let attachments: ReadonlyArray<AttachmentMeta> = [];
   let attachmentsListNote: string | undefined;
   if (m.hasAttachments === true) {
-    const listed = await graph.get(`/me/messages/${messageId}/attachments?${ATTACHMENT_METADATA_SELECT}`);
+    const listed = await graph.get(`${resourcePath}/attachments?${ATTACHMENT_METADATA_SELECT}`);
     if (!listed.ok) {
       attachmentsListNote = `attachments-list fetch failed (${listed.error.type}: ${listed.error.message}) — markdown body returned without attachment metadata`;
     } else {
@@ -254,10 +259,10 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // below) still surfaces the inline images by name + id so the caller
   // knows they exist.
   const inlineImageCandidates = embedInlineImagesEnabled ? attachments.filter(isInlineImage) : [];
-  const embedResults = await Promise.all(inlineImageCandidates.map((meta) => fetchInlineImageBytes(graph, messageId, meta)));
+  const embedResults = await Promise.all(inlineImageCandidates.map((meta) => fetchInlineImageBytes(graph, resourcePath, meta)));
   const inlineImages = embedResults.flatMap((r) => (r.inline ? [r.inline] : []));
 
-  const headers = renderHeaders(m);
+  const headers = options.renderHeaders(m);
   const rawHtml = m.body?.content ?? '';
   const withPlaceholders = renderOversizePlaceholders(rawHtml, embedResults);
   const embedded = inlineImages.length > 0 ? embedInlineImages(withPlaceholders, inlineImages) : withPlaceholders;
@@ -296,7 +301,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     quotedBoundary = findPlainTextQuoteBoundary(inlined);
     bodyMd = stripped.text;
   }
-  const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled);
+  const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled, options.attachmentHint);
   const text = [headers, bodyMd, fileList].filter((s) => s !== '').join('\n\n');
 
   // size = UTF-8 byte count; `text.length` is UTF-16 code units.
@@ -310,6 +315,25 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (quotedStripped) notes.push(`quoted reply chain stripped (removed ${removedSharePercent(inlined, quotedBoundary)}% of the body text) — pass --keep-quoted true to include it`);
   if (notes.length > 0) envelope.note = notes.join('; ');
   return ok(envelope);
+};
+
+const MAIL_ATTACHMENT_HINT = '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._';
+
+const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  return renderMessageAsMarkdown(graph, `/me/messages/${parsed.data.messageId}`, {
+    // Embedding is opt-in (`--inline-images true`): the default skips the
+    // per-image bytes fetch entirely and renders placeholders instead, which
+    // is what an LLM consumer wants from a text command.
+    inlineImages: parsed.data.inlineImages === 'true',
+    // Quoted reply chains / forwarded-message blocks are stripped by default
+    // (they duplicate content already in earlier messages and blow the context
+    // budget). Pass `--keep-quoted true` to preserve the full body.
+    keepQuoted: parsed.data.keepQuoted === 'true',
+    attachmentHint: MAIL_ATTACHMENT_HINT,
+    renderHeaders,
+  });
 };
 
 const meta: CommandMeta = {
@@ -349,6 +373,19 @@ const meta: CommandMeta = {
 };
 
 // Shared with get-mail-signature, which fetches the same inline images by the
-// same rules. Cross-command import precedent: read-mail-attachment.ts.
-export { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, execute, fetchInlineImageBytes, formatBytes, isInlineImage, meta, schema };
-export type { AttachmentMeta, InlineImageCandidate };
+// same rules, and with convert-group-post-to-markdown, which runs the whole
+// pipeline on a group post. Cross-command import precedent: read-mail-attachment.ts.
+export {
+  ATTACHMENT_METADATA_SELECT,
+  attachmentsListSchema,
+  execute,
+  fetchInlineImageBytes,
+  formatAddress,
+  formatBytes,
+  isInlineImage,
+  meta,
+  nonEmpty,
+  renderMessageAsMarkdown,
+  schema,
+};
+export type { AttachmentMeta, InlineImageCandidate, MailLikeResource, MarkdownRenderOptions };
