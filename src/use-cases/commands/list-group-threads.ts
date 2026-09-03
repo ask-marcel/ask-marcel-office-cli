@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/thread
 
 const meta: CommandMeta = {
   summary:
-    "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
+    "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Each thread carries only a truncated `preview` of its latest post: read the full posts with `list-group-thread-posts`, or pass `--expand posts` here to inline them.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/threads',

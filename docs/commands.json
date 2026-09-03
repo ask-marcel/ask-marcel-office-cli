@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.4.0",
-  "generatedAt": "2026-09-02T16:06:32.040Z",
+  "generatedAt": "2026-09-03T08:18:55.962Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -4032,7 +4032,7 @@
     },
     {
       "name": "list-group-conversations",
-      "summary": "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling.",
+      "summary": "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling. Bodies live two levels down: `list-group-threads` then `list-group-thread-posts`, or `--expand 'threads($expand=posts)'` here to fetch conversations, threads and posts in one call.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/conversations",
@@ -4251,8 +4251,44 @@
       "pagination": true
     },
     {
+      "name": "list-group-thread-posts",
+      "summary": "List every post in one thread of a unified (Microsoft 365) group inbox: the full `post` resources with the HTML `body.content`, `from`, `sender`, `receivedDateTime` and `hasAttachments`, where `list-group-threads` stops at a truncated `preview`. Graph returns the whole thread in one call with no page cursor, and it silently ignores `$top`, `$skip` and `$orderby` while rejecting `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed; sort on `receivedDateTime` client-side if order matters. `sender` is the person who wrote the post and `from` is normally the group's own address. Access is membership-gated, not scope-gated: a group the signed-in user does not belong to answers `ErrorAccessDenied` even though `list-groups` lists it.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/conversationthread-list-posts",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group the signed-in user belongs to."
+        },
+        {
+          "name": "thread-id",
+          "key": "threadId",
+          "required": true,
+          "description": "Conversation thread ID, the `id` of a `list-group-threads` entry (also inlined by `list-group-conversations --expand threads`)."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel-office list-group-thread-posts --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...'",
+      "responseShape": "collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly."
+    },
+    {
       "name": "list-group-threads",
-      "summary": "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
+      "summary": "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Each thread carries only a truncated `preview` of its latest post: read the full posts with `list-group-thread-posts`, or pass `--expand posts` here to inline them.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads",

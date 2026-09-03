@@ -8,7 +8,7 @@ const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/conver
 
 const meta: CommandMeta = {
   summary:
-    'List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling.',
+    "List conversations in a unified (Microsoft 365) group inbox. Each conversation aggregates one or more threads. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Verify the group is unified before calling. Bodies live two levels down: `list-group-threads` then `list-group-thread-posts`, or `--expand 'threads($expand=posts)'` here to fetch conversations, threads and posts in one call.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/conversations',

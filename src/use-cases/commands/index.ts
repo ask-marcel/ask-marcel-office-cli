@@ -163,6 +163,7 @@ import * as listGroupEvents from './list-group-events.ts';
 import * as getGroupCalendarView from './get-group-calendar-view.ts';
 import * as listGroupConversations from './list-group-conversations.ts';
 import * as listGroupThreads from './list-group-threads.ts';
+import * as listGroupThreadPosts from './list-group-thread-posts.ts';
 import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
@@ -315,6 +316,7 @@ const modules: Record<string, Command> = {
   'list-group-calendar-view': getGroupCalendarView,
   'list-group-conversations': listGroupConversations,
   'list-group-threads': listGroupThreads,
+  'list-group-thread-posts': listGroupThreadPosts,
   'get-mail-message-mime': getMailMessageMime,
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,

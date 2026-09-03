@@ -159,6 +159,10 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-group-owners': ['GroupMember.Read.All'],
   'list-group-conversations': ['Group.Read.All'],
   'list-group-threads': ['Group.Read.All'],
+  // Posts: Graph's least-privileged delegated scope is `Group-Conversation.Read.All`,
+  // which neither token carries. `Group.Read.All` is the documented higher-privileged
+  // alternative and the one the basic token holds, so it is what scopes-check predicts on.
+  'list-group-thread-posts': ['Group.Read.All'],
 
   // — Notes (OneNote) —
   'list-onenote-notebooks': ['Notes.Read'],
