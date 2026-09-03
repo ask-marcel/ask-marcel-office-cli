@@ -163,6 +163,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   // which neither token carries. `Group.Read.All` is the documented higher-privileged
   // alternative and the one the basic token holds, so it is what scopes-check predicts on.
   'list-group-thread-posts': ['Group.Read.All'],
+  'get-group-post': ['Group.Read.All'],
 
   // — Notes (OneNote) —
   'list-onenote-notebooks': ['Notes.Read'],
