@@ -173,3 +173,48 @@ describe('rendering an email whose surrounding metadata is incomplete', () => {
     expect(await execute(graph, { messageId: 'msg-1' })).toEqual(err({ type: 'api_error', status: 404, message: 'ErrorItemNotFound' }));
   });
 });
+
+// Graph reports `hasAttachments: false` for a message whose only attachments are
+// inline, so gating the attachments list on the flag hid exactly the images the
+// body referenced, the trap get-mail-signature sidestepped on 2026-07-19.
+describe('rendering an email whose only attachments are inline images, which Graph reports as hasAttachments: false', () => {
+  it('still lists the inline image by name and id so the caller can fetch it, and names its placeholder after it', async () => {
+    const { graph, gets } = graphWith({
+      '/me/messages/msg-1': ok(mail({ hasAttachments: false })),
+      [ATTS]: ok({ value: [inlineLogo()] }),
+    });
+
+    const result = await execute(graph, { messageId: 'msg-1' });
+
+    expect(gets).toEqual(['/me/messages/msg-1', ATTS]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(textOf(result.value)).toContain(PLACEHOLDER);
+      expect(textOf(result.value)).toContain('- logo.png (120 B, image/png, id: att-1)');
+    }
+  });
+
+  it('embeds the inline image under --inline-images true instead of silently skipping it', async () => {
+    const { graph, gets } = graphWith({
+      '/me/messages/msg-1': ok(mail({ hasAttachments: false })),
+      [ATTS]: ok({ value: [inlineLogo()] }),
+      '/me/messages/msg-1/attachments/att-1': ok({ contentBytes: 'QUJD' }),
+    });
+
+    const result = await execute(graph, { messageId: 'msg-1', inlineImages: 'true' });
+
+    expect(gets).toEqual(['/me/messages/msg-1', ATTS, '/me/messages/msg-1/attachments/att-1']);
+    if (result.ok) expect(textOf(result.value)).toContain('data:image/png;base64,QUJD');
+  });
+
+  it('still makes no attachments call for a message with no attachments and no cid: reference', async () => {
+    const { graph, gets } = graphWith({
+      '/me/messages/msg-1': ok(mail({ hasAttachments: false, body: { contentType: 'html', content: '<p>text only</p>' } })),
+    });
+
+    const result = await execute(graph, { messageId: 'msg-1' });
+
+    expect(result.ok).toBe(true);
+    expect(gets).toEqual(['/me/messages/msg-1']);
+  });
+});

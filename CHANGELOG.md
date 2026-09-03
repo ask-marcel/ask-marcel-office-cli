@@ -4,6 +4,18 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Fixed: inline-only mail no longer hides its images
+
+Graph reports `hasAttachments: false` for a message whose only attachments are
+inline images, and both markdown converters fetched the attachment list only on
+that flag. Such a message rendered its images as unnamed placeholders, left them
+out of the attachments list, and embedded nothing under `--inline-images true`.
+The list is now fetched whenever the body references a `cid:` image as well,
+the guard `get-mail-signature` already uses, so
+`convert-mail-to-markdown` and `convert-group-post-to-markdown` name the
+placeholders, list the images with their ids, and embed them on request. No
+extra call for a message without inline images.
+
 ### Changed: the shared-mailbox commands say when they will 403
 
 `list-shared-mailbox-messages`, `list-shared-mailbox-folder-messages`,

@@ -208,3 +208,15 @@ describe('a group post that cannot be rendered', () => {
     expect(lookupScopes('convert-group-post-to-markdown')).toEqual(['Group.Read.All']);
   });
 });
+
+describe('a group post whose only attachments are inline images', () => {
+  it('lists the image even though Graph reports hasAttachments false, so the caller can fetch it', async () => {
+    const { result, gets } = await render({
+      [POST]: ok(post({ hasAttachments: false, body: { contentType: 'html', content: `<p>Agenda</p>${logoImg}` } })),
+      [ATTS]: ok({ value: [inlineLogo] }),
+    });
+
+    expect(gets).toEqual([POST, ATTS]);
+    expect(envelopeOf(result).text).toContain('- logo.png (120 B, image/png, id: att-1)');
+  });
+});

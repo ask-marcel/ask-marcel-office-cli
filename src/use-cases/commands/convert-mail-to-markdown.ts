@@ -28,7 +28,8 @@ const schema = z.object({
 // past Graph's ~3 MB tolerance; Graph times out at 60s or truncates the
 // JSON mid-stream. We now stage the fetch:
 // 1. /me/messages/{id} (no $expand) — body + hasAttachments
-// 2. /me/messages/{id}/attachments?$select (metadata only) — only if hasAttachments
+// 2. /me/messages/{id}/attachments?$select (metadata only) — only if hasAttachments,
+//    or if the body references a cid: image (Graph reports false for inline-only mail)
 // 3. /me/messages/{id}/attachments/{a-id} (per inline image) — only for small inline images
 // File attachments are listed in the markdown by name + size + id (so the
 // caller can fetch them on demand via `convert-mail-attachment-to-pdf` or
@@ -56,6 +57,11 @@ const ATTACHMENT_METADATA_SELECT = '$select=id,name,contentType,size,isInline,mi
 // 4-mutant predicates into one place — the helper itself remains under test
 // via every call site's behaviour.
 const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v !== '';
+
+// Graph reports `hasAttachments: false` for a message whose only attachments
+// are inline, so the flag alone hides exactly the images the body references.
+// Twin of the guard in get-mail-signature.ts.
+const referencesCidImage = (html: string): boolean => /\bsrc\s*=\s*["']cid:/i.test(html);
 
 type Recipient = { readonly emailAddress?: { readonly name?: string; readonly address?: string } };
 
@@ -237,9 +243,10 @@ const renderMessageAsMarkdown = async (graph: GraphClient, resourcePath: string,
 
   const m = fetched.value as MailLikeResource;
 
+  const rawHtml = m.body?.content ?? '';
   let attachments: ReadonlyArray<AttachmentMeta> = [];
   let attachmentsListNote: string | undefined;
-  if (m.hasAttachments === true) {
+  if (m.hasAttachments === true || referencesCidImage(rawHtml)) {
     const listed = await graph.get(`${resourcePath}/attachments?${ATTACHMENT_METADATA_SELECT}`);
     if (!listed.ok) {
       attachmentsListNote = `attachments-list fetch failed (${listed.error.type}: ${listed.error.message}) — markdown body returned without attachment metadata`;
@@ -263,7 +270,6 @@ const renderMessageAsMarkdown = async (graph: GraphClient, resourcePath: string,
   const inlineImages = embedResults.flatMap((r) => (r.inline ? [r.inline] : []));
 
   const headers = options.renderHeaders(m);
-  const rawHtml = m.body?.content ?? '';
   const withPlaceholders = renderOversizePlaceholders(rawHtml, embedResults);
   const embedded = inlineImages.length > 0 ? embedInlineImages(withPlaceholders, inlineImages) : withPlaceholders;
   // Whatever the embed pass left as a raw cid: reference (embedding
@@ -338,7 +344,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default NO image bytes are fetched: every inline `cid:` image renders as a readable `[inline image: <name>]` placeholder and the images surface in the file-attachments list, so the output stays close to the text size (an email whose 6 KB body carried 30 KB of signature-image base64 now ships at ~6 KB). Pass `--inline-images true` to embed inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) as base64 `data:` URIs for self-contained output (non-image inline attachments are never embedded; oversize inline images keep a placeholder note; a cid whose per-image fetch fails degrades to the placeholder too). File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (only if `hasAttachments:true`), and with `--inline-images true` one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
+    'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default NO image bytes are fetched: every inline `cid:` image renders as a readable `[inline image: <name>]` placeholder and the images surface in the file-attachments list, so the output stays close to the text size (an email whose 6 KB body carried 30 KB of signature-image base64 now ships at ~6 KB). Pass `--inline-images true` to embed inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) as base64 `data:` URIs for self-contained output (non-image inline attachments are never embedded; oversize inline images keep a placeholder note; a cid whose per-image fetch fails degrades to the placeholder too). File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (when `hasAttachments` is true or the body references a `cid:` image, since Graph reports false for inline-only mail), and with `--inline-images true` one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}',
