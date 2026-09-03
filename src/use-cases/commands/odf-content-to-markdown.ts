@@ -183,6 +183,9 @@ const renderTable = (tableKids: ReadonlyArray<Node>): string => {
 };
 
 const renderBlock = (node: Node, tag: string): ReadonlyArray<string> => {
+  // Deleted text lives here as real paragraphs. It is not part of the document
+  // as it reads now; it is reported under the metadata's tracked changes.
+  if (tag === 'text:tracked-changes') return [];
   const kids = kidsOf(node, tag);
   if (tag === 'text:h') return [renderHeading(node, kids)];
   if (tag === 'text:p') {

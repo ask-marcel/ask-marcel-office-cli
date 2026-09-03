@@ -10,6 +10,21 @@ const text = (inner: string): string =>
   `<?xml version="1.0"?><office:document-content ${ODF_NS_FULL}><office:body><office:text>${inner}</office:text></office:body></office:document-content>`;
 
 describe('odfContentToMarkdown — text document (.odt)', () => {
+  // Deleted text lives under text:tracked-changes as real paragraphs. The body
+  // must show the document as it reads now: inserted text stays (it is current),
+  // deleted text goes (it is reported under tracked changes instead), and the
+  // change marks themselves leave no trace.
+  it('skips the tracked-changes region and the change marks, keeping inserted text and dropping deleted text', () => {
+    const xml = text(
+      '<text:tracked-changes><text:changed-region text:id="c1"><text:deletion><office:change-info><dc:creator>Robin Chen</dc:creator></office:change-info><text:p>obsolete sentence</text:p></text:deletion></text:changed-region>' +
+        '<text:changed-region text:id="c2"><text:insertion><office:change-info><dc:creator>Robin Chen</dc:creator></office:change-info></text:insertion></text:changed-region></text:tracked-changes>' +
+        '<text:p>Kept <text:change text:change-id="c1"/>and <text:change-start text:change-id="c2"/>added<text:change-end text:change-id="c2"/> words.</text:p>'
+    );
+    const out = renderOdfContent(xml);
+    expect(out).toBe('Kept and added words.');
+    expect(out).not.toContain('obsolete');
+  });
+
   it('renders headings (with level), inline runs (span/spaces/tab), nested lists, tables, and a display:none section in document order', async () => {
     const result = await odfContentToMarkdown(await buildRichOdt());
     expect(result.ok).toBe(true);

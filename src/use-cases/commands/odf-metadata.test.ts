@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildMalformedDocx, buildMinimalOdt, buildRichOdt } from '../../test-helpers/office-fixtures.ts';
+import { buildMalformedDocx, buildMinimalOdt, buildTrackedChangesOdt, buildRichOdt } from '../../test-helpers/office-fixtures.ts';
 import { formatOdfMetadata } from './odf-metadata-to-markdown.ts';
 import { extractOdfMetadata } from './odf-metadata.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
@@ -102,8 +102,26 @@ describe('formatOdfMetadata', () => {
         '### Document properties\n\n' +
         '- **generator**: LibreOffice/7.4.2\n- **title**: Q4 Plan\n- **creator**: Jordan\n- **description**: Internal draft\n- **initial-creator**: Alice\n- **creation-date**: 2026-05-01T10:00:00\n- **editing-cycles**: 7\n\n' +
         '### Keywords\n\n- budget\n- confidential\n\n' +
-        '### User-defined properties\n\n| name | value |\n| --- | --- |\n| ClientID | ACME-42 |\n| Reviewer | Bob |\n'
+        '### User-defined properties\n\n| name | value |\n| --- | --- |\n| ClientID | ACME-42 |\n| Reviewer | Bob |\n\n' +
+        '### Tracked changes — replacements\n\n_(none)_\n\n### Tracked changes — insertions\n\n_(none)_\n\n### Tracked changes — deletions\n\n_(none)_\n\n### Tracked changes — formatting\n\n_(none)_\n'
     );
+  });
+
+  it('renders the four tracked-change sections with exact rows, in the docx order and vocabulary', async () => {
+    const extracted = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(extracted.ok).toBe(true);
+    if (!extracted.ok) return;
+    const out = formatOdfMetadata(extracted.value);
+    expect(out).toContain(
+      '### Tracked changes — replacements\n\n| deletionId | insertionId | author | date | before | after |\n| --- | --- | --- | --- | --- | --- |\n| ct3 | ct4 | Robin Chen | 2026-09-01T10:00:00 | Q3 | Q4 |\n\n'
+    );
+    expect(out).toContain(
+      '### Tracked changes — insertions\n\n| id | author | date | text |\n| --- | --- | --- | --- |\n| ct1 | Robin Chen | 2026-09-01T10:00:00 | newly added |\n'
+    );
+    expect(out).toContain(
+      '### Tracked changes — deletions\n\n| id | author | date | text |\n| --- | --- | --- | --- |\n| ct2 | Robin Chen | 2026-09-01T10:00:00 | obsolete  sentence here now |\n'
+    );
+    expect(out).toContain('### Tracked changes — formatting\n\n| author | date | text |\n| --- | --- | --- |\n| Alex Kim | 2026-09-01T11:30:00 | reformatted words |\n');
   });
 
   it('emits `_(none)_` for every section on a barebones package', async () => {
@@ -111,7 +129,7 @@ describe('formatOdfMetadata', () => {
     expect(extracted.ok).toBe(true);
     if (!extracted.ok) return;
     expect(formatOdfMetadata(extracted.value)).toBe(
-      '## OpenDocument metadata\n\n### Document properties\n\n_(none)_\n\n### Keywords\n\n_(none)_\n\n### User-defined properties\n\n_(none)_\n'
+      '## OpenDocument metadata\n\n### Document properties\n\n_(none)_\n\n### Keywords\n\n_(none)_\n\n### User-defined properties\n\n_(none)_\n\n### Tracked changes — replacements\n\n_(none)_\n\n### Tracked changes — insertions\n\n_(none)_\n\n### Tracked changes — deletions\n\n_(none)_\n\n### Tracked changes — formatting\n\n_(none)_\n'
     );
   });
 });
@@ -149,5 +167,57 @@ describe('odfToMarkdown', () => {
   it('propagates the zip-parse error for a malformed package', async () => {
     const result = await odfToMarkdown(buildMalformedDocx());
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('extractOdfMetadata — tracked changes', () => {
+  // ODF declares each change once under text:tracked-changes and anchors it in
+  // the body with marks; an insertion's text is what sits between its marks.
+  it('reads an insertion from the text between its change marks, with the author and date of its region', async () => {
+    const r = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.insertions).toContainEqual({ id: 'ct1', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'newly added' });
+    expect(r.value.insertions).toContainEqual({ id: 'ct9', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'far-ins' });
+  });
+
+  it('reads a deletion from the paragraphs kept inside its region, since the body only holds a mark', async () => {
+    const r = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Two counted spaces, a bare text:s, a tab read as one space, and the
+    // reviewer's annotation left out: the deleted text as a reader saw it.
+    expect(r.value.deletions).toContainEqual({ id: 'ct2', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'obsolete  sentence here now' });
+    expect(r.value.deletions.map((d) => d.id)).toEqual(['ct2', 'ct6', 'ct8']);
+  });
+
+  it('pairs a deletion mark immediately followed by an insertion by the same author into one replacement', async () => {
+    const r = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.replacements).toEqual([{ deletionId: 'ct3', insertionId: 'ct4', author: 'Robin Chen', date: '2026-09-01T10:00:00', before: 'Q3', after: 'Q4' }]);
+    expect(r.value.deletions.some((d) => d.id === 'ct3')).toBe(false);
+    expect(r.value.insertions.some((i) => i.id === 'ct4')).toBe(false);
+  });
+
+  it('refuses to pair across authors or across untouched prose, the same rule as docx', async () => {
+    const r = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.insertions.map((i) => i.id)).toEqual(['ct1', 'ct7', 'ct9']);
+  });
+
+  it('reports a format change with who, when and the text it covers; ODF records no property names', async () => {
+    const r = await extractOdfMetadata(await buildTrackedChangesOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.formatChanges).toEqual([{ author: 'Alex Kim', date: '2026-09-01T11:30:00', text: 'reformatted words' }]);
+  });
+
+  it('leaves every tracked-change list empty for a document that has none', async () => {
+    const r = await extractOdfMetadata(await buildRichOdt());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect([r.value.insertions, r.value.deletions, r.value.replacements, r.value.formatChanges]).toEqual([[], [], [], []]);
   });
 });
