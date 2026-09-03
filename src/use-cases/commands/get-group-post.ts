@@ -8,7 +8,7 @@ const { execute, schema } = buildSelectableCommand((p) => `/groups/${p.groupId}/
 
 const meta: CommandMeta = {
   summary:
-    "Get a single post of a unified (Microsoft 365) group thread by ID, the sibling of `get-mail-message` for a group inbox: the full `post` resource including the HTML `body`. `--select` trims the projection. `--expand attachments` returns the post's attachments inline, each with its base64 `contentBytes`; that is the route to an attachment's bytes, since no separate attachment command exists for posts. Post IDs come from `list-group-thread-posts`.",
+    "Get a single post of a unified (Microsoft 365) group thread by ID, the sibling of `get-mail-message` for a group inbox: the full `post` resource including the HTML `body`. `--select` trims the projection. `--expand attachments` returns the post's attachments inline, each with its base64 `contentBytes`; that is the route to an attachment's bytes, since no separate attachment command exists for posts. Post IDs come from `list-group-thread-posts`; use `convert-group-post-to-markdown` for a readable rendering.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/threads/{thread-id}/posts/{post-id}',

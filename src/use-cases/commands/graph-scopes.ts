@@ -164,6 +164,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   // alternative and the one the basic token holds, so it is what scopes-check predicts on.
   'list-group-thread-posts': ['Group.Read.All'],
   'get-group-post': ['Group.Read.All'],
+  'convert-group-post-to-markdown': ['Group.Read.All'],
 
   // — Notes (OneNote) —
   'list-onenote-notebooks': ['Notes.Read'],
