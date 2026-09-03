@@ -360,6 +360,46 @@ const buildRichOdp = async (): Promise<Uint8Array> => {
 };
 
 /** A barebones ODF package: mimetype only, no meta.xml. */
+/**
+ * An .odt carrying every tracked-change shape ODF can express: regions declared
+ * under `text:tracked-changes` (deleted text lives there, as paragraphs) and
+ * anchored in the body by marks, so pairing reads mark adjacency, not siblings.
+ */
+const buildTrackedChangesOdt = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
+  zip.file(
+    'meta.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${ODF_CONTENT_NS}><office:meta><dc:title>Tracked</dc:title></office:meta></office:document-meta>`
+  );
+  const info = (who: string, when: string): string => `<office:change-info><dc:creator>${who}</dc:creator><dc:date>${when}</dc:date></office:change-info>`;
+  const R = ['Robin Chen', '2026-09-01T10:00:00'] as const;
+  const A = ['Alex Kim', '2026-09-01T11:30:00'] as const;
+  const regions =
+    `<text:changed-region text:id="ct1"><text:insertion>${info(...R)}</text:insertion></text:changed-region>` +
+    `<text:changed-region text:id="ct2"><text:deletion>${info(...R)}<text:p>obsolete<text:s text:c="2"/><text:span>sentence</text:span><text:s/>here<text:tab/>now<office:annotation><dc:creator>Alex Kim</dc:creator><text:p>reviewer note</text:p></office:annotation></text:p></text:deletion></text:changed-region>` +
+    `<text:changed-region text:id="ct3"><text:deletion>${info(...R)}<text:p>Q3</text:p></text:deletion></text:changed-region>` +
+    `<text:changed-region text:id="ct4"><text:insertion>${info(...R)}</text:insertion></text:changed-region>` +
+    `<text:changed-region text:id="ct5"><text:format-change>${info(...A)}</text:format-change></text:changed-region>` +
+    `<text:changed-region text:id="ct6"><text:deletion>${info(...R)}<text:p>hers</text:p></text:deletion></text:changed-region>` +
+    `<text:changed-region text:id="ct7"><text:insertion>${info(...A)}</text:insertion></text:changed-region>` +
+    `<text:changed-region text:id="ct8"><text:deletion>${info(...R)}<text:p>far</text:p></text:deletion></text:changed-region>` +
+    `<text:changed-region text:id="ct9"><text:insertion>${info(...R)}</text:insertion></text:changed-region>`;
+  const body =
+    '<text:p>Intro <text:change-start text:change-id="ct1"/>newly added<text:change-end text:change-id="ct1"/> text.</text:p>' +
+    '<text:p>Removed here:<text:change text:change-id="ct2"/> end.</text:p>' +
+    '<text:p>Revenue for <text:change text:change-id="ct3"/><text:change-start text:change-id="ct4"/>Q4<text:change-end text:change-id="ct4"/> looks fine.</text:p>' +
+    '<text:p><text:change-start text:change-id="ct5"/>reformatted words<text:change-end text:change-id="ct5"/></text:p>' +
+    '<text:p><text:change text:change-id="ct6"/><text:change-start text:change-id="ct7"/>theirs<text:change-end text:change-id="ct7"/></text:p>' +
+    '<text:p><text:change text:change-id="ct8"/>untouched prose <text:change-start text:change-id="ct9"/>far-ins<text:change-end text:change-id="ct9"/></text:p>' +
+    '<text:p>Final paragraph.</text:p>';
+  zip.file(
+    'content.xml',
+    `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${ODF_CONTENT_NS}><office:body><office:text><text:tracked-changes text:track-changes="true">${regions}</text:tracked-changes>${body}</office:text></office:body></office:document-content>`
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
 const buildMinimalOdt = async (): Promise<Uint8Array> => {
   const zip = new JSZip();
   zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
@@ -892,6 +932,7 @@ export {
   buildMalformedXlsx,
   buildMediaSamples,
   buildMinimalOdt,
+  buildTrackedChangesOdt,
   buildMinimalPptx,
   buildPdfNoImages,
   buildPdfWithImage,
