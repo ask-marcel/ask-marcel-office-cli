@@ -4,6 +4,17 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Changed: the shared-mailbox commands say when they will 403
+
+`list-shared-mailbox-messages`, `list-shared-mailbox-folder-messages`,
+`list-shared-mailbox-folders`, `list-shared-mailbox-child-folders` and
+`get-shared-mailbox-message` used to promise a 403 only "if the signed-in user
+does not have shared access". The scope they need, `Mail.Read.Shared`, is on
+neither token this CLI can mint, so their summaries now state that any mailbox
+other than your own is expected to answer `ErrorAccessDenied` whatever delegation
+Exchange holds, that your own UPN works, and that a Microsoft 365 group's mailbox
+is the shared-mail path that does.
+
 ### Added: read the posts of a Microsoft 365 group conversation
 
 `list-group-conversations` and `list-group-threads` stopped at Graph's truncated

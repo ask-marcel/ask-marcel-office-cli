@@ -9,7 +9,7 @@ const { execute, schema } = buildSelectableCommand((p) => `/users/${encodeURICom
 
 const meta: CommandMeta = {
   summary:
-    'Return a single message from a shared / delegated mailbox. Use `--select` to fetch only specific fields (e.g. `--select id,subject,from,receivedDateTime`) — sibling to `get-mail-message` for /me.',
+    "Return a single message from a shared / delegated mailbox. Use `--select` to fetch only specific fields (e.g. `--select id,subject,from,receivedDateTime`) — sibling to `get-mail-message` for /me. Requires the delegated `Mail.Read.Shared` scope, which neither token this CLI can mint carries (verified live on two tenants, 2026-08-30), so any mailbox other than the signed-in user's own is expected to answer `ErrorAccessDenied` whatever delegation Exchange holds. Your own UPN works; a Microsoft 365 group's mailbox is the shared-mail path that does (`list-group-conversations`, `list-group-thread-posts`).",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/users/{user-id}/messages/{message-id}',

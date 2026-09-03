@@ -9,7 +9,7 @@ const { execute, schema } = buildListCommand((p) => `/users/${encodeURIComponent
 
 const meta: CommandMeta = {
   summary:
-    'List messages from a shared or delegated mailbox the signed-in user has read access to. Same shape as `list-mail-messages` but scoped to a specific mailbox owner. 403 if the signed-in user does not have shared access to that mailbox.',
+    "List messages from a shared or delegated mailbox the signed-in user has read access to. Same shape as `list-mail-messages` but scoped to a specific mailbox owner. Requires the delegated `Mail.Read.Shared` scope, which neither token this CLI can mint carries (verified live on two tenants, 2026-08-30), so any mailbox other than the signed-in user's own is expected to answer `ErrorAccessDenied` whatever delegation Exchange holds. Your own UPN works; a Microsoft 365 group's mailbox is the shared-mail path that does (`list-group-conversations`, `list-group-thread-posts`).",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/users/{user-id}/messages',

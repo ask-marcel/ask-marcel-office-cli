@@ -14,7 +14,7 @@ const { execute, schema } = buildListCommand(
 
 const meta: CommandMeta = {
   summary:
-    'List the top-level mail folders of a shared or delegated mailbox. The `/me` sibling is `list-mail-folders`. Use it to discover the folder IDs that `list-shared-mailbox-folder-messages` needs: without it only the well-known names (`inbox`, `sentitems`, `drafts`, …) are reachable, so custom folders are invisible. 403 if the signed-in user does not have shared access to that mailbox.',
+    "List the top-level mail folders of a shared or delegated mailbox. The `/me` sibling is `list-mail-folders`. Use it to discover the folder IDs that `list-shared-mailbox-folder-messages` needs: without it only the well-known names (`inbox`, `sentitems`, `drafts`, …) are reachable, so custom folders are invisible. Requires the delegated `Mail.Read.Shared` scope, which neither token this CLI can mint carries (verified live on two tenants, 2026-08-30), so any mailbox other than the signed-in user's own is expected to answer `ErrorAccessDenied` whatever delegation Exchange holds. Your own UPN works; a Microsoft 365 group's mailbox is the shared-mail path that does (`list-group-conversations`, `list-group-thread-posts`).",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/users/{user-id}/mailFolders',
