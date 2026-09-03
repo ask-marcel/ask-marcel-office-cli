@@ -9,6 +9,7 @@ const command = commands['convert-group-post-to-markdown'];
 if (!command) throw new Error('convert-group-post-to-markdown is not registered');
 
 const POST = '/groups/g1/threads/t1/posts/p1';
+const ATTS = `${POST}/attachments?$select=id,name,contentType,size,isInline,microsoft.graph.fileAttachment/contentId`;
 
 // A post arrives FROM the group's own address; the person who wrote it is the
 // `sender` (probed live 2026-09-03). All placeholder identities.
@@ -23,6 +24,9 @@ const post = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   hasAttachments: false,
   ...over,
 });
+
+const inlineLogo = { id: 'att-1', name: 'logo.png', contentType: 'image/png', size: 120, isInline: true, contentId: 'logo@contoso' };
+const logoImg = '<img src="cid:logo@contoso">';
 
 type Envelope = { readonly contentType: string; readonly size: number; readonly text: string; readonly note?: string };
 type Reply = Awaited<ReturnType<GraphClient['get']>>;
@@ -43,6 +47,9 @@ const envelopeOf = (result: Awaited<ReturnType<typeof command.execute>>): Envelo
   if (!result.ok) throw new Error(`expected markdown, got ${result.error.type}: ${result.error.message}`);
   return result.value as Envelope;
 };
+
+// turndown escapes `[` / `]` on the way to markdown.
+const PLACEHOLDER = String.raw`\[inline image: logo.png\]`;
 
 describe('rendering a group post as markdown', () => {
   it('names the person who wrote the post on behalf of the group, dates it, and renders the body, in one call when nothing is attached', async () => {
@@ -87,6 +94,88 @@ describe('rendering a group post as markdown', () => {
     expect(text).not.toContain('**From:**');
     expect(text).not.toContain('**Date:**');
     expect(text).toContain('Agenda for Monday');
+  });
+});
+
+describe('the attachments of a group post', () => {
+  it('lists a file attachment under the body with its size and id, and points at get-group-post for the bytes', async () => {
+    const { result, gets } = await render({
+      [POST]: ok(post({ hasAttachments: true })),
+      [ATTS]: ok({ value: [{ id: 'att-2', name: 'report.pdf', contentType: 'application/pdf', size: 4_200_000, isInline: false, contentId: null }] }),
+    });
+
+    const { text } = envelopeOf(result);
+    expect(gets).toEqual([POST, ATTS]);
+    expect(text).toContain('**Attachments:**');
+    expect(text).toContain('- report.pdf (4.2 MB, application/pdf, id: att-2)');
+    expect(text).toContain('get-group-post');
+    expect(text).not.toContain('get-mail-attachment');
+  });
+
+  it('embeds an inline image fetched from the post’s own attachments path when asked to, and leaves a file attachment listed rather than fetched', async () => {
+    const { result, gets } = await render(
+      {
+        [POST]: ok(post({ hasAttachments: true, body: { contentType: 'html', content: `<p>Agenda</p>${logoImg}` } })),
+        [ATTS]: ok({ value: [inlineLogo, { id: 'att-2', name: 'report.pdf', contentType: 'application/pdf', size: 4_200_000, isInline: false }] }),
+        [`${POST}/attachments/att-1`]: ok({ contentBytes: 'QUJD' }),
+      },
+      { inlineImages: 'true' }
+    );
+
+    expect(gets).toEqual([POST, ATTS, `${POST}/attachments/att-1`]);
+    const { text } = envelopeOf(result);
+    expect(text).toContain('data:image/png;base64,QUJD');
+    // An embedded image is not also listed; the file attachment still is.
+    expect(text).toContain('- report.pdf');
+    expect(text).not.toContain('- logo.png');
+  });
+
+  it('leaves an inline image as a readable placeholder by default, lists it so the caller knows it exists, and fetches no bytes', async () => {
+    const { result, gets } = await render({
+      [POST]: ok(post({ hasAttachments: true, body: { contentType: 'html', content: `<p>Agenda</p>${logoImg}` } })),
+      [ATTS]: ok({ value: [inlineLogo] }),
+    });
+
+    expect(gets).toEqual([POST, ATTS]);
+    const { text } = envelopeOf(result);
+    expect(text).toContain(PLACEHOLDER);
+    expect(text).toContain('- logo.png (120 B, image/png, id: att-1)');
+    expect(text).not.toContain('data:image/png');
+  });
+});
+
+describe('quoted replies inside a group post', () => {
+  const quoted = '<p>My reply.</p><div id="divRplyFwdMsg"><b>From:</b> Alex Kim<br><b>Sent:</b> Friday</div><p>Original message text.</p>';
+
+  it('strips the quoted reply chain by default and says so in the note', async () => {
+    const { result } = await render({ [POST]: ok(post({ body: { contentType: 'html', content: quoted } })) });
+
+    const envelope = envelopeOf(result);
+    expect(envelope.text).toContain('My reply.');
+    expect(envelope.text).not.toContain('Original message text');
+    expect(envelope.note).toContain('quoted reply chain stripped');
+  });
+
+  it('keeps the quoted chain with --keep-quoted true', async () => {
+    const { result } = await render({ [POST]: ok(post({ body: { contentType: 'html', content: quoted } })) }, { keepQuoted: 'true' });
+
+    const envelope = envelopeOf(result);
+    expect(envelope.text).toContain('Original message text');
+    expect(envelope.note).toBeUndefined();
+  });
+
+  it('accepts an explicit false on both flags and behaves exactly as the default', async () => {
+    const byPath = {
+      [POST]: ok(post({ hasAttachments: true, body: { contentType: 'html', content: `${quoted}${logoImg}` } })),
+      [ATTS]: ok({ value: [inlineLogo] }),
+    };
+
+    const explicit = await render(byPath, { keepQuoted: 'false', inlineImages: 'false' });
+    const implicit = await render(byPath);
+
+    expect(explicit.result).toEqual(implicit.result);
+    expect(explicit.gets).toEqual([POST, ATTS]);
+    expect(envelopeOf(explicit.result).note).toContain('quoted reply chain stripped');
   });
 });
 
