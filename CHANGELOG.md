@@ -4,6 +4,32 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Added: read the posts of a Microsoft 365 group conversation
+
+`list-group-conversations` and `list-group-threads` stopped at Graph's truncated
+`preview`, and a group mailbox cannot be read through the shared-mailbox commands
+(`ErrorGroupIsUsedInNonGroupURI`), so a group's mail was reachable up to its titles
+and no further. Three commands close the gap, all on the `Group.Read.All` scope the
+token already carries:
+
+- `list-group-thread-posts --group-id --thread-id` returns every `post` of a thread
+  with its HTML body, `from`, `sender`, `receivedDateTime` and `hasAttachments`.
+  Graph hands back the whole thread in one call and silently ignores `$top`, `$skip`
+  and `$orderby` while rejecting `$filter` (probed live), so only `--select` and
+  `--expand` are exposed and there is no page cursor.
+- `get-group-post --group-id --thread-id --post-id` is the `get-mail-message` sibling
+  for a group inbox; `--expand attachments` inlines the attachments with their bytes.
+- `convert-group-post-to-markdown` renders one post the way `convert-mail-to-markdown`
+  renders a message, with the same `--inline-images` and `--keep-quoted` flags. A post
+  arrives from the group's own address with the writer in `sender`, so the author line
+  reads `Robin Chen <...> on behalf of Support <...>`; the thread `topic` is the subject
+  and is not repeated.
+
+The mail-to-markdown pipeline now takes the resource path and the header renderer as
+parameters; the mail command's output is unchanged. `list-group-threads` and
+`list-group-conversations` point at the reader, and at `--expand posts`, which already
+inlined the bodies.
+
 ### Added — `.odt` tracked changes
 
 OpenDocument text files declare every tracked change centrally under
