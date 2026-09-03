@@ -4,8 +4,9 @@
   "_packageManager_comment": "Stryker doesn't fully understand Bun yet; tell it npm so it doesn't probe for yarn/pnpm lockfiles.",
   "packageManager": "npm",
   "testRunner": "command",
+  "_commandRunner_comment": "Only the summary reaches Stryker. It keeps every killed mutant's whole process output as its status reason and serialises all of them into one report; on GitHub Actions bun test lists every test (1.2 MB a run on 2026-09-03), so a thousand killed mutants pushed JSON.stringify past V8's string limit (RangeError: Invalid string length) after the score had already passed. pipefail keeps bun's exit code, which is what decides killed vs survived.",
   "commandRunner": {
-    "command": "bun test"
+    "command": "bash -o pipefail -c 'bun test 2>&1 | tail -n 20'"
   },
   "_mutate_comment": "Core only: src/domain + src/use-cases. Test files have no logic to mutate; ports/ files are type-only (zero mutable code).",
   "mutate": [
