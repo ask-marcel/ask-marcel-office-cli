@@ -2,6 +2,30 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## Unreleased
+
+### Added — `.odt` tracked changes
+
+OpenDocument text files declare every tracked change centrally under
+`text:tracked-changes` and anchor it in the body with marks, and none of it was
+extracted: an `.odt` full of reviewer edits reported nothing. `--include-metadata`
+now returns the same four sections the docx block has, `replacements`,
+`insertions`, `deletions` and `formatting`, under the same titles, so an agent
+reads one vocabulary across both formats. An insertion's text is read off the
+body between its marks, a deletion's off the paragraphs kept inside its region,
+and a deletion mark touching an insertion by the same author is one
+`replacement` with `before` and `after`. ODF records who and when for a format
+change but never which properties moved, so that table carries no properties
+column. Spreadsheets use a different cell-change model and presentations have
+none; both stay as they were.
+
+### Fixed — deleted text no longer renders in an `.odt` body
+
+The body converter walked `text:tracked-changes` like any other block, so the
+paragraphs a reviewer had deleted printed as if they were still in the
+document. The region is skipped; deleted text appears once, under tracked
+changes.
+
 ## 2.4.0
 
 Two community fixes from [@a-tokyo](https://github.com/a-tokyo). Nothing breaks:
