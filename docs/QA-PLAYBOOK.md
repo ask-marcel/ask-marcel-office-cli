@@ -164,7 +164,26 @@ Microsoft moves things. Each run, re-verify the full endpoint surface AND the kn
 | Archived sites | 423 `resourceLocked` on GET /sites/{id}; site-search probes & excludes | working 2026-06 |
 | Elevated-token capture (visible Edge, third-party-IdP-federated SSO) | headless refused; federated IdP needs the 5-min deadline | working 2026-05 |
 
-**E3 — Auth lifecycle.** `scopes-check` vs the scope map; expired-token behavior (clear re-login hint, no stack trace); `logout` → command → actionable "not logged in" error → `login` recovers. Verify no command exceeds the Teams-token scope ceiling (commands needing Chat.Read*, ChannelMessage.Read.All, Contacts.Read*, TeamMember.Read.All, TeamsTab.Read.All, Channel.Read.All cannot ship).
+**E3 — Auth lifecycle.** `scopes-check` vs the scope map; expired-token behavior (clear re-login hint, no stack trace); `logout` → command → actionable "not logged in" error → `login` recovers.
+
+**E3b — `scopes-check` on a real TTY (added 2026-09-03).** Everything else in this playbook runs from a driver or a Bash tool, which has no TTY, and the auth layer branches on exactly that: `build-deps.ts` sets `interactive = process.stdin.isTTY`, and a non-TTY caller fails fast while a terminal user gets the interactive path (browser, and a session wipe when the persistent profile is already signed in). The 2026-08-31 audit passed E1 with `browserOpens=0` and still shipped a `scopes-check` that opened a browser in the user's terminal, because no check ever ran under a TTY. This one does, without touching the real cache or profile:
+
+```bash
+T=$(mktemp -d) && mkdir -p "$T/.ask-marcel"
+# 1. empty cache: must report not-signed-in and return within seconds, no browser
+HOME="$T" script -q /dev/null ask-marcel-office scopes-check --output json
+# 2. expired cache (synthetic JWT, exp one hour ago): must decode it, expiresInSeconds < 0, no browser
+seg() { printf '%s' "$1" | base64 | tr '+/' '-_' | tr -d '=\n'; }
+PAST=$(( $(date +%s) - 3600 ))
+JWT="$(seg '{"alg":"none"}').$(seg "{\"scp\":\"Mail.Read\",\"aud\":\"https://graph.microsoft.com\",\"exp\":$PAST}").sig"
+printf '{"access_token":"%s","expires_on":%s,"refresh_token":"synthetic"}' "$JWT" "$PAST" > "$T/.ask-marcel/token-cache.json"
+HOME="$T" script -q /dev/null ask-marcel-office scopes-check --output json
+ls "$T/.ask-marcel/"   # token-cache.json only: a browser launch would have created browser-profile/
+rm -rf "$T"
+```
+
+`script -q /dev/null` allocates a pty, so `process.stdin.isTTY` is true inside the command; a temp `HOME` isolates both the token cache and the browser profile. Pass: case 1 is `ok:false` naming `login`; case 2 is `ok:true` with a negative `expiresInSeconds` and `basic.available: false`; no `browser-profile/` appears; neither case takes longer than a few seconds. Do NOT run a registry command this way unattended: those heal interactively by design and will launch a browser.
+ Verify no command exceeds the Teams-token scope ceiling (commands needing Chat.Read*, ChannelMessage.Read.All, Contacts.Read*, TeamMember.Read.All, TeamsTab.Read.All, Channel.Read.All cannot ship).
 
 **E4 — Limits & failure modes.** One throttling observation if encountered (429 → message quality); one multi-MB attachment via `--output-path` (wall-clock + stdout size); folder-as-file, malformed id, foreign-tenant id → error quality.
 
@@ -241,6 +260,7 @@ Precedent: the 3 `download-drive-item-version-*` commands consolidated into one 
 | Derive the MCP `CATEGORY_LIST` (mcp.ts) from the manifest instead of hardcoding (currently accurate — all 12 categories — but drifts if a category is added, like `readCommandNames` does not) | F | QA 2026-07-20 | **DONE 2026-07-20 (053b2c2)** — derived as `CATEGORY_ORDER.join(', ')`; a docs-render test pins `CATEGORY_ORDER` to `CATEGORY_LABELS` so a new category can't drift out. |
 | **A5-02 — mutation debt on the 2.4.0 revision work** (ooxml-xml-walker 79.82%, docx-metadata 83.06%; CI `mutate:changed` 84.31% < 90, red on `8911fdb`) | **P1 (blocked release)** | QA A5-02 (2026-09-02) | **worked 2026-09-02** — +21 behavioural tests: the ordered walker had NO direct tests (45 survivors in its guards), the move range-markers were half-proven (no `to-only`, unbracketed, post-close or empty-text case), and `TRANSPARENT_TAGS` listed five markers while exercising one. Also fixed a test that **sorted the array before comparing it**, which made the production `.toSorted()` invisible to mutation. **Re-measured 2026-09-02: `mutate:changed` 84.31 → 92.07% ≥ 90** (walker 79.82 → 91.93, docx-metadata 83.06 → 93.17). Residual soft spot is `download-drive-item-as-markdown.ts` at 81.90%, pre-existing A5-01 debt pulled into the set by a one-line summary edit |
 | **Prose numbers drift from the registry** — four stale claims in one audit (README "184 tool schemas" vs 186; `mcp.ts` comment "180/4" vs 182/4, in a comment whose own text says "derived, never hardcoded"; USAGE "~38 KB" vs 34.1; USAGE "4800+ tests" vs 4,739, which was simply false) | P3 | QA B2-01..04 (2026-09-02) | **partly done 2026-09-02** — all four corrected, and the two most drift-prone rewritten to carry no literal at all. **Still open: the guard.** `docs:gen` already knows the true counts; extend it (or add a `scripts/check-doc-claims.ts` to the gate) to assert every registry-derived number that appears in README/USAGE/comments, so this class cannot recur |
+| **E3b — TTY blind spot**: every automated check runs without a TTY, so the interactive auth path (browser, session wipe) was never exercised; `scopes-check` shipped opening a browser from a terminal (found by the user pre-publish, 2026-09-02) | P2 | release 2.4.0 | **FIXED 2026-09-03**: `scopes-check` made decode-only in 2.4.0 (`getCachedBasicToken`), and E3b added: a pty run via `script -q /dev/null` under a temp HOME, empty and expired-cache cases, verified live against the published 2.4.0 |
 | **E-01 — `get-mail-signature` empty-state rejection had no errorCode**, so the live sweep logged it as `ERR:err` and an agent routing on `code` got nothing; the message itself was already actionable | I | QA E-01 (2026-08-31) | **FIXED 2026-09-02** — `signature_not_found` (scan and pinned misses) and `no_sent_messages`. The audit's claim that this widened an older carry-over to three commands was wrong: the other two had been fixed between audits |
 | **QA-DRIVER-01 — the live sweep masked a command** — `qa-live-sweep.ts` fed `extract-local-file-images` a `.msg`, producing a permanent false `unsupported_document` ERR that was written off as a harvest artifact on 2026-07-20 AND 2026-08-31, leaving the command effectively unaudited | P3 | QA (2026-09-02) | **FIXED 2026-09-02** — the resolver now passes `image-sample.docx` to that command; verified `ok: true, count: 1`. Lesson: a recurring "artifact" is a finding, not noise |
 | Mutation debt on new logic (draft-dedup 80%, find-mail-drafts 82%, search-all-files 89%, spo-tenant 80% host-anchor regex, inline-image-embedder 87%) — genuine killable mutants, G23-01 class; aggregate 91.26% passes | I | QA A5-01 (2026-07-20) | open |
