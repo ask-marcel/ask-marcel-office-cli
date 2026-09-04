@@ -184,8 +184,8 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-of
 claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
 ```
 
-Five gateway tools, not one per command (184 schemas per session is the bloat this CLI exists to
-avoid). Discovery is three hops:
+Five gateway tools, not one per command (one schema per command would be ~190 per session, the
+bloat this CLI exists to avoid). Discovery is three hops:
 
 ```
 list-commands { category?: string }            → terse manifest, start here
@@ -313,9 +313,9 @@ bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infr
 bun run mutate:changed  # mutation testing on changed domain/use-case files (>90% kill threshold)
 ```
 
-### Pre-commit hook (atelier 8 gates)
+### Pre-commit hook (fast gates; the rest run in CI)
 
-The repo ships an 8-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → tests → strict lint → typecheck → coverage → mutation). Install once per clone:
+The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → staged lint → typecheck). Each is O(staged files) or O(1), so the hook stays within a few seconds. The full test suite, per-tier coverage and Stryker mutation deliberately run in CI instead (`.github/workflows/ci.yml`), which is the line that cannot be skipped — a green commit has NOT run them locally. Install once per clone:
 
 ```bash
 git config core.hooksPath .githooks
