@@ -16,6 +16,10 @@ const fileAttachment = (name: string, content: string): Record<string, unknown> 
   contentBytes: btoa(content),
 });
 
+// Bytes that are not valid UTF-8, so the dispatch cannot fall back to treating
+// the file as plain text and reaches its unsupported-format branch instead.
+const BINARY = String.fromCharCode(0xff, 0xfe, 0x00, 0x01);
+
 const graphReturning = (reply: Awaited<ReturnType<GraphClient['get']>>): { graph: GraphClient; paths: string[] } => {
   const paths: string[] = [];
   const graph = fakeGraphClient({
@@ -71,5 +75,52 @@ describe('converting an attachment of a group post to markdown', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
     expect(paths).toEqual([]);
+  });
+});
+
+// The dispatch takes its remediation wording from the caller. Reusing the mail
+// set here would tell an agent to run `get-mail-attachment --message-id ...`,
+// which cannot address a post at all.
+describe('the remediation an unconvertible post attachment offers', () => {
+  it('sends an image to the post’s own bytes command, never to the mail one', async () => {
+    const { graph } = graphReturning(ok(fileAttachment('scan.png', 'not really a png')));
+
+    const result = await command.execute(graph, params);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatchObject({ type: 'api_error', status: 415, code: 'unsupported_image' });
+      expect(result.error.message).toContain('get-group-post-attachment');
+      expect(result.error.message).not.toContain('get-mail-attachment');
+      expect(result.error.message).not.toContain('convert-mail-attachment-to-pdf');
+    }
+  });
+
+  // The mail and calendar families answer this one with their PDF sibling.
+  it('sends a legacy slide deck to the bytes as well, since a group post has no PDF sibling to offer', async () => {
+    const { graph } = graphReturning(ok(fileAttachment('deck.ppt', 'legacy OLE bytes')));
+
+    const result = await command.execute(graph, params);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatchObject({ type: 'api_error', status: 415, code: 'unsupported_legacy_office' });
+      expect(result.error.message).toContain('get-group-post-attachment');
+      expect(result.error.message).not.toContain('convert-mail-attachment-to-pdf');
+      expect(result.error.message).not.toContain('convert-group-post-attachment-to-pdf');
+    }
+  });
+
+  it('sends a format it cannot read at all to the bytes, naming no mail command', async () => {
+    const { graph } = graphReturning(ok(fileAttachment('vendor.dat', BINARY)));
+
+    const result = await command.execute(graph, params);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatchObject({ type: 'api_error', status: 415, code: 'unsupported_format' });
+      expect(result.error.message).toContain('get-group-post-attachment');
+      expect(result.error.message).not.toContain('convert-mail-attachment');
+    }
   });
 });
