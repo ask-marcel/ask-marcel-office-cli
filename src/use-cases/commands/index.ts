@@ -167,6 +167,7 @@ import * as listGroupThreadPosts from './list-group-thread-posts.ts';
 import * as getGroupPost from './get-group-post.ts';
 import * as convertGroupPostToMarkdown from './convert-group-post-to-markdown.ts';
 import * as listGroupPostAttachments from './list-group-post-attachments.ts';
+import * as getGroupPostAttachment from './get-group-post-attachment.ts';
 import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
@@ -323,6 +324,7 @@ const modules: Record<string, Command> = {
   'get-group-post': getGroupPost,
   'convert-group-post-to-markdown': convertGroupPostToMarkdown,
   'list-group-post-attachments': listGroupPostAttachments,
+  'get-group-post-attachment': getGroupPostAttachment,
   'get-mail-message-mime': getMailMessageMime,
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,
