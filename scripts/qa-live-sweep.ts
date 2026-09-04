@@ -90,7 +90,30 @@ if (pool['site-id']) {
   }
 }
 // groups / teams / chats
-P('group-id', first(run(['list-groups', '--top', '5']))?.id);
+// A UNIFIED group the signed-in user BELONGS to. `list-groups` is a tenant-wide
+// DIRECTORY read, so its first hit is typically a security or distribution group
+// with no mailbox that the user is not a member of: the group-mailbox commands then
+// answer MailboxNotEnabledForRESTAPI, which reads as a product failure and is not,
+// and no thread id is harvested at all — which left the whole six-command group-post
+// family unaudited on the run that shipped it (QA-DRIVER-02, 2026-09-04).
+const unifiedGroups = val(run(['list-my-memberships', '--top', '60'])).filter(
+  (g: any) => g['@odata.type'] === '#microsoft.graph.group' && (g.groupTypes ?? []).includes('Unified')
+);
+P('group-id', (unifiedGroups[0] ?? first(run(['list-groups', '--top', '5'])))?.id);
+// thread -> post -> post-attachment, from the first unified group that has a post.
+let postAttId: string | undefined;
+for (const g of unifiedGroups) {
+  for (const t of val(run(['list-group-threads', '--group-id', g.id, '--top', '10']))) {
+    const posts = val(run(['list-group-thread-posts', '--group-id', g.id, '--thread-id', t.id]));
+    if (posts.length === 0) continue;
+    pool['group-id'] = String(g.id);
+    P('thread-id', t.id);
+    P('post-id', posts[0].id);
+    postAttId ??= first(run(['list-group-post-attachments', '--group-id', g.id, '--thread-id', t.id, '--post-id', posts[0].id]))?.id;
+    break;
+  }
+  if (pool['thread-id'] && postAttId) break;
+}
 P('team-id', first(run(['list-joined-teams']))?.id);
 if (pool['team-id']) for (const ch of val(run(['list-team-channels', '--team-id', pool['team-id']]))) { if (run(['get-channel-files-folder', '--team-id', pool['team-id'], '--channel-id', ch.id]).ok) { P('channel-id', ch.id); break; } P('channel-id', ch.id); }
 const chatId = first(run(['list-chats', '--top', '5']))?.id;
@@ -130,7 +153,7 @@ if (xlsx) { P('worksheet-id', first(run(['list-excel-worksheets', '--drive-id', 
 if (anyFile) { const vers = val(run(['list-drive-item-versions', '--drive-id', anyFile.driveId, '--item-id', anyFile.itemId])); P('version-id', (vers[1] || vers[0])?.id); }
 // a group conversation (boundary-dependent)
 let convGroup: any, convId: any;
-for (const g of val(run(['list-groups', '--top', '15']))) { const conv = first(run(['list-group-conversations', '--group-id', g.id])); if (conv) { convGroup = g.id; convId = conv.id; break; } }
+for (const g of [...unifiedGroups, ...val(run(['list-groups', '--top', '15']))]) { const conv = first(run(['list-group-conversations', '--group-id', g.id])); if (conv) { convGroup = g.id; convId = conv.id; break; } }
 // a real nextLink for next-page
 const nlProbe = run(['list-mail-messages', '--top', '2']);
 const nextLink = (nlProbe as any).data?.nextLink ?? undefined;
@@ -167,6 +190,7 @@ const argFor = (cmd: string, opt: string): string[] | null => {
   if (opt === 'onenote-section-id' && /sharepoint-site/.test(cmd)) return siteNb.sectionId ? ['--onenote-section-id', siteNb.sectionId] : null;
   if (opt === 'onenote-page-id' && /sharepoint-site/.test(cmd)) return siteNb.pageId ? ['--onenote-page-id', siteNb.pageId] : null;
   if (opt === 'site-id' && /sharepoint-site-onenote/.test(cmd)) return siteNb.siteId ? ['--site-id', siteNb.siteId] : (pool['site-id'] ? ['--site-id', pool['site-id']] : null);
+  if (opt === 'attachment-id' && /group-post/.test(cmd)) return postAttId ? ['--attachment-id', postAttId] : null;
   if (opt === 'conversation-id') return convId ? ['--conversation-id', convId] : null;
   if (opt === 'group-id' && /conversation/.test(cmd)) return convGroup ? ['--group-id', convGroup] : null;
   if (opt === 'drive-id') return pr?.driveId ? ['--drive-id', pr.driveId] : null;
