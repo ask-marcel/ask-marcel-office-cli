@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { lookupScopes } from './graph-scopes.ts';
@@ -71,6 +71,32 @@ describe('fetching one attachment of a group post', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
     expect(paths).toEqual([]);
+  });
+
+  it('passes a failed read through untouched rather than dressing it as an attachment', async () => {
+    const graph = fakeGraphClient({ get: async () => err({ type: 'api_error', status: 404, message: 'ErrorItemNotFound' }) });
+
+    expect(await command.execute(graph, params)).toEqual(err({ type: 'api_error', status: 404, message: 'ErrorItemNotFound' }));
+  });
+
+  // Both halves of the mirror condition matter: the wrong subtype and the right
+  // subtype with nothing to mirror each have to come back untouched.
+  it('adds no mirror to a file attachment Graph returned without its bytes', async () => {
+    const { graph } = graphReturning({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf' });
+
+    const result = await command.execute(graph, params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { base64?: string }).base64).toBeUndefined();
+  });
+
+  it('adds no mirror to a reference attachment even when it carries a contentBytes field', async () => {
+    const { graph } = graphReturning({ '@odata.type': '#microsoft.graph.referenceAttachment', contentBytes: 'JVBERi0=' });
+
+    const result = await command.execute(graph, params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { base64?: string }).base64).toBeUndefined();
   });
 
   it('is a mail command that produces bytes, on the group scope the token already carries', () => {

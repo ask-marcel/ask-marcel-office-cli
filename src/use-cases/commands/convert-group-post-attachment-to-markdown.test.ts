@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
+import { buildSampleDocx } from '../../test-helpers/office-fixtures.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { commands } from './index.ts';
 
@@ -122,5 +123,39 @@ describe('the remediation an unconvertible post attachment offers', () => {
       expect(result.error.message).toContain('get-group-post-attachment');
       expect(result.error.message).not.toContain('convert-mail-attachment');
     }
+  });
+});
+
+// Both flags are forwarded to the shared pipeline, and nothing else in this
+// file proves they arrive: inverted or hardcoded, every test above still
+// passes. These pin the threading, one flag per behaviour it changes.
+describe('the flags a caller sets on a post attachment', () => {
+  const asBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  };
+
+  const renderDocx = async (over: Record<string, string>): Promise<string> => {
+    const docx = await buildSampleDocx();
+    const graph = fakeGraphClient({ get: async () => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.docx', contentBytes: asBase64(docx) }) });
+    const result = await command.execute(graph, { ...params, ...over });
+    return result.ok ? (result.value as { text: string }).text : '';
+  };
+
+  it('appends the Office metadata block only when --include-metadata is true', async () => {
+    expect(await renderDocx({})).not.toContain('## DOCX metadata');
+    expect(await renderDocx({ includeMetadata: 'false' })).not.toContain('## DOCX metadata');
+    expect(await renderDocx({ includeMetadata: 'true' })).toContain('## DOCX metadata');
+  });
+
+  it('refuses a value the flag does not define, rather than treating it as off', async () => {
+    const { graph, paths } = graphReturning(ok({}));
+
+    const result = await command.execute(graph, { ...params, includeMetadata: 'yes' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+    expect(paths).toEqual([]);
   });
 });
