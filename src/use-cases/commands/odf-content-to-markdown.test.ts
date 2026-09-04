@@ -12,8 +12,7 @@ const text = (inner: string): string =>
 describe('odfContentToMarkdown — text document (.odt)', () => {
   // Deleted text lives under text:tracked-changes as real paragraphs. The body
   // must show the document as it reads now: inserted text stays (it is current),
-  // deleted text goes (it is reported under tracked changes instead), and the
-  // change marks themselves leave no trace.
+  // deleted text goes, and the change marks themselves leave no trace.
   it('skips the tracked-changes region and the change marks, keeping inserted text and dropping deleted text', () => {
     const xml = text(
       '<text:tracked-changes><text:changed-region text:id="c1"><text:deletion><office:change-info><dc:creator>Robin Chen</dc:creator></office:change-info><text:p>obsolete sentence</text:p></text:deletion></text:changed-region>' +
