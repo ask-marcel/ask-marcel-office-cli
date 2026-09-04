@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
+import { buildLegacyXls, buildSampleDocx, buildSampleXlsx, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
 import { execute } from './read-mail-attachment.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
@@ -115,5 +115,143 @@ describe('read-mail-attachment (polymorphic, auto-routes by content-type)', () =
     } else {
       expect(result.error.type === 'api_error' ? result.error.message : '').not.toContain('no contentBytes');
     }
+  });
+});
+
+// ── Content-type rename hardening. The rename that lets a mislabelled file
+//    reach the right converter had one test (`report.jpg` carrying text/csv),
+//    so most of its branches decided nothing observable. Each case below picks
+//    a filename whose own extension would route somewhere else, making the
+//    rename the only reason the right converter runs.
+describe('read-mail-attachment routes by content-type when the filename would misroute', () => {
+  const csvBytes = (): string => toBase64(new TextEncoder().encode('name,score\nAda,100\n'));
+  const textOf = (value: unknown): string => (value as { text?: string }).text ?? '';
+
+  it('matches the content-type case-insensitively, since the wire casing is not the sender’s choice', async () => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.jpg', contentType: 'TEXT/CSV', contentBytes: csvBytes() };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(textOf(result.value)).toContain('Ada');
+  });
+
+  it('gives a name with no extension at all the one its content-type implies', async () => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'attachment', contentType: 'text/csv', contentBytes: csvBytes() };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(textOf(result.value)).toContain('Ada');
+  });
+
+  it('still converts when Graph returns the attachment with no name at all', async () => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', contentType: 'text/csv', contentBytes: csvBytes() };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(textOf(result.value)).toContain('Ada');
+  });
+
+  it('leaves the filename alone for a content-type outside the rename map, so a vague label cannot misroute a correctly named file', async () => {
+    const att = {
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: 'note.txt',
+      contentType: 'application/octet-stream',
+      contentBytes: toBase64(new TextEncoder().encode('plain body')),
+    };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.value as { contentType?: string }).contentType).toBe('text/plain');
+      expect(textOf(result.value)).toContain('plain body');
+    }
+  });
+
+  it('falls back to the filename when Graph reports no content-type', async () => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt', contentBytes: toBase64(new TextEncoder().encode('plain body')) };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(textOf(result.value)).toContain('plain body');
+  });
+
+  it('renames a mislabelled spreadsheet to its real format and reads the sheet', async () => {
+    const att = {
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: 'quarterly.jpg',
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      contentBytes: toBase64(buildSampleXlsx()),
+    };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { contentType?: string }).contentType).toBe('text/markdown');
+  });
+
+  it('renames a mislabelled document to its real format and reads the body', async () => {
+    const att = {
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: 'contract.jpg',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentBytes: toBase64(await buildSampleDocx()),
+    };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(textOf(result.value)).toContain('Sample Heading');
+  });
+
+  it('renames a mislabelled legacy spreadsheet, which has its own converter', async () => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'ledger.jpg', contentType: 'application/vnd.ms-excel', contentBytes: toBase64(buildLegacyXls()) };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value as { contentType?: string }).contentType).toBe('text/markdown');
+  });
+});
+
+describe('read-mail-attachment addresses the attachment and forwards its flags', () => {
+  it('reads the attachment from the message that owns it', async () => {
+    const paths: string[] = [];
+    const graph = fakeGraphClient({
+      get: async (path) => {
+        paths.push(path);
+        return ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt', contentType: 'text/plain', contentBytes: toBase64(new TextEncoder().encode('body')) });
+      },
+    });
+
+    await execute(graph, { messageId: 'm7', attachmentId: 'a9' });
+
+    expect(paths).toEqual(['/me/messages/m7/attachments/a9']);
+  });
+
+  // Nothing above proved --include-metadata reached the dispatch: inverted or
+  // hardcoded, every other test in this file still passes.
+  it('appends the Office metadata block only when --include-metadata is true', async () => {
+    const docx = toBase64(await buildSampleDocx());
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'contract.docx', contentType: 'application/octet-stream', contentBytes: docx };
+    const render = async (over: Record<string, string>): Promise<string> => {
+      const result = await execute(graphReturning(att), { ...params, ...over });
+      return result.ok ? ((result.value as { text?: string }).text ?? '') : '';
+    };
+
+    expect(await render({})).not.toContain('## DOCX metadata');
+    expect(await render({ includeMetadata: 'false' })).not.toContain('## DOCX metadata');
+    expect(await render({ includeMetadata: 'true' })).toContain('## DOCX metadata');
+  });
+
+  it.each([{ flag: 'includeMetadata' }, { flag: 'keepQuoted' }])('refuses a $flag value the flag does not define, rather than reading it as off', async ({ flag }) => {
+    const result = await execute(graphReturning({}), { ...params, [flag]: 'yes' });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
   });
 });
