@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { buildMalformedDocx, buildMinimalOdt, buildTrackedChangesOdt, buildRichOdt } from '../../test-helpers/office-fixtures.ts';
 import { formatOdfMetadata } from './odf-metadata-to-markdown.ts';
 import { extractOdfMetadata } from './odf-metadata.ts';
+import type { OdfMetadata } from './odf-metadata.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
 
 // A meta.xml exercising the extractor's skip/filter branches: office:meta
@@ -219,5 +220,135 @@ describe('extractOdfMetadata — tracked changes', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect([r.value.insertions, r.value.deletions, r.value.replacements, r.value.formatChanges]).toEqual([[], [], [], []]);
+  });
+});
+
+// Every tracked-change test above reads one shared fixture, so whole branches of
+// the body walk and the replacement pairing were never decided by a document
+// built to decide them: the mutation gate scored this file 65.36% with 150
+// survivors (QA A5-01, 2026-09-04). Each case below is the smallest document
+// that makes one branch observable.
+describe('extractOdfMetadata — tracked-change branches a single fixture cannot reach', () => {
+  const NS =
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"';
+  const info = (who: string, when = '2026-09-01T10:00:00'): string => `<office:change-info><dc:creator>${who}</dc:creator><dc:date>${when}</dc:date></office:change-info>`;
+
+  const odt = async (regions: string, body: string): Promise<Uint8Array> => {
+    const zip = new JSZip();
+    zip.file('mimetype', 'application/vnd.oasis.opendocument.text');
+    zip.file('meta.xml', `<?xml version="1.0" encoding="UTF-8"?><office:document-meta ${NS}><office:meta><dc:title>Branches</dc:title></office:meta></office:document-meta>`);
+    zip.file(
+      'content.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS}><office:body><office:text><text:tracked-changes text:track-changes="true">${regions}</text:tracked-changes>${body}</office:text></office:body></office:document-content>`
+    );
+    return zip.generateAsync({ type: 'uint8array' });
+  };
+  const extract = async (regions: string, body: string): Promise<OdfMetadata> => {
+    const r = await extractOdfMetadata(await odt(regions, body));
+    if (!r.ok) throw new Error('expected a readable package');
+    return r.value;
+  };
+
+  const ins = (id: string, who = 'Robin Chen'): string => `<text:changed-region text:id="${id}"><text:insertion>${info(who)}</text:insertion></text:changed-region>`;
+  const del = (id: string, text: string, who = 'Robin Chen'): string =>
+    `<text:changed-region text:id="${id}"><text:deletion>${info(who)}<text:p>${text}</text:p></text:deletion></text:changed-region>`;
+  const span = (id: string, inner: string): string => `<text:change-start text:change-id="${id}"/>${inner}<text:change-end text:change-id="${id}"/>`;
+
+  it('pairs an insertion followed by a deletion, the reverse of the order the shared fixture carries', async () => {
+    const v = await extract(ins('i1') + del('d1', 'old'), `<text:p>${span('i1', 'new')}<text:change text:change-id="d1"/></text:p>`);
+
+    expect(v.replacements).toEqual([{ deletionId: 'd1', insertionId: 'i1', author: 'Robin Chen', date: '2026-09-01T10:00:00', before: 'old', after: 'new' }]);
+    expect(v.insertions).toEqual([]);
+    expect(v.deletions).toEqual([]);
+  });
+
+  it('leaves an insertion whose span holds no text unpaired, since a replacement needs both halves', async () => {
+    const v = await extract(del('d1', 'old') + ins('i1'), `<text:p><text:change text:change-id="d1"/>${span('i1', '')}</text:p>`);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.deletions.map((d) => d.id)).toEqual(['d1']);
+  });
+
+  it('leaves a deletion that kept no text unpaired for the same reason', async () => {
+    const v = await extract(del('d1', '') + ins('i1'), `<text:p><text:change text:change-id="d1"/>${span('i1', 'new')}</text:p>`);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.insertions.map((i) => i.id)).toEqual(['i1']);
+  });
+
+  it('does not pair a mark whose id was never declared', async () => {
+    const v = await extract(ins('i1'), `<text:p><text:change text:change-id="ghost"/>${span('i1', 'new')}</text:p>`);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.insertions.map((i) => i.id)).toEqual(['i1']);
+  });
+
+  it('does not pair a format change sitting where an insertion would be', async () => {
+    const fmt = `<text:changed-region text:id="f1"><text:format-change>${info('Robin Chen')}</text:format-change></text:changed-region>`;
+    const v = await extract(del('d1', 'old') + fmt, `<text:p><text:change text:change-id="d1"/>${span('f1', 'restyled')}</text:p>`);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.formatChanges).toEqual([{ author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'restyled' }]);
+  });
+
+  it('reads counted spaces, a bare space, a tab and a line break inside an insertion as the reader sees them', async () => {
+    const inner = 'a<text:s text:c="3"/>b<text:s/>c<text:tab/>d<text:line-break/>e';
+    const v = await extract(ins('i1'), `<text:p>${span('i1', inner)}</text:p>`);
+
+    expect(v.insertions).toEqual([{ id: 'i1', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'a   b c d e' }]);
+  });
+
+  it('leaves a reviewer annotation out of the text an insertion covers', async () => {
+    const inner = 'kept<office:annotation><dc:creator>Alex Kim</dc:creator><text:p>note</text:p></office:annotation><office:annotation-end/> tail';
+    const v = await extract(ins('i1'), `<text:p>${span('i1', inner)}</text:p>`);
+
+    expect(v.insertions).toEqual([{ id: 'i1', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'kept tail' }]);
+  });
+
+  it('treats a space count that is not a positive number as a single space', async () => {
+    const v = await extract(ins('i1'), `<text:p>${span('i1', 'a<text:s text:c="oops"/>b')}</text:p>`);
+    const w = await extract(ins('i2'), `<text:p>${span('i2', 'c<text:s text:c="-4"/>d')}</text:p>`);
+
+    expect(v.insertions[0]?.text).toBe('a b');
+    expect(w.insertions[0]?.text).toBe('c d');
+  });
+
+  it('reads a deletion whose kept text sits in a heading, not only in a paragraph', async () => {
+    const region = `<text:changed-region text:id="d1"><text:deletion>${info('Robin Chen')}<text:h>dropped title</text:h></text:deletion></text:changed-region>`;
+    const v = await extract(region, '<text:p><text:change text:change-id="d1"/></text:p>');
+
+    expect(v.deletions).toEqual([{ id: 'd1', author: 'Robin Chen', date: '2026-09-01T10:00:00', text: 'dropped title' }]);
+  });
+
+  it('names no author or date for a region that declares no change-info', async () => {
+    const region = '<text:changed-region text:id="d1"><text:deletion><text:p>old</text:p></text:deletion></text:changed-region>';
+    const v = await extract(region, '<text:p><text:change text:change-id="d1"/></text:p>');
+
+    expect(v.deletions).toEqual([{ id: 'd1', author: '', date: '', text: 'old' }]);
+  });
+
+  it('ignores a changed-region that declares no kind this reader understands', async () => {
+    const region = `<text:changed-region text:id="x1"><text:unknown-change>${info('Robin Chen')}<text:p>mystery</text:p></text:unknown-change></text:changed-region>`;
+    const v = await extract(region + ins('i1'), `<text:p>${span('i1', 'new')}</text:p>`);
+
+    expect(v.insertions.map((i) => i.id)).toEqual(['i1']);
+    expect([v.deletions, v.replacements, v.formatChanges]).toEqual([[], [], []]);
+  });
+
+  it('counts a list item and a table cell as block boundaries, so edits either side are separate', async () => {
+    const body = `<text:list><text:list-item><text:p><text:change text:change-id="d1"/></text:p></text:list-item><text:list-item><text:p>${span('i1', 'new')}</text:p></text:list-item></text:list>`;
+    const v = await extract(del('d1', 'old') + ins('i1'), body);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.deletions.map((d) => d.id)).toEqual(['d1']);
+    expect(v.insertions.map((i) => i.id)).toEqual(['i1']);
+  });
+
+  it('refuses to pair a deletion and an insertion separated by a block boundary', async () => {
+    const v = await extract(del('d1', 'old') + ins('i1'), `<text:p><text:change text:change-id="d1"/></text:p><text:p>${span('i1', 'new')}</text:p>`);
+
+    expect(v.replacements).toEqual([]);
+    expect(v.deletions.map((d) => d.id)).toEqual(['d1']);
+    expect(v.insertions.map((i) => i.id)).toEqual(['i1']);
   });
 });
