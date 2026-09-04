@@ -12,7 +12,7 @@
 
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
 
-[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 189 commands](docs/COMMANDS.md)
+[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 192 commands](docs/COMMANDS.md)
 
 </div>
 
@@ -61,7 +61,7 @@ Microsoft Graph normally means registering an Azure app, chasing tenant-admin co
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 189 commands break down as 181 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft Graph and a periodic npm version check.
+The 192 commands break down as 184 GET, 4 read-only POST (three searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft Graph and a periodic npm version check.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -111,7 +111,7 @@ $ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item
 
 | Surface | Commands | In practice |
 |---|---:|---|
-| 📧 Outlook Mail | 41 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
+| 📧 Outlook Mail | 44 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
 | 📁 OneDrive + SharePoint | 49 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history, share links resolved even into partner tenants where you're a guest |
 | 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
 | 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
@@ -203,7 +203,7 @@ You get **five gateway tools**, not one per command — a schema per command wou
 |:--|:--|
 | `list-commands` | The terse manifest. Start here; `category` narrows it. |
 | `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 185 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-command` | The 188 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 
@@ -249,7 +249,7 @@ Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Gra
 
 ## Deep docs
 
-- **[All 189 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
+- **[All 192 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
 - **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release

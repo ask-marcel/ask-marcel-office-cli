@@ -4,6 +4,33 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Added: read what is attached to a group post
+
+`get-group-post --expand attachments` was the only route to a post's attachments,
+and it inlines every one of them at once, which is the shape that times out on a
+post carrying a multi-MB file. Three commands make the group inbox readable
+attachment by attachment, all on the `Group.Read.All` scope the token already has:
+
+- `list-group-post-attachments` returns the metadata alone, with the same slim
+  default `--select` the mail and calendar siblings use. Graph silently ignores
+  `$top`, `$skip`, `$orderby` and `$filter` here (probed live: asking for one
+  attachment returned all seven, and `isInline eq false` returned all seven when
+  every one was inline), so only `--select` and `--expand` are exposed.
+- `get-group-post-attachment` fetches one attachment, mirroring `contentBytes`
+  as `base64` so `--output-path` lands it on disk. This is also the route to an
+  image attached to a post.
+- `convert-group-post-attachment-to-markdown` renders one through the shared
+  conversion pipeline, the way the mail and calendar siblings do.
+
+### Fixed: unconvertible attachments name a command that can reach them
+
+The shared conversion pipeline hardcoded the mail remediation wording, so an
+image or scanned PDF attached to a calendar event told the caller to run
+`get-mail-attachment --message-id ...`, which cannot address an event. Each
+caller now supplies its own hints: the calendar converter points at
+`get-calendar-event --expand attachments` and its PDF sibling, and the new post
+converter points at `get-group-post-attachment`.
+
 ### Fixed: inline-only mail no longer hides its images
 
 Graph reports `hasAttachments: false` for a message whose only attachments are
