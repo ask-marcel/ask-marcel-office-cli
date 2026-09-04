@@ -44,18 +44,23 @@ const CONTENT_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
   'text/csv': 'csv',
 };
 
-// Rename a fileAttachment to the extension its content-type implies when the
-// filename's own extension disagrees, so the shared dispatch picks the right
-// converter. Non-file attachments and already-correct names pass through unchanged.
+// Rename a fileAttachment to the extension its content-type implies, so the
+// shared dispatch picks the right converter for a mislabelled file. A
+// non-file attachment, and a content-type outside the map, pass through.
+//
+// The name given here is consumed only by `extensionOf` inside the dispatch
+// and never reaches the output envelope, so the extension is the whole
+// payload and the original stem is not worth carrying. Preserving it used to
+// cost four branches (no dot, empty name, an already-correct extension) whose
+// outcomes were indistinguishable downstream: `report.jpg` renamed to
+// `report.csv` and to `attachment.csv` both route to the CSV converter, which
+// left the mutation gate unable to tell a correct rename from a broken one.
 const nameByContentType = (a: Record<string, unknown>): Record<string, unknown> => {
   if (a['@odata.type'] !== '#microsoft.graph.fileAttachment') return a;
   const contentType = typeof a['contentType'] === 'string' ? a['contentType'].toLowerCase() : '';
   const ext = Object.hasOwn(CONTENT_TYPE_EXTENSIONS, contentType) ? CONTENT_TYPE_EXTENSIONS[contentType] : undefined;
   if (ext === undefined) return a;
-  const name = typeof a['name'] === 'string' ? a['name'] : '';
-  const dot = name.lastIndexOf('.');
-  if ((dot === -1 ? '' : name.slice(dot + 1).toLowerCase()) === ext) return a;
-  return { ...a, name: `${dot === -1 ? name || 'attachment' : name.slice(0, dot)}.${ext}` };
+  return { ...a, name: `attachment.${ext}` };
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
