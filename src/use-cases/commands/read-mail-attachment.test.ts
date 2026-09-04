@@ -2,7 +2,18 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { buildLegacyXls, buildSampleDocx, buildSampleXlsx, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
+import {
+  buildLegacyXls,
+  buildPdfWithText,
+  buildRichOdp,
+  buildRichOds,
+  buildRichOdt,
+  buildRichPptx,
+  buildSampleDoc,
+  buildSampleDocx,
+  buildSampleXlsx,
+  buildSampleZipArchive,
+} from '../../test-helpers/office-fixtures.ts';
 import { execute } from './read-mail-attachment.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
@@ -244,7 +255,9 @@ describe('read-mail-attachment addresses the attachment and forwards its flags',
     };
 
     expect(await render({})).not.toContain('## DOCX metadata');
-    expect(await render({ includeMetadata: 'false' })).not.toContain('## DOCX metadata');
+    const explicitFalse = await execute(graphReturning(att), { ...params, includeMetadata: 'false' });
+    expect(explicitFalse.ok).toBe(true);
+    if (explicitFalse.ok) expect((explicitFalse.value as { text?: string }).text ?? '').not.toContain('## DOCX metadata');
     expect(await render({ includeMetadata: 'true' })).toContain('## DOCX metadata');
   });
 
@@ -253,5 +266,48 @@ describe('read-mail-attachment addresses the attachment and forwards its flags',
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+});
+
+// One case per remaining entry of the content-type map. Each names the file
+// `.jpg`, whose own extension would earn an image 415, so the conversion
+// succeeding is proof that this entry routed it. Without them the map's values
+// could be emptied one by one and every other test here would still pass.
+describe('read-mail-attachment honours every content-type in its rename map', () => {
+  const routes = [
+    { format: 'a presentation', contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', bytes: buildRichPptx },
+    { format: 'an OpenDocument spreadsheet', contentType: 'application/vnd.oasis.opendocument.spreadsheet', bytes: buildRichOds },
+    { format: 'an OpenDocument text', contentType: 'application/vnd.oasis.opendocument.text', bytes: buildRichOdt },
+    { format: 'an OpenDocument presentation', contentType: 'application/vnd.oasis.opendocument.presentation', bytes: buildRichOdp },
+    { format: 'a PDF', contentType: 'application/pdf', bytes: async () => buildPdfWithText() },
+    { format: 'a legacy Word document', contentType: 'application/msword', bytes: buildSampleDoc },
+  ];
+
+  it.each(routes)('converts $format that arrived under a .jpg filename', async ({ contentType, bytes }) => {
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'mislabelled.jpg', contentType, contentBytes: toBase64(await bytes()) };
+
+    const result = await execute(graphReturning(att), params);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // An image 415 is what an unrouted `.jpg` would have produced.
+      expect((result.value as { contentType?: string }).contentType).toMatch(/^text\//);
+    }
+  });
+});
+
+describe('read-mail-attachment forwards its flags into an archive too', () => {
+  it('applies --include-metadata to the entries it unpacks from a zip', async () => {
+    const archive = toBase64(await buildSampleZipArchive());
+    const att = { '@odata.type': '#microsoft.graph.fileAttachment', name: 'bundle.zip', contentType: 'application/zip', contentBytes: archive };
+    const entriesText = async (over: Record<string, string>): Promise<string> => {
+      const result = await execute(graphReturning(att), { ...params, ...over });
+      if (!result.ok) return '';
+      const { files } = result.value as { files?: ReadonlyArray<{ text?: string }> };
+      return (files ?? []).map((f) => f.text ?? '').join('\n');
+    };
+
+    expect(await entriesText({})).not.toContain('## DOCX metadata');
+    expect(await entriesText({ includeMetadata: 'true' })).toContain('## DOCX metadata');
   });
 });
