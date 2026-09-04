@@ -116,7 +116,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.unknownOption',
-    hint: 'Unknown CLI flag. Run `ask-marcel-office <command> --help` for the supported flags on that command, or `ask-marcel-office help-json --terse --category <name>` (~6 KB) to scan the whole category.',
+    hint: 'Unknown CLI flag. Run `ask-marcel-office <command> --help` for the supported flags on that command, or `ask-marcel-office help-json --terse --category <name>` (~8 KB) to scan the whole category.',
   },
   {
     source: 'cli',
@@ -140,7 +140,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     // envelope shape matches Commander's `commander.unknownCommand`. Same
     // hint — both are the "this subcommand doesn't exist" surface.
     matchCode: (c) => c === 'commander.unknownCommand' || c === 'cli_unknown_command',
-    hint: 'Unknown ask-marcel-office subcommand. Run `ask-marcel-office help-json --terse` (~31 KB across all categories) or `ask-marcel-office help-json --terse --category mail` (~6 KB for one category) to discover the right command.',
+    hint: 'Unknown ask-marcel-office subcommand. Run `ask-marcel-office help-json --terse` (~33 KB across all categories) or `ask-marcel-office help-json --terse --category mail` (~8 KB for one category) to discover the right command.',
   },
   {
     source: 'cli',

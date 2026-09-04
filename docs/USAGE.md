@@ -19,7 +19,7 @@ ask-marcel-office login
 
 # the rest is discoverable
 ask-marcel-office --help                                # ~34 KB, one-sentence summaries
-ask-marcel-office help-json --terse --category mail     # ~6 KB JSON for one category
+ask-marcel-office help-json --terse --category mail     # ~8 KB JSON for one category
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
 

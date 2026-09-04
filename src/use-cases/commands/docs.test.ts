@@ -134,17 +134,22 @@ describe('buildTerseManifest — discovery view', () => {
     expect(terse.length).toBeLessThan(full.length / 2);
   });
 
-  it('keeps the real help-json sizes within their documented budget — a tripwire so the "~440 KB full / ~31 KB terse / ~6 KB per category" hints (README/USAGE/cli/error-hints) cannot silently go stale as commands are added', () => {
+  it('keeps the real help-json sizes within their documented budget — a tripwire so the "~505 KB full / ~33 KB terse / ~8 KB per category" hints (USAGE/cli/docs/error-hints) cannot silently go stale as commands are added', () => {
     const stamp = (): Date => new Date(0);
+    const terse = buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp);
     const full = JSON.stringify(buildManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp)).length;
-    const terseAll = JSON.stringify(buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp)).length;
-    const terseDrive = JSON.stringify(filterManifestByCategory(buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp), 'drive')).length;
+    const terseAll = JSON.stringify(terse).length;
+    // Measured across every category rather than a named one: `drive` was the
+    // largest when this was written and `mail` has since overtaken it, so
+    // naming a category let the real ceiling drift unwatched.
+    const categories = [...new Set(Object.values(commands).map((c) => c.meta.category))];
+    const largestCategory = Math.max(...categories.map((c) => JSON.stringify(filterManifestByCategory(terse, c)).length));
     // If a band trips, update BOTH the documented "~N KB" hints and these bounds in the same change.
     expect(full).toBeGreaterThan(350_000); // floor: catch a broken/empty projection
-    expect(full).toBeLessThan(520_000); // ceiling: docs say ~440 KB
+    expect(full).toBeLessThan(560_000); // ceiling: docs say ~505 KB
     expect(terseAll).toBeGreaterThan(22_000);
-    expect(terseAll).toBeLessThan(40_000); // docs say ~31 KB
-    expect(terseDrive).toBeLessThan(8_500); // docs say ~6 KB/category (drive is the largest)
+    expect(terseAll).toBeLessThan(45_000); // docs say ~33 KB
+    expect(largestCategory).toBeLessThan(10_000); // docs say ~8 KB/category
   });
 });
 

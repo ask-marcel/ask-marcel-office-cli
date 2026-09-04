@@ -241,7 +241,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~6 KB for one category, vs ~440 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~30 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~8 KB for one category, vs ~505 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~30 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',
