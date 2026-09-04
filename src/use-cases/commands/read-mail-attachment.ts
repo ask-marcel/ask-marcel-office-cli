@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { convertFetchedAttachment } from './convert-mail-attachment-to-markdown.ts';
+import { convertFetchedAttachment, MAIL_HINTS } from './convert-mail-attachment-to-markdown.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
@@ -80,7 +80,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     }
     return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted });
   }
-  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted });
+  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted }, MAIL_HINTS);
 };
 
 const meta: CommandMeta = {

@@ -43,8 +43,8 @@ const MAIL_HINTS: ConversionHints = {
 
 // fileAttachment carries the bytes inline (base64) — decode and run them through the
 // shared dispatch (docx/xlsx/pptx/odf/csv/pdf/legacy + content-sniff), same as drive.
-const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> =>
-  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, MAIL_HINTS);
+const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> =>
+  bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, hints);
 
 const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
@@ -109,7 +109,12 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // Route an ALREADY-FETCHED attachment object to markdown by its polymorphic
 // `@odata.type`. Split out from the path-based fetch so `read-mail-attachment`
 // can peek the type for zip-routing without a second Graph round-trip.
-const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>, opts: ConvertOptions): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
+const convertFetchedAttachment = (
+  graph: GraphClient,
+  a: Record<string, unknown>,
+  opts: ConvertOptions,
+  hints: ConversionHints
+): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
   const odataType = a['@odata.type'];
   if (typeof odataType !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'attachment response missing @odata.type discriminator' });
@@ -117,7 +122,7 @@ const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return convertFileAttachment(a, opts);
+      return convertFileAttachment(a, opts, hints);
     case '#microsoft.graph.referenceAttachment':
       return convertReferenceAttachment(graph, a, opts);
     case '#microsoft.graph.itemAttachment':
@@ -127,20 +132,22 @@ const convertFetchedAttachment = (graph: GraphClient, a: Record<string, unknown>
   }
 };
 
-const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
+const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
-  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts);
+  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
-  return convertAttachmentToMarkdown(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, {
-    includeMetadata: parsed.data.includeMetadata === 'true',
-    keepQuoted: parsed.data.keepQuoted === 'true',
-  });
+  return convertAttachmentToMarkdown(
+    graph,
+    `/me/messages/${messageId}/attachments/${attachmentId}`,
+    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true' },
+    MAIL_HINTS
+  );
 };
 
 const meta: CommandMeta = {
@@ -169,4 +176,5 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { convertAttachmentToMarkdown, convertFetchedAttachment, execute, meta, schema };
+export { convertAttachmentToMarkdown, convertFetchedAttachment, execute, MAIL_HINTS, meta, schema };
+export type { ConvertOptions };
