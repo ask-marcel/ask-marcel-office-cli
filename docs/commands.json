@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.4.0",
-  "generatedAt": "2026-09-03T09:50:17.658Z",
+  "generatedAt": "2026-09-04T08:02:55.336Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -4348,6 +4348,48 @@
       "example": "ask-marcel-office list-group-owners --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
       "pagination": true
+    },
+    {
+      "name": "list-group-post-attachments",
+      "summary": "List the attachments (file, item, reference) on one post of a unified (Microsoft 365) group thread. Ships the slim default `--select=id,name,contentType,size,isInline` the mail and calendar siblings use, so a caller sees what is attached without pulling any bytes — the staged alternative to `get-group-post --expand attachments`, which inlines EVERY attachment at once and times out on a post carrying a multi-MB file. Graph returns the whole collection in one response and silently ignores `$top`, `$skip`, `$orderby` and `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed. A post whose only attachments are inline images reports `hasAttachments: false`, so call this whenever the body shows `cid:` references.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}/attachments",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/post-list-attachments",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group you belong to."
+        },
+        {
+          "name": "thread-id",
+          "key": "threadId",
+          "required": true,
+          "description": "Conversation thread ID, the `id` of a `list-group-threads` entry."
+        },
+        {
+          "name": "post-id",
+          "key": "postId",
+          "required": true,
+          "description": "Post ID inside that thread. Returned by `list-group-thread-posts`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        }
+      ],
+      "example": "ask-marcel-office list-group-post-attachments --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body."
     },
     {
       "name": "list-group-thread-posts",
