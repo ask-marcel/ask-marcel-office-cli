@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.4.0",
-  "generatedAt": "2026-09-04T08:03:56.769Z",
+  "generatedAt": "2026-09-04T08:04:58.309Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -136,8 +136,71 @@
       "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
     },
     {
+      "name": "convert-group-post-attachment-to-markdown",
+      "summary": "Convert an attachment on one post of a unified (Microsoft 365) group thread to markdown, the `convert-mail-attachment-to-markdown` sibling for a group inbox. Polymorphic on the attachment’s `@odata.type` and sharing the mail pipeline: fileAttachment decodes the inline bytes and converts them locally (docx, xlsx, csv, odt/ods/odp, pptx as per-slide text, pdf text layer, legacy .xls/.doc, an Outlook `.msg` rendered recursively with its quoted chain stripped unless `--keep-quoted true`, plain text passed through); referenceAttachment resolves via `/shares/{token}/driveItem`; an embedded mail, event or contact is rendered locally. There is no PDF sibling here, so an image, a scanned PDF, a legacy `.ppt` and any other unsupported format return a 415 pointing at `get-group-post-attachment` for the raw bytes.",
+      "category": "mail",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}/attachments/{attachment-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/attachment-get",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID for a unified (Microsoft 365) group the signed-in user belongs to."
+        },
+        {
+          "name": "thread-id",
+          "key": "threadId",
+          "required": true,
+          "description": "Conversation thread ID, the `id` of a `list-group-threads` entry."
+        },
+        {
+          "name": "post-id",
+          "key": "postId",
+          "required": true,
+          "description": "Post ID inside that thread. Returned by `list-group-thread-posts`."
+        },
+        {
+          "name": "attachment-id",
+          "key": "attachmentId",
+          "required": true,
+          "description": "Attachment ID inside that post. Returned by `list-group-post-attachments`."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to append the Office side-channel metadata block, exactly as `convert-mail-attachment-to-markdown` documents it. No-op on other attachment types.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "keep-quoted",
+          "key": "keepQuoted",
+          "required": false,
+          "description": "Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel-office convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
+      "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file and reference attachments run through the conversion dispatch; an embedded item is rendered locally). Plain-text sources return the raw-bytes envelope, and a PDF source carries `pageCount`. Unsupported types return an api_error with status 415 naming `get-group-post-attachment` as the way to the bytes.",
+      "producesBytes": true
+    },
+    {
       "name": "convert-group-post-to-markdown",
-      "summary": "Render one post of a unified (Microsoft 365) group thread as markdown, the way `convert-mail-to-markdown` renders an Outlook message: a `**From:**` line, a `**Date:**` line, then the HTML body through turndown with quoted reply chains stripped. A post arrives from the group's own address with the writer in `sender`, so the author line reads `Robin Chen <robin.chen@contoso.com> on behalf of Support <support@contoso.com>`. There is no subject line: the thread `topic` is the subject and lives on `list-group-threads`. By default no image bytes are fetched; inline `cid:` images render as `[inline image: <name>]` placeholders unless `--inline-images true`. File attachments are listed below the body by name, size and id and their bytes are never fetched here; `get-group-post` with `attachments` expanded returns them. Same staged-fetch design as the mail command: one call for the post, one for the attachment list when `hasAttachments` is true or the body references a `cid:` image (Graph reports false for a post whose only attachments are inline), and with `--inline-images true` one per small inline image.",
+      "summary": "Render one post of a unified (Microsoft 365) group thread as markdown, the way `convert-mail-to-markdown` renders an Outlook message: a `**From:**` line, a `**Date:**` line, then the HTML body through turndown with quoted reply chains stripped. A post arrives from the group's own address with the writer in `sender`, so the author line reads `Robin Chen <robin.chen@contoso.com> on behalf of Support <support@contoso.com>`. There is no subject line: the thread `topic` is the subject and lives on `list-group-threads`. By default no image bytes are fetched; inline `cid:` images render as `[inline image: <name>]` placeholders unless `--inline-images true`. File attachments are listed below the body by name, size and id and their bytes are never fetched here; read one with `convert-group-post-attachment-to-markdown` or fetch it with `get-group-post-attachment`. Same staged-fetch design as the mail command: one call for the post, one for the attachment list when `hasAttachments` is true or the body references a `cid:` image (Graph reports false for a post whose only attachments are inline), and with `--inline-images true` one per small inline image.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}",
@@ -1631,7 +1694,7 @@
     },
     {
       "name": "get-group-post",
-      "summary": "Get a single post of a unified (Microsoft 365) group thread by ID, the sibling of `get-mail-message` for a group inbox: the full `post` resource including the HTML `body`. `--select` trims the projection. `--expand attachments` returns the post's attachments inline, each with its base64 `contentBytes`; that is the route to an attachment's bytes, since no separate attachment command exists for posts. Post IDs come from `list-group-thread-posts`; use `convert-group-post-to-markdown` for a readable rendering.",
+      "summary": "Get a single post of a unified (Microsoft 365) group thread by ID, the sibling of `get-mail-message` for a group inbox: the full `post` resource including the HTML `body`. `--select` trims the projection. `--expand attachments` returns every attachment inline with its base64 `contentBytes`, which is convenient for a small post and the wrong shape for one carrying a multi-MB file: list them with `list-group-post-attachments` and fetch one with `get-group-post-attachment` instead. Post IDs come from `list-group-thread-posts`; use `convert-group-post-to-markdown` for a readable rendering.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}",
@@ -4400,7 +4463,7 @@
     },
     {
       "name": "list-group-post-attachments",
-      "summary": "List the attachments (file, item, reference) on one post of a unified (Microsoft 365) group thread. Ships the slim default `--select=id,name,contentType,size,isInline` the mail and calendar siblings use, so a caller sees what is attached without pulling any bytes — the staged alternative to `get-group-post --expand attachments`, which inlines EVERY attachment at once and times out on a post carrying a multi-MB file. Graph returns the whole collection in one response and silently ignores `$top`, `$skip`, `$orderby` and `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed. A post whose only attachments are inline images reports `hasAttachments: false`, so call this whenever the body shows `cid:` references. Fetch one with `get-group-post-attachment`.",
+      "summary": "List the attachments (file, item, reference) on one post of a unified (Microsoft 365) group thread. Ships the slim default `--select=id,name,contentType,size,isInline` the mail and calendar siblings use, so a caller sees what is attached without pulling any bytes — the staged alternative to `get-group-post --expand attachments`, which inlines EVERY attachment at once and times out on a post carrying a multi-MB file. Graph returns the whole collection in one response and silently ignores `$top`, `$skip`, `$orderby` and `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed. A post whose only attachments are inline images reports `hasAttachments: false`, so call this whenever the body shows `cid:` references. Read one with `convert-group-post-attachment-to-markdown`, or fetch its bytes with `get-group-post-attachment`.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}/attachments",
