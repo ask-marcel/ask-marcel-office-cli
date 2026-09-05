@@ -2,7 +2,7 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
-## Unreleased
+## 2.5.0
 
 ### Added: read what is attached to a group post
 
