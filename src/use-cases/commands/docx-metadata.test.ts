@@ -66,6 +66,57 @@ const buildCraftedDocx = async (): Promise<Uint8Array> => {
   return buffer;
 };
 
+/**
+ * A one-row table whose table, row and cell properties were each changed under
+ * revision marking by a different reviewer. The `docx` package has no public
+ * API for `w:tblPrChange` / `w:trPrChange` / `w:tcPrChange`, so the zip is
+ * hand-rolled the way `buildCraftedDocx` above is, and for the same reason.
+ * Three different authors, one per scope, so a change reported at the wrong
+ * level is visible rather than merely miscounted. Each changed property is a
+ * leaf carrying its own attributes (`w:tblW`, `w:trHeight`, `w:shd`), which is
+ * what the shared attribute comparison can see: a nested container such as
+ * `w:tblBorders`, whose values hang off child elements, compares as unchanged
+ * and is reported with no property named.
+ */
+const buildTableRevisionDocx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'word/document.xml',
+    `<?xml version="1.0"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9000" w:type="dxa"/>
+        <w:tblPrChange w:id="800" w:author="Robin Chen" w:date="2026-05-01T00:00:00Z">
+          <w:tblPr><w:tblW w:w="5000" w:type="dxa"/></w:tblPr>
+        </w:tblPrChange>
+      </w:tblPr>
+      <w:tr>
+        <w:trPr>
+          <w:trHeight w:val="500"/>
+          <w:trPrChange w:id="801" w:author="Alex Kim" w:date="2026-05-02T00:00:00Z">
+            <w:trPr><w:trHeight w:val="300"/></w:trPr>
+          </w:trPrChange>
+        </w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:shd w:val="clear" w:fill="FFFF00"/>
+            <w:tcPrChange w:id="802" w:author="Jordan Avery" w:date="2026-05-03T00:00:00Z">
+              <w:tcPr><w:shd w:val="clear" w:fill="FFFFFF"/></w:tcPr>
+            </w:tcPrChange>
+          </w:tcPr>
+          <w:p><w:r><w:t>quarterly figures</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>`
+  );
+  return await zip.generateAsync({ type: 'uint8array' });
+};
+
 describe('extractDocxMetadata', () => {
   it('returns every section populated for a rich docx — core/custom props, comment, tracked ins/del, hidden text, external rel, MERGEFIELD, bookmark', async () => {
     const bytes = await buildRichDocx();
@@ -379,6 +430,35 @@ describe('extractDocxMetadata — moves and format changes', () => {
     if (!result.ok) return;
     const refonted = result.value.formatChanges.find((f) => f.text === 'refonted words');
     expect(refonted?.properties).toEqual(['w:rFonts']);
+  });
+
+  it('reports a table whose width a reviewer changed under revision marking, scoped to the table', async () => {
+    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const table = result.value.formatChanges.find((f) => f.scope === 'table');
+    expect(table?.author).toBe('Robin Chen');
+    expect(table?.date).toBe('2026-05-01T00:00:00Z');
+    expect(table?.properties).toEqual(['w:tblW']);
+  });
+
+  it('reports a row whose height a reviewer changed under revision marking, scoped to the row', async () => {
+    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const row = result.value.formatChanges.find((f) => f.scope === 'row');
+    expect(row?.author).toBe('Alex Kim');
+    expect(row?.properties).toEqual(['w:trHeight']);
+  });
+
+  it('reports a cell whose shading a reviewer changed under revision marking, scoped to the cell', async () => {
+    const result = await extractDocxMetadata(await buildTableRevisionDocx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const cell = result.value.formatChanges.find((f) => f.scope === 'cell');
+    expect(cell?.author).toBe('Jordan Avery');
+    expect(cell?.text).toBe('quarterly figures');
+    expect(cell?.properties).toEqual(['w:shd']);
   });
 
   it('reports a paragraph-property change against the paragraph text, scoped apart from run formatting', async () => {

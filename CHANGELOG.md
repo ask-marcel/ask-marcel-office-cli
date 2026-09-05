@@ -4,6 +4,21 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## 2.5.0
 
+### Added: docx tracked changes cover the table
+
+`extractDocxMetadata` reported formatting revisions on runs and paragraphs only,
+so a reviewer who restyled a table left no trace in the metadata block. Word
+records a table, row and cell property change the same way it records a run's,
+the properties as they were BEFORE the edit nested inside a `*Change` element,
+so the same walker reads all five. `formatChanges[].scope` gains `table`, `row`
+and `cell` alongside `run` and `paragraph`.
+
+One limit worth knowing: a property whose values hang off child elements rather
+than its own attributes, and `w:tblBorders` is the common table case, compares
+as unchanged. The revision is still reported with its author, date and scope; it
+names no property. Structural revisions (`w:cellIns`, `w:cellDel`, `w:cellMerge`)
+carry no before/after pair and are not reported.
+
 ### Added: read what is attached to a group post
 
 `get-group-post --expand attachments` was the only route to a post's attachments,

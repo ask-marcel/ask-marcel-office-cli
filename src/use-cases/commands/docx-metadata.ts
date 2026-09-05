@@ -24,8 +24,8 @@ import {
  * Pulls the side-channel content out of a .docx zip — every text-bearing
  * surface mammoth drops on the floor: core / app / custom doc properties,
  * people registry, external hyperlinks, comments, tracked changes (replacements,
- * the insertions and deletions that pair with nothing, moves, and run /
- * paragraph formatting changes),
+ * the insertions and deletions that pair with nothing, moves, and run,
+ * paragraph, table, row and cell formatting changes),
  * hidden text (w:vanish), text-box / shape text (w:txbxContent), header/footer
  * body prose, field instructions (MERGEFIELD / HYPERLINK / DOCVARIABLE), bookmarks.
  *
@@ -44,7 +44,8 @@ type Comment = { readonly id: string; readonly author: string; readonly initials
 type TrackedChange = { readonly id: string; readonly author: string; readonly date: string; readonly text: string };
 type Replacement = { readonly deletionId: string; readonly insertionId: string; readonly author: string; readonly date: string; readonly before: string; readonly after: string };
 type Move = { readonly name: string; readonly author: string; readonly date: string; readonly text: string; readonly halves: 'both' | 'from-only' | 'to-only' };
-type FormatChange = { readonly scope: 'run' | 'paragraph'; readonly author: string; readonly date: string; readonly text: string; readonly properties: ReadonlyArray<string> };
+type FormatChangeScope = 'run' | 'paragraph' | 'table' | 'row' | 'cell';
+type FormatChange = { readonly scope: FormatChangeScope; readonly author: string; readonly date: string; readonly text: string; readonly properties: ReadonlyArray<string> };
 type Field = { readonly source: string; readonly instruction: string };
 type Bookmark = { readonly id: string; readonly name: string };
 type HeaderFooter = { readonly part: string; readonly text: string };
@@ -62,7 +63,7 @@ type DocxMetadata = {
   readonly replacements: ReadonlyArray<Replacement>;
   /** Text moved elsewhere, joined by the range name that brackets both halves. */
   readonly moves: ReadonlyArray<Move>;
-  /** Run or paragraph properties changed under revision marking. */
+  /** Run, paragraph, table, row or cell properties changed under revision marking. */
   readonly formatChanges: ReadonlyArray<FormatChange>;
   readonly hiddenText: ReadonlyArray<string>;
   readonly textBoxes: ReadonlyArray<string>;
@@ -306,7 +307,7 @@ const propertiesOf = (props: unknown, exclude: string): ReadonlyMap<string, stri
 const changedProperties = (before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): ReadonlyArray<string> =>
   [...new Set([...before.keys(), ...after.keys()])].filter((name) => before.get(name) !== after.get(name)).toSorted((a, b) => a.localeCompare(b));
 
-const changesIn = (root: unknown, container: string, propsTag: string, changeTag: string, scope: 'run' | 'paragraph'): ReadonlyArray<FormatChange> => {
+const changesIn = (root: unknown, container: string, propsTag: string, changeTag: string, scope: FormatChangeScope): ReadonlyArray<FormatChange> => {
   const out: Array<FormatChange> = [];
   for (const node of findAll(root, container)) {
     const props = node[propsTag];
@@ -326,9 +327,22 @@ const changesIn = (root: unknown, container: string, propsTag: string, changeTag
   return out;
 };
 
+// A table carries its revisions at three levels, and Word records each the same
+// way it records a run or a paragraph: the properties as they were BEFORE the
+// edit, nested inside a `*Change` element under the current properties. So the
+// same walker reads all five, and the scope is what tells a reader whether a
+// reviewer restyled the whole table, one row, or one cell. Structural revisions
+// (`w:cellIns`, `w:cellDel`, `w:cellMerge`) carry no before/after pair and are
+// deliberately not reported here. Note the limit `attrSignature` imposes on all
+// five: a property whose values hang off child elements rather than its own
+// attributes (`w:tblBorders` is the common table case) compares as unchanged, so
+// the revision is reported with its author and scope but names no property.
 const extractFormatChanges = (root: unknown): ReadonlyArray<FormatChange> => [
   ...changesIn(root, 'w:r', 'w:rPr', 'w:rPrChange', 'run'),
   ...changesIn(root, 'w:p', 'w:pPr', 'w:pPrChange', 'paragraph'),
+  ...changesIn(root, 'w:tbl', 'w:tblPr', 'w:tblPrChange', 'table'),
+  ...changesIn(root, 'w:tr', 'w:trPr', 'w:trPrChange', 'row'),
+  ...changesIn(root, 'w:tc', 'w:tcPr', 'w:tcPrChange', 'cell'),
 ];
 
 const extractDocxMetadata = async (bytes: Uint8Array): Promise<Result<DocxMetadata, GraphError>> => {
