@@ -66,6 +66,10 @@ jobs:
         run: bun test
       - name: coverage (per-tier thresholds)
         run: bun run coverage
+      - name: doc numbers match the registry (selftest first, so the gate proves it can fail)
+        run: |
+          bun run scripts/check-doc-numbers.ts --selftest
+          bun run check:docs
       - name: mutation (changed files; see deviation 3 in the header)
         env:
           # The branch tip BEFORE this push. Read via env rather than inlined,

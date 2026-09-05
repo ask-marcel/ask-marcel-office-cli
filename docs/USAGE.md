@@ -190,7 +190,7 @@ bloat this CLI exists to avoid). Discovery is three hops:
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 180 READ commands
+run-command { command, params?, outputPath?, outputDir? }        → the 188 READ commands
 run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
 ```

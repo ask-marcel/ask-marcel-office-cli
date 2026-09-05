@@ -19,6 +19,23 @@ as unchanged. The revision is still reported with its author, date and scope; it
 names no property. Structural revisions (`w:cellIns`, `w:cellDel`, `w:cellMerge`)
 carry no before/after pair and are not reported.
 
+### Added: a gate that holds the docs to the registry's numbers
+
+Four numeric claims drifted during the 2.4.0 cycle, and one was wrong on main for
+two releases: `docs/USAGE.md` promised "the 180 READ commands" where the registry
+held 188, three sections after `README.md` said 188 correctly. `mcp.ts` already
+derives its counts and carries a comment saying the prose must be derived too;
+nothing enforced it.
+
+`bun run check:docs` reads the counts off the command registry and the rendered
+manifest, then holds all ten numeric claims in `README.md`, `docs/USAGE.md` and
+`docs/COMMANDS.md` to them, printing `file:line expected N, found M`. A claim
+whose anchor text no longer matches anything fails too, so rewording a sentence
+cannot silently switch its own check off. It runs in CI behind a `--selftest`
+that proves the matcher rejects both a wrong number and a lost anchor.
+
+The stale 188 is corrected in the same change.
+
 ### Added: read what is attached to a group post
 
 `get-group-post --expand attachments` was the only route to a post's attachments,

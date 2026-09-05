@@ -76,6 +76,7 @@
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "bun --bun x tsc --noEmit",
     "coverage": "bun run scripts/check-coverage.ts",
+    "check:docs": "bun run scripts/check-doc-numbers.ts",
     "mutate": "stryker run",
     "mutate:changed": "bash scripts/mutate-changed.sh",
     "mutate:staged": "bash scripts/mutate-staged.sh",
