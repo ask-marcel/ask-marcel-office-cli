@@ -1,22 +1,24 @@
 ---
 name: ask-marcel
 description: >
-  Answer questions from the user's own Microsoft 365 via the local read-only ask-marcel-office
-  CLI — Outlook mail, OneDrive/SharePoint files, people directory, calendar, To Do / Planner,
-  OneNote — and prepare UNSENT Outlook drafts (reply, forward, new mail) on request. It is the
-  ONLY way to read the user's mail, files, calendar and colleagues: use it for ANY factual
-  question about their work content, even when they name no tool or assume you can't see their
-  data, instead of answering from memory or claiming no access. Triggers: "what's the status of
-  X", "find / summarize the latest doc on Y", "who is Z, their number / manager", "did we decide
-  / hear back on…", "what's on my calendar / plate", "reply to X saying…", "draft an email to Y",
-  "forward that thread to Z". Do NOT use it to SEND mail (every draft stays unsent; the user
-  sends in Outlook), schedule time, create tasks, or change settings, nor for a file already on
-  local disk, debugging the CLI itself, or how-to questions not about the user's own content.
+  Answer questions from the user's own Microsoft 365, AND draft their replies, forwards and new
+  mails as UNSENT Outlook drafts, via the local ask-marcel-office CLI — Outlook mail,
+  OneDrive/SharePoint files, people directory, calendar, To Do / Planner, OneNote, Teams chats,
+  Microsoft 365 group inboxes. It is the ONLY way to read the user's mail, files, calendar and
+  colleagues, and the only way to write a draft in their mailbox: use it for ANY factual question
+  about their work content, and for ANY request to reply, forward or write an email, even when
+  they name no tool or assume you can't see their data, instead of answering from memory or
+  claiming no access. Triggers: "what's the status of X", "find / summarize the latest doc on Y",
+  "who is Z, their number / manager", "did we decide / hear back on…", "what's on my calendar /
+  plate", "reply to X saying…", "answer this email", "draft an email to Y", "forward that thread
+  to Z", "write back to…". Do NOT use it to SEND mail (every draft stays unsent; the user sends in
+  Outlook), schedule time, create tasks, or change settings, nor for a file already on local
+  disk, debugging the CLI itself, or how-to questions not about the user's own content.
 ---
 
-# Answer a question from Microsoft 365
+# Answer a question, or draft a reply, from Microsoft 365
 
-Thin orchestrator over `ask-marcel-office` (~190 typed Microsoft Graph subcommands — read-only except four unsent-draft writers). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
+Thin orchestrator over `ask-marcel-office` (~195 typed Microsoft Graph subcommands — read-only except four unsent-draft writers). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
 
 ## Ground rules
 
@@ -27,7 +29,7 @@ Thin orchestrator over `ask-marcel-office` (~190 typed Microsoft Graph subcomman
 - **Answer for the user, not the log.** The final answer carries findings, not plumbing: no command names, no Graph/HTTP error codes, no token-or-scope talk (that a lookup returned nothing is a fact; *how* the API said so is not). Keep it concise and mirror how the user writes to you — when in doubt, terse and skimmable beats a wall of prose.
 - **All timestamps come back in UTC.** `my-quick-context` returns `tenantTimeZone`; convert before stating any time. In a UTC+8 tenant, a meeting Graph reports at `07:00` starts at 15:00 local — answering "7am" is wrong.
 - **Default text output is fine.** Add `--output json` only when you need to extract fields programmatically.
-- **Large payloads go to disk.** `--output-path <file>` works on every command that returns a document body — and ONLY those: JSON commands (searches, listings) refuse it, so shell-redirect those instead (`--output json > out.json`) and extract with a script. The `sizeHint` printed on oversized listings claims the flag "works on every command" — it doesn't; believe the refusal error, not the hint. `microsoft-search-query` is the usual case: six fixed 25-hit containers, no `--top`/`--select`, routinely >100 KB.
+- **Large payloads go to disk.** `--output-path <file>` works on every command that returns a document body — and ONLY those: JSON commands (searches, listings) refuse it, so shell-redirect those instead (`--output json > out.json`) and extract with a script. `microsoft-search-query` is the usual case: six fixed 25-hit containers, no `--top`/`--select`, routinely >100 KB.
 - Discover anything not covered here with `ask-marcel-office --help` (all commands) or `ask-marcel-office docs <command>` (per-command page).
 
 ## Setup (once)
@@ -61,10 +63,15 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | Who wrote / last touched this doc | `get-drive-item-created-by-user` / `get-drive-item-last-modified-by-user` |
 | Org tree | `get-user-manager`, `list-user-direct-reports` (recurse manually) |
 | Team / group membership | `list-groups` → `list-group-members` / `list-group-owners` |
+| What was posted in a group / a group's inbox | `list-groups` → `list-group-threads --group-id '<id>'` → `list-group-thread-posts --thread-id '<id>'` → `convert-group-post-to-markdown`. Only Microsoft 365 (unified) groups have an inbox, and only members can read it. See *Read a group post* |
+| What did X say in a Teams chat | `find-chats-with-user --name '<person>'` → `list-teams-chat-messages --chat-id '<id>'`; or `list-teams-chats-with-messages` for recent chats with bodies inlined. Chat content is not in federated search, so this is the only route |
 | What's on my calendar | `list-calendars` → `list-specific-calendar-view --calendar-id '<id>' --start-date-time '<from>' --end-date-time '<to>'` — dates accept `today`, `start-of-week`, `+7d` |
 | Is X free / common slot | `get-schedule` |
 | What's on my plate | `list-incomplete-todo-tasks` + `list-incomplete-planner-tasks` — neither is in federated search |
 | Meeting notes / decisions | `search-onenote-pages --filter "contains(title,'<keyword>')"` — OneNote search is title-only, so also try Mail + Files |
+| Reply to / answer this email | Read the thread first (*Read an email in full*), then *Draft an email* → **Reply**. The draft goes on the thread's newest message |
+| Forward this to Y | *Read an email in full* for what it carries, then *Draft an email* → **Forward** |
+| Write / send a new email to Y | *Draft an email* → **New mail** (it will be an unsent draft; the user sends). Resolve Y via the people path first |
 
 **3. Open the best few in full** — newest first, only the handful that look relevant. Emails: *Read an email in full*. Files: *Read a document in full*. Both below.
 
@@ -136,6 +143,38 @@ ask-marcel-office extract-sharepoint-links-in-mail --message-id '<id>'
 
 Each resolved link returns `driveId` + `itemId` — read it as a document. Non-file links (site pages, access-request URLs) error per-link; ignore those. A link that returns `accessDenied` while a sibling file in the same drive opens is a per-file permission gap: name the links you couldn't open so the user can request access, and take the figures from the email body instead.
 
+
+## Read a group post
+
+A Microsoft 365 group's inbox, thread by thread and post by post. Only unified groups have one; a security or distribution group answers `MailboxNotEnabledForRESTAPI`, and a group you are not a member of answers `ErrorAccessDenied` even though `list-groups` lists it.
+
+**1. Find the group, then its threads, newest first:**
+
+```bash
+ask-marcel-office list-groups --select id,displayName,groupTypes
+ask-marcel-office list-group-threads --group-id '<id>' --orderby 'lastDeliveredDateTime desc' --top 10 --select id,topic,lastDeliveredDateTime,hasAttachments
+```
+
+The thread `topic` is the subject. Each thread row carries only a truncated `preview`; there is no `--filter` here (Graph refuses it), so narrow with `--orderby` + `--top` and stop at the first thread older than what you need.
+
+**2. Read the posts of a thread:**
+
+```bash
+ask-marcel-office list-group-thread-posts --group-id '<id>' --thread-id '<tid>' --select id,sender,receivedDateTime,hasAttachments
+ask-marcel-office convert-group-post-to-markdown --group-id '<id>' --thread-id '<tid>' --post-id '<pid>'
+```
+
+One call returns the whole thread, no cursor. `sender` is the person who wrote the post; `from` is the group's own address, so the author line reads *X on behalf of the group*. There is no subject line in the rendering, since the topic sits on the thread. Same flags as mail: `--keep-quoted true` to keep quoted history, and leave `--inline-images` off.
+
+**3. Attachments.** `hasAttachments` is `false` for a post whose only attachments are inline images, so when the body shows `cid:` placeholders list them anyway:
+
+```bash
+ask-marcel-office list-group-post-attachments --group-id '<id>' --thread-id '<tid>' --post-id '<pid>'
+ask-marcel-office convert-group-post-attachment-to-markdown --group-id '<id>' --thread-id '<tid>' --post-id '<pid>' --attachment-id '<aid>'
+```
+
+The mail siblings all exist here with the same shape: `get-group-post-attachment --output-path <file>` for raw bytes or an image, `convert-group-post-attachment-to-pdf --output-path deck.pdf` for a deck where layout matters, `extract-group-post-attachment-images --output-dir <dir>` for the diagrams inside a document, and `extract-sharepoint-links-in-group-post` to resolve every SharePoint URL in a post body to a driveItem you can then download.
+
 ## Read a document in full
 
 First get the file's `drive-id` + `item-id`.
@@ -168,9 +207,9 @@ Returns `driveId` + `itemId` + `tenantId`. If `tenantId` isn't yours (a share fr
 - **Big or many-sheeted Excel** — go sheet by sheet: `list-excel-worksheets` then `get-excel-used-range --worksheet-id '<name>'`. Pass `--full true` to get formulas and value types alongside values — it shows directly whether a total is computed or hand-typed. Named tables read via `list-excel-tables` → `list-excel-table-rows`. Also run `download-drive-item-as-markdown --include-metadata true` once for the `## Workbook metadata` block — cell comments (often the "why" behind a number), hidden sheets, defined names — which the sheet reads don't include.
 - **Counting rows or categories** (how many FIT vs GAP, how many open items) — count with a script over the converted markdown (`grep -c`, `awk`), never by eye. Hand-counting a few hundred rows in a wide sheet is unreliable and two reads rarely agree; a one-line filter is exact and repeatable.
 - **PowerPoint / anything where layout matters** — `download-drive-item-as-pdf --drive-id … --item-id … --output-path deck.pdf`, then read the PDF.
-- **Zip archives** — one call unzips and converts every file inside (legacy GBK/CP437 entry names decoded): `convert-drive-item-zip-to-markdown` (in OneDrive/SharePoint), `convert-mail-attachment-zip-to-markdown` (mail), `convert-local-file --path ./archive.zip` (disk). It returns the text content and lists images and scanned/image-only PDFs without unpacking them. To read those scanned entries (a stamped invoice, a bank passbook, a registration cert): `download-drive-item-content --drive-id … --item-id … --output-path archive.zip`, unzip locally, then Read the image and PDF files — Read renders PDF pages visually, scans included. Triage from the converter's scan-only list: open the files the question needs and the pages that carry the data; skip boilerplate and duplicate copies.
+- **Zip archives** — one call unzips and converts every file inside (legacy GBK/CP437 entry names decoded): `convert-drive-item-zip-to-markdown` (in OneDrive/SharePoint), `convert-mail-attachment-zip-to-markdown` (mail), `convert-local-file-to-markdown --path ./archive.zip` (disk). It returns the text content and lists images and scanned/image-only PDFs without unpacking them. To read those scanned entries (a stamped invoice, a bank passbook, a registration cert): `download-drive-item-content --drive-id … --item-id … --output-path archive.zip`, unzip locally, then Read the image and PDF files — Read renders PDF pages visually, scans included. Triage from the converter's scan-only list: open the files the question needs and the pages that carry the data; skip boilerplate and duplicate copies.
 - **Follow references out of the doc:** `extract-sharepoint-links-in-documents --drive-id … --item-id …`
-- **A file already on disk** (works logged-out): `convert-local-file --path './report.docx'`
+- **A file already on disk** (works logged-out): `convert-local-file-to-markdown --path './report.docx'`
 
 ## Heavy reads — delegate when your harness has subagents
 
@@ -184,7 +223,7 @@ The CLI's only write is an UNSENT draft in the Drafts folder — reply, forward,
 
 **Draft to the right person.** Decide who owns the response — the same "whose move is it" read as a catch-up. If the user owns it, reply on the thread. If a colleague owns it, draft an *internal* mail to that owner (delegating, or aligning on a joint reply) instead of answering the outside sender directly. The draft must match your analysis: whoever you named as the owner is who the draft goes to. When it's genuinely ambiguous, say which you'd do and why before creating it. Never assert a reporting line or team ownership in the draft's wording ("my team", "your team", handing work to someone) without checking it via the people path — presence on the same thread or in the same region is not a reporting line, and getting it wrong reframes the whole reply.
 
-**Write in the user's voice, and add value.** Before composing anything you wrote (as opposed to dictated), study one or two of the user's own recent SENT messages to learn their voice — greeting, sign-off, sentence length, formality. Once per session is enough: reuse what you learned for every later draft, and re-study only when the audience changes — a new formality register or another language. Skip the noise: meeting auto-responses and invites (`@odata.type: eventMessageResponse` / `eventMessageRequest`; subjects starting `Accepted:/Declined:/Tentative:/Following:` — but an invite can hide behind a neutral subject like "Quick Update", so filter on the `@odata.type` already visible in the listing before opening anything) and one-line acks teach nothing. A search hit is not proof of authorship: `from:me` KQL also surfaces messages where the user is merely a recipient — check the `From:` line before mirroring a sample. Prefer a substantive message to the same person or on the same topic — `search-mail-messages --query 'from:me to:<recipient>'` beats the raw `sentitems` listing; if none exists, mirror an existing reply already on the thread:
+**Write in the user's voice, and add value.** Before composing anything you wrote (as opposed to dictated), study two or three of the user's own SENT messages to learn their voice — greeting, sign-off, sentence length, formality. Choose them by **relationship, not recency**: the newest substantive message to *this* recipient; failing that, to someone in the same relationship (their manager, a peer, an external client), because the user writes differently to each and two mails to the boss teach nothing about how they write to the team. Once per session per relationship is enough: reuse what you learned for every later draft to that kind of recipient, and re-study when the audience changes — a new relationship, a new formality register, or another language. Skip the noise: meeting auto-responses and invites (`@odata.type: eventMessageResponse` / `eventMessageRequest`; subjects starting `Accepted:/Declined:/Tentative:/Following:` — but an invite can hide behind a neutral subject like "Quick Update", so filter on the `@odata.type` already visible in the listing before opening anything) and one-line acks teach nothing. A search hit is not proof of authorship: `from:me` KQL also surfaces messages where the user is merely a recipient — check the `From:` line before mirroring a sample. Prefer a substantive message to the same person or on the same topic — `search-mail-messages --query 'from:me to:<recipient>'` beats the raw `sentitems` listing; if none exists, mirror an existing reply already on the thread:
 
 ```bash
 ask-marcel-office search-mail-messages --query 'from:me to:<recipient>'   # same person; or drop to:… and add the topic
@@ -193,12 +232,12 @@ ask-marcel-office list-mail-folder-messages --mail-folder-id sentitems --top 10 
 
 `convert-mail-to-markdown` a good example and mirror it. Make the reply move the recipient's ask forward — answer the question they asked, grounded in the topic search (files + mail), with the concrete details in the body — rather than a bare acknowledgement, unless the user only wants an ack. Promise only what you found: a "pre-read" or "attached analysis" goes in the draft only after you've confirmed it exists. When the ask is to review or validate a document, concrete review comments are the value: ground each one in the document itself — internal consistency, a regional variant diffed against the global baseline in the same deck — and phrase anything you cannot confirm from the user's own data as a question to the document's owner, never as an assertion. The `get-mail-signature` step below handles the sign-off block; voice is about the words above it.
 
-**Compose in the tenant default font, with real blank lines.** Wrap the HTML body you write in `font-family:Aptos,Aptos_EmbeddedFont,Aptos_MSFontService,Calibri,Helvetica,sans-serif; font-size:11pt` — matching Outlook's current default and the user's own signature — and repeat it on any `<table>` and its cells, since some clients don't inherit the wrapper's font. Outlook normalizes bare `<p>` tags to `margin:0cm`, so paragraphs written without explicit spacing render as a cramped block: author each paragraph as `<p style="margin:0cm">…</p>` followed by a `<div><br></div>` spacer (Outlook's own blank-line idiom), including after lists and tables. Compose in the language the *recipient* uses on the thread — a thread can mix languages across branches (e.g. French with the boss, English with the team); match the person the draft goes to, not the branch you happened to read. On a threaded reply this rich body goes in via `create-reply-draft`'s `--body-content` with `--body-content-type HTML` (below) — despite the name it fills Graph's `comment`, the text above the quote; a flag literally called `--comment` exists only on `update-mail-draft`.
+**Compose in the tenant default font, with real blank lines.** Wrap the HTML body you write in `font-family:Aptos,Aptos_EmbeddedFont,Aptos_MSFontService,Calibri,Helvetica,sans-serif; font-size:11pt` — matching Outlook's current default and the user's own signature — and repeat it on any `<table>` and its cells, since some clients don't inherit the wrapper's font. Outlook normalizes bare `<p>` tags to `margin:0cm`, so paragraphs written without explicit spacing render as a cramped block: author each paragraph as `<p style="margin:0cm">…</p>` followed by a `<div><br></div>` spacer (Outlook's own blank-line idiom), including after lists and tables. Compose in the language the *recipient* uses on the thread — a thread can mix languages across branches (e.g. French with the boss, English with the team); match the person the draft goes to, not the branch you happened to read. On a threaded reply or forward this rich body goes in via `--comment` with `--body-content-type HTML` (below): it fills Graph's `comment`, the text above the quote, and the quoted thread stays byte-identical. `--body-content` is the whole-body flag and exists only on `create-mail-draft` and `update-mail-draft`; the threaded creates do not have it.
 
 **Reply** — always reply to the thread's NEWEST message, not the one the user happened to mention: list the thread (step 1 of *Read an email in full*), take the max `receivedDateTime`, and read it first so the reply answers the actual ask — a reply threaded under a superseded message misleads every recipient.
 
 ```bash
-ask-marcel-office create-reply-draft --reply-to-message-id '<newest id>' --body-content '<reply text>'
+ask-marcel-office create-reply-draft --reply-to-message-id '<newest id>' --comment '<reply text>'
 ```
 
 Reply-ALL by default — recipients, `RE:` subject, and quoted history are inherited. Pass `--reply-all false` to reply to the sender only; dropping the other recipients is a deliberate act, so do it when the user asks or the content is clearly one-to-one. The comment goes above the quote as plain text; pass `--body-content-type HTML` when it needs markup (bold, links, a table) — the quoted thread stays byte-identical either way.
@@ -206,7 +245,7 @@ Reply-ALL by default — recipients, `RE:` subject, and quoted history are inher
 **Forward:**
 
 ```bash
-ask-marcel-office create-forward-draft --forward-message-id '<id>' --to-recipients 'a@x,b@y' --body-content '<comment>'
+ask-marcel-office create-forward-draft --forward-message-id '<id>' --to-recipients 'a@x,b@y' --comment '<comment>'
 ```
 
 `--to-recipients` is required; `FW:` subject and the quoted message are inherited; `--cc-recipients` / `--subject` optional; `--body-content-type HTML` supported like reply.
@@ -225,7 +264,7 @@ Optional: `--cc-recipients`, `--bcc-recipients`, `--importance Low|Normal|High`,
 ask-marcel-office get-mail-signature
 ```
 
-Returns the `id="Signature"` block from their newest webmail-sent message as HTML, with the logo and booking images already inlined as self-contained `data:` URIs (the response reports `inlinedImages: N`). Append the block **whole** — images and all — so the logo AND the booking link survive; do NOT strip the `<img>` tags. (Caveat: `data:` images render in Outlook web and most clients but Outlook **desktop** may block them; the "Book time to meet with me" hyperlink is a real link and always works — say so at hand-over.) The block is large (~55 KB of base64, essentially one endless HTML line no file reader can hold), so fetch it ONCE per session with `--output-path <file>`, reuse that file for every draft, and never read it back — build each signed body blind: `cat body.html sig.html > reply.html`. Append it to `--body-content` with `--body-content-type HTML`, or on a threaded draft splice it in via `update-mail-draft --comment "$(cat sig-and-body.html)" --body-content-type HTML`. If the scan finds nothing (all recent mail sent from Outlook desktop), pin a message with `--message-id`; if there's still none, hand the draft over unsigned and say so.
+Returns the `id="Signature"` block from their newest webmail-sent message as HTML, with the logo and booking images already inlined as self-contained `data:` URIs (the response reports `inlinedImages: N`). Append the block **whole** — images and all — so the logo AND the booking link survive; do NOT strip the `<img>` tags. (Caveat: `data:` images render in Outlook web and most clients but Outlook **desktop** may block them; the "Book time to meet with me" hyperlink is a real link and always works — say so at hand-over.) The block is large (~55 KB of base64, essentially one endless HTML line no file reader can hold), so fetch it ONCE per session with `--output-path <file>`, reuse that file for every draft, and never read it back — build each signed body blind: `cat body.html sig.html > reply.html`. Append it to `--body-content` on a new mail, or to `--comment` on a reply / forward, always with `--body-content-type HTML`; on an existing threaded draft splice it in via `update-mail-draft --comment "$(cat sig-and-body.html)" --body-content-type HTML`. If the scan finds nothing (all recent mail sent from Outlook desktop), pin a message with `--message-id`; if there's still none, hand the draft over unsigned and say so.
 
 **Revise, never recreate.** Before creating a reply or forward, check whether the thread already has a draft. The reliable check is the thread listing you already ran (step 1 of *Read an email in full*, with `isDraft` in the `--select`): a `from: me` row with `isDraft: true` is the existing draft. Fallback when the draft may live off-thread: `find-mail-drafts`, the CLI's purpose-built scan (matches recent drafts client-side on subject and recipients). Do NOT rely on a `conversationId` `$filter` over the Drafts folder or on `RE:/FW:` subject matching — reply drafts split across several `conversationId`s, the filter lags just-created items, and subject prefixes are localized per sender's client (`回复:`, `AW:`, `TR:`), so both quietly miss. A hit means update that draft instead of creating a second, with `update-mail-draft`:
 
@@ -246,10 +285,11 @@ Returns the `id="Signature"` block from their newest webmail-sent message as HTM
 
 ## Known limitations
 
-- OneNote search is title-substring only; Teams chat content is not searchable; To Do / Planner need their direct commands.
+- OneNote search is title-substring only; Teams chat content is not searchable (use the chat commands directly); To Do / Planner need their direct commands.
+- A shared or delegated Exchange mailbox is out of reach: the `list-shared-mailbox-*` commands answer `ErrorAccessDenied` for any mailbox but your own. A Microsoft 365 group's inbox is the shared-mail path that works (*Read a group post*).
 - Calendar and mail timestamps are UTC — convert to `tenantTimeZone`, always.
 - Graph drafts carry no signature automatically — use `get-mail-signature` (above). Drafts can't be deleted from the CLI — cleanup happens in Outlook.
 
 ---
 
-*Verified against ask-marcel-office v2.2.0 (2026-07-19). When the CLI reports a newer version, re-test the Known limitations above and prune whatever has been fixed.*
+*Verified against ask-marcel-office v2.5.0 and the 2.6.0 surface (2026-09-07). When the CLI reports a newer version, re-test the Known limitations above and prune whatever has been fixed.*
