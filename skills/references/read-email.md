@@ -1,7 +1,6 @@
 # Read an email in full
 
-
-Everything in the thread — every message, attachment, and SharePoint link. Start from any one `message-id` (a mail search hit's `id` is a message-id; the hit also carries `conversationId`).
+Everything in the thread — every message, attachment, and SharePoint link. Start from a mail search hit: its `conversationId` lists the thread (step 1), and its `id` is the message-id you read in step 2.
 
 **1. List the thread:**
 

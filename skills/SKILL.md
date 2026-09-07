@@ -28,16 +28,17 @@ Thin orchestrator over `ask-marcel-office` (~195 typed Microsoft Graph subcomman
 - **All timestamps come back in UTC.** `my-quick-context` returns `tenantTimeZone`; convert before stating any time. In a UTC+8 tenant, a meeting Graph reports at `07:00` starts at 15:00 local — answering "7am" is wrong.
 - **Default text output is fine.** Add `--output json` only when you need to extract fields programmatically.
 - **Large payloads go to disk.** `--output-path <file>` works on every command that returns a document body — and ONLY those: JSON commands (searches, listings) refuse it, so shell-redirect those instead (`--output json > out.json`) and extract with a script. `microsoft-search-query` is the usual case: six fixed 25-hit containers, no `--top`/`--select`, routinely >100 KB.
+- **Follow the `next:` footer.** A listing with more pages ends with a line `--- next: ask-marcel-office next-page --url '…'`; run that command verbatim for the next page, and stop when the line disappears or you have what you need.
+- **A failure names its own fix.** Most errors print a `hint:` line (a missing flag, the wrong id shape, a token to refresh); follow it before retrying, and keep it out of the answer.
 - Discover anything not covered here with `ask-marcel-office --help` (all commands) or `ask-marcel-office docs <command>` (per-command page).
 
 ## Setup (once)
 
 ```bash
-bun --version                 # Bun installed?
 ask-marcel-office --version   # CLI installed?
 ```
 
-If either is missing: install Bun (Windows `winget install Oven-sh.Bun`, macOS/Linux `curl -fsSL https://bun.sh/install | bash`), then `bun add -g ask-marcel-office-cli`, then restart the terminal (or reload PATH). Sign in with `ask-marcel-office login` — a browser opens once and caches the token. If a command later says you're **not signed in** or a token has lapsed (people lookups use a separate "elevated" token that expires independently), run `ask-marcel-office login --force`.
+If it's missing: `npm i -g ask-marcel-office-cli` (Node ≥20 or Bun ≥1.0), then restart the terminal (or reload PATH); or skip the install and run every command as `npx -y ask-marcel-office-cli <command>`. Sign in with `ask-marcel-office login` — a browser opens once and caches the token. If a command later says you're **not signed in** or a token has lapsed (people lookups use a separate "elevated" token that expires independently), run `ask-marcel-office login` — plain, no flag. It re-captures a lapsed token by silent SSO against the saved browser profile (a window flash, no prompt) and only escalates to a full sign-in if that fails. Do not reach for `--force`: it wipes the browser cookies, which destroys the 90-day keep-me-signed-in session and forces a credential prompt every time. Reserve it for a profile that is genuinely broken.
 
 ## Workflow
 
@@ -66,7 +67,7 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | Is X free / common slot | `get-schedule` |
 | What's on my plate | `list-incomplete-todo-tasks` + `list-incomplete-planner-tasks` — neither is in federated search |
 | Meeting notes / decisions | `search-onenote-pages --filter "contains(title,'<keyword>')"` — OneNote search is title-only, so also try Mail + Files |
-| Reply to / answer this email | Read the thread first (*Read an email in full*), then *Draft an email* → **Reply**. The draft goes on the thread's newest message |
+| Reply to / answer this email | Read the thread first (*Read an email in full*), then *Draft an email* → **Reply**. The draft goes under the thread's newest substantive message |
 | Forward this to Y | *Read an email in full* for what it carries, then *Draft an email* → **Forward** |
 | Write / send a new email to Y | *Draft an email* → **New mail** (it will be an unsent draft; the user sends). Resolve Y via the people path first |
 
@@ -108,7 +109,7 @@ Get `drive-id` + `item-id` (from a search hit, or `resolve-drive-share-link` for
 
 ## Heavy reads — delegate when your harness has subagents
 
-An artifact too big to hold alongside everything else — a long deck, a many-sheet workbook, a zip full of scans — can go to a subagent: hand it the ids and this return contract — structure, key figures with page/sheet/cell locations, short pinpoint quotes, anomalies — and keep only the summary in your context. One subagent per artifact, in parallel. Searching, lead-chasing, synthesis, and every draft stay in the main conversation: leads cross sources, and a draft has one writer. In Claude Code, `ms365-document-reader` (`.claude/agents/`) is that subagent: it carries the recipe and this return contract. Without subagents, read inline via `references/read-document.md`.
+An artifact too big to hold alongside everything else — a long deck, a many-sheet workbook, a zip full of scans — can go to a subagent: hand it the ids and this return contract — structure, key figures with page/sheet/cell locations, short pinpoint quotes, anomalies — and keep only the summary in your context. One subagent per artifact, in parallel. Searching, lead-chasing, synthesis, and every draft stay in the main conversation: leads cross sources, and a draft has one writer. That subagent ships with this skill as `agents/ms365-document-reader.md`, carrying the recipe and this return contract; copy it into your harness's agent folder to enable it (`.claude/agents/` for Claude Code). Without subagents, read inline via `references/read-document.md`.
 
 ## Draft an email — the only write
 
@@ -117,7 +118,7 @@ The CLI's only write is an UNSENT draft in the Drafts folder — reply, forward,
 - **Approval first.** Only text the user handed you verbatim is dictated → create immediately. Anything you composed — "reply saying I agree", "tell them yes", "in my style" — is shown as the exact body text and gets a yes BEFORE the draft exists. Never create a draft whose wording the user hasn't seen.
 - **Draft to the right person.** Decide who owns the response. If the user owns it, reply on the thread; if a colleague owns it, draft an internal mail to that owner instead of answering the outside sender. Never assert a reporting line ("my team", "your team") without checking it via the people path.
 - **Promise only what you found.** A "pre-read" or "attached analysis" goes in the draft only after you confirmed it exists.
-- **Reply to the thread's newest message**, not the one the user happened to mention: list the thread, take the max `receivedDateTime`, read it, then reply.
+- **Reply under the thread's newest substantive message**, not the one the user happened to mention: list the thread, skip auto-responses and one-line acks, take the newest real message on the branch you are answering, read it, then reply. Reply-all inherits its recipients from that message, so the choice decides who the draft goes to.
 - **Revise, never recreate.** If the thread already carries an `isDraft: true` row, update that draft rather than creating a second.
 - **Hand over the same way every time:** it's in Outlook Drafts, unsent, ready to review and send, with the `webLink` from the last write's response as a clickable link, and a Sources footer when the substance came from things you searched.
 
@@ -125,15 +126,14 @@ The CLI's only write is an UNSENT draft in the Drafts folder — reply, forward,
 
 - The two-step name lookup returns candidates with `id, mail, jobTitle, department`. Re-query **directory users** (GUID ids) for the full profile — the default already includes department, phones, and office.
 - A candidate whose id is **not a GUID** is an external contact: `get-user --id` rejects it with instructions — re-query by their `mail` as it says.
-- Only the full-profile path — `get-user` with a GUID / UPN / email — rides the **elevated token**, which expires independently (preflight it with `ask-marcel-office scopes-check`, no Graph call). Name-search `get-user`, `list-relevant-people`, `get-user-manager`, and `list-user-direct-reports` run on the basic token and keep working when it's cold: walk the org tree with those first — they carry title, department, and mail — and run `ask-marcel-office login --force` only for the fields they lack (phones, office). When re-auth is impossible (headless run, no browser), answer from the basic-token commands and documents (org chart, signatures) and say which profile fields are missing.
+- Only the full-profile path — `get-user` with a GUID / UPN / email — rides the **elevated token**, which expires independently (preflight it with `ask-marcel-office scopes-check`, no Graph call). Name-search `get-user`, `list-relevant-people`, `get-user-manager`, and `list-user-direct-reports` run on the basic token and keep working when it's cold: walk the org tree with those first — they carry title, department, and mail — and run a plain `ask-marcel-office login` only for the fields they lack (phones, office); it recovers the elevated token silently, where `--force` would wipe the signed-in session. When re-auth is impossible (headless run, no browser), answer from the basic-token commands and documents (org chart, signatures) and say which profile fields are missing.
 - Directory fields — `jobTitle`, `officeLocation`, `department` — can lag reality by months (an office that has since moved, a title that changed). Present them as directory values, not ground truth; if the user contradicts one, believe the user. When several candidates are plausible, list them with title + department instead of guessing.
 - Reporting lines are often a matrix: a person can have a primary/solid-line manager and a dotted/functional one. When the directory `manager` field is empty (common for senior staff), the real line usually lives in an org-chart deck on SharePoint — search for it, and when you report the answer, say which manager is the solid line and which is dotted.
-- **Role titles are org-local.** "Who is the CIO of X" can have no literal CIO — the IT chief may be titled "Chief Transformation Officer", "IS&T Director", or "Directeur du Système d'Information". The person entity of federated search matches names and company, not job titles, so a literal-title query surfaces name lookalikes and misses the real holder. When the literal title misses: search title synonyms, filter `list-relevant-people` by company, then confirm structurally — reports to the CEO, owns the CISO/CTO/infra reports, a "CIO Office" role on their team. Answer with the person's actual title and note that nobody holds the literal one.
+- **Role titles are org-local.** "Who is the head of X" rarely maps to a literal title: the same role is a "Director", a "Lead", a "VP", or a local-language title, and it varies by company and country. The person entity of federated search matches names and company, not job titles, so a literal-title query surfaces name lookalikes and misses the real holder. When the literal title misses: search title synonyms, filter `list-relevant-people` by company, then confirm structurally — who they report to, who reports to them, what their team is called. Answer with the person's actual title and note that nobody holds the literal one.
 
 ## Known limitations
 
-- OneNote search is title-substring only; Teams chat content is not searchable (use the chat commands directly); To Do / Planner need their direct commands.
+- OneNote search is title-substring only, and case-sensitive (`budget` misses `Budget`; try both); Teams chat content is not searchable (use the chat commands directly); To Do / Planner need their direct commands.
 - A shared or delegated Exchange mailbox is out of reach: the `list-shared-mailbox-*` commands answer `ErrorAccessDenied` for any mailbox but your own.
-- Calendar and mail timestamps are UTC — convert to `tenantTimeZone`, always.
 - Graph drafts carry no signature automatically — use `get-mail-signature` (`references/draft-email.md`). Drafts can't be deleted from the CLI — cleanup happens in Outlook.
 
