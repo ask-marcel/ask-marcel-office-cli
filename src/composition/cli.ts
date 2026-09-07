@@ -40,6 +40,19 @@ type BuildCliDeps = {
   readonly makeLoginAuth?: LoginAuthFactory;
 };
 
+/**
+ * `auth_cancelled` covers two very different situations and reads as only one
+ * of them. Closing the sign-in window is the common case; the other is a
+ * browser that launched and could never be driven, because Playwright talks to
+ * it over a local DevTools (CDP) connection and an endpoint-security agent can
+ * block that pipe. The second looks like a browser stuck on about:blank with no
+ * sign-in page, and a bare "Authentication cancelled" sends the reader hunting
+ * their own actions instead of their security software (four rounds of it on
+ * 2026-09-07, against a SentinelOne policy).
+ */
+const AUTH_CANCELLED_MESSAGE =
+  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause, and an exclusion for the browser Playwright launches is the fix. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
+
 const buildCli = (deps: BuildCliDeps): Command => {
   const { auth, graph, logger, processRunner, fs, version } = deps;
   const program = new Command();
@@ -313,7 +326,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
       const result = await login.execute(loginAuth, { force });
       if (!result.ok) {
-        fail(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
+        fail(result.error.type === 'auth_cancelled' ? AUTH_CANCELLED_MESSAGE : result.error.message);
         return;
       }
       // Slim confirmation: which tokens are available now, and where to look next.

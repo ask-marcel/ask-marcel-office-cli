@@ -23,20 +23,18 @@ against a warm macOS launch and does not allow for a cold Windows first run
 paying profile creation and AV scanning. Without it a slow launch and a blocked
 one are indistinguishable from the outside.
 
-### Fixed: a mandatory proxy no longer strands the browser
+### Fixed: a cancelled login says what actually went wrong
 
-`HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms were deleted from the
-environment before every browser launch, with nothing recording why. The reason
-is real: Playwright drives the browser over a local connection, and a proxy that
-captures localhost leaves the browser running but undriveable, which looks
-exactly like a launch that never happened.
+`login` answered `Authentication cancelled`, which reads as "you closed the
+window" and is exactly wrong when the window is still open. Reported on Windows:
+a browser launched, sat on `about:blank`, and no sign-in page ever appeared. The
+cause was a SentinelOne policy blocking the local DevTools (CDP) connection
+Playwright uses to drive the browser it just started, and no version of the CLI
+has ever worked on that machine.
 
-Deleting them also cut the browser's only route to teams.microsoft.com on a
-network where the proxy is mandatory. Both are now satisfied: the proxy is kept
-and `NO_PROXY` gains `localhost`, `127.0.0.1` and `::1`, so outbound traffic
-still goes through the proxy while the control connection does not.
-`ASKMARCEL_STRIP_PROXY=1` restores the old behaviour for a network a bypass
-cannot satisfy.
+Both messages now name that cause and the fix (a security exclusion for the
+browser Playwright launches), alongside the corrupt-profile case they already
+covered, and point at `ASKMARCEL_TRACE=1`.
 
 ### Added: a group post reaches as far as a mail message
 

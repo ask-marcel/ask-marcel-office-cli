@@ -707,7 +707,7 @@ const createAuthManagerFromApi = (
   const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
     const elevatedCommands = commandList(secondaryTokenCommands.elevated);
     if (reason === 'launch_timeout') {
-      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry. (Commands that need this token: ${elevatedCommands}.)`;
+      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause and needs a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser. (Commands that need this token: ${elevatedCommands}.)`;
     }
     if (reason === 'navigation_failed') {
       return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the elevated commands (${elevatedCommands}) will be unavailable.`;

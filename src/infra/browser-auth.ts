@@ -399,36 +399,23 @@ const parseChatsvcaggRegion = (url: string): string | null => {
  */
 const TEAMS_WEB_URL = 'https://teams.cloud.microsoft/v2/';
 
-const LOCAL_BYPASS = ['localhost', '127.0.0.1', '::1'];
+const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
 
 /**
- * Playwright drives the browser it launches over a LOCAL connection, and a
- * proxy that captures localhost breaks that: the browser starts, shows
- * about:blank, and every attempt to drive it hangs until the launch deadline
- * reports a failure that looks like the browser never started.
+ * Playwright drives the browser it launches over a LOCAL control connection, and
+ * a proxy that captures localhost leaves the browser running but undriveable:
+ * it opens, shows about:blank, and every attempt to drive it hangs until the
+ * launch deadline reports what looks like a browser that never started.
+ * Stripping the proxy from the environment keeps that connection direct.
  *
- * This used to be handled by deleting HTTP_PROXY / HTTPS_PROXY outright, which
- * did protect the local connection and also cut the browser's only route to
- * teams.microsoft.com on a corporate network where the proxy is mandatory
- * (reported on Windows, 2026-09-07). Bypassing localhost achieves the first
- * without the second: outbound traffic still goes through the proxy, the
- * control connection does not.
- *
- * `ASKMARCEL_STRIP_PROXY=1` restores the old delete-everything behaviour, for a
- * network where even a bypassed proxy interferes.
+ * Recorded because it was nearly removed on 2026-09-07, on a theory that it
+ * stranded the browser on a proxy-mandatory network. The actual cause of that
+ * report was an EDR agent blocking the CDP pipe, which no proxy setting
+ * affects. If a proxy-mandatory network ever does surface, the fix is a
+ * localhost bypass rather than deleting this.
  */
-const configureProxyForLocalControl = (): void => {
-  if (process.env['ASKMARCEL_STRIP_PROXY'] === '1') {
-    for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']) delete process.env[k];
-    return;
-  }
-  const existing = (process.env['NO_PROXY'] ?? process.env['no_proxy'] ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== '');
-  const merged = [...existing, ...LOCAL_BYPASS.filter((host) => !existing.includes(host))];
-  process.env['NO_PROXY'] = merged.join(',');
-  process.env['no_proxy'] = process.env['NO_PROXY'];
+const stripProxyEnv = (): void => {
+  for (const k of PROXY_ENV_KEYS) delete process.env[k];
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -468,7 +455,7 @@ const cleanupSingletonLocks = async (dir: string, fs: FileSystem): Promise<void>
 
 const createPlaywrightApi = (loader: PlaywrightLoader): BrowserAuthApi => ({
   launchPersistentContext: async (profileDir, options) => {
-    configureProxyForLocalControl();
+    stripProxyEnv();
     const { chromium } = await loader();
     return chromium.launchPersistentContext(profileDir, options);
   },

@@ -201,6 +201,20 @@ describe('buildCli command surface', () => {
     expect(out).toContain('Authentication cancelled');
   });
 
+  // "Authentication cancelled" alone reads as "the user closed the window",
+  // which is the one thing it is NOT when an endpoint-security agent blocks the
+  // local control connection: the browser opens, sits on about:blank, and is
+  // never driveable. That case cost four rounds of diagnosis on 2026-09-07, so
+  // the message names it and points at the trace.
+  it('points a cancelled login at the EDR / control-connection cause, not just the user closing the window', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(out).toContain('about:blank');
+    expect(out).toContain('security');
+    expect(out).toContain('ASKMARCEL_TRACE=1');
+  });
+
   it('invokes onCommandError exactly once when a command fails', async () => {
     const logger = createLoggerFake();
     let errorReports = 0;
