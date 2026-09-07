@@ -210,7 +210,7 @@ describe('browser auth — production wiring', () => {
     expect(typeof browser.close).toBe('function');
   });
 
-  it('strips proxy env vars before invoking the playwright loader', async () => {
+  it('keeps the proxy but bypasses localhost, so the browser still reaches the internet and Playwright still reaches the browser', async () => {
     const previousHttp = process.env.HTTP_PROXY;
     const previousHttps = process.env.HTTPS_PROXY;
     const previousLowerHttp = process.env.http_proxy;
@@ -246,15 +246,72 @@ describe('browser auth — production wiring', () => {
       expect(loaderCalled).toBe(true);
       expect(launchedDir).toBe(probeDir);
       expect(ctx).toBe(fakeContext);
-      expect(process.env.HTTP_PROXY).toBeUndefined();
-      expect(process.env.HTTPS_PROXY).toBeUndefined();
-      expect(process.env.http_proxy).toBeUndefined();
-      expect(process.env.https_proxy).toBeUndefined();
+      // The proxy survives: on a corporate network it is the browser's only
+      // route to teams.microsoft.com, and deleting it stranded the launch.
+      expect(process.env.HTTP_PROXY).toBe('http://proxy.example:8080');
+      expect(process.env.HTTPS_PROXY).toBe('https://proxy.example:8443');
+      // Localhost is bypassed, so the proxy cannot capture the CDP connection
+      // Playwright uses to drive the browser it just launched.
+      expect(process.env.NO_PROXY).toContain('127.0.0.1');
+      expect(process.env.NO_PROXY).toContain('localhost');
     } finally {
       if (previousHttp !== undefined) process.env.HTTP_PROXY = previousHttp;
       if (previousHttps !== undefined) process.env.HTTPS_PROXY = previousHttps;
       if (previousLowerHttp !== undefined) process.env.http_proxy = previousLowerHttp;
       if (previousLowerHttps !== undefined) process.env.https_proxy = previousLowerHttps;
+    }
+  });
+
+  it('restores the delete-everything behaviour under ASKMARCEL_STRIP_PROXY, for a network a bypass cannot satisfy', async () => {
+    const previousStrip = process.env['ASKMARCEL_STRIP_PROXY'];
+    const previousHttp = process.env['HTTP_PROXY'];
+    process.env['ASKMARCEL_STRIP_PROXY'] = '1';
+    process.env['HTTP_PROXY'] = 'http://proxy.example:8080';
+    try {
+      const api = createPlaywrightApi(async () => ({
+        chromium: { launchPersistentContext: async () => ({ pages: () => [], newPage: async () => ({}), clearCookies: async () => {}, close: async () => {} }) as never },
+      }));
+      await api.launchPersistentContext(join(tmpdir(), 'atelier-strip-proxy-probe'), { headless: true, args: [] });
+      expect(process.env['HTTP_PROXY']).toBeUndefined();
+    } finally {
+      if (previousStrip === undefined) delete process.env['ASKMARCEL_STRIP_PROXY'];
+      else process.env['ASKMARCEL_STRIP_PROXY'] = previousStrip;
+      if (previousHttp === undefined) delete process.env['HTTP_PROXY'];
+      else process.env['HTTP_PROXY'] = previousHttp;
+    }
+  });
+
+  it('reports WHY a channel launch failed, not merely that it did', async () => {
+    const logger = createLoggerFake();
+    const traced: string[] = [];
+    const auth = createBrowserAuthFromApi(
+      { launchPersistentContext: async () => Promise.reject(new Error('Chromium distribution "msedge" is not found')) },
+      fastConfig({ logger, trace: (m) => traced.push(m), elevatedLaunchTimeoutMs: 50 })
+    );
+    // Every rung fails here, so the last one rethrows; the point is that all
+    // three said WHY on the way past.
+    await auth.acquireElevatedToken().catch(() => undefined);
+    const failures = logger.calls.filter((c) => c.event === 'browser_launch_failed');
+    expect(failures.map((f) => f.meta?.['channel'])).toEqual(['msedge', 'chrome', 'bundled']);
+    expect(failures.length).toBeGreaterThan(0);
+    // Without the reason, a launch failure on a machine that plainly has Edge
+    // is undiagnosable from a user's trace, which cost two rounds on 2026-09-07.
+    expect(String(failures[0]?.meta?.['reason'])).toContain('is not found');
+    expect(traced.join('')).toContain('is not found');
+  });
+
+  it('honours ASKMARCEL_LAUNCH_TIMEOUT_MS so a slow launch can be told from a blocked one in the field', async () => {
+    const previous = process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS'];
+    process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS'] = '40';
+    try {
+      const traced: string[] = [];
+      const auth = createBrowserAuthFromApi({ launchPersistentContext: () => new Promise(() => undefined) }, fastConfig({ trace: (m) => traced.push(m) }));
+      const result = await auth.acquireElevatedToken();
+      expect(result.ok).toBe(false);
+      expect(traced.join('')).toContain('40ms');
+    } finally {
+      if (previous === undefined) delete process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS'];
+      else process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS'] = previous;
     }
   });
 

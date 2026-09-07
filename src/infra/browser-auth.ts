@@ -399,7 +399,37 @@ const parseChatsvcaggRegion = (url: string): string | null => {
  */
 const TEAMS_WEB_URL = 'https://teams.cloud.microsoft/v2/';
 
-const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
+const LOCAL_BYPASS = ['localhost', '127.0.0.1', '::1'];
+
+/**
+ * Playwright drives the browser it launches over a LOCAL connection, and a
+ * proxy that captures localhost breaks that: the browser starts, shows
+ * about:blank, and every attempt to drive it hangs until the launch deadline
+ * reports a failure that looks like the browser never started.
+ *
+ * This used to be handled by deleting HTTP_PROXY / HTTPS_PROXY outright, which
+ * did protect the local connection and also cut the browser's only route to
+ * teams.microsoft.com on a corporate network where the proxy is mandatory
+ * (reported on Windows, 2026-09-07). Bypassing localhost achieves the first
+ * without the second: outbound traffic still goes through the proxy, the
+ * control connection does not.
+ *
+ * `ASKMARCEL_STRIP_PROXY=1` restores the old delete-everything behaviour, for a
+ * network where even a bypassed proxy interferes.
+ */
+const configureProxyForLocalControl = (): void => {
+  if (process.env['ASKMARCEL_STRIP_PROXY'] === '1') {
+    for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']) delete process.env[k];
+    return;
+  }
+  const existing = (process.env['NO_PROXY'] ?? process.env['no_proxy'] ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  const merged = [...existing, ...LOCAL_BYPASS.filter((host) => !existing.includes(host))];
+  process.env['NO_PROXY'] = merged.join(',');
+  process.env['no_proxy'] = process.env['NO_PROXY'];
+};
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -436,13 +466,9 @@ const cleanupSingletonLocks = async (dir: string, fs: FileSystem): Promise<void>
   }
 };
 
-const stripProxyEnv = (): void => {
-  for (const k of PROXY_ENV_KEYS) delete process.env[k];
-};
-
 const createPlaywrightApi = (loader: PlaywrightLoader): BrowserAuthApi => ({
   launchPersistentContext: async (profileDir, options) => {
-    stripProxyEnv();
+    configureProxyForLocalControl();
     const { chromium } = await loader();
     return chromium.launchPersistentContext(profileDir, options);
   },
@@ -461,7 +487,11 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
   const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
   const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
   const elevatedPreferenceGraceMs = config.elevatedPreferenceGraceMs ?? 3000;
-  const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? 15_000;
+  // Settable from the environment so a slow launch can be told from a blocked
+  // one without shipping a build: 15s is measured against a warm macOS launch,
+  // and a cold Windows first run pays profile creation and AV scanning on top.
+  const envLaunchTimeout = Number(process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS']);
+  const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? (Number.isFinite(envLaunchTimeout) && envLaunchTimeout > 0 ? envLaunchTimeout : 15_000);
   const freshCachedToken = config.freshCachedToken ?? (async () => null);
   const onProgress = config.onProgress ?? (() => {});
 
@@ -487,6 +517,11 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
   };
 
+  // A bare `catch {}` here logged the channel and threw the reason away, so a
+  // launch failure on a machine that plainly has Edge was undiagnosable from a
+  // user's trace. The reason is the whole value of the log line.
+  const reasonOf = (e: unknown): string => (e instanceof Error ? (e.message.split('\n')[0] ?? 'unknown') : String(e));
+
   const launchContext = async (headless: boolean): Promise<ContextLike> => {
     for (const channel of ['msedge', 'chrome'] as const) {
       try {
@@ -498,18 +533,28 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
         logger.info('browser_launched', { channel, headless });
         trace(`[DEBUG] browser launched with channel: ${channel} (headless=${headless})\n`);
         return ctx;
-      } catch {
-        logger.info('browser_launch_failed', { channel });
-        trace(`[DEBUG] browser launch failed for channel: ${channel}\n`);
+      } catch (e) {
+        const reason = reasonOf(e);
+        logger.info('browser_launch_failed', { channel, reason });
+        trace(`[DEBUG] browser launch failed for channel: ${channel} — ${reason}\n`);
       }
     }
-    const ctx = await api.launchPersistentContext(profileDir, {
-      headless,
-      args: ['--disable-blink-features=AutomationControlled'],
-    });
-    logger.info('browser_launched', { channel: 'bundled', headless });
-    trace(`[DEBUG] browser launched with channel: bundled (headless=${headless})\n`);
-    return ctx;
+    // The bundled Chromium is the last rung, and the one most likely to be
+    // waiting when a shared deadline expires. Name its failure too.
+    try {
+      const ctx = await api.launchPersistentContext(profileDir, {
+        headless,
+        args: ['--disable-blink-features=AutomationControlled'],
+      });
+      logger.info('browser_launched', { channel: 'bundled', headless });
+      trace(`[DEBUG] browser launched with channel: bundled (headless=${headless})\n`);
+      return ctx;
+    } catch (e) {
+      const reason = reasonOf(e);
+      logger.info('browser_launch_failed', { channel: 'bundled', reason });
+      trace(`[DEBUG] browser launch failed for channel: bundled — ${reason}\n`);
+      throw e;
+    }
   };
 
   /**

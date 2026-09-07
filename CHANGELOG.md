@@ -4,6 +4,40 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Fixed: a failed `login` says which browser failed, and why
+
+Reported on Windows: `login` answered `Authentication cancelled`, a browser
+window opened and sat on `about:blank`, and no sign-in page ever appeared. The
+same happened on 2.1.0, so this is a machine's configuration rather than a
+regression, and the real fault was that the CLI could not say which part.
+
+`ASKMARCEL_TRACE=1` reported only `browser launch failed for channel: msedge`
+on a machine that plainly has Edge, because the launch error was caught and
+discarded. Every rung now logs its actual reason, the bundled-Chromium
+fallback included: it is the last rung tried and so the one most likely to be
+still pending when the shared deadline expires, and it was the only one that
+failed anonymously.
+
+`ASKMARCEL_LAUNCH_TIMEOUT_MS` raises the 15s launch budget, which is measured
+against a warm macOS launch and does not allow for a cold Windows first run
+paying profile creation and AV scanning. Without it a slow launch and a blocked
+one are indistinguishable from the outside.
+
+### Fixed: a mandatory proxy no longer strands the browser
+
+`HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms were deleted from the
+environment before every browser launch, with nothing recording why. The reason
+is real: Playwright drives the browser over a local connection, and a proxy that
+captures localhost leaves the browser running but undriveable, which looks
+exactly like a launch that never happened.
+
+Deleting them also cut the browser's only route to teams.microsoft.com on a
+network where the proxy is mandatory. Both are now satisfied: the proxy is kept
+and `NO_PROXY` gains `localhost`, `127.0.0.1` and `::1`, so outbound traffic
+still goes through the proxy while the control connection does not.
+`ASKMARCEL_STRIP_PROXY=1` restores the old behaviour for a network a bypass
+cannot satisfy.
+
 ### Added: a group post reaches as far as a mail message
 
 `convert-group-post-attachment-to-markdown` and `get-group-post-attachment`
