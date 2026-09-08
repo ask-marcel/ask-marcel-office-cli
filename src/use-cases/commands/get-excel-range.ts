@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
+import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // Graph happily expands an absurd range like `ZZ999999:AAA1` into ~2M
 // "General" cells and streams ~76 MB back — enough to exhaust LLM context
@@ -68,8 +69,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: WORKBOOK_DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     {

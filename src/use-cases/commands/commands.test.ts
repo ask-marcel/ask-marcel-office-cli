@@ -590,6 +590,59 @@ describe('commands', () => {
     }
   });
 
+  // The 100 000-cell cap had one rejecting test and nothing at the boundary, so
+  // the arithmetic behind it (column letters to index, the +1 inclusive counts,
+  // the sheet-prefix strip) mutated freely: 31 survivors at 69.90%. Each case
+  // below is a real address an agent can send.
+  it('get-excel-range treats the 100 000-cell cap as inclusive: exactly 100 000 cells is accepted, one more is rejected', async () => {
+    // CV = column 100, so A1:CV1000 is 100 x 1000 = 100 000 cells, on the cap.
+    const onCap = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1:CV1000' }, { values: [] });
+    expect(onCap.ok).toBe(true);
+    // A1:A100001 is 1 x 100 001, one cell over.
+    const oneOver = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1:A100001' }, {});
+    expect(oneOver.ok).toBe(false);
+    if (!oneOver.ok) expect(oneOver.error.message).toContain('spans 100,001 cells');
+  });
+
+  it('get-excel-range counts a multi-letter column correctly, so A1:CW1000 (101 columns) is over the cap', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1:CW1000' }, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('spans 101,000 cells');
+  });
+
+  it('get-excel-range still applies the cap when the address carries a sheet prefix', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'Data!A1:ZZ99999' }, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  // The cap applies only to an address the CLI can parse on BOTH sides; anything
+  // else goes to Graph, which validates it. One side unparseable at a time, so
+  // each anchor of the A1 regex is exercised on its own — junk on both sides
+  // at once lets either anchor's mutant hide behind the other.
+  it('get-excel-range hands an address whose LEFT side it cannot parse to Graph unchanged', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: '?A1:ZZ99999' }, { values: [] });
+    expect(result.ok).toBe(true);
+  });
+
+  it('get-excel-range hands an address whose RIGHT side it cannot parse to Graph unchanged', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'A1:ZZ99999x' }, { values: [] });
+    expect(result.ok).toBe(true);
+  });
+
+  it('get-excel-range strips a one-character sheet prefix before applying the cap', async () => {
+    // A sheet named `D`: the `!` sits at index 1, the one position a
+    // careless prefix check could confuse with "not found".
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: 'D!A1:ZZ99999' }, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  it('get-excel-range accepts absolute references like $A$1:$C$10', async () => {
+    const result = await callCommand('get-excel-range', { driveId: 'd1', itemId: 'i1', worksheetId: 'ws1', address: '$A$1:$C$10' }, { values: [] });
+    expect(result.ok).toBe(true);
+  });
+
   it('get-excel-chart-image returns the chart PNG as { image/png, size, base64 } from Graph chart Image()', async () => {
     const result = await callCommand('get-excel-chart-image', { driveId: 'd1', itemId: 'i1', worksheetId: 'Sheet1', chartId: 'Chart 1' }, { value: 'aW1n' });
     expect(result.ok).toBe(true);
