@@ -3,6 +3,7 @@ import { buildPickODataListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { pickODataOptions } from './odata-query.ts';
+import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // Graph's `/workbook/tables/{id}/rows` honors `$top`, `$skip`, `$select`,
 // `$expand` but silently ignores `$filter` and `$orderby`. Drop the
@@ -25,8 +26,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: WORKBOOK_DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     { name: 'table-id', key: 'tableId', required: true, description: 'Workbook table ID or table name. Returned by `ask-marcel-office list-excel-tables`.' },

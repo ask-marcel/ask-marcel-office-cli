@@ -11,3 +11,11 @@
  */
 export const DRIVE_ID_DESCRIPTION =
   'Microsoft Graph drive ID. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';
+
+/**
+ * `--drive-id` for the Excel commands. Same guidance as the generic one, with
+ * the workbook-specific lead the file header calls out as deliberate — shared
+ * so the five Excel commands that carry it cannot drift apart.
+ */
+export const WORKBOOK_DRIVE_ID_DESCRIPTION =
+  'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';

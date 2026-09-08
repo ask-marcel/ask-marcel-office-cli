@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
+import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), tableId: z.string().min(1) });
 const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables/${p.tableId}`, schema);
@@ -18,8 +19,7 @@ const meta: CommandMeta = {
       name: 'drive-id',
       key: 'driveId',
       required: true,
-      description:
-        'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.',
+      description: WORKBOOK_DRIVE_ID_DESCRIPTION,
     },
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file.' },
     { name: 'table-id', key: 'tableId', required: true, description: 'Workbook table ID or table name. Returned by `ask-marcel-office list-excel-tables`.' },
