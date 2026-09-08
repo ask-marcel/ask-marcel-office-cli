@@ -329,6 +329,12 @@ describe('findErrorHint — Commander.js parser errors', () => {
     expect(result?.hint).toContain('required CLI flag is missing');
   });
 
+  it('tells a required-flag-missing caller that a bare word like `item--id` was read as a positional (the item--id typo case)', () => {
+    const result = findErrorHint("required option '--item-id <value>' not specified", 'commander.missingMandatoryOptionValue');
+    expect(result?.hint).toContain('item--id');
+    expect(result?.hint).toContain('--item-id');
+  });
+
   it('maps `commander.optionMissingArgument` (same shape as missingMandatoryOptionValue but Commander emits it differently for --foo with no value) to the same hint family', () => {
     const result = findErrorHint("option '--message-id <value>' argument missing", 'commander.optionMissingArgument');
     expect(result?.source).toBe('cli');

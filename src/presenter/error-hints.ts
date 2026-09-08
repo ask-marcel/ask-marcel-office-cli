@@ -126,7 +126,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'cli',
     matchCode: (c) => c === 'commander.missingMandatoryOptionValue' || c === 'commander.optionMissingArgument',
-    hint: 'A required CLI flag is missing or was passed without its value. Run `ask-marcel-office <command> --help` for the full required-params list with their value shapes.',
+    hint: 'A required CLI flag is missing or was passed without its value. A common cause is a mistyped flag read as a bare word: `item--id x` is parsed as a positional, leaving the real `--item-id` unset — every flag needs its leading `--`. Run `ask-marcel-office <command> --help` for the full required-params list with their value shapes.',
   },
   {
     source: 'cli',
