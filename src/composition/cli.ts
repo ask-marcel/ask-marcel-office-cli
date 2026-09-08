@@ -51,7 +51,7 @@ type BuildCliDeps = {
  * 2026-09-07, against a SentinelOne policy).
  */
 const AUTH_CANCELLED_MESSAGE =
-  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause, and an exclusion for the browser Playwright launches is the fix. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
+  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g ask-marcel-office-cli`, then `ask-marcel-office login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
 
 const buildCli = (deps: BuildCliDeps): Command => {
   const { auth, graph, logger, processRunner, fs, version } = deps;

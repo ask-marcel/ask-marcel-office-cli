@@ -215,6 +215,18 @@ describe('buildCli command surface', () => {
     expect(out).toContain('ASKMARCEL_TRACE=1');
   });
 
+  // A SentinelOne policy on one Windows box blocked the CDP pipe only under Bun;
+  // the same login ran fine under Node (npm install, node shebang). The message
+  // should offer that runtime switch, since it is cheaper than a security
+  // exclusion.
+  it('offers the run-under-Node workaround on a cancelled login', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(out).toContain('Node');
+    expect(out).toContain('Bun');
+  });
+
   it('invokes onCommandError exactly once when a command fails', async () => {
     const logger = createLoggerFake();
     let errorReports = 0;

@@ -5,7 +5,7 @@
 
 ## Context
 
-`login` drives a browser with Playwright and harvests the tokens Microsoft's own web clients mint (Teams web `5e3ce6c0`, M365ChatClient `c0ab8ce9`, OfficeHome `4765445b`). On one Windows machine this cannot work at all: a SentinelOne EDR policy blocks the local DevTools (CDP) pipe Playwright uses to steer the browser, so the browser opens, sits on `about:blank`, and is never driveable. No version of the CLI has ever worked there, and no code change can fix a blocked pipe.
+`login` drives a browser with Playwright and harvests the tokens Microsoft's own web clients mint (Teams web `5e3ce6c0`, M365ChatClient `c0ab8ce9`, OfficeHome `4765445b`). On one Windows machine this cannot work at all: a SentinelOne EDR policy blocks the local DevTools (CDP) pipe Playwright uses to steer the browser, so the browser opens, sits on `about:blank`, and is never driveable. No version of the CLI worked there under Bun, which framed the block as unfixable at the time (corrected below).
 
 The OAuth 2.0 Device Authorization Grant (RFC 8628) needs no browser automation and no local pipe: the user enters a short code at `microsoft.com/device` on any device. A proof of concept was built in an `auth-experiment/` folder (since deleted; this record replaces it) to see whether device code could reach the same command surface without browser capture.
 
@@ -59,7 +59,7 @@ A feature whose reach differs by tenant, and which cannot know its own reach unt
 
 ## Consequences
 
-- The EDR-blocked machine stays unfixable from the CLI. The remedies are a security exclusion for the browser Playwright launches, or running `login` on an unrestricted machine and copying `~/.ask-marcel/token-cache.json` across. The `Authentication cancelled` and elevated-timeout messages now name this cause (commit 49bebc5).
+- The EDR-blocked machine has a simpler fix than this ADR first assumed. **Correction 2026-09-08:** the SentinelOne block hit only under **Bun**; the same machine runs `login` fine under **Node**, and the published bin is `#!/usr/bin/env node`, so `npm i -g ask-marcel-office-cli` then `ask-marcel-office login` works. SentinelOne trusts the signed `node.exe` and blocks the less-common `bun.exe` from driving a child browser over CDP. So the block was never unfixable from the CLI: run under Node. A security exclusion, or copying `~/.ask-marcel/token-cache.json` from an unrestricted machine, remain fallbacks. The `Authentication cancelled` and elevated-timeout messages name both the cause and the run-under-Node workaround. This does not reopen the decision below: device code was rejected for the fixed-scope reason, which is independent of the EDR block that prompted the exploration.
 - `Mail.Read.Shared` remains out of reach. The device grant carries it, and a real consent grant might read a shared mailbox where the harvested Outlook Web token was refused; that test was never run and stays open.
 - Nothing in `src/` changed for this evaluation.
 

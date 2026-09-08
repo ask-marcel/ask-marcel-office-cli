@@ -605,6 +605,18 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
+  it('recaptureElevated launch_timeout message offers the run-under-Node workaround (Bun-only EDR block)', async () => {
+    const fs = createFileSystemFake();
+    const browser = fakeBrowserAuth({ elevatedFailure: 'launch_timeout' });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const result = await auth.getElevatedAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.message).toContain('Node');
+      expect(result.error.message).toContain('Bun');
+    }
+  });
+
   it('recaptureElevated returns the navigation_failed-specific error message when network/tenant blocks navigation', async () => {
     const fs = createFileSystemFake();
     const browser = fakeBrowserAuth({ elevatedFailure: 'navigation_failed' });
