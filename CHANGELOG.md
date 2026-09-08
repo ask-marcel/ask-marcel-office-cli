@@ -29,12 +29,27 @@ one are indistinguishable from the outside.
 window" and is exactly wrong when the window is still open. Reported on Windows:
 a browser launched, sat on `about:blank`, and no sign-in page ever appeared. The
 cause was a SentinelOne policy blocking the local DevTools (CDP) connection
-Playwright uses to drive the browser it just started, and no version of the CLI
-has ever worked on that machine.
+Playwright uses to drive the browser it just started.
 
-Both messages now name that cause and the fix (a security exclusion for the
-browser Playwright launches), alongside the corrupt-profile case they already
-covered, and point at `ASKMARCEL_TRACE=1`.
+It turned out to hit only when the CLI ran under Bun: the same machine runs
+`login` fine under Node, and the published bin is `#!/usr/bin/env node`, so an
+`npm i -g ask-marcel-office-cli` install uses Node and works. The EDR trusts
+the signed `node.exe` and blocks the less-common `bun.exe` from driving a child
+browser over CDP.
+
+Both messages now name the cause and offer the runtime switch first (cheaper
+than an admin exclusion), with a security exclusion as the fallback, alongside
+the corrupt-profile case they already covered, and point at
+`ASKMARCEL_TRACE=1`.
+
+### Fixed: a mistyped flag names its own cause
+
+`get-drive-item --drive-id d1 item--id x` answered "required option
+`--item-id` not specified" with a hint that only said a required flag was
+missing. The typo hint that names `item--id` → `--item-id` existed, but on the
+excess-argument path; Commander reports the missing required flag first, so the
+one case the hint was written for never reached it. The required-flag hint now
+names the bare-word-as-positional cause too.
 
 ### Added: a group post reaches as far as a mail message
 
