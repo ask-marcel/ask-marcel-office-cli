@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
 import { buildSelectableCommand } from './build-command.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
+import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().min(1) });
 const inner = buildSelectableCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}`, baseSchema);
@@ -10,21 +10,8 @@ const inner = buildSelectableCommand((p) => `/teams/${p.teamId}/channels/${p.cha
 // Graph surfaces a stripped `1: NotFound` for a missing channel-id (the
 // `1:` prefix is the Teams thread-id segment, unhelpfully echoed). The
 // sibling `get-team` returns a clear `BadRequest: teamId needs to be a
-// valid GUID.` Rewrite for parity.
-const execute: Command['execute'] = async (graph, params) => {
-  const result = await inner.execute(graph, params);
-  if (result.ok) return result;
-  if (result.error.type === 'api_error' && /^1:\s*NotFound/i.test(result.error.message)) {
-    const channelId = typeof params['channelId'] === 'string' ? params['channelId'] : '<unknown>';
-    return err({
-      type: 'api_error',
-      status: result.error.status,
-      message: `NotFound: Microsoft Teams channel not found (channel-id: "${channelId}"). Verify it exists in this team via \`ask-marcel-office list-team-channels --team-id <team-id>\`.`,
-      code: 'cli_rewrite_channel_not_found',
-    });
-  }
-  return result;
-};
+// valid GUID.` The rewrite is shared with every channel-scoped command.
+const execute: Command['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
 const { schema } = inner;
 
 const meta: CommandMeta = {
