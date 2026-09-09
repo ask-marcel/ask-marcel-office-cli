@@ -77,6 +77,8 @@ import * as listTeamMembers from './list-team-members.ts';
 import * as listTeamChannelMembers from './list-team-channel-members.ts';
 import * as listTeamChannelTabs from './list-team-channel-tabs.ts';
 import * as listTeamChannelMessages from './list-team-channel-messages.ts';
+import * as getTeamChannelMessage from './get-team-channel-message.ts';
+import * as listTeamChannelMessageReplies from './list-team-channel-message-replies.ts';
 import * as listTodoLinkedResources from './list-todo-linked-resources.ts';
 import * as listTodoTaskLists from './list-todo-task-lists.ts';
 import * as listTodoTasks from './list-todo-tasks.ts';
@@ -308,6 +310,8 @@ const modules: Record<string, Command> = {
   'list-team-channel-members': listTeamChannelMembers,
   'list-team-channel-tabs': listTeamChannelTabs,
   'list-team-channel-messages': listTeamChannelMessages,
+  'get-team-channel-message': getTeamChannelMessage,
+  'list-team-channel-message-replies': listTeamChannelMessageReplies,
   'list-chats': listChats,
   'get-chat': getChat,
   'list-teams-chats-with-messages': listTeamsChatsWithMessages,
