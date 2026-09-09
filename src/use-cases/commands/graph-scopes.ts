@@ -230,6 +230,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-channel-files-folder': ['Channel.ReadBasic.All', 'Files.Read'],
   'list-team-members': ['TeamMember.Read.All'],
   'list-team-channel-members': ['ChannelMember.Read.All'],
+  'list-team-channel-tabs': ['TeamsTab.Read.All'],
 
   // — Chats (require M365ChatClient elevated token; see needsElevatedToken) —
   'list-chats': ['Chat.ReadBasic'],
