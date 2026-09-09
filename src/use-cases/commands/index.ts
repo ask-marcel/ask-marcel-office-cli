@@ -73,6 +73,8 @@ import * as listSharepointSiteListItems from './list-sharepoint-site-list-items.
 import * as listSharepointSiteLists from './list-sharepoint-site-lists.ts';
 import * as listSpecificCalendarEvents from './list-specific-calendar-events.ts';
 import * as listTeamChannels from './list-team-channels.ts';
+import * as listTeamMembers from './list-team-members.ts';
+import * as listTeamChannelMembers from './list-team-channel-members.ts';
 import * as listTodoLinkedResources from './list-todo-linked-resources.ts';
 import * as listTodoTaskLists from './list-todo-task-lists.ts';
 import * as listTodoTasks from './list-todo-tasks.ts';
@@ -300,6 +302,8 @@ const modules: Record<string, Command> = {
   'get-team': getTeam,
   'list-team-channels': listTeamChannels,
   'get-team-channel': getTeamChannel,
+  'list-team-members': listTeamMembers,
+  'list-team-channel-members': listTeamChannelMembers,
   'list-chats': listChats,
   'get-chat': getChat,
   'list-teams-chats-with-messages': listTeamsChatsWithMessages,

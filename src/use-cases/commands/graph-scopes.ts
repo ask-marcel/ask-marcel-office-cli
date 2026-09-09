@@ -11,9 +11,13 @@
  * read-only choice. The basic Teams web client token grants ~30 scopes
  * (`User.Read`, `Mail.Read`, `Calendars.Read`, `Files.Read`, `Tasks.Read`,
  * `Notes.Read.All`, `Sites.Read.All`, `Group.Read.All`, `Team.ReadBasic.All`,
- * `Channel.ReadBasic.All`, `People.Read`, `MailboxSettings.Read`, etc.). The
- * M365ChatClient elevated identity adds `Chat.ReadBasic` and ODSP allow-list
- * access (covered by `needsElevatedToken: true` per command).
+ * `Channel.ReadBasic.All`, `People.Read`, `MailboxSettings.Read`, etc.). That
+ * set moves: on 2026-09-09 it had gained `ChannelMessage.Read.All`,
+ * `TeamMember.ReadWrite.All`, `ChannelMember.ReadWrite.All` and
+ * `TeamsTab.ReadWrite.All` since the 2026-04 snapshot (the channel-read
+ * commands below ship on them, live-verified). The M365ChatClient elevated
+ * identity adds `Chat.ReadBasic` and ODSP allow-list access (covered by
+ * `needsElevatedToken: true` per command).
  *
  * Surface: this map is read by `docs.ts toEntry` at manifest-render time
  * and merged into each command's `scopesRequired`. Per-command inline
@@ -224,6 +228,8 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-team-primary-channel': ['Channel.ReadBasic.All'],
   'list-team-installed-apps': ['TeamsAppInstallation.ReadForTeam'],
   'get-channel-files-folder': ['Channel.ReadBasic.All', 'Files.Read'],
+  'list-team-members': ['TeamMember.Read.All'],
+  'list-team-channel-members': ['ChannelMember.Read.All'],
 
   // — Chats (require M365ChatClient elevated token; see needsElevatedToken) —
   'list-chats': ['Chat.ReadBasic'],
