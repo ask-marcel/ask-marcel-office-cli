@@ -2,7 +2,7 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
-## Unreleased
+## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox
 
