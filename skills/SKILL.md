@@ -61,7 +61,8 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | Who do I work with on X | `list-relevant-people` |
 | Who wrote / last touched this doc | `get-drive-item-created-by-user` / `get-drive-item-last-modified-by-user` |
 | Org tree | `get-user-manager`, `list-user-direct-reports` (recurse manually) |
-| Team / group membership | `list-groups` → `list-group-members` / `list-group-owners` |
+| Team / group membership | `list-joined-teams` → `list-team-members` (roles: owner, guest) or `list-team-channel-members --channel-id '<id>'` for a private channel's roster; `list-groups` → `list-group-members` / `list-group-owners` for a plain group |
+| What was said in a Teams channel | `list-joined-teams` → `list-team-channels --team-id '<id>'` → `list-team-channel-messages --team-id '<id>' --channel-id '<id>'` (root posts, HTML bodies, newest first); `list-team-channel-message-replies --message-id '<id>'` for the thread under a post. Channel content is not searchable: pick the channel, then read |
 | What did X say in a Teams chat | `find-chats-with-user --name '<person>'` → `list-teams-chat-messages --chat-id '<id>'`; or `list-teams-chats-with-messages` for recent chats with bodies inlined. Chat content is not in federated search, so this is the only route |
 | What's on my calendar | `list-calendars` → `list-specific-calendar-view --calendar-id '<id>' --start-date-time '<from>' --end-date-time '<to>'` — dates accept `today`, `start-of-week`, `+7d` |
 | Is X free / common slot | `get-schedule` |

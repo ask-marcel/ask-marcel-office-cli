@@ -2,6 +2,27 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## Unreleased
+
+### Added: a Teams channel reads as far as a group inbox
+
+Six commands read a Team through Microsoft Graph on the basic token, with no
+chat-substrate warm-up: `list-team-channel-messages` (newest first, `--top` up
+to 50, `--expand replies`, older history through `next-page`),
+`get-team-channel-message`, `list-team-channel-message-replies`,
+`list-team-members`, `list-team-channel-members` (the roster of a private or
+shared channel) and `list-team-channel-tabs` (each tab with its app expanded).
+The Teams web client token now carries `ChannelMessage.Read.All`,
+`TeamMember.ReadWrite.All`, `ChannelMember.ReadWrite.All` and
+`TeamsTab.ReadWrite.All`, four scopes absent from the 2026-04 snapshot that
+fixed the scope ceiling; every route was verified live on three teams before
+shipping, and `/me/chats` is still refused, so chats stay on the substrate.
+Graph names nothing when a channel or message id is wrong (`1: NotFound`, a
+Skype backend failure, `410 Gone: UnknownError`, and a `403 Forbidden:
+UnknownError` for an unknown message id that reads as a scope failure); every
+channel-scoped command, `get-team-channel` included, now names the id at fault
+and where to source it. Surface 195 -> 201.
+
 ## 2.6.0
 
 ### Fixed: a failed `login` says which browser failed, and why
