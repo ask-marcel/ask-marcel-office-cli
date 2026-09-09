@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.6.0",
-  "generatedAt": "2026-09-09T04:23:54.652Z",
+  "generatedAt": "2026-09-09T05:30:56.289Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2686,6 +2686,42 @@
       ],
       "example": "ask-marcel-office get-team-channel --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --select 'id,displayName'",
       "responseShape": "single Microsoft Graph `channel` resource"
+    },
+    {
+      "name": "get-team-channel-message",
+      "summary": "Get a single message posted in a channel of a Microsoft Team by its id, through Microsoft Graph on the basic token: the full `chatMessage` with the HTML `body.content`, `from.user`, `createdDateTime`, `attachments[]`, `mentions[]` and `reactions[]`. `--select` trims the projection (`id,from,body`). Its replies are a separate read, `list-team-channel-message-replies`; a reply itself is fetched by its own id the same way, with `replyToId` naming the root post. An unknown message id is named in the error: Graph answers it with `403 Forbidden: UnknownError`, which is not a scope failure.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/{message-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-get",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Channel message ID, the numeric `id` of a `list-team-channel-messages` entry (a reply id from `list-team-channel-message-replies` works too)."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        }
+      ],
+      "example": "ask-marcel-office get-team-channel-message --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
+      "responseShape": "single Microsoft Graph `chatMessage` resource: `id`, `replyToId`, `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`"
     },
     {
       "name": "get-team-primary-channel",
@@ -7044,6 +7080,165 @@
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
+      "name": "list-team-channel-members",
+      "summary": "List the members of a single channel inside a Microsoft Team: the same `conversationMember` entries as `list-team-members` (`displayName`, `email`, `userId`, `roles`), scoped to the channel. On a standard channel this is the whole team; on a private or shared channel it is the channel roster, which `list-team-members` cannot see. `--filter` narrows server-side (owners only with `roles/any(r:r eq 'owner')` on `microsoft.graph.aadUserConversationMember`); only `--filter` and `--select` reach Graph, a large roster continues through the `next:` footer with `next-page`. An unknown channel id is named in the error instead of the bare `1: NotFound` Graph answers.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/members",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/channel-list-members",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        }
+      ],
+      "example": "ask-marcel-office list-team-channel-members --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
+      "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
+      "pagination": true
+    },
+    {
+      "name": "list-team-channel-message-replies",
+      "summary": "List the replies to one root post in a channel of a Microsoft Team, newest first, through Microsoft Graph on the basic token: the same `chatMessage` shape as `list-team-channel-messages`, each with `replyToId` set to the root post. This is the thread under a post; `list-team-channel-messages` can inline the same replies on every root post of a page instead, through its `expand` option. `--top` pages up to 50 at a time, older replies continue through the `next:` footer with `next-page`. Graph answers an unknown message id with an EMPTY list rather than an error, so an empty result does not prove the post exists: `get-team-channel-message` does.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-list-replies",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Root post ID, the numeric `id` of a `list-team-channel-messages` entry whose `replyToId` is null."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: page size, 1 to 50 (Graph caps a page of channel messages at 50 and answers 400 above it; the CLI refuses larger values up front). Without it Graph picks its own page size, around 20. Older messages continue through the `next:` footer with `next-page`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        }
+      ],
+      "example": "ask-marcel-office list-team-channel-message-replies --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
+      "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`, each with `replyToId` set to the root post: `id`, `messageType`, `createdDateTime`, `deletedDateTime`, `from { user { id, displayName } }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`",
+      "pagination": true
+    },
+    {
+      "name": "list-team-channel-messages",
+      "summary": "List the messages posted in a single channel of a Microsoft Team, newest first, through Microsoft Graph on the basic token (no chat-substrate warm-up, unlike the Teams chat commands): the `chatMessage` resources with the HTML `body.content`, `from.user` (`displayName`, `id`), `createdDateTime`, `messageType` (`message` for a post, `systemEventMessage` for a membership or channel event), `attachments[]` as references (a shared file carries `contentUrl` and `name`), `mentions[]` and `reactions[]`. Each entry is a ROOT post: replies are not inlined unless `--expand replies` is passed, or fetched with `list-team-channel-message-replies`. A deleted message stays in the list with `deletedDateTime` set and an empty body. `--top` pages up to 50 at a time; older history continues through the `next:` footer with `next-page`. Find the ids with `list-joined-teams` then `list-team-channels`; an unknown or malformed channel id is named in the error instead of the bare `UnknownError` Graph answers.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/channel-list-messages",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`, or `get-team-primary-channel` for General."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: page size, 1 to 50 (Graph caps a page of channel messages at 50 and answers 400 above it; the CLI refuses larger values up front). Without it Graph picks its own page size, around 20. Older messages continue through the `next:` footer with `next-page`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: pass `replies` to inline each root post's replies (the only navigation Graph expands on this collection). Increases response size."
+        }
+      ],
+      "example": "ask-marcel-office list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
+      "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`: `id`, `replyToId` (null on a root post), `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`",
+      "pagination": true
+    },
+    {
+      "name": "list-team-channel-tabs",
+      "summary": "List the tabs pinned to a single channel of a Microsoft Team, each with its `teamsApp` expanded (the CLI hard-pins `$expand=teamsApp`) so a tab reads as \"Planner\", \"Website\" or \"SharePoint\" and not only as its `displayName`. `webUrl` opens the tab in Teams; `configuration` carries the app's own settings (a Planner `planId`, a website `websiteUrl`, a Files folder `contentUrl`). `--filter` narrows server-side (`displayName eq 'Files'`) and `--select` trims the projection; Graph rejects `$top` here and a channel has few tabs, so there is no paging. An unknown channel id is named in the error instead of the Skype backend failure Graph answers.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/tabs?$expand=teamsApp",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/channel-list-tabs",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        }
+      ],
+      "example": "ask-marcel-office list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
+      "responseShape": "collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`"
+    },
+    {
       "name": "list-team-channels",
       "summary": "List the channels (standard, private, shared) inside a single Microsoft Team. Microsoft documents this endpoint as supporting only `$filter` and `$select` — Graph returns `BadRequest` on `$top`, `$skip`, `$orderby`, `$expand`, so the CLI exposes only the two flags that actually work.",
       "category": "teams",
@@ -7090,6 +7285,37 @@
       ],
       "example": "ask-marcel-office list-team-installed-apps --team-id 'tm1'",
       "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
+      "pagination": true
+    },
+    {
+      "name": "list-team-members",
+      "summary": "List the members of a Microsoft Team with their roles: `conversationMember` entries carrying `displayName`, `email`, `userId`, `tenantId` and `roles` (`owner`, `guest`, or empty for a plain member). The sibling of `list-group-members` for the team itself rather than its backing group, and the answer to \"who is in this team\". `--filter` narrows server-side, e.g. owners only with `--filter \"(microsoft.graph.aadUserConversationMember/roles/any(r:r eq 'owner'))\"`. Only `--filter` and `--select` reach Graph here: the endpoint rejects `$skip` and mis-pages on `$top`, so a large team continues through the `next:` footer with `next-page`.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/members",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/team-list-members",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        },
+        {
+          "name": "filter",
+          "key": "filter",
+          "required": false,
+          "description": "OData $filter: predicate to narrow results server-side. Quoting rules: string literals MUST use SINGLE quotes (`subject eq 'invoice'`), NOT double quotes — Graph rejects `subject eq \"invoice\"` with `InvalidFilterClause`. To embed a single quote inside a string, double it (`subject eq 'O''Brien'`). Booleans, numbers, and dates are unquoted (`isRead eq false`, `receivedDateTime ge 2026-01-01T00:00:00Z`). Wrap the whole flag value in shell DOUBLE quotes so the inner single quotes survive (`--filter \"subject eq 'invoice'\"`). Same syntax Graph documents per resource type."
+        }
+      ],
+      "example": "ask-marcel-office list-team-members --team-id 'abc-1234-...'",
+      "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
       "pagination": true
     },
     {
