@@ -2,7 +2,7 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
-## Unreleased
+## 2.6.0
 
 ### Fixed: a failed `login` says which browser failed, and why
 
