@@ -235,6 +235,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-team-channel-message': ['ChannelMessage.Read.All'],
   'list-team-channel-message-replies': ['ChannelMessage.Read.All'],
   'convert-team-channel-message-to-markdown': ['ChannelMessage.Read.All'],
+  'convert-team-channel-messages-to-markdown': ['ChannelMessage.Read.All'],
 
   // — Chats (require M365ChatClient elevated token; see needsElevatedToken) —
   'list-chats': ['Chat.ReadBasic'],
