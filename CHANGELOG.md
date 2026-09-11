@@ -23,6 +23,25 @@ UnknownError` for an unknown message id that reads as a scope failure); every
 channel-scoped command, `get-team-channel` included, now names the id at fault
 and where to source it. Surface 195 -> 201.
 
+### Added: a channel reads as a transcript, and says what changed since
+
+Three more commands turn the raw channel reads into what an agent asks for.
+`convert-team-channel-messages-to-markdown` renders a channel as one dated
+transcript, oldest post first, each post with its replies quoted beneath it:
+the newest page by default, or with `--since` (an ISO instant or `7d`) every
+root post touched since then, walked through the delta route up to
+`--max-pages`; membership events are counted in the note, not shown.
+`convert-team-channel-message-to-markdown` renders one post and the replies
+under it as a thread. Both flatten , resolve attachment placeholders
+into links, meeting, tab and card summaries, mark edits, deletions and
+reactions, and keep pasted images as placeholders unless `--inline-images
+true` fetches them from Graph `hostedContents`. `list-team-channel-messages-delta`
+is the JSON form of "what changed": root posts modified since `--since`, a
+`deltaLink` to resume from, `--expand replies` to inline the threads. Probed
+live before shipping: the delta route returns root posts only, a fresh reply
+updates its root, and Teams glues an attachment tag to the text before it.
+Surface 201 -> 204.
+
 ## 2.6.0
 
 ### Fixed: a failed `login` says which browser failed, and why

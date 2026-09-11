@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-09T07:14:37.638Z",
+  "generatedAt": "2026-09-10T01:11:55.680Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -531,6 +531,106 @@
       ],
       "example": "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped, carrying the share of the body’s readable text that went with it (`quoted reply chain stripped (removed 62% of the body text) — pass --keep-quoted true to include it`). A share near 100% on a message that should have had a real reply above the quote is the signature of a mis-detected boundary: refetch with `--keep-quoted true` to confirm.",
+      "producesBytes": true
+    },
+    {
+      "name": "convert-team-channel-message-to-markdown",
+      "summary": "Render one post of a Microsoft Teams channel and the replies under it as a markdown thread, the way `convert-group-post-to-markdown` renders a group post: a `### date time · author` heading (`· high importance` when flagged), the subject in bold when the post has one, the body converted from Teams HTML with @mentions flattened to their text, attachment placeholders resolved to `[name](url)` links, `[meeting: …]`, `[tab: …]` or `[card: …]` summaries, then each reply as a quoted block, oldest first, with `_(edited)_`, `_message deleted_` and `_reactions: 👍 2_` markers. Replies are read fifty at a time up to ten pages. Pasted images live in Graph `hostedContents` and are shown as a placeholder unless `--inline-images true` fetches and embeds them (image/*, 2 MB or less). Reads through Graph on the basic token; an unknown message id is named in the error rather than surfacing the `403 UnknownError` Graph answers.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/{message-id}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-get",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "Root post ID, the numeric `id` of a `list-team-channel-messages` entry. A reply id renders that reply alone."
+        },
+        {
+          "name": "inline-images",
+          "key": "inlineImages",
+          "required": false,
+          "description": "Pass `--inline-images true` to fetch pasted images from Graph `hostedContents` and embed them as base64 `data:` URIs (image/* only, 2 MB or less). Default is `false`: no per-image fetch, each image becomes a placeholder naming this flag.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel-office convert-team-channel-message-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: the post heading, its body, then the replies as quoted blocks. The optional `note` reports a failed or truncated replies read.",
+      "producesBytes": true
+    },
+    {
+      "name": "convert-team-channel-messages-to-markdown",
+      "summary": "Render a Microsoft Teams channel as one markdown transcript, oldest post first, each post with its replies quoted beneath it: the catch-up read for \"what was said in this channel\". Without `--since` it renders the newest page (`--top`, up to 50 root posts). With `--since` (an ISO instant or a relative date such as `7d`) it walks the delta route filtered on `lastModifiedDateTime`, so every root post touched since then comes back with its replies, up to `--max-pages` pages of `--top` posts (defaults 10 and 50, so 500 posts). Membership and channel events are omitted and counted in the `note`; a truncated walk is said there too. Bodies render as in `convert-team-channel-message-to-markdown` (@mentions, attachment links, card summaries, edit, delete and reaction markers); pasted images are placeholders unless `--inline-images true` embeds them. Reads through Graph on the basic token, no chat-substrate warm-up; an unknown channel id is named in the error.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/delta?$filter=lastModifiedDateTime gt {since}&$expand=replies",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-delta",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`, or `get-team-primary-channel` for General."
+        },
+        {
+          "name": "since",
+          "key": "since",
+          "required": false,
+          "description": "Lower bound on `lastModifiedDateTime`: every root post created, edited or replied to after this instant is included. Omit it to render only the newest page. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: page size, 1 to 50 (Graph caps a page of channel messages at 50 and answers 400 above it; the CLI refuses larger values up front). Without it Graph picks its own page size, around 20. Older messages continue through the `next:` footer with `next-page`."
+        },
+        {
+          "name": "max-pages",
+          "key": "maxPages",
+          "required": false,
+          "description": "With `--since`: how many pages of `--top` posts to walk before stopping, 1 to 50 (default 10). A cut walk is reported in the `note`."
+        },
+        {
+          "name": "inline-images",
+          "key": "inlineImages",
+          "required": false,
+          "description": "Pass `--inline-images true` to fetch pasted images from Graph `hostedContents` and embed them as base64 `data:` URIs (image/* only, 2 MB or less). Default is `false`: each image becomes a placeholder naming this flag.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        }
+      ],
+      "example": "ask-marcel-office convert-team-channel-messages-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d'",
+      "responseShape": "`{ contentType: \"text/markdown\", size, text, note }`: a `# Transcript of <channel>` heading, then every post as `### date time · author` with its body and quoted replies. The `note` counts the posts and pages read, the system events omitted, and says when the walk was cut at `--max-pages`.",
       "producesBytes": true
     },
     {
@@ -7200,6 +7300,49 @@
       ],
       "example": "ask-marcel-office list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
       "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`: `id`, `replyToId` (null on a root post), `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`",
+      "pagination": true
+    },
+    {
+      "name": "list-team-channel-messages-delta",
+      "summary": "Track what changed in a single channel of a Microsoft Team: the first call returns the root posts (created, edited or replied to, since a fresh reply updates its root) plus `@odata.nextLink` while paging and `@odata.deltaLink` on the final page; feed either to `next-page`, and keep the deltaLink to ask later for only what changed since. Without `--since` the first sync walks the whole channel history; `--since` (an ISO instant or a relative date such as `7d`) bounds it on `lastModifiedDateTime`, the one filter Graph accepts here. Root posts only: pass `--expand replies` to inline each post's replies. `--top` pages up to 50 at a time. Reads through Graph on the basic token; an unknown channel id is named in the error.",
+      "category": "teams",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/delta?$filter=lastModifiedDateTime gt {since}",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-delta",
+      "options": [
+        {
+          "name": "team-id",
+          "key": "teamId",
+          "required": true,
+          "description": "Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`."
+        },
+        {
+          "name": "channel-id",
+          "key": "channelId",
+          "required": true,
+          "description": "Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`."
+        },
+        {
+          "name": "since",
+          "key": "since",
+          "required": false,
+          "description": "Lower bound on `lastModifiedDateTime` for the first sync (the deltaLink encodes the position for later syncs). Omit it to sync the whole history. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "OData $top: page size, 1 to 50 (Graph caps a page of channel messages at 50 and answers 400 above it; the CLI refuses larger values up front). Without it Graph picks its own page size, around 20. Older messages continue through the `next:` footer with `next-page`."
+        },
+        {
+          "name": "expand",
+          "key": "expand",
+          "required": false,
+          "description": "OData $expand: pass `replies` to inline each root post's replies (the only navigation Graph expands here). Increases response size."
+        }
+      ],
+      "example": "ask-marcel-office list-team-channel-messages-delta --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d' --expand replies",
+      "responseShape": "collection of Microsoft Graph `chatMessage` root posts under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page; feed either to `next-page`.",
       "pagination": true
     },
     {
