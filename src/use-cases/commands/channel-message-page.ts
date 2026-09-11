@@ -31,3 +31,19 @@ const withChannelMessagesTopCap =
   };
 
 export { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap };
+
+/** A Graph `@odata.nextLink` as the relative path the client takes; `undefined` when there is no next page. */
+const relativeGraphPath = (link: string | undefined): string | undefined => (link === undefined ? undefined : link.replace(/^https:\/\/graph\.microsoft\.com\/v1\.0/, ''));
+
+type MarkdownEnvelope = { readonly contentType: 'text/markdown'; readonly size: number; readonly text: string; readonly note?: string };
+
+/** The `{ contentType, size, text, note? }` envelope every markdown command answers with; `size` is the UTF-8 byte count. */
+const markdownEnvelope = (text: string, notes: ReadonlyArray<string>): MarkdownEnvelope => ({
+  contentType: 'text/markdown',
+  size: new TextEncoder().encode(text).byteLength,
+  text,
+  ...(notes.length > 0 ? { note: notes.join('; ') } : {}),
+});
+
+export { markdownEnvelope, relativeGraphPath };
+export type { MarkdownEnvelope };

@@ -55,3 +55,24 @@ describe('the 50-message page cap on channel message reads', () => {
     expect(CHANNEL_MESSAGES_TOP_OPTION.description).toContain('50');
   });
 });
+
+describe('the helpers the markdown commands share', () => {
+  it('turns a Graph nextLink into the relative path the client follows, and passes a missing link through', async () => {
+    const { relativeGraphPath } = await import('./channel-message-page.ts');
+    expect(relativeGraphPath('https://graph.microsoft.com/v1.0/teams/t/channels/c/messages?$skiptoken=x')).toBe('/teams/t/channels/c/messages?$skiptoken=x');
+    expect(relativeGraphPath(undefined)).toBeUndefined();
+  });
+
+  it('builds the markdown envelope with a UTF-8 byte size and joins notes with a semicolon, omitting the field when there is none', async () => {
+    const { markdownEnvelope } = await import('./channel-message-page.ts');
+    expect(markdownEnvelope('héllo', [])).toEqual({ contentType: 'text/markdown', size: 6, text: 'héllo' });
+    expect(markdownEnvelope('x', ['a', 'b'])).toEqual({ contentType: 'text/markdown', size: 1, text: 'x', note: 'a; b' });
+  });
+});
+
+describe('what a Graph link must look like to be followed', () => {
+  it('leaves a link that only contains the Graph origin somewhere inside it untouched', async () => {
+    const { relativeGraphPath } = await import('./channel-message-page.ts');
+    expect(relativeGraphPath('https://evil.example/https://graph.microsoft.com/v1.0/x')).toBe('https://evil.example/https://graph.microsoft.com/v1.0/x');
+  });
+});
