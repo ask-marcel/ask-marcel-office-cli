@@ -234,6 +234,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-team-channel-messages': ['ChannelMessage.Read.All'],
   'get-team-channel-message': ['ChannelMessage.Read.All'],
   'list-team-channel-message-replies': ['ChannelMessage.Read.All'],
+  'list-team-channel-messages-delta': ['ChannelMessage.Read.All'],
   'convert-team-channel-message-to-markdown': ['ChannelMessage.Read.All'],
   'convert-team-channel-messages-to-markdown': ['ChannelMessage.Read.All'],
 
