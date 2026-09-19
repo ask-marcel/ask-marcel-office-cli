@@ -101,3 +101,40 @@ describe('microsoft-search-query', () => {
     expect(meta.bodyTemplate).toContain('one-of-driveItem-listItem-site-message-event-person');
   });
 });
+
+describe('sizing the page with --top', () => {
+  const capture = (): { captured: CapturedRequest[]; graph: GraphClient } => {
+    const captured: CapturedRequest[] = [];
+    const graph = fakeGraph({
+      post: async (_path, body) => {
+        captured.push(...(body as { requests: CapturedRequest[] }).requests);
+        return ok({ value: [] });
+      },
+    });
+    return { captured, graph };
+  };
+
+  it('asks Graph for --top hits per entity type, and 25 when the flag is absent', async () => {
+    const small = capture();
+    await execute(small.graph, { query: 'budget', top: '5' });
+    expect(small.captured.map((r) => r.size)).toEqual([5, 5, 5, 5, 5, 5]);
+    const dflt = capture();
+    await execute(dflt.graph, { query: 'budget' });
+    expect(new Set(dflt.captured.map((r) => r.size))).toEqual(new Set([25]));
+  });
+
+  it('refuses 0, 26 and non-numbers before calling Graph, naming the range', async () => {
+    for (const top of ['0', '26', 'ten']) {
+      const { captured, graph } = capture();
+      const result = await execute(graph, { query: 'budget', top });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.message).toContain('from 1 to 25');
+      expect(captured).toEqual([]);
+    }
+  });
+
+  it('advertises the flag', () => {
+    expect(meta.options.map((o) => o.name)).toEqual(['query', 'top']);
+    expect(schema.safeParse({ query: 'x', top: '25' }).success).toBe(true);
+  });
+});

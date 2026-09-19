@@ -8,7 +8,8 @@ const ALL_ENTITY_TYPES = ['driveItem', 'listItem', 'site', 'message', 'event', '
 type EntityType = (typeof ALL_ENTITY_TYPES)[number];
 const PAGE_SIZE = 25;
 
-const schema = z.object({ query: z.string().min(1) });
+const TOP_PATTERN = /^(?:[1-9]|1\d|2[0-5])$/;
+const schema = z.object({ query: z.string().min(1), top: z.string().regex(TOP_PATTERN, 'must be a whole number from 1 to 25').optional() });
 
 type SearchHitsContainer = { readonly searchTerms?: ReadonlyArray<string>; readonly hitsContainers?: ReadonlyArray<unknown> };
 type SearchResponse = { readonly value?: ReadonlyArray<SearchHitsContainer> };
@@ -17,8 +18,9 @@ const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const queryString = parsed.data.query;
+  const size = parsed.data.top === undefined ? PAGE_SIZE : Number(parsed.data.top);
 
-  const calls = ALL_ENTITY_TYPES.map((entityType) => graph.post('/search/query', { requests: [{ entityTypes: [entityType], query: { queryString }, size: PAGE_SIZE }] }));
+  const calls = ALL_ENTITY_TYPES.map((entityType) => graph.post('/search/query', { requests: [{ entityTypes: [entityType], query: { queryString }, size }] }));
   const results = await Promise.all(calls);
 
   // `results` and `ALL_ENTITY_TYPES` have identical length by construction
@@ -54,6 +56,13 @@ const meta: CommandMeta = {
       required: true,
       description:
         'KQL query string. Supports field operators where indexed by the corpus (e.g. `from:alice`, `subject:"q3 budget"`, `filetype:xlsx`). Free-text works everywhere.',
+    },
+    {
+      name: 'top',
+      key: 'top',
+      required: false,
+      description:
+        'Hits per entity type, 1 to 25 (default 25, the most Graph search returns per request). Six entity types are searched, so the response holds up to six times this many hits.',
     },
   ],
   example: "ask-marcel-office microsoft-search-query --query 'q3 budget'",
