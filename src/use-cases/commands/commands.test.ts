@@ -7121,6 +7121,7 @@ describe('list-teams-chat-history applies slim projection by default', () => {
       from: '8:orgid:user-a',
       imdisplayname: 'Alice',
       content: 'hello world',
+      webUrl: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.v2/m1',
     });
   });
 
@@ -7169,7 +7170,7 @@ describe('list-teams-chat-history applies slim projection by default', () => {
     if (!result.ok) return;
     const v = result.value as { messages: Array<Record<string, unknown>>; projection: string };
     expect(v.projection).toBe('full');
-    expect(v.messages[0]).toEqual(richMessage);
+    expect(v.messages[0]).toEqual({ ...richMessage, webUrl: 'https://teams.microsoft.com/l/message/c/m1' });
   });
 
   it('rejects --full values other than true/false as a validation_error', async () => {

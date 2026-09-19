@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor } from './substrate-message.ts';
 
 // Deep Teams chat history via the IC3 messaging substrate at
 // `teams.microsoft.com/api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages`.
@@ -44,6 +45,8 @@ const schema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
     .optional(),
+  skipSystem: z.enum(['true', 'false']).optional(),
+  mentionsMe: z.enum(['true', 'false']).optional(),
 });
 
 type Ic3MessageRaw = Readonly<Record<string, unknown>>;
@@ -54,7 +57,7 @@ type Ic3MessagesResponse = {
 
 // Default projection — covers the "who said what, when" question without the
 // IC3 envelope noise. Override by passing `--full true`.
-const PROJECTED_KEYS = ['id', 'sequenceId', 'composetime', 'originalarrivaltime', 'messagetype', 'from', 'imdisplayname', 'content'] as const;
+const PROJECTED_KEYS = ['id', 'sequenceId', 'composetime', 'originalarrivaltime', 'messagetype', 'event', 'from', 'imdisplayname', 'content', 'webUrl'] as const;
 const DEFAULT_MAX_CONTENT_CHARS = 4096;
 
 type ProjectedMessage = Readonly<Record<string, unknown>>;
@@ -93,6 +96,8 @@ const execute: Command['execute'] = async (graph, params) => {
   const maxPages = Number(parsed.data.maxPages ?? '20');
   const fullMode = parsed.data.full === 'true';
   const maxContentChars = Number(parsed.data.maxContentChars ?? String(DEFAULT_MAX_CONTENT_CHARS));
+  const filter = await substrateFilterFor(graph, parsed.data);
+  if (!filter.ok) return filter;
 
   const accumulated: Array<Ic3MessageRaw> = [];
   let nextRelativePath: string =
@@ -119,8 +124,10 @@ const execute: Command['execute'] = async (graph, params) => {
     nextSyncState = syncStateUrl;
   }
 
+  const enriched = accumulated.map((m) => enrichSubstrateMessage(chatId, m));
+  const kept = filterSubstrateMessages(enriched, filter.value);
   // Apply slim projection unless caller explicitly opted into the raw IC3 shape.
-  const projectedMessages: ReadonlyArray<ProjectedMessage | Ic3MessageRaw> = fullMode ? accumulated : accumulated.map((m) => projectMessage(m, maxContentChars));
+  const projectedMessages: ReadonlyArray<ProjectedMessage | Ic3MessageRaw> = fullMode ? kept : kept.map((m) => projectMessage(m, maxContentChars));
 
   return ok({
     messages: projectedMessages,
@@ -128,6 +135,7 @@ const execute: Command['execute'] = async (graph, params) => {
     pagesFetched,
     nextSyncState,
     projection: fullMode ? 'full' : 'slim',
+    ...(kept.length === enriched.length ? {} : { omitted: enriched.length - kept.length }),
   });
 };
 
@@ -180,6 +188,7 @@ const meta: CommandMeta = {
       description:
         'When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set.',
     },
+    ...SUBSTRATE_FILTER_OPTIONS,
   ],
   example: "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
   responseShape:
