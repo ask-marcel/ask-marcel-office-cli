@@ -176,3 +176,31 @@ describe('the sender, date and reaction shapes a thread must survive', () => {
     expect(md.indexOf('early')).toBeLessThan(md.indexOf('late'));
   });
 });
+
+describe('deep links on posts and replies', () => {
+  it('prints a link line under the heading of a post and under the author line of a reply when Graph gives a webUrl, and nothing when it does not', () => {
+    const md = text(
+      renderThread(
+        post({ webUrl: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.tacv2/1700000000000' }),
+        [reply({ webUrl: 'https://teams.microsoft.com/l/message/19%3Aabc%40thread.tacv2/1700000000001' }), reply({ id: '2', webUrl: null })],
+        NO_IMAGES,
+        false
+      )
+    );
+    expect(md).toBe(
+      [
+        '### 2026-09-08 14:03 · Alex Kim',
+        'link: https://teams.microsoft.com/l/message/19%3Aabc%40thread.tacv2/1700000000000',
+        '',
+        'Budget review is **Monday**',
+        '',
+        '> **Robin Chen · 2026-09-08 14:10**',
+        '> link: https://teams.microsoft.com/l/message/19%3Aabc%40thread.tacv2/1700000000001',
+        '> Works for me',
+        '',
+        '> **Robin Chen · 2026-09-08 14:10**',
+        '> Works for me',
+      ].join('\n')
+    );
+  });
+});

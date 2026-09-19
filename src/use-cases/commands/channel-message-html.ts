@@ -30,6 +30,7 @@ type ChannelMessage = {
   readonly deletedDateTime?: string | null;
   readonly subject?: string | null;
   readonly importance?: string;
+  readonly webUrl?: string | null;
   readonly from?: {
     readonly user?: { readonly id?: string; readonly displayName?: string | null } | null;
     readonly application?: { readonly displayName?: string | null } | null;
