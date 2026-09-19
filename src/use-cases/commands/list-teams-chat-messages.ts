@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, type SubstrateMessage } from './substrate-message.ts';
 
 // Per-chat message history via the Microsoft Teams chat substrate. Same
 // chatsvcagg-audience bearer as `list-teams-chats-with-messages`. Returns
@@ -19,13 +20,24 @@ import { formatZodError } from './format-zod-error.ts';
 // in project memory for the substrate audit.
 const schema = z.object({
   chatId: z.string().min(1),
+  skipSystem: z.enum(['true', 'false']).optional(),
+  mentionsMe: z.enum(['true', 'false']).optional(),
 });
+
+type Envelope = { readonly messages?: ReadonlyArray<SubstrateMessage> } & Record<string, unknown>;
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId } = parsed.data;
-  return graph.teamsChat(`/api/v1/chats/${encodeURIComponent(chatId)}/messages`);
+  const filter = await substrateFilterFor(graph, parsed.data);
+  if (!filter.ok) return filter;
+  const fetched = await graph.teamsChat(`/api/v1/chats/${encodeURIComponent(chatId)}/messages`);
+  if (!fetched.ok) return fetched;
+  const body = fetched.value as Envelope;
+  const messages = (body.messages ?? []).map((m) => enrichSubstrateMessage(chatId, m));
+  const kept = filterSubstrateMessages(messages, filter.value);
+  return ok({ ...body, messages: kept, ...(kept.length === messages.length ? {} : { omitted: messages.length - kept.length }) });
 };
 
 const meta: CommandMeta = {
@@ -43,6 +55,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`.',
     },
+    ...SUBSTRATE_FILTER_OPTIONS,
   ],
   example: "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
   responseShape:
