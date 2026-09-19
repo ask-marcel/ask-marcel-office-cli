@@ -130,7 +130,14 @@ const renderCollection = (items: ReadonlyArray<unknown>, footer: string): string
 const isScalar = (value: unknown): boolean => value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
 const renderEnveloped = (data: Record<string, unknown>, tenantId?: string): string => {
-  if (isTextPayload(data)) return `${data.text as string}\n`;
+  if (isTextPayload(data)) {
+    // The markdown commands park what a reader must know about the render
+    // (a cut walk, omitted events, a failed sub-read) in `note`; the JSON
+    // envelope carries it as a field, so the text form prints it as a footer
+    // the way `next:` is printed, instead of dropping it.
+    const note = typeof data.note === 'string' && data.note !== '' ? `\n\nnote: ${data.note}` : '';
+    return `${data.text as string}${note}\n`;
+  }
   if (isBinaryPayload(data)) return `binary: ${data.contentType as string}, ${data.size as number} bytes — use --output-path to save\n`;
   if (isUnsavedMediaPayload(data)) return mediaHintLine(data.media as ReadonlyArray<unknown>);
   const { stripped, cursors } = extractCursors(data);

@@ -706,3 +706,15 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     expect(out).toBe('');
   });
 });
+
+describe('presenter output — the note on a markdown envelope in text mode', () => {
+  it('prints the note as a footer after the body, so a cut walk or an omitted event is not lost outside --output json', () => {
+    const out = renderTextOutput({ contentType: 'text/markdown', size: 5, text: '# Hi\n\nbody', note: '3 posts on the newest page; 1 system event omitted' });
+    expect(out).toBe('# Hi\n\nbody\n\nnote: 3 posts on the newest page; 1 system event omitted\n');
+  });
+
+  it('prints the bare body when there is no note, or an empty one', () => {
+    expect(renderTextOutput({ contentType: 'text/markdown', size: 4, text: 'body' })).toBe('body\n');
+    expect(renderTextOutput({ contentType: 'text/markdown', size: 4, text: 'body', note: '' })).toBe('body\n');
+  });
+});
