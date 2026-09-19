@@ -176,6 +176,15 @@ describe('command meta — invariants on every registered command', () => {
           // OData flags above, so it is a query param rather than a URL
           // placeholder.
           'include-hidden-folders',
+          // Slice A of the daily-brief gap register (2026-09-19): four post-fetch
+          // knobs. `--exclude-meeting-responses` drops eventMessageResponse items
+          // from a mail listing client-side; `--skip-system` and `--mentions-me`
+          // filter substrate chat messages after the read; `--before` picks a
+          // version by date from the versions listing. None is a URL placeholder.
+          'exclude-meeting-responses',
+          'skip-system',
+          'mentions-me',
+          'before',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

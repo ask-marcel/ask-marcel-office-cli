@@ -2,13 +2,16 @@ import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
 import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { EXCLUDE_MEETING_RESPONSES_OPTION, withMeetingResponseFilter } from './mail-response-filter.ts';
+import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 // Slim default projection shared with search-mail-messages / get-mail-message
 // (see mail-message-select.ts); at 25 messages/page the full Graph projection
 // runs ~1 MB vs ~30-60 KB slim. A user-supplied `--select` always wins.
-const { execute, schema } = buildListCommand(() => '/me/messages', baseSchema, { defaultSelect: MAIL_MESSAGE_DEFAULT_SELECT });
+const inner = buildListCommand(() => '/me/messages', baseSchema, { defaultSelect: MAIL_MESSAGE_DEFAULT_SELECT });
+const schema = z.object({ ...baseSchema.shape, ...odataQuerySchema.shape, excludeMeetingResponses: z.enum(['true', 'false']).optional() });
+const execute = withMeetingResponseFilter(schema, inner.execute);
 
 const meta: CommandMeta = {
   summary:
@@ -17,7 +20,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-messages',
-  options: [...odataQueryOptions],
+  options: [...odataQueryOptions, EXCLUDE_MEETING_RESPONSES_OPTION],
   example: 'ask-marcel-office list-mail-messages',
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
