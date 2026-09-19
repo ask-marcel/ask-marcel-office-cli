@@ -8,6 +8,7 @@ import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 import { normalizeVersionId } from './version-id.ts';
+import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // v1.4.0 surface-consolidation: the three historical-version downloads
@@ -17,10 +18,45 @@ import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 const schema = z.object({
   driveId: z.string().min(1),
   itemId: z.string().min(1),
-  versionId: z.string().min(1),
+  versionId: z.string().min(1).optional(),
+  before: isoDateTimeField.optional(),
   format: z.enum(['original', 'pdf', 'markdown']).optional(),
   includeMetadata: z.enum(['true', 'false']).optional(),
 });
+
+type ListedVersion = { readonly id?: unknown; readonly lastModifiedDateTime?: unknown };
+
+// `--before` picks the newest version saved strictly before an instant, so a
+// caller comparing "what changed in the window" no longer lists the versions
+// and chooses by hand. An explicit `--version-id` wins and skips the listing.
+const resolveVersionId = async (
+  graph: GraphClient,
+  driveId: string,
+  itemId: string,
+  versionId: string | undefined,
+  before: string | undefined
+): Promise<Result<string, GraphError>> => {
+  if (versionId !== undefined) return ok(normalizeVersionId(versionId));
+  if (before === undefined)
+    return err({
+      type: 'validation_error',
+      message: 'pass --version-id <id> (from list-drive-item-versions) or --before <datetime> to pick the newest version saved before that instant',
+    });
+  const listed = await graph.get(`/drives/${driveId}/items/${itemId}/versions?$select=id,lastModifiedDateTime`);
+  if (!listed.ok) return listed;
+  const candidates = ((listed.value as { readonly value?: ReadonlyArray<ListedVersion> }).value ?? [])
+    .filter((v): v is { id: string; lastModifiedDateTime: string } => typeof v.id === 'string' && typeof v.lastModifiedDateTime === 'string' && v.lastModifiedDateTime < before)
+    .toSorted((a, b) => b.lastModifiedDateTime.localeCompare(a.lastModifiedDateTime));
+  const newest = candidates[0];
+  if (newest === undefined)
+    return err({
+      type: 'api_error',
+      status: 404,
+      message: `NotFound: no version of this file was saved before ${before}; list-drive-item-versions shows what exists`,
+      code: 'cli_no_version_before',
+    });
+  return ok(newest.id);
+};
 
 const fetchOriginal = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> =>
   inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
@@ -58,22 +94,39 @@ const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string
   return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true, includeMetadata });
 };
 
+type FetchRequest = {
+  readonly driveId: string;
+  readonly itemId: string;
+  readonly versionId: string;
+  readonly format: 'original' | 'pdf' | 'markdown';
+  readonly includeMetadata: boolean;
+};
+
+const fetchByFormat = (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+  if (r.format === 'original') return fetchOriginal(graph, r.driveId, r.itemId, r.versionId);
+  if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.versionId);
+  return fetchMarkdown(graph, r.driveId, r.itemId, r.versionId, r.includeMetadata);
+};
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
-  const versionId = normalizeVersionId(parsed.data.versionId);
+  const resolved = await resolveVersionId(graph, driveId, itemId, parsed.data.versionId, parsed.data.before);
+  if (!resolved.ok) return resolved;
+  const versionId = resolved.value;
   const format = parsed.data.format ?? 'original';
   const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  if (format === 'original') return fetchOriginal(graph, driveId, itemId, versionId);
-  if (format === 'pdf') return fetchPdf(graph, driveId, itemId, versionId);
-  return fetchMarkdown(graph, driveId, itemId, versionId, includeMetadata);
+  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId, format, includeMetadata });
+  if (!fetched.ok || parsed.data.before === undefined) return fetched;
+  // Say which version `--before` chose: the caller never saw the listing.
+  return ok({ ...(fetched.value as Record<string, unknown>), versionId });
 };
 
 const meta: CommandMeta = {
   summary:
-    'Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch).',
+    'Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content',
@@ -89,9 +142,15 @@ const meta: CommandMeta = {
     {
       name: 'version-id',
       key: 'versionId',
-      required: true,
+      required: false,
       description:
         'driveItemVersion ID. Returned by `ask-marcel-office list-drive-item-versions`. Use the `id` field of an entry under `value[]`. Pick a non-current version — the first entry (e.g. `12.0`) is the live file and Graph rejects this endpoint for it; use `value[1]` or older.',
+    },
+    {
+      name: 'before',
+      key: 'before',
+      required: false,
+      description: `Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as \`versionId\`. ${RELATIVE_DATE_DESCRIPTION}`,
     },
     {
       name: 'format',
