@@ -1,4 +1,5 @@
 import type { Result } from '../../domain/result.ts';
+import { ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
@@ -30,9 +31,23 @@ const DRIVE_HINTS: ConversionHints = {
 
 type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean; readonly maxCells?: number; readonly keepQuoted?: boolean };
 
+// Graph's HTML conversion of a fresh Loop page can come back empty while the
+// page already holds content (a meeting-notes page with one 14 KB save rendered
+// to nothing, 2026-09-19); the converter lags the saves. An empty body is
+// therefore said, so the caller retries later instead of reading "no notes".
+const EMPTY_LOOP_NOTE =
+  'Graph returned no HTML for this page: its Loop converter lags the saves, sometimes by hours. Retry later; `list-drive-item-versions` shows when the page was last saved.';
+
+const withEmptyLoopNote = (result: Result<unknown, GraphError>): Result<unknown, GraphError> => {
+  if (!result.ok) return result;
+  const envelope = result.value as { readonly text?: unknown };
+  if (typeof envelope.text !== 'string' || envelope.text.trim() !== '') return result;
+  return ok({ ...(result.value as Record<string, unknown>), note: EMPTY_LOOP_NOTE });
+};
+
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
-  if (HTML_FORMAT_INPUTS.has(ext)) return convertToMarkdown(graph, `${contentPath}?format=html`);
+  if (HTML_FORMAT_INPUTS.has(ext)) return withEmptyLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`));
   const bytes = await fetchRawBytes(graph, contentPath, opts);
   if (!bytes.ok) return bytes;
   return bytesToMarkdown(bytes.value, filename, opts, DRIVE_HINTS);
