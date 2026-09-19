@@ -5507,7 +5507,8 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   {
     name: 'list-mail-messages',
     params: {},
-    expectedPath: '/me/messages?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId',
+    expectedPath:
+      '/me/messages?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId%2CwebLink',
   },
   // explicit --select wins over the slim default.
   { name: 'list-mail-messages', params: { select: 'id,subject' }, expectedPath: '/me/messages?$select=id%2Csubject' },
@@ -5527,7 +5528,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     name: 'get-mail-message',
     params: { messageId: 'm1' },
     expectedPath:
-      '/me/messages/m1?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId',
+      '/me/messages/m1?$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId%2CwebLink',
   },
   { name: 'get-mail-message', params: { messageId: 'm1', select: 'id,subject' }, expectedPath: '/me/messages/m1?$select=id%2Csubject' },
   {
@@ -5544,7 +5545,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     name: 'search-mail-messages',
     params: { query: 'invoice' },
     expectedPath:
-      '/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId',
+      '/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId%2CwebLink',
   },
   // Explicit --select wins over the slim default.
   { name: 'search-mail-messages', params: { query: 'invoice', select: 'id,subject' }, expectedPath: '/me/messages?$search=%22invoice%22&$select=id%2Csubject' },
@@ -7435,7 +7436,7 @@ describe('search-mail-messages rejects --filter client-side', () => {
   it('still works when only --query is supplied (no regression on the happy path) — URL carries the slim default $select alongside $search', async () => {
     const url = await capturedUrl('search-mail-messages', { query: 'invoice' });
     expect(url).toBe(
-      'https://graph.microsoft.com/v1.0/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId'
+      'https://graph.microsoft.com/v1.0/me/messages?$search=%22invoice%22&$select=id%2Csubject%2Cfrom%2CtoRecipients%2CccRecipients%2CreceivedDateTime%2ChasAttachments%2CisRead%2Cimportance%2CbodyPreview%2CconversationId%2CwebLink'
     );
   });
 

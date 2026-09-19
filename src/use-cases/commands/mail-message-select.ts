@@ -6,4 +6,4 @@
 // string). `conversationId` is included so a caller can group results into a
 // thread — and hand that id to `list-conversation-messages` — without a second
 // round-trip. A user-supplied `--select` overrides this list entirely.
-export const MAIL_MESSAGE_DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId';
+export const MAIL_MESSAGE_DEFAULT_SELECT = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId,webLink';
