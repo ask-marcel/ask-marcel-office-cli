@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-10T01:11:55.680Z",
+  "generatedAt": "2026-09-19T13:50:04.149Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -974,7 +974,7 @@
     },
     {
       "name": "download-drive-item-version",
-      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch).",
+      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content",
@@ -995,8 +995,14 @@
         {
           "name": "version-id",
           "key": "versionId",
-          "required": true,
+          "required": false,
           "description": "driveItemVersion ID. Returned by `ask-marcel-office list-drive-item-versions`. Use the `id` field of an entry under `value[]`. Pick a non-current version — the first entry (e.g. `12.0`) is the live file and Graph rejects this endpoint for it; use `value[1]` or older."
+        },
+        {
+          "name": "before",
+          "key": "before",
+          "required": false,
+          "description": "Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as `versionId`. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
         },
         {
           "name": "format",
@@ -2978,7 +2984,7 @@
     },
     {
       "name": "list-accessible-drives",
-      "summary": "Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, drives behind files shared with the user, private/shared Teams channel sites, drives behind recently-used / followed / trending items (activity signals), AND every NON-default document library of each discovered SharePoint site — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups → `/groups/{id}/drive`), `/me/drive/sharedWithMe`, per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (private/shared channels only — their files live in their own site, not the team default drive), `/me/drive/recent` + `/me/drive/following` + `/me/insights/{trending,used,shared}`, and a path-addressed `/sites/{host}:/sites/{name}:/drives` per discovered site (catches secondary libraries like \"Teams Wiki Data\" the default-drive vectors miss). Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites + OneDrives), these vectors surface drives the search index never returns; the index in turn returns sites you can open but are not a member of, so the *union of both commands* is the practical maximum on a delegated token. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-resource \"can't reach this one\" failures are dropped silently (404 no drive, 403 access-denied / non-member private channel, 423 admin-locked site, 400 stale/unresolvable id); only actionable failures (auth, throttling, 5xx, network) appear in `partialErrors[]`, so it stays signal-only. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, a `filesFolder` call per private/shared channel, five fixed activity calls, and one `/sites/{id}/drives` call per discovered site (all capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token.",
+      "summary": "Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, drives behind files shared with the user, private/shared Teams channel sites, drives behind recently-used / followed / trending items (activity signals), AND every NON-default document library of each discovered SharePoint site — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups → `/groups/{id}/drive`), `/me/drive/sharedWithMe`, per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (private/shared channels only — their files live in their own site, not the team default drive), `/me/drive/recent` + `/me/drive/following` + `/me/insights/{trending,used,shared}`, and a path-addressed `/sites/{host}:/sites/{name}:/drives` per discovered site (catches secondary libraries like \"Teams Wiki Data\" the default-drive vectors miss). Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites + OneDrives), these vectors surface drives the search index never returns; the index in turn returns sites you can open but are not a member of, so the *union of both commands* is the practical maximum on a delegated token. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-resource \"can't reach this one\" failures are dropped silently (404 no drive, 403 access-denied / non-member private channel, 423 admin-locked site, 400 stale/unresolvable id); only actionable failures (auth, throttling, 5xx, network) appear in `partialErrors[]`, so it stays signal-only. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, a `filesFolder` call per private/shared channel, five fixed activity calls, and one `/sites/{id}/drives` call per discovered site (all capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token. Loop workspaces are not in this union: their container drives cannot be listed on a delegated token (the containers endpoint answers 403), so find a workspace through `search-all-files` with the query `filetype:loop` and take `parentReference.driveId` from a hit.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/drives + /me/joinedTeams + /me/memberOf + /me/drive/sharedWithMe + per-group /groups/<id>/drive + per-team /teams/<id>/channels/<ch>/filesFolder + /me/drive/recent + /me/drive/following + /me/insights/<trending|used|shared> + per-site /sites/<host>:/sites/<name>:/drives",
@@ -5153,6 +5159,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "exclude-meeting-responses",
+          "key": "excludeMeetingResponses",
+          "required": false,
+          "description": "Pass `--exclude-meeting-responses true` to drop the Accepted / Declined / Tentative replies to meeting invites (`@odata.type` `eventMessageResponse`) from the page, client-side; the count dropped comes back as `excludedMeetingResponses`. Invites themselves stay.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-mail-folder-messages --mail-folder-id 'inbox'",
@@ -5319,6 +5338,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "exclude-meeting-responses",
+          "key": "excludeMeetingResponses",
+          "required": false,
+          "description": "Pass `--exclude-meeting-responses true` to drop the Accepted / Declined / Tentative replies to meeting invites (`@odata.type` `eventMessageResponse`) from the page, client-side; the count dropped comes back as `excludedMeetingResponses`. Invites themselves stay.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-mail-messages",
@@ -7504,6 +7536,32 @@
           "key": "maxContentChars",
           "required": false,
           "description": "When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set."
+        },
+        {
+          "name": "skip-system",
+          "key": "skipSystem",
+          "required": false,
+          "description": "Pass `--skip-system true` to drop the system entries (call started and ended, recording and transcript cards, members added or removed, topic changes) and keep only what people wrote. Every entry carries a normalised `event` field naming its kind, and the count dropped comes back as `omitted`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "mentions-me",
+          "key": "mentionsMe",
+          "required": false,
+          "description": "Pass `--mentions-me true` to keep only the messages that @mention the signed-in user (one extra `/me` read resolves the identity). Combines with `--skip-system`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
@@ -7524,6 +7582,32 @@
           "key": "chatId",
           "required": true,
           "description": "Teams chat ID — typically `19:<thread>@unq.gbl.spaces` (1:1) or `19:<thread>@thread.v2` (group). Source via `list-chats` or `list-teams-chats-with-messages`."
+        },
+        {
+          "name": "skip-system",
+          "key": "skipSystem",
+          "required": false,
+          "description": "Pass `--skip-system true` to drop the system entries (call started and ended, recording and transcript cards, members added or removed, topic changes) and keep only what people wrote. Every entry carries a normalised `event` field naming its kind, and the count dropped comes back as `omitted`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "mentions-me",
+          "key": "mentionsMe",
+          "required": false,
+          "description": "Pass `--mentions-me true` to keep only the messages that @mention the signed-in user (one extra `/me` read resolves the identity). Combines with `--skip-system`.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
@@ -7533,7 +7617,7 @@
     },
     {
       "name": "list-teams-chats-with-messages",
-      "summary": "List the signed-in user's Microsoft Teams chats with the last message body inlined per chat. Uses the chatsvcagg-audience bearer captured at login. Paginated via `continuationToken` (default page size 100; pass the response's `continuationToken` back as `--continuation-token` while `hasMoreData: true`). **Best-effort, may break on Microsoft client updates**: the chat substrate is not part of the public Microsoft Graph API; Microsoft can change route shapes without notice. Caller Graph scopes do NOT matter here; the substrate server gates access on the appid + identity, not on Graph scopes.",
+      "summary": "List the signed-in user's Microsoft Teams chats with the last message body inlined per chat. Uses the chatsvcagg-audience bearer captured at login. Paginated via `continuationToken` (default page size 100; pass the response's `continuationToken` back as `--continuation-token` while `hasMoreData: true`). **Best-effort, may break on Microsoft client updates**: the chat substrate is not part of the public Microsoft Graph API; Microsoft can change route shapes without notice. Caller Graph scopes do NOT matter here; the substrate server gates access on the appid + identity, not on Graph scopes. Members come back as display names only; for their `email` and `userId`, read `list-chat-members` for that chat on the basic token.",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "https://teams.microsoft.com/api/csa/{region}/api/v3/teams/users/me/chats",
@@ -7846,6 +7930,12 @@
           "key": "query",
           "required": true,
           "description": "KQL query string. Supports field operators where indexed by the corpus (e.g. `from:alice`, `subject:\"q3 budget\"`, `filetype:xlsx`). Free-text works everywhere."
+        },
+        {
+          "name": "top",
+          "key": "top",
+          "required": false,
+          "description": "Hits per entity type, 1 to 25 (default 25, the most Graph search returns per request). Six entity types are searched, so the response holds up to six times this many hits."
         }
       ],
       "example": "ask-marcel-office microsoft-search-query --query 'q3 budget'",
@@ -7892,7 +7982,7 @@
     },
     {
       "name": "read-mail-attachment",
-      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively (quoted chain stripped unless `--keep-quoted true`), plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format.",
+      "summary": "Read an Outlook mail attachment whatever it is — one command that auto-routes by file type, preferring the content-type when the filename extension is misleading (a real `.jpg` that is actually a spreadsheet still converts), so a caller never has to choose between the convert-mail-attachment-* siblings. A `.zip` fileAttachment is unpacked and every entry converted (mirrors `convert-mail-attachment-zip-to-markdown`, returning the `{ count, files }` envelope; legacy GBK/CP437 names decoded). Any other attachment — docx/xlsx/pptx/odt/ods/odp + macro/template variants → markdown, csv → table, pdf → text layer (with `pageCount`), legacy .xls/.doc extracted, an inner Outlook .msg rendered recursively (quoted chain stripped unless `--keep-quoted true`), plain text passed through, referenceAttachment resolved via `/shares`, and itemAttachment (embedded mail/event/contact) rendered — goes through the same dispatch as `convert-mail-attachment-to-markdown` (returning its `{ contentType, size, text }` envelope). Images, scanned/image-only PDFs, and legacy .ppt return an actionable 415 pointing at `convert-mail-attachment-to-pdf` + a vision model or `get-mail-attachment` for the raw bytes. Pass `--include-metadata true` to append Office side-channel metadata. Use the explicit `convert-mail-attachment-to-markdown` / `-to-pdf` / `-zip` siblings only when you need to force a specific output format. This command converts; for the raw bytes (an image to look at, a workbook to re-upload, a file to open elsewhere) use `get-mail-attachment` with an output path, which writes the attachment as it is.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
@@ -7961,7 +8051,7 @@
     },
     {
       "name": "resolve-drive-share-link",
-      "summary": "Resolve a OneDrive / SharePoint sharing URL (a \"Copy link\" address someone sent you) to the file it points at, returning `driveId` + `itemId` ready to feed `get-drive-item`, `download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, and the rest of the `*-drive-item` family. It encodes the URL to the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)) and fetches `/shares/{token}/driveItem` in ONE call (basic token, `Files.Read.All`) — a raw sharing URL carries no ids, so this is the entry point into the drive-item family from a shared link. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`. **Cross-tenant links work too**: when the URL belongs to a tenant you are only a GUEST in, your home token cannot read its SharePoint (Graph answers `invalidAudienceUri` — it cannot mint a SharePoint token for a foreign tenant), so this command identifies the owning tenant from the URL host and retries with a guest token automatically, then returns that tenant as `tenantId` — see `responseShape` for how to pass it on to the follow-up calls.",
+      "summary": "Resolve a OneDrive / SharePoint sharing URL (a \"Copy link\" address someone sent you) to the file it points at, returning `driveId` + `itemId` ready to feed `get-drive-item`, `download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, and the rest of the `*-drive-item` family. It encodes the URL to the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)) and fetches `/shares/{token}/driveItem` in ONE call (basic token, `Files.Read.All`) — a raw sharing URL carries no ids, so this is the entry point into the drive-item family from a shared link. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft's short-link host `1drv.ms`. **Cross-tenant links work too**: when the URL belongs to a tenant you are only a GUEST in, your home token cannot read its SharePoint (Graph answers `invalidAudienceUri` — it cannot mint a SharePoint token for a foreign tenant), so this command identifies the owning tenant from the URL host and retries with a guest token automatically, then returns that tenant as `tenantId` — see `responseShape` for how to pass it on to the follow-up calls. The answer names the file as `driveId` and `itemId` (not `parentReference.driveId` and `id` as a `driveItem` does); to list a shared folder, pass them to `list-folder-files` as its drive id and item id.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/shares/(u!<base64url> of {url})/driveItem",
