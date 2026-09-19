@@ -56,3 +56,35 @@ describe('timeoutLabelFor / timeoutMsFor — single source of truth for the two-
     expect(timeoutMsFor('binary')).toBe(BINARY_TRANSFER_TIMEOUT_MS);
   });
 });
+
+describe('ASKMARCEL_BINARY_TIMEOUT_MS widens the binary tier per machine', () => {
+  const restore = process.env['ASKMARCEL_BINARY_TIMEOUT_MS'];
+  const withEnv = (value: string | undefined, run: () => void): void => {
+    if (value === undefined) delete process.env['ASKMARCEL_BINARY_TIMEOUT_MS'];
+    else process.env['ASKMARCEL_BINARY_TIMEOUT_MS'] = value;
+    try {
+      run();
+    } finally {
+      if (restore === undefined) delete process.env['ASKMARCEL_BINARY_TIMEOUT_MS'];
+      else process.env['ASKMARCEL_BINARY_TIMEOUT_MS'] = restore;
+    }
+  };
+
+  it('uses the override for the binary tier and labels it in seconds, leaving the JSON tier alone', () => {
+    withEnv('900000', () => {
+      expect(timeoutMsFor('binary')).toBe(900_000);
+      expect(timeoutLabelFor('binary')).toBe('900s');
+      expect(timeoutMsFor('json')).toBe(REQUEST_TIMEOUT_MS);
+      expect(timeoutLabelFor('json')).toBe(REQUEST_TIMEOUT_LABEL);
+    });
+  });
+
+  it('keeps the 5-minute default for an empty, non-numeric, zero or negative value', () => {
+    for (const bad of ['', 'soon', '0', '-5']) {
+      withEnv(bad, () => {
+        expect(timeoutMsFor('binary')).toBe(BINARY_TRANSFER_TIMEOUT_MS);
+        expect(timeoutLabelFor('binary')).toBe(BINARY_TRANSFER_TIMEOUT_LABEL);
+      });
+    }
+  });
+});
