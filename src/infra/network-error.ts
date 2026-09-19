@@ -45,5 +45,18 @@ export const networkErrorMessage = (e: unknown, label: string, timeoutLabel: str
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 export type TimeoutTier = 'json' | 'binary';
 
-export const timeoutLabelFor = (tier: TimeoutTier): string => (tier === 'binary' ? BINARY_TRANSFER_TIMEOUT_LABEL : REQUEST_TIMEOUT_LABEL);
-export const timeoutMsFor = (tier: TimeoutTier): number => (tier === 'binary' ? BINARY_TRANSFER_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+// A 92 MB deck through the CDN took longer than five minutes on a slow link
+// (daily-brief register, 2026-09-16). The binary tier can be widened per
+// machine with `ASKMARCEL_BINARY_TIMEOUT_MS`; anything that is not a positive
+// number keeps the default, and the label follows the value in use.
+const binaryTimeoutOverrideMs = (): number | undefined => {
+  const raw = Number(process.env['ASKMARCEL_BINARY_TIMEOUT_MS']);
+  return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+};
+
+export const timeoutLabelFor = (tier: TimeoutTier): string => {
+  if (tier !== 'binary') return REQUEST_TIMEOUT_LABEL;
+  const override = binaryTimeoutOverrideMs();
+  return override === undefined ? BINARY_TRANSFER_TIMEOUT_LABEL : `${Math.round(override / 1000)}s`;
+};
+export const timeoutMsFor = (tier: TimeoutTier): number => (tier === 'binary' ? (binaryTimeoutOverrideMs() ?? BINARY_TRANSFER_TIMEOUT_MS) : REQUEST_TIMEOUT_MS);

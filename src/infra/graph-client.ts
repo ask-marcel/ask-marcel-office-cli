@@ -6,7 +6,7 @@ import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
-import { BINARY_TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
+import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
 type GraphError =
   | { type: 'api_error'; status: number; message: string; code?: string; retryAfterSeconds?: number }
@@ -611,7 +611,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const res = await fetchFn(url, {
         method: 'GET',
         headers: { accept: 'text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8' },
-        signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMsFor('binary')),
       });
       if (!res.ok) return err(await apiErrorFrom(res, url));
       const contentType = res.headers.get('content-type');
@@ -641,7 +641,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         method: 'PUT',
         headers: { ...headers.value, 'content-type': contentType ?? 'application/octet-stream' },
         body: body as unknown as BodyInit,
-        signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMsFor('binary')),
       });
       if (!res.ok) return err(await apiErrorFrom(res, url));
       return ok(await res.json());
@@ -682,7 +682,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
           method: 'PUT',
           headers: { 'Content-Range': `bytes ${start}-${end}/${total}` },
           body: chunk as unknown as BodyInit,
-          signal: AbortSignal.timeout(BINARY_TRANSFER_TIMEOUT_MS),
+          signal: AbortSignal.timeout(timeoutMsFor('binary')),
         });
         if (!res.ok) {
           // Best-effort session cancellation; ignore failure. DELETE keeps
