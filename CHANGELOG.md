@@ -2,6 +2,35 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## Unreleased
+
+### Fixed: what the daily brief asked for on every run, part one
+
+Ten small things a scheduled brief hit each morning (the register is
+`docs/plans/2026-09-19-daily-brief-gap-register.md`). Mail: `webLink` is in the
+slim default projection of `list-mail-messages`, `get-mail-message` and
+`search-mail-messages`, and `--exclude-meeting-responses true` on the two mail
+listings drops the Accepted / Declined / Tentative replies client-side (Graph
+refuses to filter on them), reporting the count as `excludedMeetingResponses`.
+Teams chats: every substrate message now carries `webUrl` (the Teams deep link)
+and, for a system entry, `event` (`call-started`, `call-ended`,
+`recording-posted`, `transcript-posted`, `member-added`, `member-removed`,
+`topic-changed`); `list-teams-chat-messages` and `list-teams-chat-history` take
+`--skip-system true` and `--mentions-me true`. Channel transcripts and threads
+print a `link:` line per post and reply, and every markdown command prints its
+`note` as a footer in text mode, not only in `--output json`.
+`microsoft-search-query --top` sizes the page (1 to 25 per entity type).
+`download-drive-item-version --before <datetime>` picks the newest version
+saved before an instant, relative dates included, and reports the `versionId`
+it chose. `ASKMARCEL_BINARY_TIMEOUT_MS` widens the 5-minute budget of a binary
+download. A `.loop` page whose Graph HTML conversion comes back empty says so
+in a `note` instead of reading as an empty page. Help text now says where the
+raw bytes of a mail attachment are (`get-mail-attachment`), what
+`resolve-drive-share-link` names its fields, where chat members' emails come
+from (`list-chat-members`), that Loop workspaces are found through
+`filetype:loop`, and that a scheduled run must `login` before the elevated
+commands.
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox

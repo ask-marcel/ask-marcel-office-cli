@@ -300,6 +300,7 @@ Environment variables read at composition time:
 | `ASKMARCEL_LOG_LEVEL` | Winston logger; all log output goes to **stderr** (stdout reserved for command output — text by default, JSON under `--output json`). Namespaced so a generic `LOG_LEVEL` exported by another tool in your shell does not leak into ours. | `error` (use `info` or `debug` for troubleshooting) |
 | `HOME` / `USERPROFILE` | Default cache and browser-profile paths | _(required)_ |
 | `ASKMARCEL_BROWSER_PROFILE` | Override Playwright user-data-dir | _(none)_ |
+| `ASKMARCEL_BINARY_TIMEOUT_MS` | Wall-clock budget for one binary download (a file's bytes, a PDF conversion) in milliseconds; a 90 MB deck on a slow link needs more than the default | `300000` (5 min) |
 
 `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy` are stripped from the process environment immediately before launching Playwright (see `src/infra/browser-auth.ts`).
 
