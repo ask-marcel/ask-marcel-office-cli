@@ -44,15 +44,17 @@ const bodyLines = (m: ChannelMessage, images: ReadonlyMap<string, string>, inlin
 
 const postBlock = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean): string => {
   const header = `### ${whenOf(m.createdDateTime)} · ${authorOf(m)}${m.importance === 'high' ? ' · high importance' : ''}`;
+  const link = nonEmpty(m.webUrl) ? [`link: ${m.webUrl}`] : [];
   const title = nonEmpty(m.subject) ? [`**${m.subject.trim()}**`, ''] : [];
-  return [header, '', ...title, ...bodyLines(m, images, inline)].join('\n');
+  return [header, ...link, '', ...title, ...bodyLines(m, images, inline)].join('\n');
 };
 
 const replyBlock = (m: ChannelMessage, images: ReadonlyMap<string, string>, inline: boolean): string => {
   const quoted = bodyLines(m, images, inline)
     .flatMap((l) => l.split('\n'))
     .map((l) => (l === '' ? '>' : `> ${l}`));
-  return [`> **${authorOf(m)} · ${whenOf(m.createdDateTime)}**`, ...quoted].join('\n');
+  const link = nonEmpty(m.webUrl) ? [`> link: ${m.webUrl}`] : [];
+  return [`> **${authorOf(m)} · ${whenOf(m.createdDateTime)}**`, ...link, ...quoted].join('\n');
 };
 
 const byCreated = (a: ChannelMessage, b: ChannelMessage): number => (a.createdDateTime ?? '').localeCompare(b.createdDateTime ?? '');
