@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { enrichSubstrateMessage, type SubstrateMessage } from './substrate-message.ts';
 
 const schema = z.object({
   chatId: z.string().min(1),
@@ -12,7 +13,9 @@ const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId, messageId } = parsed.data;
-  return graph.teamsChat(`/api/v1/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`);
+  const fetched = await graph.teamsChat(`/api/v1/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`);
+  if (!fetched.ok) return fetched;
+  return ok(enrichSubstrateMessage(chatId, fetched.value as SubstrateMessage));
 };
 
 const meta: CommandMeta = {
