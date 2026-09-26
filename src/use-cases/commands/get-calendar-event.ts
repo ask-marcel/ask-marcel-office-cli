@@ -8,7 +8,7 @@ const { execute, schema } = buildSelectableCommand((p) => `/me/events/${p.eventI
 
 const meta: CommandMeta = {
   summary:
-    'Fetch a single calendar event by ID from the signed-in user’s default calendar. Pass `--select` to project only the fields you need (the full event body can be large with HTML body and attendee lists).',
+    "Fetch a single calendar event by ID from the signed-in user’s default calendar. Pass `--select` to project only the fields you need (the full event body can be large with HTML body and attendee lists). Replies are recorded on the organiser's copy: on your copy of someone else's meeting, `attendees[].status.response` reads `none` for people who did answer, and the organiser's own entry reads `none` too; your answer is `responseStatus`.",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/events/{event-id}',

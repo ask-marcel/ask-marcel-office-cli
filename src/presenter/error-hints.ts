@@ -175,7 +175,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     // and /users/ emit; the other variants come from /mailFolders/, /events/,
     // and the SharePoint family. All share the same remedy.
     matchCode: (c) => c === 'ErrorItemNotFound' || c === 'itemNotFound' || c === 'ItemNotFound' || c === 'ResourceNotFound',
-    hint: 'The ID is well-formed but the resource is missing — it may have been deleted, moved, or never existed in this tenant. Re-fetch via the relevant `list-*` command before retrying.',
+    hint: 'The ID is well-formed but the resource is missing — it may have been deleted, moved, or never existed in this tenant. Re-fetch via the relevant `list-*` command before retrying. An Outlook message id also changes when the message moves to another folder (an archive rule, a sweep), so a message listed a moment ago can answer this: find it again by its thread with `list-conversation-messages --conversation-id <its conversationId>`.',
   },
   // v1.4.0 audit #8: Graph emits `BadRequest: <fooId> needs to be a valid
   // GUID.` for every /teams/, /groups/, /users/ malformed-ID case. Pattern-
