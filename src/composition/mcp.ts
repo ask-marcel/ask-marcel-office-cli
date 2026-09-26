@@ -23,6 +23,7 @@ import { z } from 'zod';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
+import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
@@ -31,6 +32,7 @@ import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
+import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
 
 const PACKAGE_NAME = 'ask-marcel-office-cli';
@@ -79,6 +81,8 @@ const writeCommandNames = Object.entries(cmdRegistry)
 const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 
 const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
+  // Same rule as the CLI: named days resolve in `ASKMARCEL_TZ`, else the machine's zone.
+  setDateZone(resolveDateZone(undefined).zone);
   const { auth, graph, fs } = deps;
   const version = deps.version ?? '0.0.0';
   const server = new McpServer({ name: 'ask-marcel-office', version });

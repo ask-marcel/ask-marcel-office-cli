@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { parseIsoDateTime } from '../../domain/iso-datetime.ts';
+import { currentDateZone } from './date-zone.ts';
 
 /**
  * Reusable Zod field for an ISO-8601 UTC datetime parameter that ALSO accepts
@@ -17,7 +18,7 @@ export const isoDateTimeField = z
   .string()
   .min(1)
   .transform((value, ctx) => {
-    const parsed = parseIsoDateTime(value);
+    const parsed = parseIsoDateTime(value, new Date(), currentDateZone());
     if (parsed.ok) return parsed.value;
     ctx.addIssue({
       code: 'custom',
@@ -33,4 +34,4 @@ export const isoDateTimeField = z
  * in `--help`.
  */
 export const RELATIVE_DATE_DESCRIPTION =
-  'ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC).';
+  "ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today.";

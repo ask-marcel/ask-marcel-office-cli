@@ -13,6 +13,9 @@ import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
+import { setDateZone } from '../use-cases/commands/date-zone.ts';
+import { isValidTimeZone } from '../domain/iso-datetime.ts';
+import { resolveDateZone } from './date-zone.ts';
 import * as update from '../use-cases/commands/update.ts';
 import { buildRenderContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
@@ -202,6 +205,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
           });
       })()
     );
+
+  // Named days (`today`, `monday`, `start-of-month`) are wall-clock notions:
+  // a user at UTC+8 asking for `today` at 02:00 means their day, not the one
+  // UTC is still on. The zone comes from `--tz`, then `ASKMARCEL_TZ`, then the
+  // machine, and is set once before any subcommand parses its dates.
+  program.option(
+    '--tz <zone>',
+    "Globally available. The IANA time zone in which named days and boundaries resolve (`today`, `yesterday`, `monday`, `start-of-week`); instants such as `2026-04-01T10:00:00Z` and offsets such as `7d` are unaffected. Default: `ASKMARCEL_TZ`, else the machine's zone.",
+    (value: string): string => {
+      if (!isValidTimeZone(value)) throw new InvalidArgumentError('Not a known IANA time zone (e.g. Europe/Amsterdam, Asia/Shanghai, UTC).');
+      return value;
+    }
+  );
+  program.hook('preAction', () => {
+    const resolved = resolveDateZone(program.opts<{ tz?: string }>().tz);
+    setDateZone(resolved.zone);
+    if (resolved.warning !== undefined) logger.warn('date_zone_fallback', { warning: resolved.warning });
+  });
 
   // explicit pointers to per-command help and the
   // machine-readable manifest. Without this, an LLM that hits the compact
