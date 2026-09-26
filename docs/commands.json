@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T14:21:32.647Z",
+  "generatedAt": "2026-09-26T14:43:47.193Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -5069,6 +5069,12 @@
           "description": "todoTaskList ID. Returned by `ask-marcel-office list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list."
         },
         {
+          "name": "due-before",
+          "key": "dueBefore",
+          "required": false,
+          "description": "Keep only the tasks due strictly before this instant, filtered by Graph; a task with no due date drops out. `--due-before tomorrow` keeps what is due today or overdue. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
+        },
+        {
           "name": "top",
           "key": "top",
           "required": false,
@@ -7931,6 +7937,12 @@
           "key": "todoTaskListId",
           "required": true,
           "description": "To Do task list ID. Returned by `ask-marcel-office list-todo-task-lists`."
+        },
+        {
+          "name": "due-before",
+          "key": "dueBefore",
+          "required": false,
+          "description": "Keep only the tasks due strictly before this instant, filtered by Graph; a task with no due date drops out. `--due-before tomorrow` keeps what is due today or overdue. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",

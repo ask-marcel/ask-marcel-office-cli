@@ -3,6 +3,7 @@ import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { DUE_BEFORE_OPTION, dueBeforeClause, dueBeforeField } from './todo-due-before.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 
 // Hardcoded `$filter=status ne 'completed'` in the path means a user-supplied
@@ -12,7 +13,7 @@ import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 // generic "unknown option" — the LLM didn't know why or what to use instead.
 // Accept --filter at the schema layer and reject in execute with a sharp
 // pointer at the sibling command that supports it.
-const schema = z.object({ todoTaskListId: z.string().min(1) }).extend(odataQuerySchema.shape);
+const schema = z.object({ todoTaskListId: z.string().min(1), dueBefore: dueBeforeField }).extend(odataQuerySchema.shape);
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -24,7 +25,8 @@ const execute: Command['execute'] = async (graph, params) => {
         "--filter is not supported on list-incomplete-todo-tasks: the path already pins `$filter=status ne 'completed'` and Graph rejects two $filter query params. To combine with your own filter, call `list-todo-tasks --filter \"status ne 'completed' and <your-predicate>\"` instead (single $filter, AND your predicate yourself).",
     });
   }
-  const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks?$filter=status ne 'completed'`, parsed.data);
+  const due = parsed.data.dueBefore === undefined ? '' : ` and ${dueBeforeClause(parsed.data.dueBefore)}`;
+  const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks?$filter=status ne 'completed'${due}`, parsed.data);
   const result = await graph.get(path);
   if (result.ok) return result;
   // Same /tasks endpoint as the all-tasks sibling, so the same RequestBroker--
@@ -48,6 +50,7 @@ const meta: CommandMeta = {
       description:
         'todoTaskList ID. Returned by `ask-marcel-office list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
     },
+    DUE_BEFORE_OPTION,
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",

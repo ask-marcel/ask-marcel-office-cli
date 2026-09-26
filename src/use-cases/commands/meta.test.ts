@@ -192,6 +192,9 @@ describe('command meta — invariants on every registered command', () => {
           'sheet',
           // `--pages` narrows a PDF to some pages after the download.
           'pages',
+          // Slice E (2026-09-26): `--due-before` ANDs a due-date bound onto the
+          // To Do listings' $filter, runtime-additive like `--filter` itself.
+          'due-before',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

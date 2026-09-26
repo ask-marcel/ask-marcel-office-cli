@@ -3,14 +3,15 @@ import { err } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { DUE_BEFORE_OPTION, dueBeforeField, withDueBefore } from './todo-due-before.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 
-const schema = z.object({ todoTaskListId: z.string().min(1) }).extend(odataQuerySchema.shape);
+const schema = z.object({ todoTaskListId: z.string().min(1), dueBefore: dueBeforeField }).extend(odataQuerySchema.shape);
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks`, parsed.data);
+  const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks`, { ...parsed.data, filter: withDueBefore(parsed.data.filter, parsed.data.dueBefore) });
   const result = await graph.get(path);
   if (result.ok) return result;
   // Graph's RequestBroker--ParseUri title quirk on this endpoint — rewrite the
@@ -33,6 +34,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'To Do task list ID. Returned by `ask-marcel-office list-todo-task-lists`.',
     },
+    DUE_BEFORE_OPTION,
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
