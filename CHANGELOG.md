@@ -82,6 +82,16 @@ no size hints, no paging cursors; a failure still prints the JSON error
 envelope. New runtime dependency: `postal-mime` (MIT-0, no dependencies of its
 own).
 
+### Fixed: an old Loop version is no longer rendered as the current page
+
+`download-drive-item-version --format markdown` sent a Loop, Fluid or
+Whiteboard version through Graph's HTML conversion, which answers any version
+with the current page; it now refuses such a version with
+`unsupported_version_render` and points at `--format original` (the version's
+own bytes) or `download-drive-item-as-markdown` (the current page). Its summary
+also says plainly that Graph's PDF conversion of a historical version returns
+the raw version bytes, flagged `passthrough: true`.
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T08:03:24.775Z",
+  "generatedAt": "2026-09-26T09:52:34.775Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -980,7 +980,7 @@
     },
     {
       "name": "download-drive-item-version",
-      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.",
+      "summary": "Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with \"You cannot get the content of the current version\"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Caveat for `--format pdf`: Graph does not convert a historical version — `?format=pdf` on one answers the raw bytes of that version, flagged `passthrough: true` — so save it with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A Loop, Fluid or Whiteboard version is refused in markdown, because Graph renders any version of those as the current page; `--format original` returns the bytes of that version. A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content",
@@ -1014,7 +1014,7 @@
           "name": "format",
           "key": "format",
           "required": false,
-          "description": "Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/odf/plain-text). All formats inline the bytes; pair with the global `--output-path` to land them on disk.",
+          "description": "Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/odf/plain-text); a Loop / Fluid / Whiteboard version is refused, since Graph would render the current page instead. All formats inline the bytes; pair with the global `--output-path` to land them on disk.",
           "argumentHint": {
             "kind": "magicValue",
             "values": [

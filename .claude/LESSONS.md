@@ -6,6 +6,18 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [gotcha] 2026-09-26 | Graph never converts a historical version: `?format=html` answers the current page, and `?format=pdf` answers the version's raw bytes
+
+Slice D probed `/drives/{d}/items/{i}/versions/{id}/content?format=html` on two Loop pages (5 and 8 versions). Every call answered 200 `text/html`, and every version's HTML had the same SHA-256 as the current page's, although the versions' raw Fluid bytes differed (47,500 B against 63,000 B). The basic token got the same answer, although it is refused a version's raw bytes, which is the tell that the version segment was never read. `?format=pdf` on a historical version of a docx and of a Loop page answered `application/octet-stream`: the version's raw bytes, unconverted. `download-drive-item-version --format markdown` sent Loop versions through the HTML route, so it silently returned the current page as the old one; it now refuses with `unsupported_version_render`, and the summary says pdf conversion of a version is a passthrough.
+
+Rule for next time: a Graph conversion (`?format=`) on a path that selects a version or a snapshot must be proven to read that version, by comparing its output with the current item's; a 200 proves nothing.
+
+## [decision] 2026-09-26 | Meeting transcripts stay on the file route: `media/transcripts` is an unsupported segment on v1.0 and beta, with either token
+
+A Teams meeting recording (`.mp4` in the organiser's OneDrive) carries `media`, `video` and `source` facets; its `media` holds the recording times and viewer settings, no transcript link. `GET /drives/{d}/items/{i}/media/transcripts` answered 400 `invalidRequest: Unsupported segment type` on v1.0 and on beta, signed with the Teams web token and with the elevated M365ChatClient token alike. With `OnlineMeetingTranscript.Read.All` absent from the fixed scopes, the Graph routes to a transcript are closed; no `download-recording-transcript` command. A transcript downloaded as a `.docx` or `.vtt` reads like any file.
+
+Rule for next time: do not re-probe the Graph transcript routes without a scope change; the untested remainder is SharePoint's own `_api/v2.1/.../media/transcripts`, which needs a SharePoint-audience token the CLI does not hold.
+
 ## [gotcha] 2026-09-04 | Improving a below-90 file can BREAK the mutation gate, because `mutate:changed` aggregates only the diff and a small commit makes one weak file the whole score
 
 `read-mail-attachment.ts` sat at 66.05 for months without ever failing CI: it rode inside larger changed sets, and the b23b11b run scored 10 files at an aggregate 91.02. Raising it to 75.93 and committing that improvement ALONE turned main red at 86.91, because the diff then held two files and the weak one dominated. The next commit was worse: base f623ccc gave a ONE-file diff, so the aggregate was literally that file's 88.06. A change that strictly improved the codebase failed the gate that the unimproved code had passed, purely because of how the commit was split.
