@@ -7,6 +7,7 @@ import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 import { extensionOf } from './text-passthrough.ts';
+import { refuseSheet } from './xlsx-to-markdown.ts';
 
 /**
  * `*-as-markdown` dispatcher for a OneDrive / SharePoint drive item. Loop/Fluid/
@@ -29,7 +30,13 @@ const DRIVE_HINTS: ConversionHints = {
   generic: (ext) => `${ext} not supported by \`*-as-markdown\`. Use the corresponding \`*-as-pdf\` command — Graph \`?format=pdf\` accepts 38 input extensions including this one.`,
 };
 
-type OfficeToMarkdownOptions = FetchOptions & { readonly includeMetadata?: boolean; readonly inlineImages?: boolean; readonly maxCells?: number; readonly keepQuoted?: boolean };
+type OfficeToMarkdownOptions = FetchOptions & {
+  readonly includeMetadata?: boolean;
+  readonly inlineImages?: boolean;
+  readonly maxCells?: number;
+  readonly keepQuoted?: boolean;
+  readonly sheet?: string;
+};
 
 // Graph's HTML conversion of a fresh Loop page can come back empty while the
 // page already holds content (a meeting-notes page with one 14 KB save rendered
@@ -47,6 +54,7 @@ const withEmptyLoopNote = (result: Result<unknown, GraphError>): Result<unknown,
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
+  if (opts.sheet !== undefined && HTML_FORMAT_INPUTS.has(ext)) return refuseSheet(`this file is a .${ext}`);
   if (HTML_FORMAT_INPUTS.has(ext)) return withEmptyLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`));
   const bytes = await fetchRawBytes(graph, contentPath, opts);
   if (!bytes.ok) return bytes;
