@@ -3,6 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
+import { emlToMarkdown } from './eml-to-markdown.ts';
 import { msgToMarkdown } from './msg-to-markdown.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
@@ -77,15 +78,15 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells, sheet: opts.sheet }); // legacy Excel — no OOXML side-channel
   if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, code: 'unsupported_legacy_office', message: hints.legacyPpt });
-  if (ext === 'msg') {
-    // Outlook .msg: render headers + body and recurse each attachment through this
-    // same dispatch (the zip pattern), incrementing depth so a .msg-in-.msg can't
-    // loop. Attachments are NESTED files — container-neutral hints, not the
-    // caller's (a png inside a .msg must not point at drive-item commands).
+  if (ext === 'msg' || ext === 'eml') {
+    // An Outlook .msg or a raw RFC 822 .eml: render headers + body and recurse each
+    // attachment through this same dispatch (the zip pattern), incrementing depth
+    // so a message inside a message can't loop. Attachments are NESTED files —
+    // container-neutral hints, not the caller's (a png inside a .msg must not
+    // point at drive-item commands).
     const depth = opts.depth ?? 0;
-    return msgToMarkdown(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) =>
-      bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS)
-    );
+    const render = ext === 'msg' ? msgToMarkdown : emlToMarkdown;
+    return render(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
   }
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, code: 'unsupported_image', message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);

@@ -17,7 +17,7 @@ import { mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import {
   buildRichDocx, buildRichXlsx, buildRichPptx, buildRichOdt, buildRichOds, buildRichOdp,
-  buildPdfWithText, buildPdfWithImage, buildSampleDoc, buildLegacyXls, buildSampleMsg, buildSampleZipArchive,
+  buildPdfWithText, buildPdfWithImage, buildSampleDoc, buildLegacyXls, buildSampleMsg, buildSampleEml, buildSampleZipArchive,
 } from '../src/test-helpers/office-fixtures.ts';
 
 const DIR = '/tmp/qa/smoke';
@@ -36,6 +36,7 @@ F.pdf = await write('f.pdf', await buildPdfWithText());
 F.doc = await write('f.doc', await buildSampleDoc());
 F.xls = await write('f.xls', await buildLegacyXls());
 F.msg = await write('f.msg', await buildSampleMsg());
+F.eml = await write('f.eml', buildSampleEml());
 F.zip = await write('f.zip', await buildSampleZipArchive());
 F.csv = await write('f.csv', new TextEncoder().encode('a,b,c\n1,2,3\n'));
 const pdfImg = await write('img.pdf', await buildPdfWithImage());
