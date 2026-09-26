@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { didYouMean } from '../../domain/closest-names.ts';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
@@ -35,15 +36,15 @@ const allowedKeys = (schema: Command['schema']): ReadonlyArray<string> => {
 };
 
 const unknownParamError = (unknown: ReadonlyArray<string>, allowed: ReadonlyArray<string>): GraphError => {
-  const named = unknown.map((k) => `--${camelToKebab(k)}`).join(', ');
-  const supported = allowed
-    .map((k) => `--${camelToKebab(k)}`)
-    .toSorted((a, b) => a.localeCompare(b))
-    .join(', ');
+  const unknownFlags = unknown.map((k) => `--${camelToKebab(k)}`);
+  const allowedFlags = allowed.map((k) => `--${camelToKebab(k)}`);
+  const supported = allowedFlags.toSorted((a, b) => a.localeCompare(b)).join(', ');
+  // One unknown flag reads "Did you mean"; several name the flag each suggestion is for.
+  const suggestions = unknownFlags.map((flag) => didYouMean(flag, allowedFlags, unknownFlags.length === 1 ? undefined : `For \`${flag}\`, did you mean`)).join('');
   return {
     type: 'validation_error',
     code: 'unknown_parameter',
-    message: `${named} ${unknown.length === 1 ? 'is not a parameter' : 'are not parameters'} of this command, so it would have been ignored rather than applied. Supported: ${supported || '(none)'}.`,
+    message: `${unknownFlags.join(', ')} ${unknown.length === 1 ? 'is not a parameter' : 'are not parameters'} of this command, so it would have been ignored rather than applied.${suggestions} Supported: ${supported}.`,
   };
 };
 

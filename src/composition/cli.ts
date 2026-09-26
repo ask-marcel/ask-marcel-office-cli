@@ -1,4 +1,6 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
+import type { CommanderError } from 'commander';
+import { didYouMean } from '../domain/closest-names.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
@@ -94,7 +96,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program.configureOutput({
     writeErr: () => undefined,
   });
-  program.exitOverride((err) => {
+  // Commander's own suggestion reaches only three edits of the whole name; ours
+  // also matches by words (`--folder-id` → `--mail-folder-id`), so theirs is off.
+  // Set before any subcommand exists: a subcommand copies the setting when created.
+  program.showSuggestionAfterError(false);
+  const globalFlags = (): ReadonlyArray<string> => program.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
+  const suggestionFor = (err: CommanderError, optionFlags: ReadonlyArray<string>): string => {
+    const command = /^error: unknown command '([^']+)'/.exec(err.message)?.[1];
+    if (command !== undefined)
+      return didYouMean(
+        command,
+        program.commands.map((c) => c.name())
+      );
+    const flag = /^error: unknown option '([^']+)'/.exec(err.message)?.[1];
+    return flag === undefined ? '' : didYouMean(flag, optionFlags);
+  };
+  // `optionFlags`: the flags a mistyped one is compared with — the command's own
+  // plus the global ones for a registry command, the global ones at the top level.
+  const onCommanderError = (err: CommanderError, optionFlags: ReadonlyArray<string>): void => {
     if (err.code === 'commander.helpDisplayed' || err.code === 'commander.version' || err.code === 'commander.help') return;
     // Commander prefixes its messages with `error: ` (e.g. "error: unknown option '--foo'"),
     // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
@@ -109,9 +128,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // also stamp `source: 'cli'` explicitly
     // so the envelope shape stays stable even if a future Commander error
     // code variant doesn't have a matching rule yet.
-    fail(stripped, err.code, 'cli');
+    const suggestion = suggestionFor(err, optionFlags);
+    fail(suggestion === '' ? stripped : `${stripped}.${suggestion}`, err.code, 'cli');
     throw err;
-  });
+  };
+  program.exitOverride((err) => onCommanderError(err, globalFlags()));
 
   // previous default `--help` ran ~60 KB because the
   // top-level subcommand listing rendered each command's full summary (often
@@ -279,7 +300,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
       // pass an explicit `cli_unknown_command`
       // code so error-hints can match it structurally — gives the same
       // envelope shape as Commander's own `commander.unknownCommand` path.
-      fail(`Unknown command "${result.error.name}". Run \`ask-marcel-office --help\` to list every command.`, 'cli_unknown_command');
+      fail(
+        `Unknown command "${result.error.name}".${didYouMean(result.error.name, result.error.available)} Run \`ask-marcel-office --help\` to list every command.`,
+        'cli_unknown_command'
+      );
     });
 
   program
@@ -435,7 +459,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
         // structured `cli_unknown_command`
         // code so the envelope matches the `help <unknown>` and
         // `commander.unknownCommand` paths — single branch for LLM consumers.
-        fail(`Unknown command "${result.error.name}". Run \`ask-marcel-office --help\` to list every command.`, 'cli_unknown_command');
+        fail(
+          `Unknown command "${result.error.name}".${didYouMean(result.error.name, result.error.available)} Run \`ask-marcel-office --help\` to list every command.`,
+          'cli_unknown_command'
+        );
         return;
       }
       await writeOrPrintText(result.value, 'text/markdown', 'docs');
@@ -478,6 +505,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
           commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
         }
       }
+      commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()]));
       const helpLines = [
         `\nGraph endpoint: ${cmd.meta.graphMethod} ${cmd.meta.graphPathTemplate}`,
         `Microsoft Learn: ${cmd.meta.graphDocsUrl}`,
