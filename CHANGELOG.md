@@ -47,6 +47,20 @@ projects neither `lastModifiedDateTime` nor `lastModifiedBy` there and ignores
 `convert-mail-attachment-to-markdown` renders one sheet of a workbook, names
 the sheets when the name is unknown, and is refused on anything else.
 
+### Added: the Planner plans a group owns, and what a plan's labels are called
+
+`list-group-planner-plans --group-id <id>` lists the plans a Microsoft 365
+group owns (`/groups/{id}/planner/plans`, `--select` only). A group's plans are
+granted by membership and need not appear in `list-planner-plans`, which lists
+the plans shared with the signed-in user: a consumer found it answering no
+plans while the user's four groups held three between them. To find every plan
+a user can read, list their groups with `list-my-memberships` and ask each.
+`list-planner-plans` now says so in its summary instead of promising every plan
+across every group. `get-planner-plan-details --planner-plan-id <id>` reads a
+plan's details, whose `categoryDescriptions` name the labels a task carries as
+`category1` to `category25` in its `appliedCategories`. The full `help-json`
+manifest is now about 560 KB, and the help text says so.
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox
