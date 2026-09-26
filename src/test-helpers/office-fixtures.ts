@@ -117,6 +117,14 @@ const buildSampleDoc = async (): Promise<Uint8Array> => new Uint8Array(await Bun
 // attachment "summary.txt" (text content). Round-trips cleanly through MsgReader.
 const buildSampleMsg = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/sample.msg`).arrayBuffer());
 
+// A second synthetic .msg, built the same one-off way, whose plain-text body is a
+// reply over a quoted chain: subject "Re: Review date", sender "Robin Chen
+// <robin.chen@example.com>", body "Agreed, let's move the review to Thursday."
+// followed by a "----- Original Message -----" block from Alex Kim ending "Can we
+// push the Fabrikam review by two days?". No recipients, no attachments. It is
+// the fixture that tells `--keep-quoted true` from the default.
+const buildQuotedSampleMsg = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/quoted-sample.msg`).arrayBuffer());
+
 // A sheet with a fully-blank middle row — what Excel leaves behind when the used
 // range is padded past the real data. Default `sheet_to_csv` emits it as a bare
 // `,` line; the adapter drops it via `blankrows: false`.
@@ -877,6 +885,7 @@ export {
   buildLegacyXls,
   buildSampleDoc,
   buildSampleMsg,
+  buildQuotedSampleMsg,
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,
