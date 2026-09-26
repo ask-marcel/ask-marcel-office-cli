@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import { err, map, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
+import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
 import { docxToMarkdown } from './docx-to-markdown.ts';
 import { emlToMarkdown } from './eml-to-markdown.ts';
@@ -15,6 +16,10 @@ import { refuseSheet, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown
 // Image extensions that have no markdown text representation. NOTE: `svg` is NOT
 // here — an SVG is XML text, so it content-sniffs to text/plain like any text file.
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'ico']);
+
+// A saved web page is markup, not prose: it goes through turndown like a mail body.
+// The raw source stays one command away (`download-drive-item-content`).
+const HTML_EXTENSIONS: ReadonlySet<string> = new Set(['html', 'htm']);
 
 // Context-specific hint messages. The dispatch ladder is shared; each caller (drive /
 // mail / zip) supplies its own wording (which sibling command to use, raw-bytes route).
@@ -51,10 +56,20 @@ const NESTED_HINTS: ConversionHints = {
   generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
 };
 
-const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<unknown, GraphError> => {
-  const md = renderCsvCapped(new TextDecoder().decode(bytes), maxCells);
-  return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
-};
+const markdownEnvelope = (md: string): { contentType: 'text/markdown'; size: number; text: string } => ({
+  contentType: 'text/markdown',
+  size: new TextEncoder().encode(md).byteLength,
+  text: md,
+});
+
+const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<unknown, GraphError> =>
+  ok(markdownEnvelope(renderCsvCapped(new TextDecoder().decode(bytes), maxCells)));
+
+// The <head> (title, meta, stylesheets, scripts) is page chrome; turndown would print
+// the title as a stray first line. `[\s>]` keeps a body <header> element.
+const withoutHead = (html: string): string => html.replace(/<head[\s>][\s\S]*?<\/head>/i, '');
+
+const htmlEnvelope = (bytes: Uint8Array): Result<unknown, GraphError> => map(htmlToMarkdown(withoutHead(new TextDecoder().decode(bytes))), markdownEnvelope);
 
 /**
  * The single extension→converter dispatch for every markdown command, operating on
@@ -70,6 +85,7 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
   if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
+  if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(bytes);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells, sheet: opts.sheet });
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
