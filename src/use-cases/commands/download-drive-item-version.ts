@@ -5,7 +5,7 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { officeToMarkdown } from './office-to-markdown.ts';
+import { officeToMarkdown, rendersThroughGraph } from './office-to-markdown.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 import { normalizeVersionId } from './version-id.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
@@ -91,6 +91,16 @@ const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
+  // Graph answers `?format=html` on a historical version with the CURRENT page,
+  // so rendering an old Loop version would silently return the wrong page.
+  if (rendersThroughGraph(name)) {
+    return err({
+      type: 'api_error',
+      status: 415,
+      code: 'unsupported_version_render',
+      message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. Use \`--format original\` for this version's raw bytes, or \`download-drive-item-as-markdown\` for the current page.`,
+    });
+  }
   return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true, includeMetadata });
 };
 
@@ -126,7 +136,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. caveat for `--format pdf`: Graph sometimes silently falls back to raw source bytes for the current version (which Graph occasionally serves through this endpoint) — when the response carries `passthrough: true`, save with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.',
+    'Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Caveat for `--format pdf`: Graph does not convert a historical version — `?format=pdf` on one answers the raw bytes of that version, flagged `passthrough: true` — so save it with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A Loop, Fluid or Whiteboard version is refused in markdown, because Graph renders any version of those as the current page; `--format original` returns the bytes of that version. A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content',
@@ -157,7 +167,7 @@ const meta: CommandMeta = {
       key: 'format',
       required: false,
       description:
-        'Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/odf/plain-text). All formats inline the bytes; pair with the global `--output-path` to land them on disk.',
+        'Output format. `original` (default) returns the raw historical-version bytes. `pdf` runs Graph `?format=pdf` for Office sources (docx/pptx/xlsx) — plain-text and pdf sources short-circuit to raw bytes with `passthrough: true`. `markdown` runs the local conversion pipeline (mammoth/sheetjs/csv/odf/plain-text); a Loop / Fluid / Whiteboard version is refused, since Graph would render the current page instead. All formats inline the bytes; pair with the global `--output-path` to land them on disk.',
       argumentHint: { kind: 'magicValue', values: ['original', 'pdf', 'markdown'] },
     },
     {
