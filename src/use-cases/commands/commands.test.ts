@@ -47,6 +47,7 @@ import * as getOnenotePageAsMarkdown from './get-onenote-page-as-markdown.ts';
 import * as getOnenotePageContent from './get-onenote-page-content.ts';
 import * as getPlannerBucket from './get-planner-bucket.ts';
 import * as getPlannerPlan from './get-planner-plan.ts';
+import * as getPlannerPlanDetails from './get-planner-plan-details.ts';
 import * as getPlannerTaskDetails from './get-planner-task-details.ts';
 import * as getPlannerTask from './get-planner-task.ts';
 import * as getSharepointSiteByPath from './get-sharepoint-site-by-path.ts';
@@ -176,6 +177,7 @@ import * as listGroupEvents from './list-group-events.ts';
 import * as getGroupCalendarView from './get-group-calendar-view.ts';
 import * as listGroupConversations from './list-group-conversations.ts';
 import * as listGroupThreads from './list-group-threads.ts';
+import * as listGroupPlannerPlans from './list-group-planner-plans.ts';
 import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
@@ -241,6 +243,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-planner-tasks': listPlannerTasks,
   'list-incomplete-planner-tasks': listIncompletePlannerTasks,
   'get-planner-plan': getPlannerPlan,
+  'get-planner-plan-details': getPlannerPlanDetails,
   'list-plan-tasks': listPlanTasks,
   'get-planner-task': getPlannerTask,
   'get-planner-task-details': getPlannerTaskDetails,
@@ -315,6 +318,7 @@ const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
   'list-group-calendar-view': getGroupCalendarView,
   'list-group-conversations': listGroupConversations,
   'list-group-threads': listGroupThreads,
+  'list-group-planner-plans': listGroupPlannerPlans,
   'get-mail-message-mime': getMailMessageMime,
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,
@@ -5213,6 +5217,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-planner-tasks', params: {} },
   { name: 'list-incomplete-planner-tasks', params: {} },
   { name: 'get-planner-plan', params: { plannerPlanId: 'p1' } },
+  { name: 'get-planner-plan-details', params: { plannerPlanId: 'p1' } },
   { name: 'list-plan-tasks', params: { plannerPlanId: 'p1' } },
   { name: 'get-planner-task', params: { plannerTaskId: 't1' } },
   { name: 'get-planner-task-details', params: { plannerTaskId: 't1' } },
@@ -5277,6 +5282,7 @@ const allCommandFixtures: CommandFixture[] = [
   { name: 'list-group-calendar-view', params: { groupId: 'g1', startDateTime: '2026-04-01T00:00:00Z', endDateTime: '2026-05-01T00:00:00Z' } },
   { name: 'list-group-conversations', params: { groupId: 'g1' } },
   { name: 'list-group-threads', params: { groupId: 'g1' } },
+  { name: 'list-group-planner-plans', params: { groupId: 'g1' } },
   { name: 'get-mail-message-mime', params: { messageId: 'm1' }, responseBody: { contentType: 'message/rfc822', size: 5, base64: 'JVBERi0=' } },
   { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' } },
   { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' } },
@@ -5364,6 +5370,7 @@ describe('command schema rejection', () => {
     { name: 'get-sharepoint-site-by-path', params: { hostname: 'contoso.sharepoint.com', path: 'sites/Marketing' } },
     { name: 'get-todo-task', params: { todoTaskListId: 'tl1' } },
     { name: 'get-planner-plan', params: {} },
+    { name: 'get-planner-plan-details', params: {} },
     { name: 'get-mail-message', params: {} },
     { name: 'list-mail-child-folders', params: {} },
     { name: 'get-onenote-page-content', params: {} },
@@ -5402,6 +5409,7 @@ describe('command schema rejection', () => {
     { name: 'list-group-calendar-view', params: {} },
     { name: 'list-group-conversations', params: {} },
     { name: 'list-group-threads', params: {} },
+    { name: 'list-group-planner-plans', params: {} },
     { name: 'get-mail-message-mime', params: {} },
     { name: 'list-mail-folder-messages-delta', params: {} },
     { name: 'list-shared-mailbox-messages', params: {} },
@@ -5499,6 +5507,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   { name: 'list-planner-tasks', params: {}, expectedPath: '/me/planner/tasks' },
   { name: 'list-incomplete-planner-tasks', params: {}, expectedPath: '/me/planner/tasks?$filter=percentComplete ne 100' },
   { name: 'get-planner-plan', params: { plannerPlanId: 'p1' }, expectedPath: '/planner/plans/p1' },
+  { name: 'get-planner-plan-details', params: { plannerPlanId: 'p1' }, expectedPath: '/planner/plans/p1/details' },
   { name: 'list-plan-tasks', params: { plannerPlanId: 'p1' }, expectedPath: '/planner/plans/p1/tasks' },
   { name: 'get-planner-task', params: { plannerTaskId: 't1' }, expectedPath: '/planner/tasks/t1' },
   { name: 'get-planner-task-details', params: { plannerTaskId: 't1' }, expectedPath: '/planner/tasks/t1/details' },
@@ -5656,6 +5665,7 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
   },
   { name: 'list-group-conversations', params: { groupId: 'g1' }, expectedPath: '/groups/g1/conversations' },
   { name: 'list-group-threads', params: { groupId: 'g1' }, expectedPath: '/groups/g1/threads' },
+  { name: 'list-group-planner-plans', params: { groupId: 'g1' }, expectedPath: '/groups/g1/planner/plans' },
   { name: 'get-mail-message-mime', params: { messageId: 'm1' }, expectedPath: '/me/messages/m1/$value' },
   { name: 'list-mail-folder-messages-delta', params: { mailFolderId: 'inbox' }, expectedPath: '/me/mailFolders/inbox/messages/delta()' },
   { name: 'list-shared-mailbox-messages', params: { userId: 'shared@contoso.com' }, expectedPath: '/users/shared%40contoso.com/messages' },
@@ -7387,6 +7397,18 @@ describe('the group conversation collections drop $filter, which Graph refuses',
   it('list-group-threads keeps $filter out of the URL even when a caller supplies it', async () => {
     const url = await capturedUrl('list-group-threads', { groupId: 'g1', top: '2', select: 'id', filter: "topic eq 'x'" });
     expect(url).toBe('https://graph.microsoft.com/v1.0/groups/g1/threads?$top=2&$select=id');
+  });
+});
+
+describe("a group's Planner plans are listed the way the signed-in user's are", () => {
+  it('list-group-planner-plans.meta.options exposes group-id and select only, since the plans collections honour $select and drop the rest', () => {
+    const names = listGroupPlannerPlans.meta.options.map((o) => o.name).toSorted((a, b) => a.localeCompare(b));
+    expect(names).toEqual(['group-id', 'select']);
+  });
+
+  it('list-group-planner-plans passes $select through and keeps every other OData key out of the URL', async () => {
+    const url = await capturedUrl('list-group-planner-plans', { groupId: 'g1', select: 'title', top: '1' });
+    expect(url).toBe('https://graph.microsoft.com/v1.0/groups/g1/planner/plans?$select=title');
   });
 });
 
