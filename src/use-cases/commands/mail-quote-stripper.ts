@@ -212,7 +212,7 @@ const keepQuotedOption: CommandOptionMeta = {
   key: 'keepQuoted',
   required: false,
   description:
-    'Applies to Outlook `.msg` input only. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.',
+    'Applies to email input only: an Outlook `.msg` or a raw `.eml`. The quoted reply chain / forwarded-message block is stripped by default (it duplicates history and inflates the context budget) and replaced with a single visible marker naming this flag, so nothing is removed silently. Pass `--keep-quoted true` to render the full body. The recognized markers are the same set `convert-mail-to-markdown` uses — see `ask-marcel-office docs convert-mail-to-markdown`.',
   argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
 };
 

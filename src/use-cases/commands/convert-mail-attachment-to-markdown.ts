@@ -29,7 +29,7 @@ const schema = z.object({
 });
 
 // The dispatch flags this command forwards per attachment. `keepQuoted` only
-// bites on a `.msg` attachment (an email attached to an email).
+// bites on a `.msg` or `.eml` attachment (an email attached to an email).
 type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean; readonly sheet?: string };
 
 const MAIL_HINTS: ConversionHints = {
@@ -154,7 +154,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg attachment rendered to markdown — headers + body (quoted reply chain stripped unless `--keep-quoted true`; inline `cid:` images shown as placeholders) with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
+    'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg or raw .eml attachment rendered to markdown — headers + body (quoted reply chain stripped unless `--keep-quoted true`; inline `cid:` images shown as placeholders) with its own attachments converted recursively — plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
