@@ -62,6 +62,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-document-comments': ['Files.Read'],
   'list-accessible-drives': ['Team.ReadBasic.All', 'Group.Read.All', 'Sites.Read.All', 'Files.Read', 'Channel.ReadBasic.All'],
   'download-drive-item-version': ['Files.Read'],
+  'diff-drive-item-versions': ['Files.Read'],
   'list-trending-insights': ['Sites.Read.All'],
   'list-recently-used-insights': ['Sites.Read.All'],
   'list-shared-insights': ['Sites.Read.All'],

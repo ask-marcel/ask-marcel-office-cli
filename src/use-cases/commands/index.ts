@@ -1,5 +1,6 @@
 import type { Command } from './command-types.ts';
 import { withUnknownParamRejection } from './reject-unknown-params.ts';
+import * as diffDriveItemVersions from './diff-drive-item-versions.ts';
 import * as diffDriveItems from './diff-drive-items.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
@@ -222,6 +223,7 @@ const modules: Record<string, Command> = {
   'download-drive-item-as-pdf': downloadDriveItemAsPdf,
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
   'diff-drive-items': diffDriveItems,
+  'diff-drive-item-versions': diffDriveItemVersions,
   'extract-drive-item-images': extractDriveItemImages,
   'list-document-comments': listDocumentComments,
   'list-changed-files': listChangedFiles,

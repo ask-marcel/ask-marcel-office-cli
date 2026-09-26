@@ -52,7 +52,7 @@ describe('command meta — invariants on every registered command', () => {
   });
 
   it('flags EXACTLY the elevated-token (M365ChatClient) commands with needsElevatedToken — the auth fail-fast message derives its command list from this set, so a new elevated command added without the flag would be omitted from the remedy', () => {
-    const expected = new Set(['download-drive-item-version', 'get-chat', 'get-user', 'list-chats']);
+    const expected = new Set(['diff-drive-item-versions', 'download-drive-item-version', 'get-chat', 'get-user', 'list-chats']);
     const flagged = new Set(
       Object.entries(commands)
         .filter(([, c]) => c.meta.needsElevatedToken === true)

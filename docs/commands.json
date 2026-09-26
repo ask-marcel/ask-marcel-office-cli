@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T15:03:56.036Z",
+  "generatedAt": "2026-09-26T15:07:45.491Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -851,6 +851,62 @@
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
       "mutates": true
+    },
+    {
+      "name": "diff-drive-item-versions",
+      "summary": "What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.",
+      "category": "drive",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content and /drives/{drive-id}/items/{item-id}/content",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitemversion-get-content",
+      "options": [
+        {
+          "name": "drive-id",
+          "key": "driveId",
+          "required": true,
+          "description": "Microsoft Graph drive ID. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library."
+        },
+        {
+          "name": "item-id",
+          "key": "itemId",
+          "required": true,
+          "description": "driveItem ID of the file, from `list-folder-files`, `search-all-files`, `list-changed-files` or `resolve-drive-share-link`."
+        },
+        {
+          "name": "version-id",
+          "key": "versionId",
+          "required": false,
+          "description": "The older version to compare, from `list-drive-item-versions` (`4` and `4.0` both work). Not the first entry: that one is the live file."
+        },
+        {
+          "name": "before",
+          "key": "before",
+          "required": false,
+          "description": "Instead of --version-id: compare the newest version saved strictly before this instant, the start of a reporting window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
+        },
+        {
+          "name": "include-metadata",
+          "key": "includeMetadata",
+          "required": false,
+          "description": "Pass `--include-metadata true` to render the side-channel content of Office files (comments, tracked changes, properties, speaker notes) on both sides, so changes there appear in the diff.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        {
+          "name": "max-cells",
+          "key": "maxCells",
+          "required": false,
+          "description": "Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first."
+        }
+      ],
+      "example": "ask-marcel-office diff-drive-item-versions --drive-id 'b!1234' --item-id '01ABC' --before yesterday",
+      "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed, versionId }` — `text` is the unified diff; `note` instead says when nothing was saved after the instant, when the two render the same, or when they differ too much to diff (no counts).",
+      "needsElevatedToken": true
     },
     {
       "name": "diff-drive-items",
