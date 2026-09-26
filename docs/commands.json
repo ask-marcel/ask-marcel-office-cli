@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T14:43:47.193Z",
+  "generatedAt": "2026-09-26T15:02:19.977Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -553,7 +553,7 @@
     },
     {
       "name": "convert-team-channel-message-to-markdown",
-      "summary": "Render one post of a Microsoft Teams channel and the replies under it as a markdown thread, the way `convert-group-post-to-markdown` renders a group post: a `### date time · author` heading (`· high importance` when flagged), the subject in bold when the post has one, the body converted from Teams HTML with @mentions flattened to their text, attachment placeholders resolved to `[name](url)` links, `[meeting: …]`, `[tab: …]` or `[card: …]` summaries, then each reply as a quoted block, oldest first, with `_(edited)_`, `_message deleted_` and `_reactions: 👍 2_` markers. Replies are read fifty at a time up to ten pages. Pasted images live in Graph `hostedContents` and are shown as a placeholder unless `--inline-images true` fetches and embeds them (image/*, 2 MB or less). Reads through Graph on the basic token; an unknown message id is named in the error rather than surfacing the `403 UnknownError` Graph answers.",
+      "summary": "Render one post of a Microsoft Teams channel and the replies under it as a markdown thread, the way `convert-group-post-to-markdown` renders a group post: a `### date time · author` heading (`· high importance` when flagged), the subject in bold when the post has one, the body converted from Teams HTML with @mentions flattened to their text, attachment placeholders resolved to `[name](url)` links, `[meeting: …]`, `[tab: …]` or `[card: …]` summaries, then each reply as a quoted block, oldest first, with `_(edited)_`, `_message deleted_` and `_reactions: 👍 2_` markers, then `_reacted: …_` naming who reacted and when, oldest first (a reactor Graph leaves unnamed is named from the posts in the same read, else `user <id>`). Replies are read fifty at a time up to ten pages. Pasted images live in Graph `hostedContents` and are shown as a placeholder unless `--inline-images true` fetches and embeds them (image/*, 2 MB or less). Reads through Graph on the basic token; an unknown message id is named in the error rather than surfacing the `403 UnknownError` Graph answers.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/{message-id}",
@@ -597,7 +597,7 @@
     },
     {
       "name": "convert-team-channel-messages-to-markdown",
-      "summary": "Render a Microsoft Teams channel as one markdown transcript, oldest post first, each post with its replies quoted beneath it: the catch-up read for \"what was said in this channel\". Without `--since` it renders the newest page (`--top`, up to 50 root posts). With `--since` (an ISO instant or a relative date such as `7d`) it walks the delta route filtered on `lastModifiedDateTime`, so every root post touched since then comes back with its replies, up to `--max-pages` pages of `--top` posts (defaults 10 and 50, so 500 posts). Membership and channel events are omitted and counted in the `note`; a truncated walk is said there too. Bodies render as in `convert-team-channel-message-to-markdown` (@mentions, attachment links, card summaries, edit, delete and reaction markers); pasted images are placeholders unless `--inline-images true` embeds them. Reads through Graph on the basic token, no chat-substrate warm-up; an unknown channel id is named in the error.",
+      "summary": "Render a Microsoft Teams channel as one markdown transcript, oldest post first, each post with its replies quoted beneath it: the catch-up read for \"what was said in this channel\". Without `--since` it renders the newest page (`--top`, up to 50 root posts). With `--since` (an ISO instant or a relative date such as `7d`) it walks the delta route filtered on `lastModifiedDateTime`, so every root post touched since then comes back with its replies, up to `--max-pages` pages of `--top` posts (defaults 10 and 50, so 500 posts). Membership and channel events are omitted and counted in the `note`; a truncated walk is said there too. Bodies render as in `convert-team-channel-message-to-markdown` (@mentions, attachment links, card summaries, edit, delete and reaction markers, with who reacted and when, so a post touched only by a reaction says so); pasted images are placeholders unless `--inline-images true` embeds them. Reads through Graph on the basic token, no chat-substrate warm-up; an unknown channel id is named in the error.",
       "category": "teams",
       "graphMethod": "GET",
       "graphPathTemplate": "/teams/{team-id}/channels/{channel-id}/messages/delta?$filter=lastModifiedDateTime gt {since}&$expand=replies",

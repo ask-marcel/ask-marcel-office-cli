@@ -38,7 +38,11 @@ type ChannelMessage = {
   readonly body?: { readonly contentType?: string; readonly content?: string };
   readonly attachments?: ReadonlyArray<ChannelAttachment>;
   readonly mentions?: ReadonlyArray<{ readonly id?: number; readonly mentionText?: string | null }>;
-  readonly reactions?: ReadonlyArray<{ readonly reactionType?: string }>;
+  readonly reactions?: ReadonlyArray<{
+    readonly reactionType?: string;
+    readonly createdDateTime?: string;
+    readonly user?: { readonly user?: { readonly id?: string; readonly displayName?: string | null } | null } | null;
+  }>;
   readonly eventDetail?: { readonly '@odata.type'?: string };
   readonly replies?: ReadonlyArray<ChannelMessage>;
 };
