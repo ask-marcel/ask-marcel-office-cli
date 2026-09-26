@@ -26,28 +26,19 @@ const schema = z.object({
 
 type ListedVersion = { readonly id?: unknown; readonly lastModifiedDateTime?: unknown };
 
+type PickedVersion = { readonly id: string; readonly current: boolean };
+
 // `--before` picks the newest version saved strictly before an instant, so a
 // caller comparing "what changed in the window" no longer lists the versions
-// and chooses by hand. An explicit `--version-id` wins and skips the listing.
-const resolveVersionId = async (
-  graph: GraphClient,
-  driveId: string,
-  itemId: string,
-  versionId: string | undefined,
-  before: string | undefined
-): Promise<Result<string, GraphError>> => {
-  if (versionId !== undefined) return ok(normalizeVersionId(versionId));
-  if (before === undefined)
-    return err({
-      type: 'validation_error',
-      message: 'pass --version-id <id> (from list-drive-item-versions) or --before <datetime> to pick the newest version saved before that instant',
-    });
+// and chooses by hand. `current` says that version is still the live file:
+// nothing was saved after the instant.
+const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: string, before: string): Promise<Result<PickedVersion, GraphError>> => {
   const listed = await graph.get(`/drives/${driveId}/items/${itemId}/versions?$select=id,lastModifiedDateTime`);
   if (!listed.ok) return listed;
-  const candidates = ((listed.value as { readonly value?: ReadonlyArray<ListedVersion> }).value ?? [])
-    .filter((v): v is { id: string; lastModifiedDateTime: string } => typeof v.id === 'string' && typeof v.lastModifiedDateTime === 'string' && v.lastModifiedDateTime < before)
+  const versions = ((listed.value as { readonly value?: ReadonlyArray<ListedVersion> }).value ?? [])
+    .filter((v): v is { id: string; lastModifiedDateTime: string } => typeof v.id === 'string' && typeof v.lastModifiedDateTime === 'string')
     .toSorted((a, b) => b.lastModifiedDateTime.localeCompare(a.lastModifiedDateTime));
-  const newest = candidates[0];
+  const newest = versions.find((v) => v.lastModifiedDateTime < before);
   if (newest === undefined)
     return err({
       type: 'api_error',
@@ -55,7 +46,25 @@ const resolveVersionId = async (
       message: `NotFound: no version of this file was saved before ${before}; list-drive-item-versions shows what exists`,
       code: 'cli_no_version_before',
     });
-  return ok(newest.id);
+  return ok({ id: newest.id, current: newest === versions[0] });
+};
+
+// An explicit `--version-id` wins and skips the listing (its `current` is unknown,
+// so false: Graph itself refuses the live version on this endpoint).
+const resolveVersion = async (
+  graph: GraphClient,
+  driveId: string,
+  itemId: string,
+  versionId: string | undefined,
+  before: string | undefined
+): Promise<Result<PickedVersion, GraphError>> => {
+  if (versionId !== undefined) return ok({ id: normalizeVersionId(versionId), current: false });
+  if (before === undefined)
+    return err({
+      type: 'validation_error',
+      message: 'pass --version-id <id> (from list-drive-item-versions) or --before <datetime> to pick the newest version saved before that instant',
+    });
+  return pickVersionBefore(graph, driveId, itemId, before);
 };
 
 const fetchOriginal = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> =>
@@ -87,20 +96,21 @@ const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, ver
   );
 };
 
+// Graph answers `?format=html` on a historical version with the CURRENT page,
+// so rendering an old Loop version would silently return the wrong page.
+const refuseVersionRender = (name: string): Result<never, GraphError> =>
+  err({
+    type: 'api_error',
+    status: 415,
+    code: 'unsupported_version_render',
+    message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. Use \`--format original\` for this version's raw bytes, or \`download-drive-item-as-markdown\` for the current page.`,
+  });
+
 const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, versionId: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
-  // Graph answers `?format=html` on a historical version with the CURRENT page,
-  // so rendering an old Loop version would silently return the wrong page.
-  if (rendersThroughGraph(name)) {
-    return err({
-      type: 'api_error',
-      status: 415,
-      code: 'unsupported_version_render',
-      message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. Use \`--format original\` for this version's raw bytes, or \`download-drive-item-as-markdown\` for the current page.`,
-    });
-  }
+  if (rendersThroughGraph(name)) return refuseVersionRender(name);
   return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true, includeMetadata });
 };
 
@@ -122,9 +132,9 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
-  const resolved = await resolveVersionId(graph, driveId, itemId, parsed.data.versionId, parsed.data.before);
+  const resolved = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, parsed.data.before);
   if (!resolved.ok) return resolved;
-  const versionId = resolved.value;
+  const versionId = resolved.value.id;
   const format = parsed.data.format ?? 'original';
   const includeMetadata = parsed.data.includeMetadata === 'true';
 
@@ -186,4 +196,5 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { execute, meta, schema };
+export { execute, meta, refuseVersionRender, resolveVersion, schema };
+export type { PickedVersion };
