@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
+import { searchDriveItems } from './drive-item-search.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 /**
@@ -20,52 +21,16 @@ import { formatZodError } from './format-zod-error.ts';
  * the user can open even without membership.
  */
 
-const PAGE_SIZE = 200; // Microsoft's recommended driveItem page size (max is 1000) — balances latency vs round-trips.
 const MAX_PAGES = 25; // runaway guard: 25 × 200 = 5000 files, then `truncated: true`. Narrow with --query to see the rest.
 
 const schema = z.object({ query: z.string().min(1) });
 
-type Hit = { readonly hitId?: unknown; readonly resource?: unknown };
-type HitsContainer = { readonly moreResultsAvailable?: unknown; readonly hits?: ReadonlyArray<Hit> };
-type SearchResponse = { readonly value?: ReadonlyArray<{ readonly hitsContainers?: ReadonlyArray<HitsContainer> }> };
-
-const firstContainer = (body: unknown): HitsContainer | undefined => (body as SearchResponse | null)?.value?.[0]?.hitsContainers?.[0];
-
-const dedupKey = (hit: Hit): string | undefined => {
-  if (typeof hit.hitId === 'string') return hit.hitId;
-  const resource = hit.resource;
-  if (resource === null || typeof resource !== 'object') return undefined;
-  const id = (resource as { id?: unknown }).id;
-  return typeof id === 'string' ? id : undefined;
-};
-
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const queryString = parsed.data.query;
-
-  const seen = new Set<string>();
-  const value: Array<unknown> = [];
-  let truncated = false;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const r = await graph.post('/search/query', { requests: [{ entityTypes: ['driveItem'], query: { queryString }, from: page * PAGE_SIZE, size: PAGE_SIZE }] });
-    if (!r.ok) {
-      if (page === 0) return r;
-      truncated = true;
-      break;
-    }
-    const container = firstContainer(r.value);
-    for (const hit of container?.hits ?? []) {
-      const key = dedupKey(hit);
-      if (key !== undefined && !seen.has(key)) {
-        seen.add(key);
-        value.push(hit.resource);
-      }
-    }
-    if (container?.moreResultsAvailable !== true) break;
-    if (page === MAX_PAGES - 1) truncated = true;
-  }
-
+  const sweep = await searchDriveItems(graph, parsed.data.query, MAX_PAGES);
+  if (!sweep.ok) return sweep;
+  const { value, truncated } = sweep.value;
   return ok({ value, count: value.length, ...(truncated ? { truncated: true } : {}) });
 };
 
