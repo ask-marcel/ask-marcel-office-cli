@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T13:48:03.928Z",
+  "generatedAt": "2026-09-26T14:20:57.693Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1207,7 +1207,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships."
+      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "extract-sharepoint-links-in-group-post",
@@ -1237,7 +1237,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
-      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence."
+      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -1255,7 +1255,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
-      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence."
+      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "find-chats-with-user",

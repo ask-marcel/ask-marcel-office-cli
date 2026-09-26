@@ -1,5 +1,5 @@
 import { bytesToBase64 } from '../../domain/utilities/base64.ts';
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 
 /**
  * Shared helpers for the SharePoint-link-extraction commands
@@ -27,6 +27,9 @@ const SP_URL_PATTERN = /https:\/\/[\w-]+(?:\.[\w-]+)*\.sharepoint\.com[^\s"'<>)]
 
 const MAX_LINKS = 25; // Hardening #4: cap fan-out
 
+/** Where a link points, read from its URL: someone's OneDrive, or a SharePoint site. */
+type LinkLocation = { readonly kind: 'onedrive'; readonly owner: string } | { readonly kind: 'site'; readonly site: string };
+
 type ResolvedLink = {
   readonly url: string;
   readonly driveId?: string;
@@ -34,6 +37,8 @@ type ResolvedLink = {
   readonly name?: string;
   readonly webUrl?: string;
   readonly error?: string;
+  readonly location?: LinkLocation;
+  readonly hint?: string;
 };
 
 type ResolvedLinks = {
@@ -65,10 +70,44 @@ const buildShareToken = (url: string): string => {
   return `u!${b64}`;
 };
 
+// A link Graph refuses gives no owner, so the URL is read instead: a OneDrive lives
+// at `-my.sharepoint.com/personal/<account>`, a site at `/sites/<name>` or
+// `/teams/<name>`; a sharing link puts `/:x:/g/` or `/:w:/r/` in front, or names
+// the site straight after `/:x:/s/` (a site) or `/:x:/t/` (a team).
+const ONEDRIVE_URL = /-my\.sharepoint\.com\/(?::[a-z]+:\/[a-z]\/)?personal\/([^/?#]+)/i;
+const SITE_URL = /\.sharepoint\.com\/(?::[a-z]+:\/[a-z]\/)?(sites|teams)\/([^/?#]+)/i;
+const SHARED_SITE_URL = /\.sharepoint\.com\/:[a-z]+:\/([st])\/([^/?#]+)/i;
+
+const locationOf = (url: string): LinkLocation | undefined => {
+  const onedrive = ONEDRIVE_URL.exec(url);
+  if (onedrive !== null) return { kind: 'onedrive', owner: onedrive[1] };
+  const site = SITE_URL.exec(url);
+  if (site !== null) return { kind: 'site', site: `${site[1].toLowerCase()}/${site[2]}` };
+  const shared = SHARED_SITE_URL.exec(url);
+  if (shared !== null) return { kind: 'site', site: `${shared[1].toLowerCase() === 's' ? 'sites' : 'teams'}/${shared[2]}` };
+  return undefined;
+};
+
+const ASK_IN_BROWSER = 'open the link in a browser to send an access request.';
+
+const accessHint = (location: LinkLocation | undefined): string => {
+  if (location === undefined) return `Ask the file's owner for access, or ${ASK_IN_BROWSER}`;
+  if (location.kind === 'onedrive')
+    return `It sits in the OneDrive of ${location.owner} (a sign-in name with . and @ written as _), which has not been shared with you: ask the owner for access, or ${ASK_IN_BROWSER}`;
+  return `It sits on the SharePoint site ${location.site}, which you cannot open: ask a site owner for access, or ${ASK_IN_BROWSER}`;
+};
+
+const failedLink = (url: string, error: GraphError): ResolvedLink => {
+  const location = locationOf(url);
+  const where = location === undefined ? {} : { location };
+  if (error.type !== 'api_error') return { url, error: `${error.type}: ${error.message}`, ...where };
+  return { url, error: error.message, ...where, ...(error.status === 403 ? { hint: accessHint(location) } : {}) };
+};
+
 const resolveOne = async (graph: GraphClient, url: string): Promise<ResolvedLink> => {
   const token = buildShareToken(url);
   const result = await graph.get(`/shares/${token}/driveItem`);
-  if (!result.ok) return { url, error: result.error.type === 'api_error' ? result.error.message : `${result.error.type}: ${result.error.message}` };
+  if (!result.ok) return failedLink(url, result.error);
   const item = result.value as { id?: string; name?: string; webUrl?: string; parentReference?: { driveId?: string } };
   return {
     url,
@@ -88,4 +127,4 @@ const resolveSharepointUrls = async (graph: GraphClient, urls: ReadonlyArray<str
 };
 
 export { buildShareToken, extractSharepointUrls, resolveSharepointUrls };
-export type { ResolvedLink, ResolvedLinks };
+export type { LinkLocation, ResolvedLink, ResolvedLinks };
