@@ -3,6 +3,7 @@ import { withUnknownParamRejection } from './reject-unknown-params.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
 import * as listDocumentComments from './list-document-comments.ts';
+import * as listChangedFiles from './list-changed-files.ts';
 import * as listAccessibleDrives from './list-accessible-drives.ts';
 import * as downloadDriveItemAsPdf from './download-drive-item-as-pdf.ts';
 import * as downloadDriveItemVersion from './download-drive-item-version.ts';
@@ -221,6 +222,7 @@ const modules: Record<string, Command> = {
   'download-drive-item-as-markdown': downloadDriveItemAsMarkdown,
   'extract-drive-item-images': extractDriveItemImages,
   'list-document-comments': listDocumentComments,
+  'list-changed-files': listChangedFiles,
   'list-accessible-drives': listAccessibleDrives,
   'search-onedrive-files': searchOnedriveFiles,
   'search-my-documents': searchMyDocuments,

@@ -44,6 +44,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'search-onedrive-files': ['Files.Read'],
   'search-my-documents': ['Files.Read'],
   'search-all-files': ['Files.Read', 'Sites.Read.All'],
+  'list-changed-files': ['Files.Read', 'Sites.Read.All'],
   'get-drive-delta': ['Files.Read'],
   'get-drive-root-delta': ['Files.Read'],
   'list-recent-files': ['Files.Read'],
