@@ -31,6 +31,22 @@ from (`list-chat-members`), that Loop workspaces are found through
 `filetype:loop`, and that a scheduled run must `login` before the elevated
 commands.
 
+### Fixed: what the daily brief asked for on every run, part two
+
+Named days now mean the user's day: `today`, `yesterday`, `monday`,
+`start-of-week` and the other boundaries resolve at midnight in the run's time
+zone, which is the machine's, or `--tz <IANA zone>` on any command, or
+`ASKMARCEL_TZ`; instants, bare dates and offsets keep their meaning. A daylight
+change is honoured. `list-teams-chat-history --since <date>` hands the bound to
+the substrate itself (its `startTime`), so "since yesterday" is one small page
+instead of a walk. `--with-item true` on `list-recent-files` and the three
+insight listings reads the driveItem behind every row after the listing (Graph
+projects neither `lastModifiedDateTime` nor `lastModifiedBy` there and ignores
+`$expand=resource`), merging it as `item` or naming the failure as `itemError`.
+`--sheet <name>` on `read-mail-attachment` and
+`convert-mail-attachment-to-markdown` renders one sheet of a workbook, names
+the sheets when the name is unknown, and is refused on anything else.
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox

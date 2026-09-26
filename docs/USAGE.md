@@ -301,6 +301,7 @@ Environment variables read at composition time:
 | `HOME` / `USERPROFILE` | Default cache and browser-profile paths | _(required)_ |
 | `ASKMARCEL_BROWSER_PROFILE` | Override Playwright user-data-dir | _(none)_ |
 | `ASKMARCEL_BINARY_TIMEOUT_MS` | Wall-clock budget for one binary download (a file's bytes, a PDF conversion) in milliseconds; a 90 MB deck on a slow link needs more than the default | `300000` (5 min) |
+| `ASKMARCEL_TZ` | IANA time zone in which named days and boundaries resolve (`today`, `yesterday`, `monday`, `start-of-week`); `--tz <zone>` on any command overrides it for one run | _(the machine's zone)_ |
 
 `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy` are stripped from the process environment immediately before launching Playwright (see `src/infra/browser-auth.ts`).
 

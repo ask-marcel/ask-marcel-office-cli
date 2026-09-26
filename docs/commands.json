@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-19T13:50:04.149Z",
+  "generatedAt": "2026-09-19T16:29:38.272Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -414,6 +414,12 @@
               "false"
             ]
           }
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
@@ -601,7 +607,7 @@
           "name": "since",
           "key": "since",
           "required": false,
-          "description": "Lower bound on `lastModifiedDateTime`: every root post created, edited or replied to after this instant is included. Omit it to render only the newest page. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound on `lastModifiedDateTime`: every root post created, edited or replied to after this instant is included. Omit it to render only the newest page. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -1002,7 +1008,7 @@
           "name": "before",
           "key": "before",
           "required": false,
-          "description": "Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as `versionId`. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as `versionId`. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "format",
@@ -2374,13 +2380,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Window lower bound (interpreted as UTC). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Window lower bound (interpreted as UTC). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "Window upper bound (interpreted as UTC). Graph caps the span at 62 days. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Window upper bound (interpreted as UTC). Graph caps the span at 62 days. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "availability-view-interval",
@@ -3147,13 +3153,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -3380,13 +3386,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -3440,13 +3446,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Lower bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "Upper bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Upper bound (required on the first call only — the deltaLink token encodes it for resumes). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -4438,13 +4444,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Start of the window (recurrences are expanded across it). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Start of the window (recurrences are expanded across it). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -5841,6 +5847,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "with-item",
+          "key": "withItem",
+          "required": false,
+          "description": "Pass `--with-item true` to read the driveItem behind every row after the listing (one get-drive-item per row) and merge it as `item`: `name`, `size`, `webUrl`, `lastModifiedDateTime`, `lastModifiedBy`, `createdBy`, `parentReference`. A row whose item cannot be read carries `itemError` instead of failing the page.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-recent-files",
@@ -5890,6 +5909,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "with-item",
+          "key": "withItem",
+          "required": false,
+          "description": "Pass `--with-item true` to read the driveItem behind every row after the listing (one get-drive-item per row) and merge it as `item`: `name`, `size`, `webUrl`, `lastModifiedDateTime`, `lastModifiedBy`, `createdBy`, `parentReference`. A row whose item cannot be read carries `itemError` instead of failing the page.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-recently-used-insights",
@@ -6165,13 +6197,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Start of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Start of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "End of the window. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -6257,6 +6289,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "with-item",
+          "key": "withItem",
+          "required": false,
+          "description": "Pass `--with-item true` to read the driveItem behind every row after the listing (one get-drive-item per row) and merge it as `item`: `name`, `size`, `webUrl`, `lastModifiedDateTime`, `lastModifiedBy`, `createdBy`, `parentReference`. A row whose item cannot be read carries `itemError` instead of failing the page.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-shared-insights",
@@ -7163,13 +7208,13 @@
           "name": "start-date-time",
           "key": "startDateTime",
           "required": true,
-          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "end-date-time",
           "key": "endDateTime",
           "required": true,
-          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Upper bound. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -7358,7 +7403,7 @@
           "name": "since",
           "key": "since",
           "required": false,
-          "description": "Lower bound on `lastModifiedDateTime` for the first sync (the deltaLink encodes the position for later syncs). Omit it to sync the whole history. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Relative forms resolve at request time relative to the CLI process clock (UTC)."
+          "description": "Lower bound on `lastModifiedDateTime` for the first sync (the deltaLink encodes the position for later syncs). Omit it to sync the whole history. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "top",
@@ -7498,7 +7543,7 @@
       "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
       "category": "chats",
       "graphMethod": "GET",
-      "graphPathTemplate": "https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages",
+      "graphPathTemplate": "https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages?startTime={since}",
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-list",
       "options": [
         {
@@ -7536,6 +7581,12 @@
           "key": "maxContentChars",
           "required": false,
           "description": "When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set."
+        },
+        {
+          "name": "since",
+          "key": "since",
+          "required": false,
+          "description": "Lower bound on message time, applied by the substrate itself (its `startTime`): only messages at or after this instant come back, so a \"since yesterday\" read is one small page instead of a walk. Without it the read starts at the beginning of the chat. Ignored when resuming with --sync-state (that URL carries its own bound). ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "skip-system",
@@ -7856,6 +7907,19 @@
           "key": "expand",
           "required": false,
           "description": "OData $expand: navigation properties to include inline (e.g. `attachments`). Increases response size; use sparingly."
+        },
+        {
+          "name": "with-item",
+          "key": "withItem",
+          "required": false,
+          "description": "Pass `--with-item true` to read the driveItem behind every row after the listing (one get-drive-item per row) and merge it as `item`: `name`, `size`, `webUrl`, `lastModifiedDateTime`, `lastModifiedBy`, `createdBy`, `parentReference`. A row whose item cannot be read carries `itemError` instead of failing the page.",
+          "argumentHint": {
+            "kind": "magicValue",
+            "values": [
+              "true",
+              "false"
+            ]
+          }
         }
       ],
       "example": "ask-marcel-office list-trending-insights",
@@ -8025,6 +8089,12 @@
               "false"
             ]
           }
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
