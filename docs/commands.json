@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-19T16:29:38.272Z",
+  "generatedAt": "2026-09-26T07:26:30.709Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2325,6 +2325,24 @@
       ],
       "example": "ask-marcel-office get-planner-plan --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
       "responseShape": "single Microsoft Graph `plannerPlan` resource"
+    },
+    {
+      "name": "get-planner-plan-details",
+      "summary": "Get the details of a Microsoft Planner plan: the names of its labels (`categoryDescriptions`, what `category1` to `category25` in a task's `appliedCategories` stand for) and who the plan is shared with.",
+      "category": "tasks",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/planner/plans/{planner-plan-id}/details",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/plannerplandetails-get",
+      "options": [
+        {
+          "name": "planner-plan-id",
+          "key": "plannerPlanId",
+          "required": true,
+          "description": "Planner plan ID. Returned by `ask-marcel-office list-planner-plans` or `list-group-planner-plans`, and in the `planId` field of any task."
+        }
+      ],
+      "example": "ask-marcel-office get-planner-plan-details --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
+      "responseShape": "single Microsoft Graph `plannerPlanDetails` resource"
     },
     {
       "name": "get-planner-task",
@@ -4708,6 +4726,31 @@
       "pagination": true
     },
     {
+      "name": "list-group-planner-plans",
+      "summary": "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships` and ask each here. Only `--select` is advertised; slice and sort client-side.",
+      "category": "tasks",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/groups/{group-id}/planner/plans",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/plannergroup-list-plans",
+      "options": [
+        {
+          "name": "group-id",
+          "key": "groupId",
+          "required": true,
+          "description": "Azure AD group object ID of a Microsoft 365 group. Returned by `ask-marcel-office list-my-memberships` or `list-groups`."
+        },
+        {
+          "name": "select",
+          "key": "select",
+          "required": false,
+          "description": "OData $select: comma-separated list of fields to include in each item (e.g. `id,subject,from`). May shrink payloads dramatically — Graph honors $select on most endpoints, but some collections (notably `/me/mailboxSettings`, `/me/outlook/masterCategories`, `/me/mailFolders/inbox/messageRules`) silently ignore it and always return the full resource. Bogus field names are silently dropped by Graph — if a field you asked for is missing from the response, double-check the spelling against the documented `responseShape`."
+        }
+      ],
+      "example": "ask-marcel-office list-group-planner-plans --group-id 'a1b2c3d4-...'",
+      "responseShape": "collection of Microsoft Graph `plannerPlan` resources under `value[]`",
+      "pagination": true
+    },
+    {
       "name": "list-group-post-attachments",
       "summary": "List the attachments (file, item, reference) on one post of a unified (Microsoft 365) group thread. Ships the slim default `--select=id,name,contentType,size,isInline` the mail and calendar siblings use, so a caller sees what is attached without pulling any bytes — the staged alternative to `get-group-post --expand attachments`, which inlines EVERY attachment at once and times out on a post carrying a multi-MB file. Graph returns the whole collection in one response and silently ignores `$top`, `$skip`, `$orderby` and `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed. A post whose only attachments are inline images reports `hasAttachments: false`, so call this whenever the body shows `cid:` references. Read one with `convert-group-post-attachment-to-markdown`, or fetch its bytes with `get-group-post-attachment`.",
       "category": "mail",
@@ -5744,7 +5787,7 @@
     },
     {
       "name": "list-planner-plans",
-      "summary": "List every Microsoft Planner plan the signed-in user has access to (across every group). Use this to discover plan IDs without needing an existing task as the entry point. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
+      "summary": "List the Microsoft Planner plans shared with the signed-in user. A Microsoft 365 group's plans need not appear here even when the user belongs to the group: list those with `list-group-planner-plans`. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/planner/plans",

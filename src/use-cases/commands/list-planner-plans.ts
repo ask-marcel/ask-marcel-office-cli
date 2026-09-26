@@ -13,7 +13,7 @@ const { execute, schema } = buildPickODataListCommand(() => '/me/planner/plans',
 
 const meta: CommandMeta = {
   summary:
-    'List every Microsoft Planner plan the signed-in user has access to (across every group). Use this to discover plan IDs without needing an existing task as the entry point. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.',
+    "List the Microsoft Planner plans shared with the signed-in user. A Microsoft 365 group's plans need not appear here even when the user belongs to the group: list those with `list-group-planner-plans`. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
   category: 'tasks',
   graphMethod: 'GET',
   graphPathTemplate: '/me/planner/plans',
