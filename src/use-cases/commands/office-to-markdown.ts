@@ -36,6 +36,9 @@ type OfficeToMarkdownOptions = FetchOptions & {
   readonly maxCells?: number;
   readonly keepQuoted?: boolean;
   readonly sheet?: string;
+  // The driveItem's `lastModifiedDateTime`, when the caller has it: a Loop page
+  // saved moments ago may render an older state (see RECENT_LOOP_NOTE).
+  readonly modifiedAt?: string;
 };
 
 // Graph's HTML conversion of a fresh Loop page can come back empty while the
@@ -45,17 +48,29 @@ type OfficeToMarkdownOptions = FetchOptions & {
 const EMPTY_LOOP_NOTE =
   'Graph returned no HTML for this page: its Loop converter lags the saves, sometimes by hours. Retry later; `list-drive-item-versions` shows when the page was last saved.';
 
-const withEmptyLoopNote = (result: Result<unknown, GraphError>): Result<unknown, GraphError> => {
+// The converter also trails the saves when it does answer: a meeting-notes page
+// rendered its 259-byte first save while two 60 KB saves from half an hour later
+// were already listed (2026-09-17).
+const RECENT_LOOP_NOTE =
+  "This page was saved in the last 30 minutes, and Graph's Loop render can trail the latest saves: if it looks stale, run this again in a while; `list-drive-item-versions` shows when it was saved.";
+const RECENT_SAVE_MS = 30 * 60_000;
+
+// An absent or unreadable save time parses to NaN, which is never recent.
+const savedRecently = (modifiedAt: string | undefined): boolean => Date.now() - Date.parse(String(modifiedAt)) < RECENT_SAVE_MS;
+
+const withLoopNote = (result: Result<unknown, GraphError>, modifiedAt: string | undefined): Result<unknown, GraphError> => {
   if (!result.ok) return result;
-  const envelope = result.value as { readonly text?: unknown };
-  if (typeof envelope.text !== 'string' || envelope.text.trim() !== '') return result;
-  return ok({ ...(result.value as Record<string, unknown>), note: EMPTY_LOOP_NOTE });
+  // convertToMarkdown answers `{ contentType, size, text }`; turndown trims the text.
+  const envelope = result.value as { readonly text: string };
+  if (envelope.text === '') return ok({ ...envelope, note: EMPTY_LOOP_NOTE });
+  if (savedRecently(modifiedAt)) return ok({ ...envelope, note: RECENT_LOOP_NOTE });
+  return result;
 };
 
 const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && HTML_FORMAT_INPUTS.has(ext)) return refuseSheet(`this file is a .${ext}`);
-  if (HTML_FORMAT_INPUTS.has(ext)) return withEmptyLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`));
+  if (HTML_FORMAT_INPUTS.has(ext)) return withLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`), opts.modifiedAt);
   const bytes = await fetchRawBytes(graph, contentPath, opts);
   if (!bytes.ok) return bytes;
   return bytesToMarkdown(bytes.value, filename, opts, DRIVE_HINTS);

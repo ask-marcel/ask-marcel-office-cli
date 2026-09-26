@@ -39,11 +39,19 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const metaPath = `/drives/${driveId}/items/${itemId}`;
   const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
   if (!meta.ok) return meta;
-  const name = (meta.value as { name?: string }).name ?? '';
+  const { name = '', lastModifiedDateTime: modifiedAt } = meta.value as { name?: string; lastModifiedDateTime?: string };
 
   // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
   // byte fetch through the whole conversion pipeline with nothing else to change.
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, keepQuoted, tenantId, sheet: parsed.data.sheet });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, {
+    includeMetadata,
+    inlineImages,
+    maxCells,
+    keepQuoted,
+    tenantId,
+    sheet: parsed.data.sheet,
+    modifiedAt,
+  });
 };
 
 const meta: CommandMeta = {
