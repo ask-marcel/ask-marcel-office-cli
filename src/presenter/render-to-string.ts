@@ -17,7 +17,7 @@ import { findErrorHint } from './error-hints.ts';
 import { canonicalizeGraphCursor } from './graph-cursor.ts';
 import { renderTextOutput } from './output-text.ts';
 
-type OutputFormat = 'text' | 'json';
+type OutputFormat = 'text' | 'json' | 'raw-json';
 
 type SuccessEnvelope = {
   readonly ok: true;
@@ -205,8 +205,12 @@ const renderTextToString = (data: unknown, context?: RenderContext): string => {
  * whenever a registry command produced the data. Omit it for the renders that
  * have no command behind them; the banner then claims no flag-level remedy.
  */
-const renderToString = (data: unknown, format: OutputFormat, context?: RenderContext): string =>
-  format === 'json' ? renderJsonToString(data, context) : renderTextToString(data, context);
+const renderToString = (data: unknown, format: OutputFormat, context?: RenderContext): string => {
+  // raw-json is for piping: the payload alone, without the envelope, the hints
+  // or the paging cursors (a caller that pages uses `json` and its nextLink).
+  if (format === 'raw-json') return `${JSON.stringify(wrap(data).data ?? null)}\n`;
+  return format === 'json' ? renderJsonToString(data, context) : renderTextToString(data, context);
+};
 
 /**
  * Render an error to its final string, newline included. The `hint` / `source`
@@ -238,7 +242,7 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
   // when the caller knew the failure category.
   const hint = findErrorHint(message, errorCode);
   const source = hint?.source ?? explicitSource;
-  if (format === 'json') {
+  if (format !== 'text') {
     const payload = {
       ok: false,
       error: message,

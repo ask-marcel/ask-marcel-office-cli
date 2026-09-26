@@ -62,7 +62,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const getFormat = (): OutputFormat => {
     const raw = program.opts<{ output?: string }>().output;
-    return raw === 'json' ? 'json' : 'text';
+    return raw === 'json' || raw === 'raw-json' ? raw : 'text';
   };
   const renderOut = (data: unknown, sizeHintContext?: RenderContext): void => render(data, logger, getFormat(), sizeHintContext);
   const fail = (message: string, code?: string, source?: ErrorSource, retryAfterSeconds?: number): void => {
@@ -186,11 +186,11 @@ const buildCli = (deps: BuildCliDeps): Command => {
         // jobs. Track invocations via a closure flag (Commander seeds
         // `previous` from the default, which would otherwise make any single
         // `--output json` look like the second occurrence).
-        const ALLOWED: ReadonlyArray<string> = ['text', 'json'];
+        const ALLOWED: ReadonlyArray<string> = ['text', 'json', 'raw-json'];
         let outputSeen = false;
         return new Option(
           '--output <format>',
-          'Output format. `text` (default, LLM-readable YAML-ish lines, ~30-60% fewer tokens on listings; errors render as `error: <message>`). `json` preserves the `{ok, data, nextLink?, deltaLink?, count?}` envelope for tool-chaining where unambiguous field extraction matters.'
+          'Output format. `text` (default, LLM-readable YAML-ish lines, ~30-60% fewer tokens on listings; errors render as `error: <message>`). `json` preserves the `{ok, data, nextLink?, deltaLink?, count?}` envelope for tool-chaining where unambiguous field extraction matters. `raw-json` prints the `data` payload alone, for piping into `jq` or a script: no envelope, no size hints, no paging cursors (use `json` to page); a failure still prints the JSON error envelope.'
         )
           .default('text')
           .argParser((value: string, previous: unknown): string => {
