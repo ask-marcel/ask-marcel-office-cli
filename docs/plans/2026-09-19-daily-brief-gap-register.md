@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -13,8 +13,8 @@ Graph itself, or by the tenant), **Probe** (worth one timed experiment before de
 
 | # | Register entry | Verdict | Evidence (2026-09-19) | Action | Size |
 |:--|:--|:--|:--|:--|:--|
-| 1 | Meeting transcripts and recordings | Cannot (+ Probe) | `/me/onlineMeetings` answers 403 on the basic token: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` are not in the fixed scope set. The recording item in the organiser's OneDrive carries `media` and `video` facets; `/media/transcripts` is an unsupported segment on v1.0. | Keep the file route (a downloaded transcript `.docx`/`.vtt` reads like any file). One probe: a signed call to the beta `driveItem/media/transcripts` route on a recording; if it answers, a `download-recording-transcript` command follows. | Probe: 1 h |
-| 2 | Historical Loop versions cannot be rendered | Probe | `download-drive-item-version` returns Fluid bytes for `.loop`; the versions endpoint has no `?format=html` in the docs. | Probe `/versions/{id}/content?format=html` once; if refused, document the limitation in the version command's summary. | Probe: 30 min |
+| 1 | Meeting transcripts and recordings | Probed (done) | `/me/onlineMeetings` answers 403 on the basic token: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` are not in the fixed scope set. The recording item in the organiser's OneDrive carries `media` and `video` facets; `/media/transcripts` is an unsupported segment on v1.0. | Probed 2026-09-26: `media/transcripts` is an unsupported segment on v1.0 and beta with either token; no command. The file route stays (see LESSONS). | done |
+| 2 | Historical Loop versions cannot be rendered | Probed (done) | `download-drive-item-version` returns Fluid bytes for `.loop`; the versions endpoint has no `?format=html` in the docs. | Probed 2026-09-26: Graph answers `?format=html` on any version with the current page (and `?format=pdf` with the raw version bytes); `download-drive-item-version --format markdown` now refuses Loop/Whiteboard versions and its summary says so. | done |
 | 3 | Loop render lags the saves | Cannot (Graph) | The `format=html` conversion is Graph's; today the kick-off meeting-notes page (14.7 KB, one version) converts to an empty body. | Add a `note` when the rendered Loop body is empty while `size > 0`: "Graph returned no HTML for this page yet; retry later". | S |
 | 4 | Loop workspaces are not enumerable | Cannot | `/storage/fileStorage/containers?$filter=containerTypeId eq <Loop>` answers 403 even with `FileStorageContainer.Selected`; container enumeration needs an app registration. | None; the `filetype:loop` search route stays the way in. Say so in `list-accessible-drives`'s summary. | S (doc) |
 | 5 | No date filter or cursor on chat messages | Build (done) | `list-teams-chat-messages` is the 200-cap substrate route; the Graph route needs `Chat.Read`, absent. Probed 2026-09-20: the IC3 route honours `startTime` as a server-side lower bound (7 messages instead of 33 for a ten-day bound). | Shipped: `list-teams-chat-history --since <date>` maps to `startTime`. | done |
@@ -91,7 +91,7 @@ Decided 2026-09-26: postal-mime for MIME parsing, the image extractors plus `--p
 4. `list-changed-files --since` across accessible libraries (19): design the delta-token store first.
 5. `--output raw-json` (38), if still wanted after slice A.
 
-### Slice D: probes (time-boxed, answer recorded in LESSONS either way)
+### Slice D: probes, answered 2026-09-26 (see .claude/LESSONS.md)
 
 1. Beta `driveItem/media/transcripts` on a recording, signed with the basic and the elevated token (1).
 2. `?format=html` on a `.loop` version content (2).
