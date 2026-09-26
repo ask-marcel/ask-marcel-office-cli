@@ -13,6 +13,7 @@ import {
 } from './embedded-item-to-markdown.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
@@ -24,11 +25,12 @@ const schema = z.object({
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   keepQuoted: keepQuotedSchemaField,
+  sheet: z.string().min(1).optional(),
 });
 
 // The dispatch flags this command forwards per attachment. `keepQuoted` only
 // bites on a `.msg` attachment (an email attached to an email).
-type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean };
+type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean; readonly sheet?: string };
 
 const MAIL_HINTS: ConversionHints = {
   pdfNoText:
@@ -126,7 +128,7 @@ const convertFetchedAttachment = (
     case '#microsoft.graph.referenceAttachment':
       return convertReferenceAttachment(graph, a, opts);
     case '#microsoft.graph.itemAttachment':
-      return convertItemAttachment(a);
+      return opts.sheet === undefined ? convertItemAttachment(a) : refuseSheet('this attachment is an embedded Outlook item');
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
@@ -145,7 +147,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return convertAttachmentToMarkdown(
     graph,
     `/me/messages/${messageId}/attachments/${attachmentId}`,
-    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true' },
+    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet },
     MAIL_HINTS
   );
 };
@@ -169,6 +171,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     keepQuotedOption,
+    SHEET_OPTION,
   ],
   example: "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

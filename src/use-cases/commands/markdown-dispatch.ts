@@ -9,7 +9,7 @@ import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-exte
 import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
 import { decodeUtf8Text, extensionOf } from './text-passthrough.ts';
-import { renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
+import { refuseSheet, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 // Image extensions that have no markdown text representation. NOTE: `svg` is NOT
 // here — an SVG is XML text, so it content-sniffs to text/plain like any text file.
@@ -33,6 +33,7 @@ type BytesToMarkdownOptions = {
   readonly maxCells?: number;
   readonly inlineImages?: boolean;
   readonly keepQuoted?: boolean;
+  readonly sheet?: string;
   readonly depth?: number;
 };
 
@@ -66,13 +67,14 @@ const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<un
  */
 const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
+  if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
   if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
-  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells });
+  if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells, sheet: opts.sheet });
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
   if (ext === 'pdf') return pdfToMarkdown(bytes, hints.pdfNoText);
-  if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells }); // legacy Excel — no OOXML side-channel
+  if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells, sheet: opts.sheet }); // legacy Excel — no OOXML side-channel
   if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, code: 'unsupported_legacy_office', message: hints.legacyPpt });
   if (ext === 'msg') {

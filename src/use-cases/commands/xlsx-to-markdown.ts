@@ -1,12 +1,13 @@
+import type { CommandOptionMeta } from './command-types.ts';
 import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { readSheetsAsCsv } from '../../infra/sheetjs-adapter.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
 
-type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number };
+type XlsxToMarkdownOptions = { readonly includeMetadata?: boolean; readonly maxCells?: number; readonly sheet?: string };
 
 // A dense sheet renders a markdown table proportional to rows × cols, so a 49 MB
 // workbook with a genuinely large used range builds a multi-hundred-MB string and
@@ -93,11 +94,23 @@ const csvToMarkdownSection = (name: string, csv: string, maxCells: number = DEFA
   return body === '' ? `## ${name}` : `## ${name}\n\n${body}`;
 };
 
+type NamedCsv = { readonly name: string; readonly csv: string };
+
+/** Every sheet, or only the one named by `--sheet` (case-insensitive); an unknown name lists the sheets there are. */
+const narrowToSheet = (sheets: ReadonlyArray<NamedCsv>, wanted: string | undefined): Result<ReadonlyArray<NamedCsv>, GraphError> => {
+  if (wanted === undefined) return ok(sheets);
+  const chosen = sheets.filter(({ name }) => name.toLowerCase() === wanted.toLowerCase());
+  if (chosen.length > 0) return ok(chosen);
+  return err({ type: 'validation_error', message: `no sheet named "${wanted}" in this workbook; its sheets are: ${sheets.map(({ name }) => name).join(', ')}` });
+};
+
 const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const sheets = await readSheetsAsCsv(bytes);
   if (!sheets.ok) return sheets;
   const maxCells = opts.maxCells ?? DEFAULT_MAX_CELLS;
-  const sections = sheets.value.map(({ name, csv }) => csvToMarkdownSection(name, csv, maxCells));
+  const chosen = narrowToSheet(sheets.value, opts.sheet);
+  if (!chosen.ok) return chosen;
+  const sections = chosen.value.map(({ name, csv }) => csvToMarkdownSection(name, csv, maxCells));
   let md = sections.join('\n\n');
   if (opts.includeMetadata === true) {
     const meta = await extractXlsxMetadata(bytes);
@@ -108,5 +121,16 @@ const xlsxToMarkdown = async (bytes: Uint8Array, opts: XlsxToMarkdownOptions = {
   return ok({ contentType: 'text/markdown', size: new TextEncoder().encode(md).byteLength, text: md });
 };
 
-export { csvToMarkdownSection, csvToMarkdownTable, renderCsvCapped, xlsxToMarkdown };
+const SHEET_OPTION: CommandOptionMeta = {
+  name: 'sheet',
+  key: 'sheet',
+  required: false,
+  description:
+    'Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused.',
+};
+
+/** `--sheet` narrows a workbook; on anything else it is refused rather than silently ignored. */
+const refuseSheet = (what: string): Result<never, GraphError> => err({ type: 'validation_error', message: `--sheet applies to a workbook (xlsx, xlsm, xls); ${what}` });
+
+export { csvToMarkdownSection, csvToMarkdownTable, refuseSheet, renderCsvCapped, SHEET_OPTION, xlsxToMarkdown };
 export type { XlsxToMarkdownOptions };

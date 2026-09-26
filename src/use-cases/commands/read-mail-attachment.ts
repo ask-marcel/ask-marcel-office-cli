@@ -7,6 +7,7 @@ import { convertFetchedAttachment, MAIL_HINTS } from './convert-mail-attachment-
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
+import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 const schema = z.object({
@@ -14,6 +15,7 @@ const schema = z.object({
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   keepQuoted: keepQuotedSchemaField,
+  sheet: z.string().min(1).optional(),
 });
 
 // A fileAttachment whose bytes are a zip archive — by extension or content-type.
@@ -69,6 +71,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const { messageId, attachmentId } = parsed.data;
   const includeMetadata = parsed.data.includeMetadata === 'true';
   const keepQuoted = parsed.data.keepQuoted === 'true';
+  const sheet = parsed.data.sheet;
 
   // Single fetch, then auto-route by content-type: a zip is unpacked + converted
   // entry-by-entry; everything else (docx/xlsx/pptx/odf/csv/pdf/.msg/legacy/text,
@@ -79,13 +82,14 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const a = fetched.value as Record<string, unknown>;
 
   if (isZipAttachment(a)) {
+    if (sheet !== undefined) return refuseSheet('this attachment is a zip archive');
     const contentBytes = a['contentBytes'];
     if (typeof contentBytes !== 'string') {
       return err({ type: 'api_error', status: 400, message: 'zip fileAttachment has no contentBytes to unpack (the attachment may be empty).' });
     }
     return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted });
   }
-  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted }, MAIL_HINTS);
+  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted, sheet }, MAIL_HINTS);
 };
 
 const meta: CommandMeta = {
@@ -107,6 +111,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     keepQuotedOption,
+    SHEET_OPTION,
   ],
   example: "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
