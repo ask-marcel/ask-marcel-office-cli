@@ -44,7 +44,8 @@ const schema = z.object({
 // Local-context notes: the file is already on the caller's disk, so every
 // unconvertible case points at reading it directly with a vision-capable model.
 const LOCAL_HINTS: ConversionHints = {
-  pdfNoText: 'pdf has no extractable text layer — it looks scanned / image-only. Read the local file directly with a vision-capable model, or run OCR.',
+  pdfNoText:
+    'pdf has no extractable text layer — it looks scanned / image-only. Read the local file directly with a vision-capable model, or run OCR. `extract-local-file-images` returns the scanned page images as PNG.',
   legacyPpt:
     'ppt (legacy PowerPoint 97-2003, OLE binary) has no local markdown path — upload it to OneDrive and use `download-drive-item-as-pdf` (Graph renders legacy .ppt), or read the file directly with a vision-capable model.',
   image: (ext) => `${ext} is an image — read the file directly with a vision-capable model.`,

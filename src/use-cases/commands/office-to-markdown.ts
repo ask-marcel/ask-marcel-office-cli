@@ -22,7 +22,7 @@ const HTML_FORMAT_INPUTS: ReadonlySet<string> = new Set(['loop', 'fluid', 'wbtx'
 
 const DRIVE_HINTS: ConversionHints = {
   pdfNoText:
-    'pdf has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). This command extracts the embedded text layer, not pixels. Use `download-drive-item-as-pdf` to fetch the PDF and read it with a vision-capable model, or run OCR.',
+    'pdf has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). This command extracts the embedded text layer, not pixels. Use `download-drive-item-as-pdf` to fetch the PDF and read it with a vision-capable model, or run OCR. `extract-drive-item-images --pages 1-3` returns the scanned page images as PNG, a few pages at a time.',
   legacyPpt:
     'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown here — there is no pure-JS parser for the format. Convert it to PDF first with `download-drive-item-as-pdf` (Graph renders legacy .ppt), then read the PDF with a vision-capable model.',
   image: (ext) =>
