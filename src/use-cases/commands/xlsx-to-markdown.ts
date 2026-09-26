@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { CommandOptionMeta } from './command-types.ts';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
@@ -74,7 +75,7 @@ const csvToMarkdownTable = (csv: string): string => {
 };
 
 const truncationHint = (rows: number, columns: number, maxCells: number): string =>
-  `> _Table omitted: this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap — rendering it would build a multi-hundred-MB string. Read it band-by-band: \`get-excel-used-range\` for the populated bounding box, then \`get-excel-range --address 'A1:Cn'\` per band — or raise the cap with \`--max-cells <N>\`._`;
+  `> _Table omitted: this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap. Raise the cap with \`--max-cells <N>\`, with \`--output-path\` to land a large render on disk; a workbook in OneDrive or SharePoint also reads band-by-band through \`get-excel-used-range\`, then \`get-excel-range --address 'A1:Cn'\` per band._`;
 
 // Render a CSV to a markdown table, or a truncation hint when the cell count
 // (rows × the widest row) exceeds `maxCells`. Parsing allocates ~O(input); the
@@ -129,8 +130,24 @@ const SHEET_OPTION: CommandOptionMeta = {
     'Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused.',
 };
 
+// `--max-cells` on the commands that read an attachment: the drive and local commands
+// carry their own wording, written before this was shared.
+const maxCellsField = z
+  .string()
+  .regex(/^[1-9]\d*$/, 'must be a positive integer')
+  .transform(Number)
+  .optional();
+
+const MAX_CELLS_OPTION: CommandOptionMeta = {
+  name: 'max-cells',
+  key: 'maxCells',
+  required: false,
+  description:
+    'Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first.',
+};
+
 /** `--sheet` narrows a workbook; on anything else it is refused rather than silently ignored. */
 const refuseSheet = (what: string): Result<never, GraphError> => err({ type: 'validation_error', message: `--sheet applies to a workbook (xlsx, xlsm, xls); ${what}` });
 
-export { csvToMarkdownSection, csvToMarkdownTable, refuseSheet, renderCsvCapped, SHEET_OPTION, xlsxToMarkdown };
+export { csvToMarkdownSection, csvToMarkdownTable, MAX_CELLS_OPTION, maxCellsField, refuseSheet, renderCsvCapped, SHEET_OPTION, xlsxToMarkdown };
 export type { XlsxToMarkdownOptions };

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T13:22:17.502Z",
+  "generatedAt": "2026-09-26T13:48:03.928Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -363,6 +363,12 @@
           "key": "maxCells",
           "required": false,
           "description": "Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources."
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office convert-local-file-to-markdown --path ./report.docx",
@@ -420,6 +426,12 @@
           "key": "sheet",
           "required": false,
           "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
+        },
+        {
+          "name": "max-cells",
+          "key": "maxCells",
+          "required": false,
+          "description": "Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first."
         }
       ],
       "example": "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
@@ -910,6 +922,12 @@
           "key": "maxCells",
           "required": false,
           "description": "Per-sheet cell cap (positive integer; default 50 000) for xlsx sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on non-xlsx sources."
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
@@ -8205,6 +8223,12 @@
           "key": "sheet",
           "required": false,
           "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
+        },
+        {
+          "name": "max-cells",
+          "key": "maxCells",
+          "required": false,
+          "description": "Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first."
         }
       ],
       "example": "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",

@@ -10,6 +10,7 @@ import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.t
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { extensionOf } from './text-passthrough.ts';
+import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 
 /**
@@ -35,6 +36,7 @@ const schema = z.object({
   inlineImages: z.enum(['true', 'false']).optional(),
   keepQuoted: keepQuotedSchemaField,
   includeImages: z.enum(['true', 'false']).optional(),
+  sheet: z.string().min(1).optional(),
   maxCells: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
@@ -69,8 +71,12 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   }
 
   const name = basename(path);
-  if (extensionOf(name) === 'zip') return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted });
-  return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted }, LOCAL_HINTS);
+  const { sheet } = parsed.data;
+  if (extensionOf(name) === 'zip') {
+    if (sheet !== undefined) return refuseSheet('this file is a zip archive');
+    return convertZipArchive(bytes.value, { includeMetadata, includeImages, keepQuoted, maxCells });
+  }
+  return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
 };
 
 const execute = async (_graph: GraphClient, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
@@ -126,6 +132,7 @@ const meta: CommandMeta = {
       description:
         'Per-sheet cell cap (positive integer; default 50 000) for xlsx/csv sources. A sheet whose used range exceeds the cap renders as a truncation hint instead of a multi-hundred-MB table. No-op on other sources.',
     },
+    SHEET_OPTION,
   ],
   example: 'ask-marcel-office convert-local-file-to-markdown --path ./report.docx',
   responseShape:

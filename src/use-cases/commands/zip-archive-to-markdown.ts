@@ -44,10 +44,10 @@ const entryImages = async (entry: ZipEntry): Promise<MediaEnvelope['media']> => 
 // An options object rather than a positional-boolean tail: the flags each zip
 // command forwards to the per-entry dispatch only grow (a `.msg` entry now honours
 // `--keep-quoted` too), and `f(bytes, true, false, true)` is unreadable.
-type ZipArchiveOptions = { readonly includeMetadata: boolean; readonly includeImages?: boolean; readonly keepQuoted?: boolean };
+type ZipArchiveOptions = { readonly includeMetadata: boolean; readonly includeImages?: boolean; readonly keepQuoted?: boolean; readonly maxCells?: number };
 
 const convertEntry = async (entry: ZipEntry, opts: ZipArchiveOptions): Promise<FileResult> => {
-  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata: opts.includeMetadata, keepQuoted: opts.keepQuoted }, NESTED_HINTS);
+  const r = await bytesToMarkdown(entry.bytes, entry.path, { includeMetadata: opts.includeMetadata, keepQuoted: opts.keepQuoted, maxCells: opts.maxCells }, NESTED_HINTS);
   if (!r.ok) return { path: entry.path, note: r.error.message };
   const env = r.value as { contentType: string; size: number; text: string };
   const base = { path: entry.path, contentType: env.contentType, size: env.size, text: env.text };

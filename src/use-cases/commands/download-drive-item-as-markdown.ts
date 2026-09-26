@@ -8,6 +8,7 @@ import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.t
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
+import { SHEET_OPTION } from './xlsx-to-markdown.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -16,6 +17,7 @@ const schema = z.object({
   includeMetadata: z.enum(['true', 'false']).optional(),
   inlineImages: z.enum(['true', 'false']).optional(),
   keepQuoted: keepQuotedSchemaField,
+  sheet: z.string().min(1).optional(),
   maxCells: z
     .string()
     .regex(/^[1-9]\d*$/, 'must be a positive integer')
@@ -41,7 +43,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   // `OfficeToMarkdownOptions` extends `FetchOptions`, so `tenantId` reaches the
   // byte fetch through the whole conversion pipeline with nothing else to change.
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, keepQuoted, tenantId });
+  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/content`, name, { includeMetadata, inlineImages, maxCells, keepQuoted, tenantId, sheet: parsed.data.sheet });
 };
 
 const meta: CommandMeta = {
@@ -84,6 +86,7 @@ const meta: CommandMeta = {
       description:
         'Per-sheet cell cap (positive integer; default 50 000) for xlsx sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on non-xlsx sources.',
     },
+    SHEET_OPTION,
   ],
   example: "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:

@@ -13,7 +13,7 @@ import {
 } from './embedded-item-to-markdown.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
+import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
@@ -26,11 +26,12 @@ const schema = z.object({
   includeMetadata: z.enum(['true', 'false']).optional(),
   keepQuoted: keepQuotedSchemaField,
   sheet: z.string().min(1).optional(),
+  maxCells: maxCellsField,
 });
 
 // The dispatch flags this command forwards per attachment. `keepQuoted` only
 // bites on a `.msg` or `.eml` attachment (an email attached to an email).
-type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean; readonly sheet?: string };
+type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: boolean; readonly sheet?: string; readonly maxCells?: number };
 
 const MAIL_HINTS: ConversionHints = {
   pdfNoText:
@@ -147,7 +148,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return convertAttachmentToMarkdown(
     graph,
     `/me/messages/${messageId}/attachments/${attachmentId}`,
-    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet },
+    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', sheet: parsed.data.sheet, maxCells: parsed.data.maxCells },
     MAIL_HINTS
   );
 };
@@ -172,6 +173,7 @@ const meta: CommandMeta = {
     },
     keepQuotedOption,
     SHEET_OPTION,
+    MAX_CELLS_OPTION,
   ],
   example: "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
