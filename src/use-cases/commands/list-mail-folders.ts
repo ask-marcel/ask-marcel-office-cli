@@ -10,7 +10,8 @@ const baseSchema = z.object({ includeHiddenFolders: z.enum(['true', 'false']).op
 const { execute, schema } = buildListCommand((p) => (p.includeHiddenFolders === 'true' ? '/me/mailFolders?includeHiddenFolders=true' : '/me/mailFolders'), baseSchema);
 
 const meta: CommandMeta = {
-  summary: 'List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.).',
+  summary:
+    'List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). Graph answers ten folders a page, so a mailbox with more top-level folders needs the `next:` footer or `--top 100`; child folders come from `list-mail-child-folders`, and `list-mail-folders-delta` lists every folder at every depth in one walk.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailFolders',

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T15:07:45.491Z",
+  "generatedAt": "2026-09-26T15:23:40.806Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -3535,7 +3535,7 @@
     },
     {
       "name": "list-calendar-view",
-      "summary": "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand.",
+      "summary": "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand. With no `--select` every occurrence carries `attendees` (each with `status.response`) and `body`; a narrow `--select` drops them unless it names them (`bodyPreview` is the light form of `body`).",
       "category": "calendar",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}",
@@ -3785,7 +3785,7 @@
           "name": "conversation-id",
           "key": "conversationId",
           "required": true,
-          "description": "Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`)."
+          "description": "Outlook `conversationId` of any message in the thread (returned by every mail-listing command, `search-mail-messages` included, and by `get-mail-message`): a reply found by search reaches the whole thread, the original included when it is still in the mailbox."
         },
         {
           "name": "top",
@@ -5240,7 +5240,7 @@
     },
     {
       "name": "list-mail-attachments",
-      "summary": "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload).",
+      "summary": "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload). An empty list on a reply is normal: Outlook leaves the original's files off a reply, so list the thread with `list-conversation-messages` (`hasAttachments` in its `--select`) to find the message that carries them.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments",
@@ -5474,7 +5474,7 @@
     },
     {
       "name": "list-mail-folders",
-      "summary": "List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.).",
+      "summary": "List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). Graph answers ten folders a page, so a mailbox with more top-level folders needs the `next:` footer or `--top 100`; child folders come from `list-mail-child-folders`, and `list-mail-folders-delta` lists every folder at every depth in one walk.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders",

@@ -36,7 +36,8 @@ const meta: CommandMeta = {
       name: 'conversation-id',
       key: 'conversationId',
       required: true,
-      description: 'Outlook `conversationId` of any message in the thread (returned by every mail-listing command and by `get-mail-message`).',
+      description:
+        'Outlook `conversationId` of any message in the thread (returned by every mail-listing command, `search-mail-messages` included, and by `get-mail-message`): a reply found by search reaches the whole thread, the original included when it is still in the mailbox.',
     },
     ...allowedOptions,
   ],

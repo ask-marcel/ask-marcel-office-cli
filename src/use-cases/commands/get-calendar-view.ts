@@ -12,7 +12,7 @@ const { execute, schema } = buildListCommand((p) => `/me/calendarView?startDateT
 
 const meta: CommandMeta = {
   summary:
-    "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand.",
+    "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand. With no `--select` every occurrence carries `attendees` (each with `status.response`) and `body`; a narrow `--select` drops them unless it names them (`bodyPreview` is the light form of `body`).",
   category: 'calendar',
   graphMethod: 'GET',
   graphPathTemplate: '/me/calendarView?startDateTime={start-date-time}&endDateTime={end-date-time}',
