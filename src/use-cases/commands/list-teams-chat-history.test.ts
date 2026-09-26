@@ -155,3 +155,29 @@ describe('the edges of the history read', () => {
     }
   });
 });
+
+describe('bounding the history read with --since', () => {
+  it('puts the instant into the substrate URL as startTime in epoch milliseconds, relative dates included, and starts at 1 without it', async () => {
+    const paths: string[] = [];
+    const graph = fakeGraphClient({
+      teamsChatIc3: async (path) => {
+        paths.push(path);
+        return ok({ messages: [] });
+      },
+    });
+    await command.execute(graph, { chatId: CHAT, since: '2026-09-10T00:00:00Z' });
+    await command.execute(graph, { chatId: CHAT, since: '7d' });
+    await command.execute(graph, { chatId: CHAT });
+    expect(paths[0]).toContain(`/conversations/${encodeURIComponent(CHAT)}/messages?startTime=${Date.parse('2026-09-10T00:00:00Z')}&pageSize=200`);
+    expect(paths[1]).toMatch(/messages\?startTime=\d{13}&pageSize=200/);
+    expect(paths[2]).toContain('messages?startTime=1&pageSize=200');
+    const result = await command.execute(graph, { chatId: CHAT, since: 'whenever' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('validation_error');
+  });
+
+  it('advertises since ahead of the two filters', () => {
+    const names = command.meta.options.map((o) => o.name);
+    expect(names.slice(-3)).toEqual(['since', 'skip-system', 'mentions-me']);
+  });
+});

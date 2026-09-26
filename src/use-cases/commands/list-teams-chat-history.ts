@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor } from './substrate-message.ts';
 
 // Deep Teams chat history via the IC3 messaging substrate at
@@ -47,6 +48,7 @@ const schema = z.object({
     .optional(),
   skipSystem: z.enum(['true', 'false']).optional(),
   mentionsMe: z.enum(['true', 'false']).optional(),
+  since: isoDateTimeField.optional(),
 });
 
 type Ic3MessageRaw = Readonly<Record<string, unknown>>;
@@ -100,10 +102,14 @@ const execute: Command['execute'] = async (graph, params) => {
   if (!filter.ok) return filter;
 
   const accumulated: Array<Ic3MessageRaw> = [];
+  // `startTime` is the substrate's own lower bound in epoch milliseconds
+  // (probed 2026-09-20: 7 messages back instead of 33 for a ten-day bound);
+  // `1` means the beginning of the chat.
+  const startTime = parsed.data.since === undefined ? '1' : String(Date.parse(parsed.data.since));
   let nextRelativePath: string =
     parsed.data.syncState !== undefined
       ? toRelativePath(parsed.data.syncState)
-      : `/v1/users/ME/conversations/${encodeURIComponent(chatId)}/messages?startTime=1&pageSize=${pageSize}&view=msnp24Equivalent|supportsMessageProperties`;
+      : `/v1/users/ME/conversations/${encodeURIComponent(chatId)}/messages?startTime=${startTime}&pageSize=${pageSize}&view=msnp24Equivalent|supportsMessageProperties`;
 
   let nextSyncState: string | undefined;
   let pagesFetched = 0;
@@ -145,7 +151,7 @@ const meta: CommandMeta = {
   category: 'chats',
   needsSubstrateToken: 'ic3',
   graphMethod: 'GET',
-  graphPathTemplate: 'https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages',
+  graphPathTemplate: 'https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages?startTime={since}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-list',
   options: [
     {
@@ -187,6 +193,12 @@ const meta: CommandMeta = {
       required: false,
       description:
         'When the slim projection is active (i.e. `--full` is not `true`), cap each message `content` at this many characters; messages cut at the cap also carry `truncated: true` and `originalContentChars` so a consumer can decide whether to re-fetch with `--full true`. Default 4096. Ignored when `--full true` is set.',
+    },
+    {
+      name: 'since',
+      key: 'since',
+      required: false,
+      description: `Lower bound on message time, applied by the substrate itself (its \`startTime\`): only messages at or after this instant come back, so a "since yesterday" read is one small page instead of a walk. Without it the read starts at the beginning of the chat. Ignored when resuming with --sync-state (that URL carries its own bound). ${RELATIVE_DATE_DESCRIPTION}`,
     },
     ...SUBSTRATE_FILTER_OPTIONS,
   ],
