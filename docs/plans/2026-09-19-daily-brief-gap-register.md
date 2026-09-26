@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E planned 2026-09-26 from the register of 24 September; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E shipped 2026-09-26 from the register of 24 September, its chat probes still waiting on a fresh login; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -165,3 +165,26 @@ case (every mail command changes for one sighting; the 404 hint names the thread
 | 60 | `read-mail-attachment` saved a PDF's text layer under `.pdf` | Build | The `--output-path` guard only covers raw bytes saved as `.pdf`. | Refuse text or markdown under a binary extension, naming the raw-bytes command. | S |
 | 61 | A 94,121-row sheet on a mail attachment (row 11 again) | Build | `--sheet` shipped, but the 50,000-cell cap still applies, the mail commands have no `--max-cells`, and the cap hint names drive-only commands. | Slice E item 3. | S |
 | 62 | An embedded message's attachment cannot be opened | Probe | Unknown whether an itemAttachment's own attachments are reachable. | Probe; fix if a route exists. | Probe |
+
+### Slice E results (2026-09-26)
+
+Shipped: HTML through turndown (43); the `--output-path` binary-name guard (60); `--max-cells` on the
+mail reads and `--sheet` on the drive and local reads (61); did-you-mean on commands, flags and
+parameters (54); `--due-before` (row 31); the location and hint on denied links (47); channel
+reactions with who and when (41, channel half); `diff-drive-items` and `diff-drive-item-versions`
+(51, 44); the Loop recent-save note (row 3); help notes for 52, 57 and 59 and for rows 13 and 42.
+
+Probed and shipped: site membership (45) became `list-sharepoint-site-members`: a group-owned
+site's library names its owning group, whose owners and members Graph lists, while the three
+SharePoint groups on the library root come back by name and role only. The embedded message (62)
+exposed a real bug: every embedded Outlook item failed as "missing inner item", because Graph
+sends the item only with `$expand`; an embedded mail is now read from its `$value` MIME source
+through the `.eml` reader. The missing folder (57) was the eleventh top-level folder of a mailbox
+that Graph pages ten at a time; `list-mail-folders-delta` walked all fourteen, nested ones
+included. The reply without its file (59) was not a gap: the file sat on a sibling reply.
+
+Still open: chat files and reactions on substrate messages (40, 41 chat half) and chat images
+(56) need the chat tokens a browser `login` captures; the To Do link shape (46) needs one click;
+a scanned PDF inside an embedded mail is named but its pages cannot yet be extracted (save the
+embedded mail as `.eml`, then extract images from it); a default page of 100 mail folders would
+remove the ten-folder trap (57) but changes pinned test paths.

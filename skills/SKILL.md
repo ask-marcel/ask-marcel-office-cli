@@ -61,6 +61,8 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | Who do I work with on X | `list-relevant-people` |
 | Who wrote / last touched this doc | `get-drive-item-created-by-user` / `get-drive-item-last-modified-by-user` |
 | What changed in my files since X | `list-changed-files --since '<date>'` — every library the user can open, newest first; the search index can lag the newest saves |
+| What changed in a document since X | `diff-drive-item-versions --drive-id '<id>' --item-id '<id>' --before '<date>'` — only the changed lines; add `--include-metadata true` to see comments and tracked changes; two files (a weekly deck): `diff-drive-items` |
+| Who can open a SharePoint site or page | `list-sharepoint-site-members --site-id '<id>'` — the owning group's people (the fewest who can open it) plus the SharePoint groups and sharing links with their roles |
 | Comments on a document, who was @-mentioned | `list-document-comments --drive-id '<id>' --item-id '<id>'` — Word, Excel (with the sheet) and PowerPoint |
 | Org tree | `get-user-manager`, `list-user-direct-reports` (recurse manually) |
 | Team / group membership | `list-joined-teams` → `list-team-members` (roles: owner, guest) or `list-team-channel-members --channel-id '<id>'` for a private channel's roster; `list-groups` → `list-group-members` / `list-group-owners` for a plain group |
@@ -68,7 +70,7 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | What did X say in a Teams chat | `find-chats-with-user --name '<person>'` → `list-teams-chat-messages --chat-id '<id>' --skip-system true` (add `--mentions-me true` for what was asked of the user; every message carries `webUrl`); for a bounded read use `list-teams-chat-history --chat-id '<id>' --since '<date>'`; or `list-teams-chats-with-messages` for recent chats with bodies inlined. Chat content is not in federated search, so this is the only route |
 | What's on my calendar | `list-calendars` → `list-specific-calendar-view --calendar-id '<id>' --start-date-time '<from>' --end-date-time '<to>'` — dates accept `today`, `start-of-week`, `+7d` |
 | Is X free / common slot | `get-schedule` |
-| What's on my plate | `list-incomplete-todo-tasks` + `list-incomplete-planner-tasks` — neither is in federated search |
+| What's on my plate | `list-incomplete-todo-tasks` (`--due-before tomorrow` for due today or overdue) + `list-incomplete-planner-tasks` — neither is in federated search |
 | Meeting notes / decisions | `search-onenote-pages --filter "contains(title,'<keyword>')"` — OneNote search is title-only, so also try Mail + Files |
 | Reply to / answer this email | Read the thread first (*Read an email in full*), then *Draft an email* → **Reply**. The draft goes under the thread's newest substantive message |
 | Forward this to Y | *Read an email in full* for what it carries, then *Draft an email* → **Forward** |

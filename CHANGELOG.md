@@ -92,6 +92,52 @@ own bytes) or `download-drive-item-as-markdown` (the current page). Its summary
 also says plainly that Graph's PDF conversion of a historical version returns
 the raw version bytes, flagged `passthrough: true`.
 
+### Added: what the daily brief asked for, part three
+
+`diff-drive-items` and `diff-drive-item-versions` answer only what changed:
+two files, or the version saved before `--before` (or a named `--version-id`)
+against the live file, are converted to markdown the way
+`download-drive-item-as-markdown` converts them and compared line by line, as
+a unified diff with the count of added and removed lines. `--include-metadata
+true` puts comments and tracked changes in both renders, so a comment added
+between them shows up; two unrelated files (more than 1,000 changed lines)
+answer a note instead of a diff. `list-sharepoint-site-members --site-id`
+says who can open a site: the owners and members of the Microsoft 365 group
+that owns it, and the SharePoint groups and sharing links holding its library
+with their roles, with a note that Graph cannot list who is inside a
+SharePoint group. HTML files convert to markdown, their head dropped, instead
+of arriving as page source. `read-mail-attachment` and
+`convert-mail-attachment-to-markdown` take `--max-cells`,
+`download-drive-item-as-markdown` and `convert-local-file-to-markdown` take
+`--sheet`, and the cell-cap hint names what every source can do.
+`--due-before` on `list-todo-tasks` and `list-incomplete-todo-tasks` keeps the
+tasks due before an instant, named days in the user's zone. Channel
+transcripts say who reacted and when. A SharePoint link the user cannot open
+names its OneDrive owner or its site, with a hint on asking for access. A
+mistyped command, flag or parameter ends with "Did you mean ...?" on the CLI,
+over MCP and in the library. A Loop page saved in the last 30 minutes carries
+a note that its render may trail the saves. New runtime dependency: `diff`
+(jsdiff, BSD-3-Clause, no dependencies of its own).
+
+### Fixed: an Outlook item attached to a mail could never be read
+
+The attachment reads answered every embedded Outlook item with
+"itemAttachment missing inner item": Graph sends the item only with
+`$expand`. An embedded item is now expanded, and an embedded mail is read from
+its MIME source through the `.eml` reader, its own attachments converted in
+turn.
+
+### Fixed: a text answer saved under a binary file name
+
+`--output-path` refuses to write a text answer (converted markdown, a PDF's
+text layer) under a `.pdf`, Office, OpenDocument, zip, `.msg` or image name,
+which made a file no reader could open, and names the raw-bytes commands
+instead. The help now says that only the organiser's copy of an event records
+replies, that a message moved to another folder changes its id, that mail
+folders come ten to a page (with `list-mail-folders-delta` walking every
+depth), that a reply carries none of the original's files, and that a
+calendar view with no `--select` carries attendees and bodies.
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox
