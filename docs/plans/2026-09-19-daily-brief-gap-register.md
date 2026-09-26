@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slices A and B shipped on main 2026-09-19 and 2026-09-26, unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -24,18 +24,18 @@ Graph itself, or by the tenant), **Probe** (worth one timed experiment before de
 | 9 | Meeting-chat system entries carry raw call metadata | Build | Verified today on the kick-off chat: `Event/Call`, `ThreadActivity/*`, `RichText/Media_CallRecording`, `RichText/Media_CallTranscript` entries with org ids and flightproxy URLs. | Add `event` (`call-started`, `call-ended`, `recording-posted`, `transcript-posted`, `member-added`, `topic-changed`) on substrate messages and `--skip-system true` on the two chat listings. | M |
 | 10 | `webLink` not in the default select of `list-mail-messages` | Build | `MAIL_MESSAGE_DEFAULT_SELECT` has no `webLink`. | Add `webLink` to the default select (about 150 bytes per message). | S |
 | 11 | Large workbook attachments cannot be read sheet by sheet | Build | The Excel commands need a drive item; attachment conversion runs the xlsx parser locally on the whole workbook. | `--sheet <name>` on `convert-mail-attachment-to-markdown` and `read-mail-attachment` (parse one sheet, list the sheet names when absent). The 3 MB cap is the brief's, not the CLI's. | M |
-| 12 | `.eml` attachments have no markdown reader | Build | No `message/rfc822` route in the conversion dispatch. | Add an `.eml` adapter (headers, text body, nested attachments listed) in the shared `bytesToMarkdown` dispatch, like `.msg`. | M |
+| 12 | `.eml` attachments have no markdown reader | Build (done) | No `message/rfc822` route in the conversion dispatch. | Shipped: `.eml` converts like `.msg` through postal-mime, by name or by the `message/rfc822` content type. | done |
 | 13 | A sent message can vanish between listing and read | Prompt | `list-conversation-messages --conversation-id` exists. | Brief prompt: on `ErrorItemNotFound`, re-read the thread by conversation id. | Prompt |
 | 14 | Image attachments that are content cannot be read | Prompt | `get-mail-attachment --output-path <file.png>` writes the decoded bytes; `extract-mail-attachment-images` and `extract-local-file-images` exist. An agent that can view images reads the saved file. | Brief prompt: save the image, then view it. Say "for the raw bytes use `get-mail-attachment`" in `read-mail-attachment`'s summary. | Prompt + S (doc) |
 | 15 | Calendar responses flood the message listing | Build | Graph rejects `isof(...)` filters and `meetingMessageType` in `$select`, but every listed item carries `@odata.type` (`eventMessageResponse` / `eventMessageRequest`). | `--exclude-meeting-responses true` on `list-mail-messages` and `list-mail-folder-messages`: drop `eventMessageResponse` items client-side (with a `note` when a page shrinks). | S |
 | 16 | `read-mail-attachment --output-path` writes converted markdown, not bytes | Prompt | By design: it converts; `get-mail-attachment` is the raw read. | Same doc line as 14. | S (doc) |
 | 17 | An invite re-send cannot be told from a meeting update | Cannot (Graph) | `meetingMessageType` is refused in `$select` and the `microsoft.graph.eventMessage` cast segment is "not found" on the Outlook broker. | Brief keeps the event `lastModifiedDateTime` comparison; document it. | Prompt |
 | 18 | A moved meeting is invisible in the day view | Prompt | `list-calendar-event-instances` exists. | Brief prompt: when a chat says "moved", read the series instances for the week. | Prompt |
-| 19 | No "changed since" across all libraries | Build (L) | `search-all-files` `LastModifiedTime>=` coverage is uncertain; `list-accessible-drives` unions the drives already. | `list-changed-files --since <date> [--exclude-mail-attachments]`. Neither drive `search` nor `delta` takes a date bound, so the honest design is a per-drive `delta` walk with a stored token per drive plus a union runner, or a stateless union of per-drive searches with a coverage note. Needs a design pass; see open question 2. | L |
-| 20 | Scanned PDFs have no OCR path | Build (M) | `download-drive-item-as-markdown` refuses image-only PDFs. | `render-drive-item-pages --pages 1-3 --output-dir` (PDF pages to PNG through pdf.js rendering) so an agent can view them; same for mail attachments. OCR itself stays out (no dependency worth carrying). | M |
+| 19 | No "changed since" across all libraries | Build (done) | `search-all-files` `LastModifiedTime>=` coverage is uncertain; `list-accessible-drives` unions the drives already. | Shipped stateless (open question 2): `list-changed-files --since <date>` sweeps the search index with a `LastModifiedTime` bound from the UTC day before, applies the exact instant to the hits, and says what the index cannot promise. | done |
+| 20 | Scanned PDFs have no OCR path | Build (done) | `download-drive-item-as-markdown` refuses image-only PDFs. | Shipped without a raster dependency (open question 3): image-only PDF refusals name the image extractors, which already return each page's image as PNG, and the drive and mail extractors take `--pages`. | done |
 | 21 | `resolve-drive-share-link` field names differ | Prompt | It returns `driveId` / `itemId`. Renaming breaks the library. | Add the two-line mapping to the command's summary and to the skill. | S (doc) |
 | 22 | No folder listing by share link | Prompt | `list-folder-files --drive-id --item-id` after `resolve-drive-share-link`. | Name the route in `resolve-drive-share-link`'s summary. | S (doc) |
-| 23 | Comment extraction is uneven | Build (M) | pptx and docx comments come through `--include-metadata`; xlsx threaded comments unverified. | `list-document-comments --drive-id --item-id` returning author, date, anchor, text and mentions for docx, pptx and xlsx (the xlsx part needs a `threadedComments` part reader). | M |
+| 23 | Comment extraction is uneven | Build (done) | pptx and docx comments come through `--include-metadata`; xlsx threaded comments unverified. | Shipped: `list-document-comments` for docx, xlsx and pptx; Excel comments now carry their sheet. | done |
 | 24 | Version pick is manual | Build | `download-drive-item-version` takes an explicit `--version-id`. | `--before <datetime>` on `download-drive-item-version`: list versions, pick the newest before the instant (relative dates accepted). | S |
 | 25 | `list-recent-files` carries no modified date for own files | Build (S) | Probed: `$select=lastModifiedDateTime,fileSystemInfo` on `/me/drive/recent` returns only `id`; Graph does not project those here. | `--with-item true`: one `get-drive-item` per row (opt-in, N calls) merged into the row. | S |
 | 26 | `list-trending-insights` carries no modifier or date | Build (S) | Probed: `$expand=resource` is ignored by Graph on `/me/insights/trending`. | Same `--with-item true` opt-in on the three insight listings. | S |
@@ -50,7 +50,7 @@ Graph itself, or by the tenant), **Probe** (worth one timed experiment before de
 | 35 | Transcript `note:` printed only with `--output-path` | Build | The text presenter prints a `text/*` envelope as its bare body and drops `note`. | Print `note:` as a trailing line in text mode for every markdown envelope (the `next:` footer already works this way). | S |
 | 36 | `microsoft-search-query` has no `--top` | Build | Only `--query`; the request body's `size` is fixed. | `--top <n>` mapped to `size` (1 to 25 per Graph). | S |
 | 37 | Python is not on the machine | Not a gap | Environment. | None. | none |
-| 38 | `--output json` wraps every payload | Build (S, optional) | `{ok, data, sizeHint}` by design. | `--output raw-json` that prints `data` alone; keep `json` as is. | S |
+| 38 | `--output json` wraps every payload | Build (done) | `{ok, data, sizeHint}` by design. | Shipped: `--output raw-json`. | done |
 | 39 | Harness refusals on the user's own sent mail | Not a gap | The auto-mode classifier, not the CLI. | Allow the three read-only commands in the project's Claude settings. | Settings |
 
 ## 2. Build plan
@@ -81,7 +81,9 @@ entry; the brief's prompt drops the corresponding workaround.
 3. `--sheet <name>` on the two attachment-to-markdown commands (11).
 4. `--since` on `list-teams-chat-history` (5), server-side through the substrate's `startTime`.
 
-### Slice C: larger features, each behind a short design note
+### Slice C: larger features, shipped 2026-09-26
+
+Decided 2026-09-26: postal-mime for MIME parsing, the image extractors plus `--pages` instead of a raster dependency, and a stateless search sweep for changed files.
 
 1. `.eml` reader in the conversion dispatch (12).
 2. `list-document-comments` for docx, pptx, xlsx (23).
@@ -111,5 +113,5 @@ entry; the brief's prompt drops the corresponding workaround.
 ## 4. Open questions (decide before slice B)
 
 1. **Zoned dates**: decided 2026-09-19: day boundaries resolve in the machine's time zone by default, so `today` means the user's today with no flag; `--tz <IANA>` and `ASKMARCEL_TZ` override it; absolute ISO inputs keep their UTC meaning.
-2. **Changed-since across libraries**: per-drive delta tokens need a store (a file under `~/.ask-marcel/`); is a stateful command acceptable, or should it stay a stateless union of searches with honest coverage notes? Recommendation: stateless first, with the coverage note; delta store only if the brief still misses changes.
-3. **Page images for scanned PDFs**: rendering needs a raster library in the bundle (pdf.js with a canvas shim under Bun and Node); worth the dependency? Recommendation: probe the bundle size first.
+2. **Changed-since across libraries**: decided 2026-09-26: stateless, one search sweep with a coverage note (shipped as `list-changed-files`). Per-drive delta tokens need a store (a file under `~/.ask-marcel/`); is a stateful command acceptable, or should it stay a stateless union of searches with honest coverage notes? Recommendation: stateless first, with the coverage note; delta store only if the brief still misses changes.
+3. **Page images for scanned PDFs**: decided 2026-09-26: no raster dependency; the image extractors already return each scanned page's image, and gained `--pages`. Rendering needs a raster library in the bundle (pdf.js with a canvas shim under Bun and Node); worth the dependency? Recommendation: probe the bundle size first.

@@ -61,6 +61,27 @@ plan's details, whose `categoryDescriptions` name the labels a task carries as
 `category1` to `category25` in its `appliedCategories`. The full `help-json`
 manifest is now about 560 KB, and the help text says so.
 
+### Added: the larger reads the daily brief asked for
+
+`list-document-comments --drive-id --item-id` lists the comments of a Word,
+Excel or PowerPoint file as one list: author, date, where each sits (the
+commented text, the cell as `Sheet!A1`, the slide), the text, and the people it
+@-mentions; Excel's legacy copy of each threaded comment is dropped, and Excel
+comments now carry their sheet. `list-changed-files --since <date>` lists every
+file changed since an instant across all the libraries the user can open,
+newest first, in one sweep of the Microsoft Search index, with a `note` on what
+the index cannot promise (`--query` adds KQL). An `.eml` file or mail
+attachment, found by name or by the `message/rfc822` content type, converts to
+markdown the way an Outlook `.msg` does: the headers, the reply without its
+quoted chain (`--keep-quoted true` keeps it), and each attachment converted in
+turn. `--pages 1-3` on `extract-drive-item-images` and
+`extract-mail-attachment-images` returns the images of only those pages of a
+scanned PDF, and every image-only PDF refusal now names the image extractor.
+`--output raw-json` prints the payload alone for piping into `jq`: no envelope,
+no size hints, no paging cursors; a failure still prints the JSON error
+envelope. New runtime dependency: `postal-mime` (MIT-0, no dependencies of its
+own).
+
 ## 2.7.0
 
 ### Added: a Teams channel reads as far as a group inbox

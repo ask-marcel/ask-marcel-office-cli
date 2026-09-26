@@ -60,6 +60,8 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | Who holds role X / tenant-wide person search | `microsoft-search-query --query '<role> <org>'` — person hits match names/company, not job titles; cross-check `list-relevant-people` and see the role-title pitfall under *People* |
 | Who do I work with on X | `list-relevant-people` |
 | Who wrote / last touched this doc | `get-drive-item-created-by-user` / `get-drive-item-last-modified-by-user` |
+| What changed in my files since X | `list-changed-files --since '<date>'` — every library the user can open, newest first; the search index can lag the newest saves |
+| Comments on a document, who was @-mentioned | `list-document-comments --drive-id '<id>' --item-id '<id>'` — Word, Excel (with the sheet) and PowerPoint |
 | Org tree | `get-user-manager`, `list-user-direct-reports` (recurse manually) |
 | Team / group membership | `list-joined-teams` → `list-team-members` (roles: owner, guest) or `list-team-channel-members --channel-id '<id>'` for a private channel's roster; `list-groups` → `list-group-members` / `list-group-owners` for a plain group |
 | What was said in a Teams channel | `list-joined-teams` → `list-team-channels --team-id '<id>'` → `convert-team-channel-messages-to-markdown --team-id '<id>' --channel-id '<id>' --since '7d'` (dated transcript, replies nested; omit `--since` for the newest page); `convert-team-channel-message-to-markdown --message-id '<id>'` for one thread; `list-team-channel-messages` and `list-team-channel-messages-delta --since '<date>'` for the JSON forms. Channel content is not searchable: pick the channel, then read |
@@ -106,7 +108,7 @@ Everything in a thread — every message, its attachments, and the SharePoint li
 
 ## Read a document in full
 
-Get `drive-id` + `item-id` (from a search hit, or `resolve-drive-share-link` for a sharing URL), then read by type: raw download for PDF/CSV/text, `download-drive-item-as-markdown --include-metadata true` for Word/Excel/OpenDocument, sheet by sheet for a big workbook, `download-drive-item-as-pdf` when layout matters, the zip converters for archives. Recipe, id-picking pitfalls, and the formula-error and hand-count rules in `references/read-document.md`.
+Get `drive-id` + `item-id` (from a search hit, or `resolve-drive-share-link` for a sharing URL), then read by type: raw download for PDF/CSV/text, `download-drive-item-as-markdown --include-metadata true` for Word/Excel/OpenDocument, sheet by sheet for a big workbook, `download-drive-item-as-pdf` when layout matters, the zip converters for archives, `extract-drive-item-images --pages 1-3` for the page images of a scanned PDF. Recipe, id-picking pitfalls, and the formula-error and hand-count rules in `references/read-document.md`.
 
 ## Heavy reads — delegate when your harness has subagents
 

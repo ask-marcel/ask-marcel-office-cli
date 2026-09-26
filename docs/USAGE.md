@@ -97,6 +97,10 @@ The stable `{ok, data, nextLink?, deltaLink?, count?}` envelope, unambiguous for
 
 `source` is one of `graph` | `substrate` | `cli` | `validation`. `hint` is present when a curated rule matched the error code or message; the envelope shape is `{ok, error, errorCode?, hint?, source, retryAfterSeconds?}` where `hint` and `retryAfterSeconds` are conditional. `retryAfterSeconds` appears only when Graph returned a `Retry-After` header (throttling: 429, sometimes 503) and is the integer seconds to wait before retrying — honor it instead of guessing a backoff. In text output the same value renders as a `retryAfter: Ns` line. It is omitted when the header is absent or in the rarely-seen HTTP-date form (delta-seconds only).
 
+### Raw JSON (`--output raw-json`, for piping)
+
+The `data` payload alone, without the envelope: `ask-marcel-office --output raw-json list-drives | jq '.value[].name'`. No size hints and no paging cursors are printed, so page with `--output json` and its `nextLink`. A failure still prints the JSON error envelope above, so a script can tell an error from data.
+
 ## OData query passthrough
 
 Most `list-*`, `search-*`, and `*-delta` commands accept the standard OData query parameters as optional flags. Use them to shrink large responses on the fly — particularly important for context-window-bound LLM consumers:
@@ -190,7 +194,7 @@ bloat this CLI exists to avoid). Discovery is three hops:
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 202 READ commands
+run-command { command, params?, outputPath?, outputDir? }        → the 204 READ commands
 run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
 ```
