@@ -5,10 +5,11 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { extractImagesFromBytes } from './image-extraction.ts';
+import type { PageRange } from '../../domain/page-range.ts';
+import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 
-const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1) });
+const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1), pages: pagesField.optional() });
 
 /**
  * The commands an unextractable attachment should send the caller to. Every
@@ -29,10 +30,18 @@ const MAIL_HINTS: ImageExtractionHints = {
   inspectHint: 'Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.',
 };
 
-const fromFileAttachment = (attachment: { name?: string; contentBytes?: string }, hints: ImageExtractionHints): Promise<Result<unknown, GraphError>> =>
-  extractImagesFromBytes(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', hints.fetchHint);
+const fromFileAttachment = (
+  attachment: { name?: string; contentBytes?: string },
+  hints: ImageExtractionHints,
+  pages: PageRange | undefined
+): Promise<Result<unknown, GraphError>> => extractImagesFromBytes(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', hints.fetchHint, pages);
 
-const fromReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, hints: ImageExtractionHints): Promise<Result<unknown, GraphError>> => {
+const fromReferenceAttachment = async (
+  graph: GraphClient,
+  attachment: { sourceUrl?: string },
+  hints: ImageExtractionHints,
+  pages: PageRange | undefined
+): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '')
     return err({
@@ -54,15 +63,15 @@ const fromReferenceAttachment = async (graph: GraphClient, attachment: { sourceU
     });
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`);
   if (!bytes.ok) return bytes;
-  return extractImagesFromBytes(bytes.value, item.name ?? '', hints.fetchHint);
+  return extractImagesFromBytes(bytes.value, item.name ?? '', hints.fetchHint, pages);
 };
 
 /**
  * Shared by every caller that can name an attachment by a Graph path: mail
  * here, and one post of a group thread. The path and the hints are the only
- * things that differ.
+ * things that differ; `pages` narrows a PDF when the caller offers `--pages`.
  */
-const extractAttachmentImages = async (graph: GraphClient, attachmentPath: string, hints: ImageExtractionHints): Promise<Result<unknown, GraphError>> => {
+const extractAttachmentImages = async (graph: GraphClient, attachmentPath: string, hints: ImageExtractionHints, pages?: PageRange): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
@@ -71,9 +80,9 @@ const extractAttachmentImages = async (graph: GraphClient, attachmentPath: strin
 
   switch (odataType) {
     case '#microsoft.graph.fileAttachment':
-      return fromFileAttachment(a, hints);
+      return fromFileAttachment(a, hints, pages);
     case '#microsoft.graph.referenceAttachment':
-      return fromReferenceAttachment(graph, a, hints);
+      return fromReferenceAttachment(graph, a, hints, pages);
     case '#microsoft.graph.itemAttachment':
       return err({ type: 'api_error', status: 415, message: 'itemAttachment (embedded mail / event / contact) has no document to extract images from.' });
     default:
@@ -85,7 +94,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
-  return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS);
+  return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
 };
 
 const meta: CommandMeta = {
@@ -98,6 +107,7 @@ const meta: CommandMeta = {
   options: [
     { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' },
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that message. Returned by `list-mail-attachments`.' },
+    PAGES_OPTION,
   ],
   example: "ask-marcel-office extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
   responseShape:

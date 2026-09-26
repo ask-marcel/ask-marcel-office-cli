@@ -34,7 +34,7 @@ type ConvertOptions = { readonly includeMetadata: boolean; readonly keepQuoted: 
 
 const MAIL_HINTS: ConversionHints = {
   pdfNoText:
-    'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.',
+    'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR. `extract-mail-attachment-images --pages 1-3` returns the scanned page images as PNG, a few pages at a time.',
   legacyPpt:
     'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown — there is no pure-JS parser for the format. Use `convert-mail-attachment-to-pdf --output-path /tmp/file.pdf` to render it, then read the PDF with a vision-capable model.',
   image: (ext) =>

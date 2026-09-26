@@ -190,6 +190,8 @@ describe('command meta — invariants on every registered command', () => {
           // to one sheet after the download. Post-fetch knobs, not URL placeholders.
           'with-item',
           'sheet',
+          // `--pages` narrows a PDF to some pages after the download.
+          'pages',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05

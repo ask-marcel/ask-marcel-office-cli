@@ -5,11 +5,11 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { extractImagesFromBytes } from './image-extraction.ts';
+import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
 
-const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
+const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), pages: pagesField.optional(), ...tenantIdShape });
 
 const FETCH_HINT = 'For other sources, fetch the raw bytes via `download-drive-item-content` and process locally.';
 
@@ -39,7 +39,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!bytes.ok) return bytes;
-  return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT);
+  return extractImagesFromBytes(bytes.value, item.name ?? '', FETCH_HINT, parsed.data.pages);
 };
 
 const meta: CommandMeta = {
@@ -62,6 +62,7 @@ const meta: CommandMeta = {
       required: true,
       description: 'driveItem ID of the pdf / docx / xlsx / pptx file. Returned by `list-folder-files` or `search-onedrive-files`.',
     },
+    PAGES_OPTION,
     TENANT_ID_OPTION,
   ],
   example: "ask-marcel-office extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",

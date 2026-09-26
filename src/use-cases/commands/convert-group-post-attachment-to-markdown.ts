@@ -15,7 +15,7 @@ import type { ConversionHints } from './markdown-dispatch.ts';
 // `?format=pdf` rejects image inputs outright.
 const POST_HINTS: ConversionHints = {
   pdfNoText:
-    'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-group-post-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR.',
+    'pdf attachment has no extractable text layer — it looks scanned / image-only (only page images, no embedded text). Use `convert-group-post-attachment-to-pdf --output-path /tmp/file.pdf` to land the bytes on disk, then read the PDF with a vision-capable model, or run OCR. `extract-group-post-attachment-images` returns the scanned page images as PNG.',
   legacyPpt:
     'ppt (legacy PowerPoint 97-2003, OLE binary) cannot be converted to markdown — there is no pure-JS parser for the format. Use `convert-group-post-attachment-to-pdf --output-path /tmp/file.pdf` to render it, then read the PDF with a vision-capable model.',
   image: (ext) =>
