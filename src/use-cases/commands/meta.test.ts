@@ -185,6 +185,11 @@ describe('command meta — invariants on every registered command', () => {
           'skip-system',
           'mentions-me',
           'before',
+          // Slice B (2026-09-20): `--with-item` reads the driveItem behind each
+          // listed row after the listing; `--sheet` narrows a workbook conversion
+          // to one sheet after the download. Post-fetch knobs, not URL placeholders.
+          'with-item',
+          'sheet',
         ]);
         const expected = Array.from(new Set(cmd.meta.options.filter((o) => !runtimeFlagNames.has(o.name)).map((o) => o.name))).toSorted((a, b) => a.localeCompare(b));
         // `{region}` is an infra-level placeholder on the post-2026-05
