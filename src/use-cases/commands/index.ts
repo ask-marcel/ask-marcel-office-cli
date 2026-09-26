@@ -25,6 +25,7 @@ import * as getOnenotePageAsMarkdown from './get-onenote-page-as-markdown.ts';
 import * as getOnenotePageContent from './get-onenote-page-content.ts';
 import * as getPlannerBucket from './get-planner-bucket.ts';
 import * as getPlannerPlan from './get-planner-plan.ts';
+import * as getPlannerPlanDetails from './get-planner-plan-details.ts';
 import * as getPlannerTaskDetails from './get-planner-task-details.ts';
 import * as getPlannerTask from './get-planner-task.ts';
 import * as getSharepointSiteByPath from './get-sharepoint-site-by-path.ts';
@@ -67,6 +68,7 @@ import * as listOnenoteSectionPages from './list-onenote-section-pages.ts';
 import * as listPlanBuckets from './list-plan-buckets.ts';
 import * as listPlanTasks from './list-plan-tasks.ts';
 import * as listPlannerPlans from './list-planner-plans.ts';
+import * as listGroupPlannerPlans from './list-group-planner-plans.ts';
 import * as listPlannerTasks from './list-planner-tasks.ts';
 import * as listSharepointSiteDrives from './list-sharepoint-site-drives.ts';
 import * as listSharepointSiteListItems from './list-sharepoint-site-list-items.ts';
@@ -244,9 +246,11 @@ const modules: Record<string, Command> = {
   'get-todo-task': getTodoTask,
   'list-todo-linked-resources': listTodoLinkedResources,
   'list-planner-plans': listPlannerPlans,
+  'list-group-planner-plans': listGroupPlannerPlans,
   'list-planner-tasks': listPlannerTasks,
   'list-incomplete-planner-tasks': listIncompletePlannerTasks,
   'get-planner-plan': getPlannerPlan,
+  'get-planner-plan-details': getPlannerPlanDetails,
   'list-plan-tasks': listPlanTasks,
   'get-planner-task': getPlannerTask,
   'get-planner-task-details': getPlannerTaskDetails,
