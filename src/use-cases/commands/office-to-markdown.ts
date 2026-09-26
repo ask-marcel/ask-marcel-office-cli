@@ -61,4 +61,7 @@ const officeToMarkdown = async (graph: GraphClient, contentPath: string, filenam
   return bytesToMarkdown(bytes.value, filename, opts, DRIVE_HINTS);
 };
 
-export { officeToMarkdown };
+/** Loop, Fluid and Whiteboard files are rendered by Graph (`?format=html`), not by a local converter. */
+const rendersThroughGraph = (filename: string): boolean => HTML_FORMAT_INPUTS.has(extensionOf(filename));
+
+export { officeToMarkdown, rendersThroughGraph };
