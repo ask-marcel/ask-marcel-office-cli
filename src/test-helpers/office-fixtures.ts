@@ -125,6 +125,49 @@ const buildSampleMsg = async (): Promise<Uint8Array> => new Uint8Array(await Bun
 // the fixture that tells `--keep-quoted true` from the default.
 const buildQuotedSampleMsg = async (): Promise<Uint8Array> => new Uint8Array(await Bun.file(`${import.meta.dir}/assets/quoted-sample.msg`).arrayBuffer());
 
+// A raw RFC 822 message (.eml), written out here because the format is text:
+// an encoded-word subject "Re: Review date — Q3" from Robin Chen, To Alex Kim and
+// a "Team" group holding Jordan Avery, Cc a bare address, a plain-text body that
+// is a reply over a "----- Original Message -----" chain, a base64 CSV attachment
+// "figures.csv" (month,total / July,12), and an attached message "Inner note"
+// from Jordan Avery whose body is "Inner body.".
+const buildSampleEml = (): Uint8Array =>
+  new TextEncoder().encode(
+    [
+      'From: "Robin Chen" <robin.chen@example.com>',
+      'To: Alex Kim <alex.kim@example.com>, Team: Jordan Avery <jordan.avery@example.com>;',
+      'Cc: sam@example.com',
+      'Subject: =?UTF-8?B?UmU6IFJldmlldyBkYXRlIOKAlCBRMw==?=',
+      'Date: Mon, 14 Sep 2026 09:12:00 +0800',
+      'MIME-Version: 1.0',
+      'Content-Type: multipart/mixed; boundary="b1"',
+      '',
+      '--b1',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      "Agreed, let's move it.",
+      '',
+      '----- Original Message -----',
+      'From: Alex Kim',
+      'old quoted history',
+      '--b1',
+      'Content-Type: text/csv; name="figures.csv"',
+      'Content-Disposition: attachment; filename="figures.csv"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      'bW9udGgsdG90YWwKSnVseSwxMgo=',
+      '--b1',
+      'Content-Type: message/rfc822',
+      '',
+      'From: Jordan Avery <jordan.avery@example.com>',
+      'Subject: Inner note',
+      '',
+      'Inner body.',
+      '--b1--',
+      '',
+    ].join('\r\n')
+  );
+
 // A sheet with a fully-blank middle row — what Excel leaves behind when the used
 // range is padded past the real data. Default `sheet_to_csv` emits it as a bare
 // `,` line; the adapter drops it via `blankrows: false`.
@@ -213,6 +256,66 @@ const buildRichXlsx = async (): Promise<Uint8Array> => {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath" Target="file:///\\\\server\\share\\other-model.xlsx" TargetMode="External"/>
 </Relationships>`
+  );
+  return zip.generateAsync({ type: 'uint8array' });
+};
+
+/**
+ * A two-sheet workbook whose comments carry their sheet through the package
+ * relationships, the way Excel writes them: "Summary" (a plain relative target)
+ * holds a threaded conversation on C3, Robin Chen asking "@Jordan Avery can you
+ * confirm the Q3 total?" and Jordan Avery replying "Confirmed.", plus the legacy
+ * "[Threaded comment]" copy Excel keeps for older versions; "Q3 Plan" (an
+ * absolute target, a name that needs quoting) holds Alex Kim's note on B2,
+ * "Check the Fabrikam line". People: Robin Chen and Jordan Avery.
+ */
+const buildCommentedXlsx = async (): Promise<Uint8Array> => {
+  const zip = new JSZip();
+  const rels = (body: string): string => `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${body}</Relationships>`;
+  const sheet = '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>';
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file(
+    'xl/workbook.xml',
+    '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Summary" sheetId="1" r:id="rId1"/><sheet name="Q3 Plan" sheetId="2" r:id="rId2"/></sheets></workbook>'
+  );
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    rels(
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet2.xml"/>'
+    )
+  );
+  zip.file('xl/worksheets/sheet1.xml', sheet);
+  zip.file('xl/worksheets/sheet2.xml', sheet);
+  zip.file(
+    'xl/worksheets/_rels/sheet1.xml.rels',
+    rels(
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="../comments1.xml"/>' +
+        '<Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2017/10/relationships/threadedComment" Target="../threadedComments/threadedComment1.xml"/>'
+    )
+  );
+  zip.file(
+    'xl/worksheets/_rels/sheet2.xml.rels',
+    rels('<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="../comments2.xml"/>')
+  );
+  zip.file(
+    'xl/comments1.xml',
+    '<?xml version="1.0"?><comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><authors><author>tc={T1}</author></authors><commentList><comment ref="C3" authorId="0"><text><t>[Threaded comment] Your version of Excel allows you to read this threaded comment. Comment: @Jordan Avery can you confirm the Q3 total?</t></text></comment></commentList></comments>'
+  );
+  zip.file(
+    'xl/comments2.xml',
+    '<?xml version="1.0"?><comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><authors><author>Alex Kim</author></authors><commentList><comment ref="B2" authorId="0"><text><r><t>Check the Fabrikam line</t></r></text></comment></commentList></comments>'
+  );
+  zip.file(
+    'xl/threadedComments/threadedComment1.xml',
+    '<?xml version="1.0"?><ThreadedComments xmlns="http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments">' +
+      '<threadedComment ref="C3" dT="2026-09-18T08:00:00Z" personId="{P1}" id="{T1}"><text>@Jordan Avery can you confirm the Q3 total?</text></threadedComment>' +
+      '<threadedComment ref="C3" dT="2026-09-18T09:30:00Z" personId="{P2}" id="{T2}" parentId="{T1}"><text>Confirmed.</text></threadedComment>' +
+      '</ThreadedComments>'
+  );
+  zip.file(
+    'xl/persons/person.xml',
+    '<?xml version="1.0"?><personList xmlns="http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments"><person displayName="Robin Chen" id="{P1}" userId="robin.chen@example.com" providerId="AD"/><person displayName="Jordan Avery" id="{P2}" userId="jordan.avery@example.com" providerId="AD"/></personList>'
   );
   return zip.generateAsync({ type: 'uint8array' });
 };
@@ -576,6 +679,36 @@ const buildImageXObject = (): Buffer => {
 };
 
 // `withImage` paints one 2x2 RGB image (FlateDecode); no-image paints an empty text object.
+// A scanned document: `pageCount` pages, each painting one 2x2 image and no text,
+// the shape a scanner produces (one raster per page, no text layer).
+const buildScannedPdf = (pageCount: number): Uint8Array => {
+  const pageIds = Array.from({ length: pageCount }, (_, i) => 3 + i * 3);
+  const kids = pageIds.map((id) => `${id} 0 R`).join(' ');
+  const objs: Record<number, Buffer> = {
+    1: enc('<</Type/Catalog/Pages 2 0 R>>'),
+    2: enc(`<</Type/Pages/Kids[${kids}]/Count ${pageCount}>>`),
+  };
+  const content = enc('q 50 0 0 50 25 25 cm /Im0 Do Q');
+  for (const id of pageIds) {
+    objs[id] = enc(`<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/Contents ${id + 1} 0 R/Resources<</XObject<</Im0 ${id + 2} 0 R>>>>>>`);
+    objs[id + 1] = Buffer.concat([enc(`<</Length ${content.length}>>\nstream\n`), content, enc('\nendstream')]);
+    objs[id + 2] = buildImageXObject();
+  }
+  const ids = Object.keys(objs)
+    .map(Number)
+    .sort((a, b) => a - b);
+  let pdf = enc('%PDF-1.7\n');
+  const off: Record<number, number> = {};
+  for (const id of ids) {
+    off[id] = pdf.length;
+    pdf = Buffer.concat([pdf, enc(`${id} 0 obj\n`), objs[id], enc('\nendobj\n')]);
+  }
+  const xrefAt = pdf.length;
+  let xref = enc(`xref\n0 ${ids.length + 1}\n0000000000 65535 f \n`);
+  for (const id of ids) xref = Buffer.concat([xref, enc(`${String(off[id]).padStart(10, '0')} 00000 n \n`)]);
+  return new Uint8Array(Buffer.concat([pdf, xref, enc(`trailer\n<</Size ${ids.length + 1}/Root 1 0 R>>\nstartxref\n${xrefAt}\n%%EOF`)]));
+};
+
 const buildPdfWithImage = (): Uint8Array => buildPdf(enc('q 50 0 0 50 25 25 cm /Im0 Do Q'), '<</XObject<</Im0 5 0 R>>>>', buildImageXObject());
 const buildPdfNoImages = (): Uint8Array => buildPdf(enc('BT ET'), '<<>>');
 // A born-digital PDF with a real text layer (Helvetica + a Tj string) — extractable by pdfjs/unpdf.
@@ -886,6 +1019,9 @@ export {
   buildSampleDoc,
   buildSampleMsg,
   buildQuotedSampleMsg,
+  buildSampleEml,
+  buildCommentedXlsx,
+  buildScannedPdf,
   buildDocxWithHeaderFooterTextbox,
   buildDocxWithSharepointLinks,
   buildOdtWithSharepointLinks,
