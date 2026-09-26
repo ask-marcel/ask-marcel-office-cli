@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
 import type { CommandMeta } from './command-types.ts';
-import { noSkipOptions } from './odata-query.ts';
+import { noSkipOptions, noSkipShape } from './odata-query.ts';
+import { recentItemPath, WITH_ITEM_OPTION, withItemEnrichment } from './with-item.ts';
 
 const baseSchema = z.object({}).strict();
-const { execute, schema } = buildNoSkipListCommand(() => '/me/drive/recent', baseSchema);
+const inner = buildNoSkipListCommand(() => '/me/drive/recent', baseSchema);
+const schema = z.object({ ...baseSchema.shape, ...noSkipShape, withItem: z.enum(['true', 'false']).optional() });
+const execute = withItemEnrichment(schema, inner.execute, recentItemPath);
 
 const meta: CommandMeta = {
   summary:
@@ -13,7 +16,7 @@ const meta: CommandMeta = {
   graphMethod: 'GET',
   graphPathTemplate: '/me/drive/recent',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-recent',
-  options: [...noSkipOptions],
+  options: [...noSkipOptions, WITH_ITEM_OPTION],
   example: 'ask-marcel-office list-recent-files',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
