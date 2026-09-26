@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slice A in progress**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A and B shipped on main 2026-09-19 and 2026-09-26, unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -17,7 +17,7 @@ Graph itself, or by the tenant), **Probe** (worth one timed experiment before de
 | 2 | Historical Loop versions cannot be rendered | Probe | `download-drive-item-version` returns Fluid bytes for `.loop`; the versions endpoint has no `?format=html` in the docs. | Probe `/versions/{id}/content?format=html` once; if refused, document the limitation in the version command's summary. | Probe: 30 min |
 | 3 | Loop render lags the saves | Cannot (Graph) | The `format=html` conversion is Graph's; today the kick-off meeting-notes page (14.7 KB, one version) converts to an empty body. | Add a `note` when the rendered Loop body is empty while `size > 0`: "Graph returned no HTML for this page yet; retry later". | S |
 | 4 | Loop workspaces are not enumerable | Cannot | `/storage/fileStorage/containers?$filter=containerTypeId eq <Loop>` answers 403 even with `FileStorageContainer.Selected`; container enumeration needs an app registration. | None; the `filetype:loop` search route stays the way in. Say so in `list-accessible-drives`'s summary. | S (doc) |
-| 5 | No date filter or cursor on chat messages | Cannot (substrate) | `list-teams-chat-messages` is the 200-cap substrate route; the Graph route (`/chats/{id}/messages`, `$top`, `$filter`) needs `Chat.Read`, absent. `list-teams-chat-history` walks backwards by pages, no date bound. | Add `--since` to `list-teams-chat-history`: stop the backward walk at the first page older than the instant (client-side, the pages are ordered). | M |
+| 5 | No date filter or cursor on chat messages | Build (done) | `list-teams-chat-messages` is the 200-cap substrate route; the Graph route needs `Chat.Read`, absent. Probed 2026-09-20: the IC3 route honours `startTime` as a server-side lower bound (7 messages instead of 33 for a ten-day bound). | Shipped: `list-teams-chat-history --since <date>` maps to `startTime`. | done |
 | 6 | No mention or ask filter | Build | Substrate messages carry `<at>` tags and the caller's mri is in the token. | `--mentions-me true` on `list-teams-chat-messages` and `list-teams-chat-history`: keep messages whose body mentions the signed-in user. | S |
 | 7 | Chat deep links assembled by hand | Build | Substrate messages have no `webUrl`; the link shape is stable. | Add `webUrl` (`https://teams.microsoft.com/l/message/<chat id>/<message id>`) to every substrate message. | S |
 | 8 | Chat members come as friendlyName only | Prompt | `list-chat-members --chat-id` (basic token, Graph) returns `email`, `userId`, `displayName`. | Point the brief at `list-chat-members`; say so in `list-teams-chats-with-messages`'s summary. | S (doc) |
@@ -74,12 +74,12 @@ each command change regenerates the manifest. Estimates are commits, not days.
 Acceptance: each has a unit test on the projection or flag, a live smoke, and a one-line changelog
 entry; the brief's prompt drops the corresponding workaround.
 
-### Slice B: medium features (4 changes, about 12 commits)
+### Slice B: medium features, shipped 2026-09-26
 
-1. Zoned relative dates (33): open question 1 first.
+1. Zoned relative dates (33): machine zone by default, `--tz` global option, `ASKMARCEL_TZ`.
 2. `--with-item true` on `list-recent-files` and the insight listings (25, 26).
 3. `--sheet <name>` on the two attachment-to-markdown commands (11).
-4. `--since` on `list-teams-chat-history` (5).
+4. `--since` on `list-teams-chat-history` (5), server-side through the substrate's `startTime`.
 
 ### Slice C: larger features, each behind a short design note
 
