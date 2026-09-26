@@ -79,7 +79,8 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   // entry-by-entry; everything else (docx/xlsx/pptx/odf/csv/pdf/.msg/.eml/legacy/text,
   // referenceAttachment, embedded item) goes through the markdown dispatch — so a
   // caller that just wants to "read this attachment" never has to pick the command.
-  const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
+  const attachmentPath = `/me/messages/${messageId}/attachments/${attachmentId}`;
+  const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
 
@@ -91,7 +92,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
     }
     return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted, maxCells });
   }
-  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted, sheet, maxCells }, MAIL_HINTS);
+  return convertFetchedAttachment(graph, nameByContentType(a), { includeMetadata, keepQuoted, sheet, maxCells }, MAIL_HINTS, attachmentPath);
 };
 
 const meta: CommandMeta = {

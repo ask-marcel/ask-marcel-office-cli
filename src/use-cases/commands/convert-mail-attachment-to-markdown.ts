@@ -11,11 +11,11 @@ import {
   type EmbeddedEvent,
   type EmbeddedMessage,
 } from './embedded-item-to-markdown.ts';
-import { base64ToBytes } from './fetch-raw-bytes.ts';
+import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
-import { bytesToMarkdown } from './markdown-dispatch.ts';
+import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
@@ -109,14 +109,34 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // branching on the polymorphic `@odata.type`. Path-agnostic so both the mail
 // (`/me/messages/{id}/attachments/{id}`) and calendar-event
 // (`/me/events/{id}/attachments/{id}`) commands share one implementation.
+// Graph leaves the embedded item out of a plain read of an itemAttachment (it
+// comes only with $expand), so every embedded item failed as "missing inner
+// item" until 2026-09-26. An embedded MAIL is read from its MIME source
+// (`$value`) instead, through the .eml reader, because that is the only form
+// that carries the mail's own attachments (a 15 MB legal opinion inside a
+// forwarded mail, 2026-09-23); an embedded event or contact renders from the
+// expanded item. An attachment that already carries `item` renders from it.
+const readItemAttachment = async (graph: GraphClient, a: Record<string, unknown>, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
+  if (a['item'] !== undefined) return convertItemAttachment(a);
+  const expanded = await graph.get(`${attachmentPath}?$expand=microsoft.graph.itemattachment/item`);
+  if (!expanded.ok) return expanded;
+  const attachment = expanded.value as { readonly item?: Record<string, unknown> };
+  if (attachment.item?.['@odata.type'] !== '#microsoft.graph.message') return convertItemAttachment(attachment);
+  const source = await fetchRawBytes(graph, `${attachmentPath}/$value`);
+  if (!source.ok) return source;
+  return bytesToMarkdown(source.value, 'attached-message.eml', opts, NESTED_HINTS);
+};
+
 // Route an ALREADY-FETCHED attachment object to markdown by its polymorphic
 // `@odata.type`. Split out from the path-based fetch so `read-mail-attachment`
-// can peek the type for zip-routing without a second Graph round-trip.
+// can peek the type for zip-routing without a second Graph round-trip; the
+// path is what an embedded item is read through.
 const convertFetchedAttachment = (
   graph: GraphClient,
   a: Record<string, unknown>,
   opts: ConvertOptions,
-  hints: ConversionHints
+  hints: ConversionHints,
+  attachmentPath: string
 ): Promise<Result<unknown, GraphError>> | Result<unknown, GraphError> => {
   const odataType = a['@odata.type'];
   if (typeof odataType !== 'string') {
@@ -129,7 +149,7 @@ const convertFetchedAttachment = (
     case '#microsoft.graph.referenceAttachment':
       return convertReferenceAttachment(graph, a, opts);
     case '#microsoft.graph.itemAttachment':
-      return opts.sheet === undefined ? convertItemAttachment(a) : refuseSheet('this attachment is an embedded Outlook item');
+      return opts.sheet === undefined ? readItemAttachment(graph, a, attachmentPath, opts) : refuseSheet('this attachment is an embedded Outlook item');
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
@@ -138,7 +158,7 @@ const convertFetchedAttachment = (
 const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
-  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints);
+  return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints, attachmentPath);
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
