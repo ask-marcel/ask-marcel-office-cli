@@ -57,6 +57,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'download-drive-item-as-markdown': ['Files.Read'],
   'convert-drive-item-zip-to-markdown': ['Files.Read'],
   'extract-drive-item-images': ['Files.Read'],
+  'list-document-comments': ['Files.Read'],
   'list-accessible-drives': ['Team.ReadBasic.All', 'Group.Read.All', 'Sites.Read.All', 'Files.Read', 'Channel.ReadBasic.All'],
   'download-drive-item-version': ['Files.Read'],
   'list-trending-insights': ['Sites.Read.All'],
