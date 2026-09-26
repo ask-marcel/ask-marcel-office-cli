@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T15:23:40.806Z",
+  "generatedAt": "2026-09-26T15:31:21.153Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7074,6 +7074,24 @@
       "example": "ask-marcel-office list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `list` resources under `value[]`",
       "pagination": true
+    },
+    {
+      "name": "list-sharepoint-site-members",
+      "summary": "Who can open a SharePoint site: the owners and members of the Microsoft 365 group that owns it (name, mail, user type), and the SharePoint groups and sharing links holding its document library, with their roles (`owner`, `write`, `read`). Graph does not list who is inside a SharePoint group, so the group's people are the fewest who can open the site, and the `note` says so. For a wiki page holding credentials or a sensitive document, this is how many people can read it. Find the site id with `search-sharepoint-sites-by-name` or `get-sharepoint-site-by-path`.",
+      "category": "sharepoint",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/sites/{site-id}/drive, then its root permissions and the owning group's owners and members",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/driveitem-list-permissions",
+      "options": [
+        {
+          "name": "site-id",
+          "key": "siteId",
+          "required": true,
+          "description": "SharePoint site ID (`contoso.sharepoint.com,<guid>,<guid>`), from `search-sharepoint-sites-by-name`, `get-sharepoint-site-by-path` or `search-all-accessible-sites`."
+        }
+      ],
+      "example": "ask-marcel-office list-sharepoint-site-members --site-id 'contoso.sharepoint.com,11111111-2222-3333-4444-555555555555,66666666-7777-8888-9999-000000000000'",
+      "responseShape": "`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`)."
     },
     {
       "name": "list-sharepoint-site-onenote-notebook-sections",

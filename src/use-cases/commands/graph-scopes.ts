@@ -87,6 +87,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'get-sharepoint-site-by-path': ['Sites.Read.All'],
   'get-sharepoint-site-drive-by-id': ['Sites.Read.All', 'Files.Read'],
   'list-sharepoint-site-drives': ['Sites.Read.All', 'Files.Read'],
+  'list-sharepoint-site-members': ['Sites.Read.All', 'GroupMember.Read.All'],
   'list-sharepoint-site-lists': ['Sites.Read.All'],
   'get-sharepoint-site-list': ['Sites.Read.All'],
   'list-sharepoint-site-list-items': ['Sites.Read.All'],

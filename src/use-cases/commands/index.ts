@@ -75,6 +75,7 @@ import * as listPlannerPlans from './list-planner-plans.ts';
 import * as listGroupPlannerPlans from './list-group-planner-plans.ts';
 import * as listPlannerTasks from './list-planner-tasks.ts';
 import * as listSharepointSiteDrives from './list-sharepoint-site-drives.ts';
+import * as listSharepointSiteMembers from './list-sharepoint-site-members.ts';
 import * as listSharepointSiteListItems from './list-sharepoint-site-list-items.ts';
 import * as listSharepointSiteLists from './list-sharepoint-site-lists.ts';
 import * as listSpecificCalendarEvents from './list-specific-calendar-events.ts';
@@ -242,6 +243,7 @@ const modules: Record<string, Command> = {
   'search-all-files': searchAllFiles,
   'get-sharepoint-site': getSharepointSite,
   'list-sharepoint-site-drives': listSharepointSiteDrives,
+  'list-sharepoint-site-members': listSharepointSiteMembers,
   'get-sharepoint-site-drive-by-id': getSharepointSiteDriveById,
   'list-sharepoint-site-lists': listSharepointSiteLists,
   'get-sharepoint-site-list': getSharepointSiteList,
