@@ -3,6 +3,8 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
+import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { extensionOf } from './text-passthrough.ts';
 
 /**
  * Generic interceptor used by the global `--output-path` flag in `cli.ts`.
@@ -31,6 +33,7 @@ export type OutputPathError =
   | { readonly type: 'empty_path' }
   | { readonly type: 'is_directory' }
   | { readonly type: 'passthrough_extension_mismatch'; readonly contentType: string; readonly requestedExtension: string }
+  | { readonly type: 'text_under_binary_extension'; readonly contentType: string; readonly requestedExtension: string }
   | { readonly type: 'inline_too_large'; readonly base64Length: number };
 
 export type OutputDirError = { readonly type: 'no_media' } | { readonly type: 'empty_path' } | { readonly type: 'write_failed'; readonly message: string };
@@ -47,6 +50,17 @@ const looksLikeDirectoryPath = (path: string): boolean => path.endsWith('/') || 
 // a clear error pointing at the right extension instead of producing garbage.
 const isPdfExtension = (path: string): boolean => path.toLowerCase().endsWith('.pdf');
 const isPdfContentType = (ct: string): boolean => ct.toLowerCase().startsWith('application/pdf');
+
+// A text envelope is never the content of these formats: their bytes always come back
+// as `base64`. Converted markdown or a PDF text layer saved as `.pdf` / `.xlsx` makes a
+// file no reader can open (a 24 Sep register entry), so the text branch refuses them.
+const BINARY_SAVE_EXTENSIONS: ReadonlySet<string> = new Set([
+  ...DOCX_FAMILY,
+  ...XLSX_FAMILY,
+  ...PPTX_FAMILY,
+  ...ODF_FAMILY,
+  ...['pdf', 'doc', 'xls', 'xlsb', 'ppt', 'zip', 'msg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tif', 'tiff'],
+]);
 
 // Above this many base64 chars (~750 KB of binary), inlining the payload to
 // stdout would flood the LLM's context — the multi-MB context-bomb class the
@@ -91,6 +105,11 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
 
   const text = data['text'];
   if (typeof text === 'string') {
+    const extension = extensionOf(outputPath);
+    if (BINARY_SAVE_EXTENSIONS.has(extension)) {
+      const contentType = typeof data['contentType'] === 'string' ? data['contentType'] : 'text/plain';
+      return err({ type: 'text_under_binary_extension', contentType, requestedExtension: `.${extension}` });
+    }
     const written = await fs.writeText(outputPath, text);
     if (!written.ok) return err({ type: 'write_failed', message: written.error.type === 'io_failed' ? written.error.message : written.error.type });
     return ok({ ...withoutKey(data, 'text'), savedTo: outputPath });

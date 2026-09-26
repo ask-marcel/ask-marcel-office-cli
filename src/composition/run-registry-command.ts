@@ -100,6 +100,9 @@ const formatOutputPathError = (error: OutputPathError, commandName: string, surf
   if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
   // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
   if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
+  // A text answer (converted markdown, a PDF text layer) under a binary name is a file no reader opens.
+  if (error.type === 'text_under_binary_extension')
+    return `--output-path: ${commandName} returned text (\`${error.contentType}\`), not the bytes of a \`${error.requestedExtension}\`; saving it under that name would make a file no reader can open. Save it as \`.md\` or \`.txt\`, or fetch the original bytes with \`get-mail-attachment\` (a mail attachment), \`download-drive-item-content\` (a drive file) or \`download-drive-item-version --format original\` (a version).`;
   // *-as-pdf fallbacks return source bytes with `passthrough:true`; refuse `.pdf` to avoid a corrupt save.
   if (error.type === 'passthrough_extension_mismatch')
     return `--output-path: response is passthrough source bytes (contentType: \`${error.contentType}\`), NOT a converted PDF. Save with the source extension matching that contentType, not \`${error.requestedExtension}\` — see the response's \`note\` field.`;
@@ -188,7 +191,7 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
   const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value);
   if (persisted.ok) return ok(persisted.value);
   // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
-  // `passthrough_extension_mismatch`, `inline_too_large`, `empty_path`, `write_failed`.
+  // `passthrough_extension_mismatch`, `text_under_binary_extension`, `inline_too_large`, `empty_path`, `write_failed`.
   return err({ message: formatOutputPathError(persisted.error, name, request.surface), code: persisted.error.type });
 };
 
