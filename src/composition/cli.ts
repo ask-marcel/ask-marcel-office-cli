@@ -147,7 +147,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // previous default `--help` ran ~60 KB because the
   // top-level subcommand listing rendered each command's full summary (often
   // 2-3 sentences). Default `--help` now truncates each subcommand description
-  // to its first sentence in the top-level listing (~34 KB total). Per-command
+  // to its first sentence in the top-level listing (~43 KB total). Per-command
   // `ask-marcel-office <cmd> --help` is never compacted — it always shows the full
   // description plus the `addHelpText` block, and `help-json` ships the full
   // summary unchanged. v1.4.0 surface-consolidation: the `--verbose` opt-out
@@ -328,7 +328,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~8 KB for one category, vs ~560 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~33 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~8 KB for one category, vs ~575 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~41 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
     )
     .option(
       '--terse',

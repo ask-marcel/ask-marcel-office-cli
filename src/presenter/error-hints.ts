@@ -140,7 +140,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
     // envelope shape matches Commander's `commander.unknownCommand`. Same
     // hint — both are the "this subcommand doesn't exist" surface.
     matchCode: (c) => c === 'commander.unknownCommand' || c === 'cli_unknown_command',
-    hint: 'Unknown ask-marcel-office subcommand. Run `ask-marcel-office help-json --terse` (~33 KB across all categories) or `ask-marcel-office help-json --terse --category mail` (~8 KB for one category) to discover the right command.',
+    hint: 'Unknown ask-marcel-office subcommand. Run `ask-marcel-office help-json --terse` (~41 KB across all categories) or `ask-marcel-office help-json --terse --category mail` (~8 KB for one category) to discover the right command.',
   },
   {
     source: 'cli',
@@ -151,7 +151,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'substrate',
     matchCode: (c) => c.startsWith('substrateHttp'),
-    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel-office login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The commands flagged `stability: experimental` in `help-json` all surface this code.',
+    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (they moved once already, in 2026-05). 4xx usually means a stale region, expired bearer (try `ask-marcel-office login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The commands flagged `stability: experimental` in `help-json` all surface this code.',
   },
   // ─── Graph: ID malformed / item not found ────────────────────────────────
   // when the failing URL was against
@@ -221,7 +221,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchMessage: (m) => /Missing scope/i.test(m),
-    hint: "The cached token doesn't include the required scope. Run `ask-marcel-office scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling (see memory.decision_teams_token_scopes) so missing scopes can't be added without a different Azure registration.",
+    hint: "The cached token doesn't include the required scope. Run `ask-marcel-office scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling, so missing scopes can't be added without a different Azure registration.",
   },
   // ─── Graph: generic access denied / forbidden ────────────────────────────
   // user reported `ErrorAccessDenied` as a
