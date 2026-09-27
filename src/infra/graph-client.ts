@@ -553,7 +553,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
         method: 'GET',
         headers: signedHeaders,
         redirect: 'manual',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        // The byte budget, not the JSON one: `/content` answers a quick 302, but
+        // an attachment's `$value` streams the whole file from Graph itself.
+        signal: AbortSignal.timeout(timeoutMsFor('binary')),
       });
       if (res.status >= 300 && res.status < 400) {
         const location = res.headers.get('location');
@@ -574,7 +576,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
       const buffer = await res.arrayBuffer();
       return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (binary)`, 'json'));
+      return err(wrapNetworkError(e, 'GET', `${path} (binary)`, 'binary'));
     }
   };
 
