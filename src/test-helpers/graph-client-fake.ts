@@ -22,6 +22,7 @@ export const fakeGraphClient = (overrides: Partial<GraphClient> = {}): GraphClie
   discoverTenantId: async () => ok(tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04')),
   teamsChat: async () => ok({}),
   teamsChatIc3: async () => ok({}),
+  teamsChatMedia: async () => ok({}),
   post: async () => ok({}),
   patch: async () => ok({}),
   getBinary: async () => ok({}),

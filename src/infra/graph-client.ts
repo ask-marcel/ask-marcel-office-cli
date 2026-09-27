@@ -89,6 +89,14 @@ type GraphClient = {
    * — the host + `/api/chatsvc/<region>` prefix are added here.
    */
   teamsChatIc3: (path: string) => Promise<Result<unknown, GraphError>>;
+  /**
+   * A pasted chat image from Teams' media service (`*.asm.skype.com`,
+   * `*.asyncgw.teams.microsoft.com`), read with the IC3 bearer, the only token it
+   * accepts (probed 2026-09-27: 200 with it, 401 with every other). The URL comes
+   * out of message content, so any other host, or plain http, is refused before a
+   * request is made. Answers `{ contentType, size, base64 }`.
+   */
+  teamsChatMedia: (url: string) => Promise<Result<unknown, GraphError>>;
   post: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   patch: (path: string, body: unknown) => Promise<Result<unknown, GraphError>>;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
@@ -278,6 +286,19 @@ const synthesizeEmptyBodyMessage = (status: number, url: string): string =>
 // so the URL → code suffix happens here at the infra boundary where the
 // URL IS still in scope (`res.url` / `fallbackUrl`). Pattern is the same
 // idea as `asSubstrateError` but for path-aware error refinement.
+// The Teams media service hosts that may receive the IC3 bearer; a chat image
+// URL is read out of message content, so nothing else is trusted with it.
+const TEAMS_MEDIA_HOST = /^[a-z0-9-]+\.(?:asm\.skype\.com|asyncgw\.teams\.microsoft\.com)$/i;
+
+const teamsMediaHost = (url: string): string | undefined => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && TEAMS_MEDIA_HOST.test(parsed.hostname) ? parsed.hostname : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const contextualizeCode = (code: string | undefined, url: string): string | undefined => {
   if (code !== 'ErrorInvalidIdMalformed' && code !== 'InvalidIdMalformed') return code;
   if (!url.includes('/mailFolders/') && !url.includes('mailFolders%2F')) return code;
@@ -500,6 +521,30 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
 
   const teamsChat = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('chatsvcagg', 'csa', path, chatsvcaggAuthHeaders);
   const teamsChatIc3 = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('ic3', 'chatsvc', path, ic3AuthHeaders);
+
+  const teamsChatMedia = async (url: string): Promise<Result<unknown, GraphError>> => {
+    const host = teamsMediaHost(url);
+    if (host === undefined)
+      return err({ type: 'validation_error', message: `not a Teams media URL (https on *.asm.skype.com or *.asyncgw.teams.microsoft.com): ${url.slice(0, 120)}` });
+    const send = async (ignoreCache: boolean): Promise<Result<Response, GraphError>> => {
+      const headers = await ic3AuthHeaders(ignoreCache ? { ignoreCache: true } : undefined);
+      if (!headers.ok) return headers;
+      return ok(await fetchFn(url, { method: 'GET', headers: headers.value, signal: AbortSignal.timeout(timeoutMsFor('binary')) }));
+    };
+    try {
+      // A revoked substrate token still looks valid in the cache: a 401 gets one
+      // replay with a freshly redeemed token, as on the other substrate reads.
+      const first = await send(false);
+      if (!first.ok) return first;
+      const res = first.value.status === 401 ? await send(true) : first;
+      if (!res.ok) return res;
+      if (!res.value.ok) return err(await apiErrorFrom(res.value, url));
+      const buffer = await res.value.arrayBuffer();
+      return ok({ contentType: res.value.headers.get('content-type') ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${host} (teams media)`, 'binary'));
+    }
+  };
 
   const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
     const url = `https://graph.microsoft.com/v1.0${path}`;
@@ -784,6 +829,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     discoverTenantId,
     teamsChat,
     teamsChatIc3,
+    teamsChatMedia,
     post: (path, body) => request('POST', path, body),
     patch: (path, body) => request('PATCH', path, body),
     getBinary,
