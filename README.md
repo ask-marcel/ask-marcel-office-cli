@@ -61,7 +61,7 @@ Microsoft Graph normally means registering an Azure app, chasing tenant-admin co
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 212 commands break down as 203 GET, 5 read-only POST (four searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft Graph and a periodic npm version check.
+The 212 commands break down as 203 GET, 5 read-only POST (four searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -111,12 +111,12 @@ $ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item
 
 | Surface | Commands | In practice |
 |---|---:|---|
-| 📧 Outlook Mail | 44 | Search and read mail as markdown, convert any attachment (down to nested `.zip` and `.msg`), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
-| 📁 OneDrive + SharePoint | 49 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history, share links resolved even into partner tenants where you're a guest |
+| 📧 Outlook Mail | 47 | Search and read mail as markdown, convert any attachment (down to nested `.zip`, `.msg`, `.eml` and forwarded mails), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
+| 📁 OneDrive + SharePoint | 54 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history and line diffs between versions or files, document comments, files changed since a date, who can open a site, share links resolved even into partner tenants where you're a guest |
 | 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
 | 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
-| 💬 Teams | 25 | Your teams, channels, channel posts as JSON or a markdown transcript, what changed since, members and tabs, chats, and chat history |
-| ✅ Planner + To Do | 15 | Plans, buckets, tasks, checklists, due dates |
+| 💬 Teams | 26 | Your teams, channels, channel posts as JSON or a markdown transcript, what changed since, members and tabs, chats, chat history with files, reactions and pasted screenshots |
+| ✅ Planner + To Do | 17 | Plans (a group's too) and their label names, buckets, tasks, checklists, due dates, the web link of every To Do task |
 | 📊 Excel | 11 | Live workbook reads: worksheets, used ranges, tables (lean values, not Graph's four redundant 2D arrays) |
 | 📓 OneNote | 11 | Notebooks, sections, page content |
 | 🔎 Search + utilities | 6 | Federated Microsoft Search across the tenant, cursor pagination (`next-page`), token status (`scopes-check`), offline local-file conversion |
@@ -135,18 +135,20 @@ One conversion pipeline, four entry points: a OneDrive / SharePoint item, an Out
 | pdf | Text-layer extraction; a scanned PDF answers with a pointer to the vision route instead of silence |
 | odt / ods / odp | Headings, lists, tables, per-slide text, comments folded inline |
 | Legacy .doc / .xls | `.xls` reads like `.xlsx`; `.doc` extracts as plain text (`.ppt`: convert to PDF first) |
-| Outlook .msg | The full email: headers, quote-stripped body, and every attachment converted recursively |
+| Outlook .msg / .eml | The full email: headers, quote-stripped body, and every attachment converted recursively; an Outlook item attached to a mail (a forwarded mail) reads the same way |
+| html / htm | The page as markdown, its head dropped and embedded images as placeholders; a page over 1 MB is flattened to plain text |
 | .zip | Every entry converted in one call; GBK / CP437 entry names decoded, never mojibake |
 | Loop / Whiteboard | Rendered through Graph's server-side converter |
 
-Need the pictures instead of the words? `extract-drive-item-images`, `extract-mail-attachment-images`, and `extract-local-file-images` pull the embedded images out of docx / xlsx / pptx / pdf (including full-resolution originals and images on hidden slides), ready for a vision model; `--output-dir` writes them straight to disk.
+Need the pictures instead of the words? `extract-drive-item-images`, `extract-mail-attachment-images`, and `extract-local-file-images` pull the embedded images out of docx / xlsx / pptx / pdf (including full-resolution originals and images on hidden slides), ready for a vision model; `--pages 1-3` narrows a scanned PDF, the mail extractor opens a forwarded mail's files too, and `extract-teams-chat-message-images` downloads a chat message's pasted screenshots. `--output-dir` writes them straight to disk.
 
 ## Designed for the agent loop
 
 - **Self-teaching.** `help-json --terse` returns a slim JSON manifest built for a model's first contact; add `--category mail` to scope it. `docs <command>` prints one command's full documentation (response shape, examples, the underlying Graph endpoint). Scan, pick, read, call.
-- **Errors that repair the call.** Every failure is `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`, with curated hints for 20+ recurring Graph mistakes, including wrong-resolver pointers (a Teams URL passed to `resolve-mail-link` answers with the command to use instead).
+- **Errors that repair the call.** Every failure is `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`, with curated hints for 20+ recurring Graph mistakes, including wrong-resolver pointers (a Teams URL passed to `resolve-mail-link` answers with the command to use instead). A mistyped command, flag or parameter ends with "Did you mean …?", on the CLI, over MCP and in the library.
 - **Pagination without state.** Every listing returns an opaque cursor; `next-page --url "<cursor>"` continues any of them.
-- **Relative dates.** `--start-date-time start-of-week --end-date-time +7d`. No timestamp math before "what's on my calendar".
+- **Relative dates.** `--start-date-time start-of-week --end-date-time +7d`. No timestamp math before "what's on my calendar". Named days resolve at midnight in your time zone (`--tz`, else `ASKMARCEL_TZ`, else the machine's).
+- **Pipe-friendly.** `--output raw-json` prints the payload alone, no envelope, for `jq`.
 - **Binary discipline.** Multi-MB payloads never hit stdout by accident: without `--output-path`, a binary answer is a one-line summary; with it, the bytes land on disk and the envelope carries `savedTo`.
 - **Tenant-wide reach.** `list-accessible-drives` unions every discovery vector a delegated token can hit (Teams libraries, group sites, private channels, shared-with-me, activity signals, secondary site libraries) and `search-all-accessible-sites` deep-pages the search index. Together: the practical maximum reachable without tenant-admin rights.
 

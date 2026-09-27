@@ -16,7 +16,7 @@ description: >
 
 # Answer a question, or draft a reply, from Microsoft 365
 
-Thin orchestrator over `ask-marcel-office` (~195 typed Microsoft Graph subcommands — read-only except four unsent-draft writers). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
+Thin orchestrator over `ask-marcel-office` (200+ typed Microsoft Graph subcommands — read-only except four unsent-draft writers). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
 
 ## Ground rules
 
@@ -27,7 +27,7 @@ Thin orchestrator over `ask-marcel-office` (~195 typed Microsoft Graph subcomman
 - **Answer for the user, not the log.** The final answer carries findings, not plumbing: no command names, no Graph/HTTP error codes, no token-or-scope talk (that a lookup returned nothing is a fact; *how* the API said so is not). Keep it concise and mirror how the user writes to you — when in doubt, terse and skimmable beats a wall of prose.
 - **All timestamps come back in UTC.** `my-quick-context` returns `tenantTimeZone`; convert before stating any time. In a UTC+8 tenant, a meeting Graph reports at `07:00` starts at 15:00 local — answering "7am" is wrong.
 - **Default text output is fine.** Add `--output json` only when you need to extract fields programmatically.
-- **Large payloads go to disk.** `--output-path <file>` works on every command that returns a document body — and ONLY those: JSON commands (searches, listings) refuse it, so shell-redirect those instead (`--output json > out.json`) and extract with a script. `microsoft-search-query` is the usual case: six fixed 25-hit containers, no `--top`/`--select`, routinely >100 KB.
+- **Large payloads go to disk.** `--output-path <file>` works on every command that returns a document body — and ONLY those: JSON commands (searches, listings) refuse it, so shell-redirect those instead (`--output json > out.json`) and extract with a script. `microsoft-search-query` is the usual case: six containers of up to 25 hits each (`--top` lowers that), no `--select`, routinely >100 KB.
 - **Follow the `next:` footer.** A listing with more pages ends with a line `--- next: ask-marcel-office next-page --url '…'`; run that command verbatim for the next page, and stop when the line disappears or you have what you need.
 - **A failure names its own fix.** Most errors print a `hint:` line (a missing flag, the wrong id shape, a token to refresh); follow it before retrying, and keep it out of the answer.
 - Discover anything not covered here with `ask-marcel-office --help` (all commands) or `ask-marcel-office docs <command>` (per-command page).
@@ -56,12 +56,12 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 |---|---|
 | What did A say / status told by mail | `search-mail-messages --query '<kql>'` |
 | Find a doc / status in documents | `search-all-files --query '<kql>'` — personal OneDrive + shared + every SharePoint/Teams library |
-| Who is X (name known) | `get-user --user-id '<name>'` → pick candidate → `get-user --id '<guid>'` (full profile incl. department and phones) |
+| Who is X (name known) | `get-user --user-id '<name>'` → pick candidate → `get-user --user-id '<guid>'` (full profile incl. department and phones) |
 | Who holds role X / tenant-wide person search | `microsoft-search-query --query '<role> <org>'` — person hits match names/company, not job titles; cross-check `list-relevant-people` and see the role-title pitfall under *People* |
 | Who do I work with on X | `list-relevant-people` |
 | Who wrote / last touched this doc | `get-drive-item-created-by-user` / `get-drive-item-last-modified-by-user` |
 | What changed in my files since X | `list-changed-files --since '<date>'` — every library the user can open, newest first; the search index can lag the newest saves |
-| What changed in a document since X | `diff-drive-item-versions --drive-id '<id>' --item-id '<id>' --before '<date>'` — only the changed lines; add `--include-metadata true` to see comments and tracked changes; two files (a weekly deck): `diff-drive-items` |
+| What changed in a document since X | `diff-drive-item-versions --drive-id '<id>' --item-id '<id>' --before '<date>'` (without `--before`: what the last save changed) — only the changed lines; needs the elevated token, so a headless run calls `login` first; add `--include-metadata true` to see comments and tracked changes; two files (a weekly deck): `diff-drive-items` |
 | Who can open a SharePoint site or page | `list-sharepoint-site-members --site-id '<id>'` — the owning group's people (the fewest who can open it) plus the SharePoint groups and sharing links with their roles |
 | Comments on a document, who was @-mentioned | `list-document-comments --drive-id '<id>' --item-id '<id>'` — Word, Excel (with the sheet) and PowerPoint |
 | Org tree | `get-user-manager`, `list-user-direct-reports` (recurse manually) |
@@ -71,8 +71,8 @@ Returns name, job title, `tenantTimeZone`, and the IDs everything below reuses (
 | What did X say in a Teams chat | `find-chats-with-user --name '<person>'` → `list-teams-chat-messages --chat-id '<id>' --skip-system true` (add `--mentions-me true` for what was asked of the user; every message carries `webUrl`); for a bounded read use `list-teams-chat-history --chat-id '<id>' --since '<date>'`; or `list-teams-chats-with-messages` for recent chats with bodies inlined. Chat content is not in federated search, so this is the only route |
 | What's on my calendar | `list-calendars` → `list-specific-calendar-view --calendar-id '<id>' --start-date-time '<from>' --end-date-time '<to>'` — dates accept `today`, `start-of-week`, `+7d` |
 | Is X free / common slot | `get-schedule` |
-| What's on my plate | `list-incomplete-todo-tasks` (`--due-before tomorrow` for due today or overdue) + `list-incomplete-planner-tasks` — neither is in federated search |
-| Meeting notes / decisions | `search-onenote-pages --filter "contains(title,'<keyword>')"` — OneNote search is title-only, so also try Mail + Files |
+| What's on my plate | `list-incomplete-todo-tasks` (`--due-before tomorrow` for due today or overdue) + `list-incomplete-planner-tasks` — neither is in federated search; a group's plans: `list-group-planner-plans --group-id '<id>'`, and a plan's label names: `get-planner-plan-details` |
+| Meeting notes / decisions | `search-onenote-pages --query '<keyword>'` — OneNote search is title-only, so also try Mail + Files |
 | Reply to / answer this email | Read the thread first (*Read an email in full*), then *Draft an email* → **Reply**. The draft goes under the thread's newest substantive message |
 | Forward this to Y | *Read an email in full* for what it carries, then *Draft an email* → **Forward** |
 | Write / send a new email to Y | *Draft an email* → **New mail** (it will be an unsent draft; the user sends). Resolve Y via the people path first |
@@ -131,7 +131,7 @@ The CLI's only write is an UNSENT draft in the Drafts folder — reply, forward,
 ## People — pitfalls that change answers
 
 - The two-step name lookup returns candidates with `id, mail, jobTitle, department`. Re-query **directory users** (GUID ids) for the full profile — the default already includes department, phones, and office.
-- A candidate whose id is **not a GUID** is an external contact: `get-user --id` rejects it with instructions — re-query by their `mail` as it says.
+- A candidate whose id is **not a GUID** is an external contact: `get-user --user-id` rejects it with instructions — re-query by their `mail` as it says.
 - Only the full-profile path — `get-user` with a GUID / UPN / email — rides the **elevated token**, which expires independently (preflight it with `ask-marcel-office scopes-check`, no Graph call). Name-search `get-user`, `list-relevant-people`, `get-user-manager`, and `list-user-direct-reports` run on the basic token and keep working when it's cold: walk the org tree with those first — they carry title, department, and mail — and run a plain `ask-marcel-office login` only for the fields they lack (phones, office); it recovers the elevated token silently, where `--force` would wipe the signed-in session. When re-auth is impossible (headless run, no browser), answer from the basic-token commands and documents (org chart, signatures) and say which profile fields are missing.
 - Directory fields — `jobTitle`, `officeLocation`, `department` — can lag reality by months (an office that has since moved, a title that changed). Present them as directory values, not ground truth; if the user contradicts one, believe the user. When several candidates are plausible, list them with title + department instead of guessing.
 - Reporting lines are often a matrix: a person can have a primary/solid-line manager and a dotted/functional one. When the directory `manager` field is empty (common for senior staff), the real line usually lives in an org-chart deck on SharePoint — search for it, and when you report the answer, say which manager is the solid line and which is dotted.

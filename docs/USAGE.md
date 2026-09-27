@@ -18,7 +18,7 @@ bun add -g ask-marcel-office-cli
 ask-marcel-office login
 
 # the rest is discoverable
-ask-marcel-office --help                                # ~34 KB, one-sentence summaries
+ask-marcel-office --help                                # ~43 KB, one-sentence summaries
 ask-marcel-office help-json --terse --category mail     # ~8 KB JSON for one category
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
@@ -29,7 +29,7 @@ The first launch prints a one-time notice if a newer version is on npm.
 
 ## Output formats — `--output text` (default) vs `--output json`
 
-Every command writes its output as a single document to **stdout** (success or error). stderr carries only diagnostics — log lines when `ASKMARCEL_LOG_LEVEL` is raised, and `login`'s sign-in progress ("Browser window open — complete the sign-in…") so a long interactive capture is distinguishable from a hang — never command output. `process.exitCode` is `0` on success and `1` on any failure. Pick the format with the global `--output <text|json>` flag.
+Every command writes its output as a single document to **stdout** (success or error). stderr carries only diagnostics — log lines when `ASKMARCEL_LOG_LEVEL` is raised, and `login`'s sign-in progress ("Browser window open — complete the sign-in…") so a long interactive capture is distinguishable from a hang — never command output. `process.exitCode` is `0` on success and `1` on any failure. Pick the format with the global `--output <text|json|raw-json>` flag; `raw-json` prints the payload alone, with no envelope, size hints or paging cursors, for piping into `jq` (a failure still prints the JSON error envelope).
 
 ### Text (default, LLM-readable)
 
@@ -134,7 +134,7 @@ ask-marcel-office list-calendar-view --start-date-time "monday"         --end-da
 ask-marcel-office list-calendar-view --start-date-time "start-of-month" --end-date-time "end-of-month"
 ```
 
-Accepted shapes (UTC, week starts Monday): strict ISO; date-only (`2026-04-01` → midnight UTC); past offsets `7d` / `1w` / `2h` / `30m`; future offsets `+7d` / `+1w`; named `now` / `today` / `yesterday` / `tomorrow`; weekday names (`monday`-`sunday` — most-recent occurrence including today); `last-<weekday>` / `next-<weekday>`; boundary anchors `start-of-week|month|year`, `end-of-week|month|year`. An unrecognised input returns a structured validation error listing every accepted shape — no second round-trip needed.
+Accepted shapes (week starts Monday): strict ISO, checked against the calendar (`2026-02-30T00:00:00Z` is refused, not rolled over); date-only (`2026-04-01` → midnight UTC); past offsets `7d` / `1w` / `2h` / `30m`; future offsets `+7d` / `+1w`; named `now` / `today` / `yesterday` / `tomorrow`; weekday names (`monday`-`sunday` — most-recent occurrence including today); `last-<weekday>` / `next-<weekday>`; boundary anchors `start-of-week|month|year`, `end-of-week|month|year`. Named days and boundaries resolve at midnight in the run's time zone: `--tz <IANA zone>` on any command, else `ASKMARCEL_TZ` (the only setting over MCP), else the machine's zone; instants, bare dates and offsets do not depend on it. An unrecognised input returns a structured validation error listing every accepted shape — no second round-trip needed.
 
 ## Writing bytes to disk (`--output-path`)
 
@@ -293,7 +293,7 @@ as tool content.
 
 `download-drive-item-version --format <original|pdf|markdown>` needs a Graph token whose `appid` is on Microsoft's ODSP allow-list — the Teams web client token returns 403 with `logicalPermissionAccessDenied` against historical-version bytes.
 
-Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used only by the historical-version command. Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command (including `list-chats` / `get-chat`, which use the regular Teams token) still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`scopes-check`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
+Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used by the five commands that need it: `download-drive-item-version`, `diff-drive-item-versions`, `list-chats`, `get-chat`, and `get-user` as its fallback when a tenant refuses the basic token (help-json flags them `needsElevatedToken`). Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`scopes-check`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
 
 ## Configuration
 
@@ -312,7 +312,7 @@ Environment variables read at composition time:
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun test           # full suite (4,700+ tests)
+bun test           # full suite (5,500+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
