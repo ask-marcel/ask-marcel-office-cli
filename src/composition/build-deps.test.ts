@@ -87,7 +87,7 @@ describe('buildDeps composition root', () => {
     for (const call of calls) {
       expect(call.secondaryTokenCommands?.elevated).toEqual(['diff-drive-item-versions', 'download-drive-item-version', 'get-chat', 'get-user', 'list-chats']);
       expect(call.secondaryTokenCommands?.chatsvcagg).toEqual(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-messages', 'list-teams-chats-with-messages']);
-      expect(call.secondaryTokenCommands?.ic3).toEqual(['list-teams-chat-history']);
+      expect(call.secondaryTokenCommands?.ic3).toEqual(['extract-teams-chat-message-images', 'list-teams-chat-history']);
     }
   });
 

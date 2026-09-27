@@ -151,7 +151,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'substrate',
     matchCode: (c) => c.startsWith('substrateHttp'),
-    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel-office login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The 5 commands flagged `stability: experimental` in `help-json` all surface this code.',
+    hint: 'Microsoft-internal chat substrate (chatsvcagg / IC3) returned an HTTP error. This surface is **experimental** — it rides routes that are not in the public Graph API and can move without notice (see `gotcha_chatsvcagg_substrate_moved` in memory for the 2026-05 migration). 4xx usually means a stale region, expired bearer (try `ask-marcel-office login`), or a chat ID from the wrong substrate. 5xx is typically transient — retry once. The commands flagged `stability: experimental` in `help-json` all surface this code.',
   },
   // ─── Graph: ID malformed / item not found ────────────────────────────────
   // when the failing URL was against

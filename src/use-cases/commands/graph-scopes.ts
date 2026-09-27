@@ -257,6 +257,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-teams-chat-messages': [],
   'list-teams-chat-history': [],
   'get-teams-chat-message': [],
+  'extract-teams-chat-message-images': [],
   'resolve-teams-link': [],
   'find-chats-with-user': [],
 

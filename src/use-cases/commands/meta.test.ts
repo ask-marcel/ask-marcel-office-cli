@@ -31,7 +31,14 @@ describe('command meta — invariants on every registered command', () => {
   });
 
   it('flags EXACTLY the Teams-substrate (chatsvcagg/ic3) chat-content commands with needsSubstrateToken so an agent can warm up auth before calling them (paired with needsElevatedToken on the m365 commands)', () => {
-    const expected = new Set(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-history', 'list-teams-chat-messages', 'list-teams-chats-with-messages']);
+    const expected = new Set([
+      'extract-teams-chat-message-images',
+      'find-chats-with-user',
+      'get-teams-chat-message',
+      'list-teams-chat-history',
+      'list-teams-chat-messages',
+      'list-teams-chats-with-messages',
+    ]);
     const flagged = new Set(
       Object.entries(commands)
         .filter(([, c]) => c.meta.needsSubstrateToken !== undefined)
@@ -40,7 +47,7 @@ describe('command meta — invariants on every registered command', () => {
     expect(flagged).toEqual(expected);
   });
 
-  it('splits the substrate set by service — EXACTLY 4 chatsvcagg commands and 1 ic3 command — because the auth fail-fast messages derive their per-token command lists from these values', () => {
+  it('splits the substrate set by service — EXACTLY 4 chatsvcagg commands and 2 ic3 commands — because the auth fail-fast messages derive their per-token command lists from these values', () => {
     const byTier = (tier: 'chatsvcagg' | 'ic3'): ReadonlySet<string> =>
       new Set(
         Object.entries(commands)
@@ -48,7 +55,7 @@ describe('command meta — invariants on every registered command', () => {
           .map(([name]) => name)
       );
     expect(byTier('chatsvcagg')).toEqual(new Set(['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-messages', 'list-teams-chats-with-messages']));
-    expect(byTier('ic3')).toEqual(new Set(['list-teams-chat-history']));
+    expect(byTier('ic3')).toEqual(new Set(['extract-teams-chat-message-images', 'list-teams-chat-history']));
   });
 
   it('flags EXACTLY the elevated-token (M365ChatClient) commands with needsElevatedToken — the auth fail-fast message derives its command list from this set, so a new elevated command added without the flag would be omitted from the remedy', () => {

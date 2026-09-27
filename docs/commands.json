@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T02:57:36.672Z",
+  "generatedAt": "2026-09-27T03:12:50.421Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1367,6 +1367,33 @@
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
       "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
+    },
+    {
+      "name": "extract-teams-chat-message-images",
+      "summary": "Fetch the images pasted into one Teams chat message (screenshots, charts), which `list-teams-chat-messages` shows only as an empty `<img>`: the message is read through the IC3 substrate and each pasted image downloaded from Teams' media service with the same token, emoji and stickers left out. Answers them as a media list, ready to save as files for a vision model. Take the ids from `list-teams-chat-messages` or `list-teams-chat-history`. **Best-effort, may break on Microsoft client updates** — the substrate and the media service are not in the public Microsoft Graph API.",
+      "category": "chats",
+      "graphMethod": "GET",
+      "graphPathTemplate": "/v1/users/ME/conversations/{chat-id}/messages/{message-id} (IC3), then each pasted image from Teams' media service",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/chatmessage-list-hostedcontents",
+      "options": [
+        {
+          "name": "chat-id",
+          "key": "chatId",
+          "required": true,
+          "description": "Teams chat ID (`19:...@thread.v2` or `19:..._...@unq.gbl.spaces`), from `list-teams-chats-with-messages` or `find-chats-with-user`."
+        },
+        {
+          "name": "message-id",
+          "key": "messageId",
+          "required": true,
+          "description": "The message `id`, from `list-teams-chat-messages` or `list-teams-chat-history`."
+        }
+      ],
+      "example": "ask-marcel-office extract-teams-chat-message-images --chat-id '19:abc@thread.v2' --message-id '1727000000000'",
+      "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }` — `path` is `image-<n>.<ext>`, in the order the images appear. Pair with the global `--output-dir <dir>` to write each image there (the response then carries `savedTo` in place of `base64`). `count: 0` with a `note` means the message holds no pasted image.",
+      "producesMedia": true,
+      "needsSubstrateToken": "ic3",
+      "stability": "experimental"
     },
     {
       "name": "find-chats-with-user",

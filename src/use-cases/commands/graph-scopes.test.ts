@@ -17,6 +17,7 @@ const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
   'list-teams-chat-messages',
   'list-teams-chat-history',
   'get-teams-chat-message',
+  'extract-teams-chat-message-images',
   // resolve-mail-link / resolve-calendar-link / resolve-teams-link are pure URL
   // parsers — no Graph call. (resolve-drive-share-link is NOT here: it now fetches
   // /shares/{token}/driveItem, so it carries a real Files.Read.All scope entry.)

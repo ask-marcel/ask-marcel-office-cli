@@ -125,6 +125,7 @@ import * as getChat from './get-chat.ts';
 import * as listTeamsChatsWithMessages from './list-teams-chats-with-messages.ts';
 import * as listTeamsChatMessages from './list-teams-chat-messages.ts';
 import * as listTeamsChatHistory from './list-teams-chat-history.ts';
+import * as extractTeamsChatMessageImages from './extract-teams-chat-message-images.ts';
 import * as getTeamsChatMessage from './get-teams-chat-message.ts';
 import * as resolveTeamsLink from './resolve-teams-link.ts';
 import * as resolveMailLink from './resolve-mail-link.ts';
@@ -338,6 +339,7 @@ const modules: Record<string, Command> = {
   'list-teams-chat-messages': listTeamsChatMessages,
   'list-teams-chat-history': listTeamsChatHistory,
   'get-teams-chat-message': getTeamsChatMessage,
+  'extract-teams-chat-message-images': extractTeamsChatMessageImages,
   'resolve-teams-link': resolveTeamsLink,
   'resolve-mail-link': resolveMailLink,
   'resolve-drive-share-link': resolveDriveShareLink,
