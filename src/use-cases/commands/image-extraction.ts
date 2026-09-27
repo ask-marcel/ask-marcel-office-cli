@@ -5,8 +5,9 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
+import type { MediaPart } from '../../infra/ooxml-media-extractor.ts';
 import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
-import { buildMediaResponse } from './media-files.ts';
+import { buildMediaResponse, isImagePath } from './media-files.ts';
 import type { CommandOptionMeta } from './command-types.ts';
 import type { MediaEnvelope } from './media-files.ts';
 import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
@@ -68,4 +69,30 @@ const PAGES_OPTION: CommandOptionMeta = {
     'PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type.',
 };
 
-export { extractImagesFromBytes, PAGES_OPTION, pagesField };
+type NamedFile = { readonly name: string; readonly bytes: Uint8Array };
+type FilesMedia = MediaEnvelope & { readonly skipped: ReadonlyArray<string> };
+
+/**
+ * Every image a set of files holds, for a mail that carries them: an image file
+ * as it is, a pdf or Office document through its extractor with each path
+ * prefixed by the file's name (`contract.pdf/pdf/page2/img_p1_1.png`), and any
+ * other file named in `skipped`, as is a document its extractor cannot read, so
+ * one broken file does not hide the others. `pages` narrows every PDF.
+ */
+const imagesOfFiles = async (files: ReadonlyArray<NamedFile>, pages?: PageRange): Promise<FilesMedia> => {
+  const parts: MediaPart[] = [];
+  const skipped: string[] = [];
+  for (const file of files) {
+    const extractor = extractorFor(extensionOf(file.name));
+    if (isImagePath(file.name)) parts.push({ path: file.name, bytes: file.bytes });
+    else if (extractor === undefined) skipped.push(file.name);
+    else {
+      const media = await extractor(file.bytes, (page) => pages === undefined || includesPage(pages, page));
+      if (media.ok) parts.push(...media.value.map((p) => ({ path: `${file.name}/${p.path}`, bytes: p.bytes })));
+      else skipped.push(`${file.name} (unreadable)`);
+    }
+  }
+  return { ...buildMediaResponse(parts), skipped };
+};
+
+export { extractImagesFromBytes, imagesOfFiles, PAGES_OPTION, pagesField };

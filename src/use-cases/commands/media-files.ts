@@ -46,5 +46,8 @@ const buildMediaResponse = (parts: ReadonlyArray<MediaPart>): MediaEnvelope => (
   })),
 });
 
-export { buildMediaResponse };
+/** Whether a file is an image the media envelope can carry as it is. */
+const isImagePath = (path: string): boolean => CONTENT_TYPES.has(extensionOf(path));
+
+export { buildMediaResponse, isImagePath };
 export type { MediaEnvelope };

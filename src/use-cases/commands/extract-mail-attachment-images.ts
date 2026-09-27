@@ -1,12 +1,14 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import type { PageRange } from '../../domain/page-range.ts';
-import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
+import { extractEml } from '../../infra/eml-parser-adapter.ts';
+import { readEmbeddedItem } from './embedded-item.ts';
+import { extractImagesFromBytes, imagesOfFiles, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 
 const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1), pages: pagesField.optional() });
@@ -66,6 +68,21 @@ const fromReferenceAttachment = async (
   return extractImagesFromBytes(bytes.value, item.name ?? '', hints.fetchHint, pages);
 };
 
+// A forwarded mail: its files come out of its MIME source through the .eml
+// parser, and every image they hold comes back named after its file (a scanned
+// contract inside a forwarded mail, 2026-09-23, was otherwise unreachable).
+const fromItemAttachment = async (graph: GraphClient, attachmentPath: string, pages: PageRange | undefined): Promise<Result<unknown, GraphError>> => {
+  const embedded = await readEmbeddedItem(graph, attachmentPath);
+  if (!embedded.ok) return embedded;
+  if (embedded.value.kind === 'other')
+    return err({ type: 'api_error', status: 415, message: 'This itemAttachment is an embedded event or contact, which carries no document to extract images from.' });
+  const mail = await extractEml(embedded.value.source);
+  if (!mail.ok) return mail;
+  const files = mail.value.attachments.map((a) => ({ name: a.fileName ?? 'unnamed', bytes: a.content ?? new Uint8Array() }));
+  const { skipped, ...media } = await imagesOfFiles(files, pages);
+  return ok(skipped.length === 0 ? media : { ...media, note: `Neither images nor documents, so skipped: ${skipped.join(', ')}.` });
+};
+
 /**
  * Shared by every caller that can name an attachment by a Graph path: mail
  * here, and one post of a group thread. The path and the hints are the only
@@ -84,7 +101,7 @@ const extractAttachmentImages = async (graph: GraphClient, attachmentPath: strin
     case '#microsoft.graph.referenceAttachment':
       return fromReferenceAttachment(graph, a, hints, pages);
     case '#microsoft.graph.itemAttachment':
-      return err({ type: 'api_error', status: 415, message: 'itemAttachment (embedded mail / event / contact) has no document to extract images from.' });
+      return fromItemAttachment(graph, attachmentPath, pages);
     default:
       return err({ type: 'api_error', status: 400, message: `unsupported attachment type: ${odataType}` });
   }
@@ -99,7 +116,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'Extract the embedded images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. itemAttachment and unsupported formats return a 415.',
+    'Extract the embedded images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. An embedded mail (a forwarded message) is opened: its image files come back as they are and its pdf / Office files through the extractor, each path prefixed with its file name, and `--pages` narrows every PDF among them; an embedded event or contact, and unsupported formats, return a 415.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',

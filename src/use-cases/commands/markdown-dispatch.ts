@@ -49,10 +49,12 @@ type BytesToMarkdownOptions = {
 // attachments — they cannot reach a file INSIDE a container. Nested
 // conversions therefore always use this container-neutral wording.
 const NESTED_HINTS: ConversionHints = {
-  pdfNoText: 'pdf has no extractable text layer (scanned / image-only) — extract it from the archive/message first, then read it with a vision-capable model',
+  pdfNoText:
+    'pdf has no extractable text layer (scanned / image-only) — extract it from the archive/message first (for a mail or a forwarded mail, `extract-mail-attachment-images --pages` returns its page images), then read it with a vision-capable model',
   legacyPpt:
     'ppt (legacy PowerPoint, OLE binary) has no markdown path — extract it, convert it to PDF first (e.g. upload to OneDrive and use `download-drive-item-as-pdf`), then read it with a vision model',
-  image: (ext) => `${ext} is an image — extract it from the archive/message first, then read it with a vision-capable model`,
+  image: (ext) =>
+    `${ext} is an image — extract it from the archive/message first (for a mail or a forwarded mail, \`extract-mail-attachment-images\` returns it), then read it with a vision-capable model`,
   generic: (ext) => `${ext} is not a convertible Office/text format (images, binaries, and nested archives are not unpacked here)`,
 };
 

@@ -11,7 +11,8 @@ import {
   type EmbeddedEvent,
   type EmbeddedMessage,
 } from './embedded-item-to-markdown.ts';
-import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
+import { base64ToBytes } from './fetch-raw-bytes.ts';
+import { readEmbeddedItem } from './embedded-item.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
@@ -118,13 +119,10 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // expanded item. An attachment that already carries `item` renders from it.
 const readItemAttachment = async (graph: GraphClient, a: Record<string, unknown>, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   if (a['item'] !== undefined) return convertItemAttachment(a);
-  const expanded = await graph.get(`${attachmentPath}?$expand=microsoft.graph.itemattachment/item`);
-  if (!expanded.ok) return expanded;
-  const attachment = expanded.value as { readonly item?: Record<string, unknown> };
-  if (attachment.item?.['@odata.type'] !== '#microsoft.graph.message') return convertItemAttachment(attachment);
-  const source = await fetchRawBytes(graph, `${attachmentPath}/$value`);
-  if (!source.ok) return source;
-  return bytesToMarkdown(source.value, 'attached-message.eml', opts, NESTED_HINTS);
+  const embedded = await readEmbeddedItem(graph, attachmentPath);
+  if (!embedded.ok) return embedded;
+  if (embedded.value.kind === 'other') return convertItemAttachment(embedded.value.attachment);
+  return bytesToMarkdown(embedded.value.source, 'attached-message.eml', opts, NESTED_HINTS);
 };
 
 // Route an ALREADY-FETCHED attachment object to markdown by its polymorphic

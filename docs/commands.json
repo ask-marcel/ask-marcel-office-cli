@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T03:12:50.421Z",
+  "generatedAt": "2026-09-27T12:42:30.108Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1211,7 +1211,7 @@
     },
     {
       "name": "extract-group-post-attachment-images",
-      "summary": "Extract the embedded images from an attachment on one post of a unified (Microsoft 365) group thread, the `extract-mail-attachment-images` sibling for a group inbox and sharing its pipeline. Handles a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. itemAttachment and unsupported formats return a 415. This is how a diagram inside a document posted to a group survives into a searchable form.",
+      "summary": "Extract the embedded images from an attachment on one post of a unified (Microsoft 365) group thread, the `extract-mail-attachment-images` sibling for a group inbox and sharing its pipeline. Handles a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. An embedded mail (a forwarded message) is opened: its image files come back as they are and its pdf / Office files through the extractor, each path prefixed with its file name; an embedded event or contact, and unsupported formats, return a 415. This is how a diagram inside a document posted to a group survives into a searchable form.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/threads/{thread-id}/posts/{post-id}/attachments/{attachment-id}",
@@ -1267,7 +1267,7 @@
     },
     {
       "name": "extract-mail-attachment-images",
-      "summary": "Extract the embedded images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. itemAttachment and unsupported formats return a 415.",
+      "summary": "Extract the embedded images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. An embedded mail (a forwarded message) is opened: its image files come back as they are and its pdf / Office files through the extractor, each path prefixed with its file name, and `--pages` narrows every PDF among them; an embedded event or contact, and unsupported formats, return a 415.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/messages/{message-id}/attachments/{attachment-id}",
