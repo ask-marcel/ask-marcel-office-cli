@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T13:14:04.545Z",
+  "generatedAt": "2026-09-27T15:10:44.034Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -854,7 +854,7 @@
     },
     {
       "name": "diff-drive-item-versions",
-      "summary": "What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.",
+      "summary": "What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content and /drives/{drive-id}/items/{item-id}/content",
@@ -902,15 +902,21 @@
           "key": "maxCells",
           "required": false,
           "description": "Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first."
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office diff-drive-item-versions --drive-id 'b!1234' --item-id '01ABC' --before yesterday",
-      "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed, versionId }` — `text` is the unified diff; `note` instead says when nothing was saved after the instant, when the two render the same, or when they differ too much to diff (no counts).",
+      "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed, versionId }` — `text` is the unified diff; `note` says when nothing was saved after the instant, when the two render the same, when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.",
       "needsElevatedToken": true
     },
     {
       "name": "diff-drive-items",
-      "summary": "Compare two OneDrive or SharePoint files and answer only what differs: each is converted to markdown the way `download-drive-item-as-markdown` converts it, and the answer is a unified diff of the two renders (`--- a/<first>`, `+++ b/<second>`, hunks with three lines of context) with the count of added and removed lines. Made for a document that is saved as a new file each week (a status deck, a task list): the diff costs the lines that moved instead of two full reads. `--include-metadata true` renders comments and tracked changes too, so a comment added between the two shows up. Two unrelated files (more than 1,000 changed lines) answer a note instead of a diff. For two versions of the same file, `diff-drive-item-versions`.",
+      "summary": "Compare two OneDrive or SharePoint files and answer only what differs: each is converted to markdown the way `download-drive-item-as-markdown` converts it, and the answer is a unified diff of the two renders (`--- a/<first>`, `+++ b/<second>`, hunks with three lines of context) with the count of added and removed lines. Made for a document that is saved as a new file each week (a status deck, a task list): the diff costs the lines that moved instead of two full reads. `--include-metadata true` renders comments and tracked changes too, so a comment added between the two shows up. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Two unrelated files (more than 1,000 changed lines) answer a note instead of a diff. For two versions of the same file, `diff-drive-item-versions`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/content and /drives/{other-drive-id}/items/{other-item-id}/content",
@@ -958,10 +964,16 @@
           "key": "maxCells",
           "required": false,
           "description": "Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first."
+        },
+        {
+          "name": "sheet",
+          "key": "sheet",
+          "required": false,
+          "description": "Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused."
         }
       ],
       "example": "ask-marcel-office diff-drive-items --drive-id 'b!1234' --item-id '01WEEK6' --other-drive-id 'b!1234' --other-item-id '01WEEK7'",
-      "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed }` — `text` is the unified diff; `note` instead says when the two render the same (empty `text`, zero counts) or differ too much to diff (no counts)."
+      "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed }` — `text` is the unified diff; `note` says when the two render the same (empty `text`, zero counts), when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side."
     },
     {
       "name": "download-drive-item-as-markdown",

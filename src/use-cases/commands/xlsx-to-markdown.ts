@@ -74,8 +74,12 @@ const csvToMarkdownTable = (csv: string): string => {
   return renderTable(records, colCount);
 };
 
+// How a table left out by the cap begins, so a reader of the render (the diffs) can
+// tell a sheet it did not compare from a sheet that did not change.
+const OMITTED_TABLE_MARKER = '> _Table omitted:';
+
 const truncationHint = (rows: number, columns: number, maxCells: number): string =>
-  `> _Table omitted: this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap. Raise the cap with \`--max-cells <N>\`, with \`--output-path\` to land a large render on disk; a workbook in OneDrive or SharePoint also reads band-by-band through \`get-excel-used-range\`, then \`get-excel-range --address 'A1:Cn'\` per band._`;
+  `${OMITTED_TABLE_MARKER} this sheet's used range is ~${(rows * columns).toLocaleString()} cells (${rows.toLocaleString()} rows × ${columns.toLocaleString()} cols), over the \`--max-cells\` ${maxCells.toLocaleString()} render cap. Raise the cap with \`--max-cells <N>\`, with \`--output-path\` to land a large render on disk; a workbook in OneDrive or SharePoint also reads band-by-band through \`get-excel-used-range\`, then \`get-excel-range --address 'A1:Cn'\` per band._`;
 
 // Render a CSV to a markdown table, or a truncation hint when the cell count
 // (rows × the widest row) exceeds `maxCells`. Parsing allocates ~O(input); the
@@ -149,5 +153,5 @@ const MAX_CELLS_OPTION: CommandOptionMeta = {
 /** `--sheet` narrows a workbook; on anything else it is refused rather than silently ignored. */
 const refuseSheet = (what: string): Result<never, GraphError> => err({ type: 'validation_error', message: `--sheet applies to a workbook (xlsx, xlsm, xls); ${what}` });
 
-export { csvToMarkdownSection, csvToMarkdownTable, MAX_CELLS_OPTION, maxCellsField, refuseSheet, renderCsvCapped, SHEET_OPTION, xlsxToMarkdown };
+export { csvToMarkdownSection, csvToMarkdownTable, MAX_CELLS_OPTION, maxCellsField, OMITTED_TABLE_MARKER, refuseSheet, renderCsvCapped, SHEET_OPTION, xlsxToMarkdown };
 export type { XlsxToMarkdownOptions };

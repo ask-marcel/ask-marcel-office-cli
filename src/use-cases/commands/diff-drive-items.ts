@@ -4,10 +4,10 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
 import { diffEnvelope, readDriveFile, renderSide } from './drive-item-diff.ts';
-import type { RenderOptions } from './drive-item-diff.ts';
+import type { Render, RenderOptions } from './drive-item-diff.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
+import { MAX_CELLS_OPTION, maxCellsField, SHEET_OPTION } from './xlsx-to-markdown.ts';
 
 const schema = z.object({
   driveId: z.string().min(1),
@@ -16,29 +16,30 @@ const schema = z.object({
   otherItemId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
   maxCells: maxCellsField,
+  sheet: z.string().min(1).optional(),
 });
 
-const renderFile = async (graph: GraphClient, driveId: string, itemId: string, opts: RenderOptions): Promise<Result<{ name: string; text: string }, GraphError>> => {
+const renderFile = async (graph: GraphClient, driveId: string, itemId: string, opts: RenderOptions): Promise<Result<{ name: string; render: Render }, GraphError>> => {
   const file = await readDriveFile(graph, driveId, itemId);
   if (!file.ok) return file;
-  const text = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
-  return text.ok ? ok({ name: file.value.name, text: text.value }) : text;
+  const render = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
+  return render.ok ? ok({ name: file.value.name, render: render.value }) : render;
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId, otherDriveId, otherItemId, maxCells } = parsed.data;
-  const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells };
+  const { driveId, itemId, otherDriveId, otherItemId, maxCells, sheet } = parsed.data;
+  const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
   const [from, to] = await Promise.all([renderFile(graph, driveId, itemId, opts), renderFile(graph, otherDriveId, otherItemId, opts)]);
   if (!from.ok) return from;
   if (!to.ok) return to;
-  return ok(diffEnvelope(`a/${from.value.name}`, from.value.text, `b/${to.value.name}`, to.value.text, 'The two files render to the same markdown.'));
+  return ok(diffEnvelope(`a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, 'The two files render to the same markdown.'));
 };
 
 const meta: CommandMeta = {
   summary:
-    'Compare two OneDrive or SharePoint files and answer only what differs: each is converted to markdown the way `download-drive-item-as-markdown` converts it, and the answer is a unified diff of the two renders (`--- a/<first>`, `+++ b/<second>`, hunks with three lines of context) with the count of added and removed lines. Made for a document that is saved as a new file each week (a status deck, a task list): the diff costs the lines that moved instead of two full reads. `--include-metadata true` renders comments and tracked changes too, so a comment added between the two shows up. Two unrelated files (more than 1,000 changed lines) answer a note instead of a diff. For two versions of the same file, `diff-drive-item-versions`.',
+    'Compare two OneDrive or SharePoint files and answer only what differs: each is converted to markdown the way `download-drive-item-as-markdown` converts it, and the answer is a unified diff of the two renders (`--- a/<first>`, `+++ b/<second>`, hunks with three lines of context) with the count of added and removed lines. Made for a document that is saved as a new file each week (a status deck, a task list): the diff costs the lines that moved instead of two full reads. `--include-metadata true` renders comments and tracked changes too, so a comment added between the two shows up. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Two unrelated files (more than 1,000 changed lines) answer a note instead of a diff. For two versions of the same file, `diff-drive-item-versions`.',
   category: 'drive',
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/content and /drives/{other-drive-id}/items/{other-item-id}/content',
@@ -62,10 +63,11 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     MAX_CELLS_OPTION,
+    SHEET_OPTION,
   ],
   example: "ask-marcel-office diff-drive-items --drive-id 'b!1234' --item-id '01WEEK6' --other-drive-id 'b!1234' --other-item-id '01WEEK7'",
   responseShape:
-    '`{ contentType: "text/x-diff", size, text, added, removed }` — `text` is the unified diff; `note` instead says when the two render the same (empty `text`, zero counts) or differ too much to diff (no counts).',
+    '`{ contentType: "text/x-diff", size, text, added, removed }` — `text` is the unified diff; `note` says when the two render the same (empty `text`, zero counts), when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.',
 };
 
 export { execute, meta, schema };
