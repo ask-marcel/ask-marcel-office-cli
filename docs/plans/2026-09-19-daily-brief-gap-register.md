@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E shipped 2026-09-26 and 2026-09-27 from the register of 24 September; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E shipped 2026-09-26 and 2026-09-27 from the register of 24 September, which is now complete; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -192,5 +192,8 @@ Shipped 2026-09-27: `extract-mail-attachment-images` opens a forwarded mail and 
 the scanned PDFs it carries (62, second half), and Graph byte reads got the five-minute budget (a
 20 MB `$value` had outlived the 60-second one).
 
-Still open: the To Do link shape (46) opens To Do but not the task, so tasks stay without a
-`webUrl`.
+Shipped 2026-09-27: the To Do link (46). The shape was confirmed by hand:
+`https://to-do.office.com/tasks/id/<id>/details` with the id as Graph gives it opens the task, while the
+same link with its `=` padding percent-encoded opens To Do without it; every task from the four To Do
+task reads now carries `webUrl`. Every entry of the register of 24 September is now shipped, documented,
+or ruled out.

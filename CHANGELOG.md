@@ -111,7 +111,8 @@ of arriving as page source. `read-mail-attachment` and
 `download-drive-item-as-markdown` and `convert-local-file-to-markdown` take
 `--sheet`, and the cell-cap hint names what every source can do.
 `--due-before` on `list-todo-tasks` and `list-incomplete-todo-tasks` keeps the
-tasks due before an instant, named days in the user's zone. Channel
+tasks due before an instant, named days in the user's zone, and every To Do
+task carries `webUrl`, the link the To Do web app opens it with. Channel
 transcripts say who reacted and when. A SharePoint link the user cannot open
 names its OneDrive owner or its site, with a hint on asking for access. A
 mistyped command, flag or parameter ends with "Did you mean ...?" on the CLI,
