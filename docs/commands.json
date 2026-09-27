@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-26T15:31:21.153Z",
+  "generatedAt": "2026-09-27T02:20:43.987Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -5474,7 +5474,7 @@
     },
     {
       "name": "list-mail-folders",
-      "summary": "List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). Graph answers ten folders a page, so a mailbox with more top-level folders needs the `next:` footer or `--top 100`; child folders come from `list-mail-child-folders`, and `list-mail-folders-delta` lists every folder at every depth in one walk.",
+      "summary": "List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). The CLI asks for 100 folders a page (Graph’s own default is ten, which once hid an eleventh folder); a larger mailbox continues through the `next:` footer, and `--top` sets the page. Child folders come from `list-mail-child-folders`, and `list-mail-folders-delta` lists every folder at every depth in one walk.",
       "category": "mail",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/mailFolders",

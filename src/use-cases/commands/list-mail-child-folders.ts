@@ -9,7 +9,8 @@ const baseSchema = z.object({ mailFolderId: z.string().min(1), includeHiddenFold
 // builder and has to be emitted by the path itself.
 const { execute, schema } = buildListCommand(
   (p) => `/me/mailFolders/${p.mailFolderId}/childFolders${p.includeHiddenFolders === 'true' ? '?includeHiddenFolders=true' : ''}`,
-  baseSchema
+  baseSchema,
+  { defaultTop: '100' } // Graph's default page is ten folders, as on list-mail-folders.
 );
 
 const meta: CommandMeta = {
