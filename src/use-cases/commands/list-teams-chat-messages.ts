@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, type SubstrateMessage } from './substrate-message.ts';
+import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople, type SubstrateMessage } from './substrate-message.ts';
 
 // Per-chat message history via the Microsoft Teams chat substrate. Same
 // chatsvcagg-audience bearer as `list-teams-chats-with-messages`. Returns
@@ -35,14 +35,15 @@ const execute: Command['execute'] = async (graph, params) => {
   const fetched = await graph.teamsChat(`/api/v1/chats/${encodeURIComponent(chatId)}/messages`);
   if (!fetched.ok) return fetched;
   const body = fetched.value as Envelope;
-  const messages = (body.messages ?? []).map((m) => enrichSubstrateMessage(chatId, m));
+  const people = substratePeople(body.messages ?? []);
+  const messages = (body.messages ?? []).map((m) => enrichSubstrateMessage(chatId, m, people));
   const kept = filterSubstrateMessages(messages, filter.value);
   return ok({ ...body, messages: kept, ...(kept.length === messages.length ? {} : { omitted: messages.length - kept.length }) });
 };
 
 const meta: CommandMeta = {
   summary:
-    "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling).",
+    "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling). Each message carries `webUrl`, `event` for a system entry, and, when it has any, `files` (name, type, `url` and `shareUrl`, either of which `resolve-drive-share-link` turns into drive ids) and `reactions` (type, who, when, oldest first).",
   category: 'chats',
   needsSubstrateToken: 'chatsvcagg',
   graphMethod: 'GET',

@@ -3,7 +3,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
-import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor } from './substrate-message.ts';
+import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople } from './substrate-message.ts';
 
 // Deep Teams chat history via the IC3 messaging substrate at
 // `teams.microsoft.com/api/chatsvc/<region>/v1/users/ME/conversations/{id}/messages`.
@@ -59,7 +59,20 @@ type Ic3MessagesResponse = {
 
 // Default projection — covers the "who said what, when" question without the
 // IC3 envelope noise. Override by passing `--full true`.
-const PROJECTED_KEYS = ['id', 'sequenceId', 'composetime', 'originalarrivaltime', 'messagetype', 'event', 'from', 'imdisplayname', 'content', 'webUrl'] as const;
+const PROJECTED_KEYS = [
+  'id',
+  'sequenceId',
+  'composetime',
+  'originalarrivaltime',
+  'messagetype',
+  'event',
+  'from',
+  'imdisplayname',
+  'content',
+  'webUrl',
+  'files',
+  'reactions',
+] as const;
 const DEFAULT_MAX_CONTENT_CHARS = 4096;
 
 type ProjectedMessage = Readonly<Record<string, unknown>>;
@@ -130,7 +143,8 @@ const execute: Command['execute'] = async (graph, params) => {
     nextSyncState = syncStateUrl;
   }
 
-  const enriched = accumulated.map((m) => enrichSubstrateMessage(chatId, m));
+  const people = substratePeople(accumulated);
+  const enriched = accumulated.map((m) => enrichSubstrateMessage(chatId, m, people));
   const kept = filterSubstrateMessages(enriched, filter.value);
   // Apply slim projection unless caller explicitly opted into the raw IC3 shape.
   const projectedMessages: ReadonlyArray<ProjectedMessage | Ic3MessageRaw> = fullMode ? kept : kept.map((m) => projectMessage(m, maxContentChars));
@@ -147,7 +161,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+    "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` (plus `webUrl`, and `event`, `files` and `reactions` when present) and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
   category: 'chats',
   needsSubstrateToken: 'ic3',
   graphMethod: 'GET',

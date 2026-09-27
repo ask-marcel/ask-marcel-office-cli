@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T02:20:43.987Z",
+  "generatedAt": "2026-09-27T02:57:36.672Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -3046,7 +3046,7 @@
         }
       ],
       "example": "ask-marcel-office get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
-      "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**",
+      "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc., plus `webUrl`, and `event`, `files` and `reactions` when present. **Microsoft-internal schema — fields may change without notice.**",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -7803,7 +7803,7 @@
     },
     {
       "name": "list-teams-chat-history",
-      "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
+      "summary": "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` (plus `webUrl`, and `event`, `files` and `reactions` when present) and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations/{chat-id}/messages?startTime={since}",
@@ -7885,7 +7885,7 @@
     },
     {
       "name": "list-teams-chat-messages",
-      "summary": "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling).",
+      "summary": "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling). Each message carries `webUrl`, `event` for a system entry, and, when it has any, `files` (name, type, `url` and `shareUrl`, either of which `resolve-drive-share-link` turns into drive ids) and `reactions` (type, who, when, oldest first).",
       "category": "chats",
       "graphMethod": "GET",
       "graphPathTemplate": "https://teams.microsoft.com/api/csa/{region}/api/v1/chats/{chat-id}/messages",

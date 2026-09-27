@@ -32,7 +32,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
   responseShape:
-    'single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc. **Microsoft-internal schema — fields may change without notice.**',
+    'single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc., plus `webUrl`, and `event`, `files` and `reactions` when present. **Microsoft-internal schema — fields may change without notice.**',
   stability: 'experimental',
 };
 
