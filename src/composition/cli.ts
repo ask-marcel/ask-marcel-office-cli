@@ -114,7 +114,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // `optionFlags`: the flags a mistyped one is compared with — the command's own
   // plus the global ones for a registry command, the global ones at the top level.
   const onCommanderError = (err: CommanderError, optionFlags: ReadonlyArray<string>): void => {
-    if (err.code === 'commander.helpDisplayed' || err.code === 'commander.version' || err.code === 'commander.help') return;
+    if (err.code === 'commander.helpDisplayed' || err.code === 'commander.help') return;
     // Commander prefixes its messages with `error: ` (e.g. "error: unknown option '--foo'"),
     // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
     // redundant prefix so consumers don't see `{"ok":false,"error":"error: ..."}`.
@@ -172,7 +172,6 @@ const buildCli = (deps: BuildCliDeps): Command => {
   program
     .name('ask-marcel-office')
     .description(surfaceDescription)
-    .version(version ?? '0.0.0')
     // override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
     // sentence in the TOP-LEVEL `ask-marcel-office --help` listing. Per-subcommand
@@ -255,6 +254,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'For full per-command help:   ask-marcel-office <command> --help',
       'For machine-readable docs:   ask-marcel-office help-json [--terse] [--category mail]',
       'For per-command Markdown:    ask-marcel-office docs <command>',
+      'For the installed version:   ask-marcel-office --version   (alone: on a command it is an unknown flag)',
       // `mcp` is intercepted in main.ts, not registered as a subcommand (that
       // would pull the SDK into every command's module graph), so Commander
       // cannot list it by itself. Name it here or it is undiscoverable.
@@ -268,12 +268,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // `preAction` of every subcommand would be wrong (it never fires for the
   // bare case); instead we override `parseAsync` itself.
   const originalParseAsync = program.parseAsync.bind(program);
+  // `--version` or `-V`, alone or beside an output format (`--output json --version`).
+  const isVersionRequest = (userArgs: ReadonlyArray<string>): boolean => {
+    const rest = userArgs.filter((arg, i) => arg !== '--output' && userArgs[i - 1] !== '--output' && !arg.startsWith('--output='));
+    return rest.length === 1 && (rest[0] === '--version' || rest[0] === '-V');
+  };
   program.parseAsync = async (argv?: readonly string[], options?: { readonly from?: 'node' | 'electron' | 'user' }) => {
     const args = argv ?? process.argv;
     const from = options?.from ?? 'node';
     const userArgsStart = from === 'node' || from === 'electron' ? 2 : 0;
     if (args.length <= userArgsStart) {
       program.outputHelp();
+      return program;
+    }
+    // Commander's version flag was global: `diff-drive-item-versions … --version 3.0`
+    // (a mistyped --version-id) printed the version, dropped the command and
+    // exited 0. It is answered here, as the whole request, and nowhere else.
+    if (isVersionRequest(args.slice(userArgsStart))) {
+      process.stdout.write(`${version ?? '0.0.0'}\n`);
       return program;
     }
     const fixedOptions = options === undefined ? undefined : { from };
