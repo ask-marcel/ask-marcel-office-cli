@@ -60,7 +60,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
   responseShape:
-    'Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).',
+    'Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc., plus `webUrl` (the Teams deep link), `event` on a system entry, and `files` / `reactions` when it has any; `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).',
   stability: 'experimental',
 };
 

@@ -66,7 +66,7 @@ const PAGES_OPTION: CommandOptionMeta = {
   key: 'pages',
   required: false,
   description:
-    'PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type.',
+    'PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type, except that on a forwarded mail it narrows each PDF the mail holds and leaves its other files whole.',
 };
 
 type NamedFile = { readonly name: string; readonly bytes: Uint8Array };

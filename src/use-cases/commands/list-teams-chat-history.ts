@@ -199,7 +199,7 @@ const meta: CommandMeta = {
       key: 'full',
       required: false,
       description:
-        "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` — covering 'who said what, when' without the IC3 envelope noise.",
+        "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, event, from, imdisplayname, content, webUrl, files, reactions` — covering 'who said what, when' without the IC3 envelope noise.",
     },
     {
       name: 'max-content-chars',
@@ -218,7 +218,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
   responseShape:
-    "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
+    "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, event?, from, imdisplayname, content, webUrl, files?, reactions? }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the walk reached the start of what was asked: the chat's earliest message, or the `--since` bound. `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. **Microsoft-internal schema — fields may change without notice.**",
   stability: 'experimental',
 };
 

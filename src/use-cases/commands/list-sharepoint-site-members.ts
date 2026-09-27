@@ -61,7 +61,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    "Who can open a SharePoint site: the owners and members of the Microsoft 365 group that owns it (name, mail, user type), and the SharePoint groups and sharing links holding its document library, with their roles (`owner`, `write`, `read`). Graph does not list who is inside a SharePoint group, so the group's people are the fewest who can open the site, and the `note` says so. For a wiki page holding credentials or a sensitive document, this is how many people can read it. Find the site id with `search-sharepoint-sites-by-name` or `get-sharepoint-site-by-path`.",
+    "Who can open a SharePoint site: the owners and members of the Microsoft 365 group that owns it (name, mail, user type), and the SharePoint groups and sharing links holding its document library, with their roles (`owner`, `write`, `read`). Graph does not list who is inside a SharePoint group, so the group's people are the fewest who can open the site, and the `note` says so. For a page or file that inherits the site's permissions (a wiki page holding credentials, a sensitive document), this is who can read it; an item with its own sharing is not covered. Graph shows a caller who is not a site owner only the grants that apply to them. Find the site id with `search-sharepoint-sites-by-name` or `get-sharepoint-site-by-path`.",
   category: 'sharepoint',
   graphMethod: 'GET',
   graphPathTemplate: "/sites/{site-id}/drive, then its root permissions and the owning group's owners and members",

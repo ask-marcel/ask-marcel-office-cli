@@ -14,7 +14,7 @@ const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupI
 
 const meta: CommandMeta = {
   summary:
-    "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships` and ask each here. Only `--select` is advertised; slice and sort client-side.",
+    "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships`, keep the ones whose `groupTypes` holds `Unified` (security groups, distribution lists and roles own no plans), and ask each here. Only `--select` is advertised; slice and sort client-side.",
   category: 'tasks',
   graphMethod: 'GET',
   graphPathTemplate: '/groups/{group-id}/planner/plans',

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T17:24:32.377Z",
+  "generatedAt": "2026-09-27T17:25:10.615Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1240,7 +1240,7 @@
           "name": "pages",
           "key": "pages",
           "required": false,
-          "description": "PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type."
+          "description": "PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type, except that on a forwarded mail it narrows each PDF the mail holds and leaves its other files whole."
         },
         {
           "name": "tenant-id",
@@ -1333,7 +1333,7 @@
           "name": "pages",
           "key": "pages",
           "required": false,
-          "description": "PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type."
+          "description": "PDF only: extract the images of these pages alone, e.g. `1-3` or `1,4,6-8` (pages count from 1). A scanned PDF holds one image per page, so this reads a long scan a few pages at a time. Refused on any other file type, except that on a forwarded mail it narrows each PDF the mail holds and leaves its other files whole."
         }
       ],
       "example": "ask-marcel-office extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
@@ -4994,7 +4994,7 @@
     },
     {
       "name": "list-group-planner-plans",
-      "summary": "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships` and ask each here. Only `--select` is advertised; slice and sort client-side.",
+      "summary": "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships`, keep the ones whose `groupTypes` holds `Unified` (security groups, distribution lists and roles own no plans), and ask each here. Only `--select` is advertised; slice and sort client-side.",
       "category": "tasks",
       "graphMethod": "GET",
       "graphPathTemplate": "/groups/{group-id}/planner/plans",
@@ -7148,7 +7148,7 @@
     },
     {
       "name": "list-sharepoint-site-members",
-      "summary": "Who can open a SharePoint site: the owners and members of the Microsoft 365 group that owns it (name, mail, user type), and the SharePoint groups and sharing links holding its document library, with their roles (`owner`, `write`, `read`). Graph does not list who is inside a SharePoint group, so the group's people are the fewest who can open the site, and the `note` says so. For a wiki page holding credentials or a sensitive document, this is how many people can read it. Find the site id with `search-sharepoint-sites-by-name` or `get-sharepoint-site-by-path`.",
+      "summary": "Who can open a SharePoint site: the owners and members of the Microsoft 365 group that owns it (name, mail, user type), and the SharePoint groups and sharing links holding its document library, with their roles (`owner`, `write`, `read`). Graph does not list who is inside a SharePoint group, so the group's people are the fewest who can open the site, and the `note` says so. For a page or file that inherits the site's permissions (a wiki page holding credentials, a sensitive document), this is who can read it; an item with its own sharing is not covered. Graph shows a caller who is not a site owner only the grants that apply to them. Find the site id with `search-sharepoint-sites-by-name` or `get-sharepoint-site-by-path`.",
       "category": "sharepoint",
       "graphMethod": "GET",
       "graphPathTemplate": "/sites/{site-id}/drive, then its root permissions and the owning group's owners and members",
@@ -7908,7 +7908,7 @@
           "name": "full",
           "key": "full",
           "required": false,
-          "description": "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` — covering 'who said what, when' without the IC3 envelope noise."
+          "description": "Pass `--full true` to return the raw IC3 substrate shape (every field on every message, no truncation). Default (`--full false`, or omitted) projects each message down to `id, sequenceId, composetime, originalarrivaltime, messagetype, event, from, imdisplayname, content, webUrl, files, reactions` — covering 'who said what, when' without the IC3 envelope noise."
         },
         {
           "name": "max-content-chars",
@@ -7950,7 +7950,7 @@
         }
       ],
       "example": "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
-      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the chat's earliest message was reached. **Microsoft-internal schema — fields may change without notice.**",
+      "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, event?, from, imdisplayname, content, webUrl, files?, reactions? }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the walk reached the start of what was asked: the chat's earliest message, or the `--since` bound. `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. **Microsoft-internal schema — fields may change without notice.**",
       "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
@@ -7996,7 +7996,7 @@
         }
       ],
       "example": "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
-      "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
+      "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc., plus `webUrl` (the Teams deep link), `event` on a system entry, and `files` / `reactions` when it has any; `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -8022,7 +8022,7 @@
         }
       ],
       "example": "ask-marcel-office list-teams-chats-with-messages --page-size 100",
-      "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (with each member's `mri`, `displayName`, `email`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
+      "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (each member's `mri` and display name; emails come from `list-chat-members`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
