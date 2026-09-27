@@ -4,64 +4,25 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
-### Fixed: what the daily brief asked for on every run, part one
+### Added: what changed in a file, as a line diff
 
-Ten small things a scheduled brief hit each morning (the register is
-`docs/plans/2026-09-19-daily-brief-gap-register.md`). Mail: `webLink` is in the
-slim default projection of `list-mail-messages`, `get-mail-message` and
-`search-mail-messages`, and `--exclude-meeting-responses true` on the two mail
-listings drops the Accepted / Declined / Tentative replies client-side (Graph
-refuses to filter on them), reporting the count as `excludedMeetingResponses`.
-Teams chats: every substrate message now carries `webUrl` (the Teams deep link)
-and, for a system entry, `event` (`call-started`, `call-ended`,
-`recording-posted`, `transcript-posted`, `member-added`, `member-removed`,
-`topic-changed`); `list-teams-chat-messages` and `list-teams-chat-history` take
-`--skip-system true` and `--mentions-me true`. Channel transcripts and threads
-print a `link:` line per post and reply, and every markdown command prints its
-`note` as a footer in text mode, not only in `--output json`.
-`microsoft-search-query --top` sizes the page (1 to 25 per entity type).
-`download-drive-item-version --before <datetime>` picks the newest version
-saved before an instant, relative dates included, and reports the `versionId`
-it chose. `ASKMARCEL_BINARY_TIMEOUT_MS` widens the 5-minute budget of a binary
-download. A `.loop` page whose Graph HTML conversion comes back empty says so
-in a `note` instead of reading as an empty page. Help text now says where the
-raw bytes of a mail attachment are (`get-mail-attachment`), what
-`resolve-drive-share-link` names its fields, where chat members' emails come
-from (`list-chat-members`), that Loop workspaces are found through
-`filetype:loop`, and that a scheduled run must `login` before the elevated
-commands.
+`diff-drive-items` compares two OneDrive or SharePoint files, and
+`diff-drive-item-versions` compares a version of one file with the live file.
+Both sides are converted to markdown the way `download-drive-item-as-markdown`
+converts them, and the answer is a unified diff with the counts of added and
+removed lines. The version is the one saved before `--before`, the one named by
+`--version-id`, or by default the one saved just before the live file (what the
+last save changed); a file saved once says there is nothing earlier to compare.
+`--include-metadata true` puts comments and tracked changes in both renders, so
+a comment added between them shows up. `--sheet` compares one sheet of a
+workbook, and a sheet over the `--max-cells` cap is named as not compared
+instead of passing for unchanged. Past 1,000 added or removed lines (a changed
+line counts once each way) the answer is a note naming the commands that read
+each side whole, and a long diff lands on disk with `--output-path`. Version
+history needs the second token `login` captures. New runtime dependency:
+`diff` (jsdiff, BSD-3-Clause, no dependencies of its own). Surface 204 -> 206.
 
-### Fixed: what the daily brief asked for on every run, part two
-
-Named days now mean the user's day: `today`, `yesterday`, `monday`,
-`start-of-week` and the other boundaries resolve at midnight in the run's time
-zone, which is the machine's, or `--tz <IANA zone>` on any command, or
-`ASKMARCEL_TZ`; instants, bare dates and offsets keep their meaning. A daylight
-change is honoured. `list-teams-chat-history --since <date>` hands the bound to
-the substrate itself (its `startTime`), so "since yesterday" is one small page
-instead of a walk. `--with-item true` on `list-recent-files` and the three
-insight listings reads the driveItem behind every row after the listing (Graph
-projects neither `lastModifiedDateTime` nor `lastModifiedBy` there and ignores
-`$expand=resource`), merging it as `item` or naming the failure as `itemError`.
-`--sheet <name>` on `read-mail-attachment` and
-`convert-mail-attachment-to-markdown` renders one sheet of a workbook, names
-the sheets when the name is unknown, and is refused on anything else.
-
-### Added: the Planner plans a group owns, and what a plan's labels are called
-
-`list-group-planner-plans --group-id <id>` lists the plans a Microsoft 365
-group owns (`/groups/{id}/planner/plans`, `--select` only). A group's plans are
-granted by membership and need not appear in `list-planner-plans`, which lists
-the plans shared with the signed-in user: a consumer found it answering no
-plans while the user's four groups held three between them. To find every plan
-a user can read, list their groups with `list-my-memberships` and ask each.
-`list-planner-plans` now says so in its summary instead of promising every plan
-across every group. `get-planner-plan-details --planner-plan-id <id>` reads a
-plan's details, whose `categoryDescriptions` name the labels a task carries as
-`category1` to `category25` in its `appliedCategories`. The full `help-json`
-manifest is now about 560 KB, and the help text says so.
-
-### Added: the larger reads the daily brief asked for
+### Added: a document's comments, the files changed since a date, and who can open a site
 
 `list-document-comments --drive-id --item-id` lists the comments of a Word,
 Excel or PowerPoint file as one list: author, date, where each sits (the
@@ -70,60 +31,140 @@ commented text, the cell as `Sheet!A1`, the slide), the text, and the people it
 comments now carry their sheet. `list-changed-files --since <date>` lists every
 file changed since an instant across all the libraries the user can open,
 newest first, in one sweep of the Microsoft Search index, with a `note` on what
-the index cannot promise (`--query` adds KQL). An `.eml` file or mail
-attachment, found by name or by the `message/rfc822` content type, converts to
-markdown the way an Outlook `.msg` does: the headers, the reply without its
-quoted chain (`--keep-quoted true` keeps it), and each attachment converted in
-turn. `--pages 1-3` on `extract-drive-item-images` and
-`extract-mail-attachment-images` returns the images of only those pages of a
-scanned PDF, and every image-only PDF refusal now names the image extractor.
-`--output raw-json` prints the payload alone for piping into `jq`: no envelope,
-no size hints, no paging cursors; a failure still prints the JSON error
-envelope. New runtime dependency: `postal-mime` (MIT-0, no dependencies of its
-own).
+the index cannot promise (`--query` adds KQL). `list-sharepoint-site-members
+--site-id` says who can open a site: the owners and members of the Microsoft
+365 group that owns it, and the SharePoint groups and sharing links holding its
+library with their roles, with a note that Graph cannot list who is inside a
+SharePoint group. It covers pages and files that inherit the site's
+permissions, and Graph shows a caller who is not a site owner only the grants
+that apply to them. Surface 206 -> 209.
 
-### Fixed: an old Loop version is no longer rendered as the current page
+### Added: the Planner plans a group owns, and what a plan's labels are called
 
-`download-drive-item-version --format markdown` sent a Loop, Fluid or
-Whiteboard version through Graph's HTML conversion, which answers any version
-with the current page; it now refuses such a version with
-`unsupported_version_render` and points at `--format original` (the version's
-own bytes) or `download-drive-item-as-markdown` (the current page). Its summary
-also says plainly that Graph's PDF conversion of a historical version returns
-the raw version bytes, flagged `passthrough: true`.
+`list-group-planner-plans --group-id <id>` lists the plans a Microsoft 365
+group owns (`/groups/{id}/planner/plans`, `--select` only). A group's plans are
+granted by membership and need not appear in `list-planner-plans`, which lists
+the plans shared with the signed-in user: a consumer found it answering no
+plans while the user's four groups held three between them. To find every plan
+a user can read, list their groups with `list-my-memberships`, keep the unified
+ones, and ask each; `list-planner-plans` now says so instead of promising every
+plan across every group. `get-planner-plan-details --planner-plan-id <id>`
+reads a plan's details, whose `categoryDescriptions` name the labels a task
+carries as `category1` to `category25` in its `appliedCategories`.
+Surface 209 -> 211.
 
-### Added: what the daily brief asked for, part three
+### Added: Teams chats carry their links, events, files and reactions
 
-`diff-drive-items` and `diff-drive-item-versions` answer only what changed:
-two files, or the version saved before `--before` (or a named `--version-id`)
-against the live file, are converted to markdown the way
-`download-drive-item-as-markdown` converts them and compared line by line, as
-a unified diff with the count of added and removed lines. `--include-metadata
-true` puts comments and tracked changes in both renders, so a comment added
-between them shows up; two unrelated files (more than 1,000 changed lines)
-answer a note instead of a diff. `list-sharepoint-site-members --site-id`
-says who can open a site: the owners and members of the Microsoft 365 group
-that owns it, and the SharePoint groups and sharing links holding its library
-with their roles, with a note that Graph cannot list who is inside a
-SharePoint group. HTML files convert to markdown, their head dropped, instead
-of arriving as page source. `read-mail-attachment` and
-`convert-mail-attachment-to-markdown` take `--max-cells`,
-`download-drive-item-as-markdown` and `convert-local-file-to-markdown` take
-`--sheet`, and the cell-cap hint names what every source can do.
-`--due-before` on `list-todo-tasks` and `list-incomplete-todo-tasks` keeps the
-tasks due before an instant, named days in the user's zone, and every To Do
-task carries `webUrl`, the link the To Do web app opens it with. Channel
-transcripts say who reacted and when. A SharePoint link the user cannot open
-names its OneDrive owner or its site, with a hint on asking for access. A
-mistyped command, flag or parameter ends with "Did you mean ...?" on the CLI,
-over MCP and in the library. A Loop page saved in the last 30 minutes carries
-a note that its render may trail the saves. Teams chat messages carry
-`files` (name, type, and the links `resolve-drive-share-link` resolves) and
-`reactions` (type, who, when) when they have any, and
+Every substrate chat message carries `webUrl` (the Teams deep link) and, for a
+system entry, `event` (`call-started`, `call-ended`, `recording-posted`,
+`transcript-posted`, `member-added`, `member-removed`, `topic-changed`, or
+`thread-activity:<kind>` for any other). Messages with any carry `files` (name,
+type, and the links `resolve-drive-share-link` resolves) and `reactions` (type,
+who, when). `list-teams-chat-messages` and `list-teams-chat-history` take
+`--skip-system true` and `--mentions-me true`, reporting the dropped count as
+`omitted`, and `list-teams-chat-history --since <date>` hands the bound to the
+substrate itself, so "since yesterday" is one small page instead of a walk.
 `extract-teams-chat-message-images --chat-id --message-id` downloads a
 message's pasted screenshots from Teams' media service as a media list for
-`--output-dir`. New runtime dependency: `diff` (jsdiff, BSD-3-Clause, no
-dependencies of its own).
+`--output-dir`; the image URL comes from message content, so the token goes
+only to the media service's own hosts over https. Channel transcripts and
+threads print a `link:` line per post and reply, and say who reacted and when.
+Surface 211 -> 212.
+
+### Added: more files read, and more of each
+
+An `.eml` file or mail attachment, found by name or by the `message/rfc822`
+content type, converts to markdown the way an Outlook `.msg` does: the headers,
+the reply without its quoted chain (`--keep-quoted true` keeps it), and each
+attachment converted in turn. HTML files convert to markdown, their head
+dropped and embedded `data:` images as `[image: alt]` unless `--inline-images
+true`; a page over 1 MB is flattened to plain text in one pass, each table row
+on one line with its cells separated by `|`. `--pages 1-3` on
+`extract-drive-item-images` and `extract-mail-attachment-images` returns the
+images of only those pages of a scanned PDF, and every image-only PDF refusal
+names the image extractor. `--sheet <name>` renders one sheet of a workbook on
+`read-mail-attachment`, `convert-mail-attachment-to-markdown`,
+`download-drive-item-as-markdown` and `convert-local-file-to-markdown`, names
+the sheets when the name is unknown, and is refused on anything else.
+`--max-cells` reaches every command that renders a sheet, the two zip commands,
+the event and group-post attachment converters and `download-drive-item-version
+--format markdown` included, and the cap hint names what every source can do.
+A `.loop` page whose Graph HTML conversion comes back empty says so in a
+`note`, and one saved in the last 30 minutes carries a note that its render may
+trail the saves. New runtime dependency: `postal-mime` (MIT-0, no dependencies
+of its own).
+
+### Added: mail, files and tasks for a scheduled brief
+
+`webLink` is in the slim default projection of `list-mail-messages`,
+`get-mail-message` and `search-mail-messages`, and `--exclude-meeting-responses
+true` on the two mail listings drops the Accepted / Declined / Tentative
+replies client-side (Graph refuses to filter on them), reporting the count as
+`excludedMeetingResponses`. `microsoft-search-query --top` sizes the page (1 to
+25 per entity type). `download-drive-item-version --before <datetime>` picks
+the newest version saved before an instant and reports the `versionId` it
+chose; when nothing was saved after the instant it reads the live file, flagged
+`current: true`. `--with-item true` on `list-recent-files` and the three
+insight listings reads the driveItem behind every row (Graph projects neither
+`lastModifiedDateTime` nor `lastModifiedBy` there and ignores
+`$expand=resource`), merging it as `item` or naming the failure as
+`itemError`. `--due-before` on `list-todo-tasks` and
+`list-incomplete-todo-tasks` keeps the tasks due before an instant, and every
+To Do task carries `webUrl`, the link the To Do web app opens it with, on every
+page `next-page` reads too (a deleted task in a delta page gets none). A
+SharePoint link the user cannot open names its OneDrive owner or its site, with
+a hint on asking for access.
+
+### Added: the command line meets an agent halfway
+
+A mistyped command, flag or parameter ends with "Did you mean ...?" on the
+CLI, over MCP and in the library: it matches by words and plurals, stays
+silent rather than offering an unrelated short flag, offers a lifecycle command
+its own flags, and names the flag a mistyped required one was meant to be.
+`--output raw-json` prints the payload alone for piping into `jq`: no envelope,
+no size hints, no paging cursors; a failure still prints the JSON error
+envelope. Named days (`today`, `yesterday`, `monday`, `start-of-week` and the
+other boundaries) resolve at midnight in the run's time zone: `--tz <IANA zone>`
+on any command, else `ASKMARCEL_TZ` (the only setting over MCP), else the
+machine's zone; a daylight change is honoured, and instants, bare dates and
+offsets keep their meaning. `ASKMARCEL_BINARY_TIMEOUT_MS` widens the 5-minute
+budget of a binary download. `next-page --top` keeps a page size on the
+continuation (Graph honours `Prefer: odata.maxpagesize` only on the request
+that carries it). Every markdown and media command prints its `note` in text
+mode, not only in `--output json`, and `--output-dir` keeps it while numbering
+two images of one name instead of overwriting the first. The help now says
+where the raw bytes of a mail attachment are (`get-mail-attachment`), what
+`resolve-drive-share-link` names its fields, where chat members' emails come
+from (`list-chat-members`), that Loop workspaces are found through
+`filetype:loop`, that a scheduled run must `login` before the elevated
+commands, that only the organiser's copy of an event records replies, that a
+message moved to another folder changes its id, that `list-mail-folders-delta`
+walks every depth, that a reply carries none of the original's files, and that
+a calendar view with no `--select` carries attendees and bodies.
+
+### Changed: what a consumer of 2.7.0 may notice
+
+- Named days resolve in the run's time zone, not in UTC.
+- `list-mail-folders` and `list-mail-child-folders` ask for 100 folders a page,
+  where Graph answers 10.
+- `webLink` joins the default mail projection; chat messages gain `webUrl`,
+  `event`, `files` and `reactions`, and the chat listings may report
+  `omitted`; To Do tasks gain `webUrl`.
+- `.html` / `.htm` and `.eml` files convert to markdown instead of arriving as
+  their source text.
+- Text output prints `note:` and `link:` lines.
+- `--output-path` refuses to write a converted text answer (markdown, a PDF's
+  text layer) under a `.pdf`, Office, OpenDocument, zip, `.msg` or image name,
+  which made a file no reader could open (`text_under_binary_extension`); the
+  text of `download-drive-item-content`, which is the file's own bytes, still
+  saves under the file's own name.
+- `download-drive-item-version --format markdown` refuses a Loop, Fluid or
+  Whiteboard version (`unsupported_version_render`).
+- A SharePoint link that could not be read carries `location` and `hint`.
+- `--version` answers only as the whole request (see Fixed).
+- An impossible instant (`2026-02-30T00:00:00Z`) is a validation error.
+- Library: the exported `GraphClient` type gains a required `teamsChatMedia`
+  method, so a hand-written client or a typed fake must add it.
 
 ### Fixed: an Outlook item attached to a mail could never be read
 
@@ -138,22 +179,36 @@ scanned contract inside a forwarded mail reaches a vision model. A byte read
 straight from Graph (an attachment's `$value`) now has the five-minute transfer
 budget instead of the 60-second one of a JSON read.
 
-### Fixed: the mail-folder listings ask for a hundred folders a page
+### Fixed: an old Loop version is no longer rendered as the current page
+
+`download-drive-item-version --format markdown` sent a Loop, Fluid or
+Whiteboard version through Graph's HTML conversion, which answers any version
+with the current page; it now refuses such a version and points at `--format
+original` (the version's own bytes) or `download-drive-item-as-markdown` (the
+current page). Its summary also says plainly that Graph's PDF conversion of a
+historical version returns the raw version bytes, flagged `passthrough: true`.
+
+### Fixed: the mail-folder listings missed the eleventh folder
 
 Graph answers ten mail folders a page, so a mailbox's eleventh top-level
-folder sat unseen behind a cursor. `list-mail-folders` and
-`list-mail-child-folders` now ask for 100 unless `--top` says otherwise.
+folder sat unseen behind a cursor. The two folder listings now ask for 100
+unless `--top` says otherwise.
 
-### Fixed: a text answer saved under a binary file name
+### Fixed: `--version` on a command line printed the version and dropped the command
 
-`--output-path` refuses to write a text answer (converted markdown, a PDF's
-text layer) under a `.pdf`, Office, OpenDocument, zip, `.msg` or image name,
-which made a file no reader could open, and names the raw-bytes commands
-instead. The help now says that only the organiser's copy of an event records
-replies, that a message moved to another folder changes its id, that mail
-folders come ten to a page (with `list-mail-folders-delta` walking every
-depth), that a reply carries none of the original's files, and that a
-calendar view with no `--select` carries attendees and bodies.
+Commander's version flag was global, so `diff-drive-item-versions ...
+--version 3.0` (a natural slip for `--version-id`) printed the CLI version,
+ignored `--output json` and exited 0, which an agent reads as success.
+`--version` and `-V` now answer only as the whole request (an output format
+beside them is fine); on a command they are an unknown flag like any other.
+
+### Fixed: an impossible instant crashed or shifted instead of being refused
+
+A strict ISO instant was never checked against the calendar:
+`2026-02-30T08:00:00Z` could silently become 2 March, and the new date filters
+would have crashed on `2026-13-01T00:00:00Z` with no JSON envelope. It now
+takes the same round trip a bare date already did and is refused with the list
+of accepted shapes.
 
 ## 2.7.0
 
@@ -185,7 +240,7 @@ the newest page by default, or with `--since` (an ISO instant or `7d`) every
 root post touched since then, walked through the delta route up to
 `--max-pages`; membership events are counted in the note, not shown.
 `convert-team-channel-message-to-markdown` renders one post and the replies
-under it as a thread. Both flatten , resolve attachment placeholders
+under it as a thread. Both flatten `<at>` mentions, resolve attachment placeholders
 into links, meeting, tab and card summaries, mark edits, deletions and
 reactions, and keep pasted images as placeholders unless `--inline-images
 true` fetches them from Graph `hostedContents`. `list-team-channel-messages-delta`
