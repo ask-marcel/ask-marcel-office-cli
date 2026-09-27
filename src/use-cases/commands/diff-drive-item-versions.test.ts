@@ -108,13 +108,10 @@ describe('diff-drive-item-versions', () => {
     expect(result.value).toMatchObject({ text: '', note: 'This version and the live file render to the same markdown.' });
   });
 
-  it('refuses a Loop page, whose old versions Graph cannot render, and a call with neither --version-id nor --before', async () => {
+  it('refuses a Loop page, whose old versions Graph cannot render', async () => {
     const loop = await run(graphFor({ ...HANDOVER, name: 'notes.loop' }), { before: '2026-09-22T12:00:00Z' });
     expect(loop.ok).toBe(false);
     if (!loop.ok) expect(loop.error).toMatchObject({ status: 415, code: 'unsupported_version_render' });
-    const neither = await run(graphFor(HANDOVER), {});
-    expect(neither.ok).toBe(false);
-    if (!neither.ok) expect(neither.error.message).toContain('pass --version-id <id>');
   });
 
   it('diffs the comments and tracked changes too with --include-metadata true', async () => {

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T15:44:47.522Z",
+  "generatedAt": "2026-09-27T16:10:56.100Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -854,7 +854,7 @@
     },
     {
       "name": "diff-drive-item-versions",
-      "summary": "What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.",
+      "summary": "What changed in a OneDrive or SharePoint file: the version saved before `--before`, the one named by `--version-id`, or by default the version saved just before the live one (what the last save changed), and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.",
       "category": "drive",
       "graphMethod": "GET",
       "graphPathTemplate": "/drives/{drive-id}/items/{item-id}/versions/{version-id}/content and /drives/{drive-id}/items/{item-id}/content",
@@ -876,7 +876,7 @@
           "name": "version-id",
           "key": "versionId",
           "required": false,
-          "description": "The older version to compare, from `list-drive-item-versions` (`4` and `4.0` both work). Not the first entry: that one is the live file."
+          "description": "The older version to compare, from `list-drive-item-versions` (`4` and `4.0` both work). Not the first entry: that one is the live file. Without this or `--before`, the version saved just before the live one is compared."
         },
         {
           "name": "before",
@@ -1151,7 +1151,7 @@
           "name": "before",
           "key": "before",
           "required": false,
-          "description": "Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as `versionId`. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
+          "description": "Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as `versionId`. When nothing was saved after the instant, that version is the live file, which is read as the file itself and flagged `current: true` with a note. ISO 8601 UTC (e.g. `2026-04-01T00:00:00Z` or `2026-04-01`) OR a relative shape: `7d` / `1w` / `2h` / `30m` (past), `+7d` (future), `today` / `yesterday` / `tomorrow` / `now`, `monday`-`sunday` (most recent), `last-<weekday>` / `next-<weekday>`, `start-of-week|month|year`, `end-of-week|month|year`. Offsets count back from now; named days and boundaries start at midnight in the run's time zone (the machine's, or `--tz <IANA zone>` / `ASKMARCEL_TZ`), so `today` is the user's today."
         },
         {
           "name": "format",

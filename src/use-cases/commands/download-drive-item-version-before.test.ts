@@ -44,8 +44,9 @@ describe('picking a historical version by date', () => {
   it('accepts the relative date vocabulary and lets an explicit --version-id win without listing, still reporting the id used', async () => {
     const relative = graphWith();
     const r1 = await execute(relative.graph, { driveId: 'd1', itemId: 'i1', before: 'now' });
-    expect(r1.ok).toBe(true);
-    expect(relative.downloads).toEqual(['/drives/d1/items/i1/versions/3.0/content']);
+    if (!r1.ok) throw new Error('expected ok');
+    expect(relative.downloads).toEqual(['/drives/d1/items/i1/content']);
+    expect(r1.value).toMatchObject({ versionId: '3.0', current: true });
     const explicit = graphWith();
     const r2 = await execute(explicit.graph, { driveId: 'd1', itemId: 'i1', versionId: '2', before: '2026-09-17T09:00:00Z' });
     if (!r2.ok) throw new Error('expected ok');

@@ -3,7 +3,7 @@ import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import type { CommandMeta } from './command-types.ts';
-import { refuseVersionRender, resolveVersion } from './download-drive-item-version.ts';
+import { pickPreviousVersion, refuseVersionRender, resolveVersion } from './download-drive-item-version.ts';
 import { diffEnvelope, readDriveFile, renderSide } from './drive-item-diff.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
@@ -26,6 +26,11 @@ const WORDING = {
   readWhole: 'read the version with download-drive-item-version --format markdown and the live file with download-drive-item-as-markdown',
 };
 
+const liveNote = (id: string, before: string | undefined): string =>
+  before === undefined
+    ? `Version ${id} is the only one saved: there is no earlier version to compare with the live file.`
+    : `Nothing was saved after ${before}: version ${id} is the live file.`;
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -33,21 +38,15 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const file = await readDriveFile(graph, driveId, itemId);
   if (!file.ok) return file;
   const { name } = file.value;
-  if (rendersThroughGraph(name)) return refuseVersionRender(name, 'Use `download-drive-item-version --format original` for an old version\'s raw bytes');
-  const version = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
+  if (rendersThroughGraph(name)) return refuseVersionRender(name, "Use `download-drive-item-version --format original` for an old version's raw bytes");
+  const version =
+    parsed.data.versionId === undefined && before === undefined
+      ? await pickPreviousVersion(graph, driveId, itemId)
+      : await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
   if (!version.ok) return version;
   const { id, current } = version.value;
-  // The newest version before the instant is still the live file: nothing moved.
-  if (current)
-    return ok({
-      contentType: 'text/x-diff',
-      size: 0,
-      text: '',
-      added: 0,
-      removed: 0,
-      versionId: id,
-      note: `Nothing was saved after ${String(before)}: version ${id} is the live file.`,
-    });
+  // The chosen version is still the live file: nothing moved, nothing to download.
+  if (current) return ok({ contentType: 'text/x-diff', size: 0, text: '', added: 0, removed: 0, versionId: id, note: liveNote(id, before) });
   const opts = { includeMetadata: parsed.data.includeMetadata === 'true', maxCells, sheet };
   const old = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/versions/${id}/content`, { ...opts, elevated: true });
   if (!old.ok) return old;
@@ -59,7 +58,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
 const meta: CommandMeta = {
   summary:
-    'What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.',
+    'What changed in a OneDrive or SharePoint file: the version saved before `--before`, the one named by `--version-id`, or by default the version saved just before the live one (what the last save changed), and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.',
   category: 'drive',
   producesBytes: true,
   graphMethod: 'GET',
@@ -77,7 +76,8 @@ const meta: CommandMeta = {
       name: 'version-id',
       key: 'versionId',
       required: false,
-      description: 'The older version to compare, from `list-drive-item-versions` (`4` and `4.0` both work). Not the first entry: that one is the live file.',
+      description:
+        'The older version to compare, from `list-drive-item-versions` (`4` and `4.0` both work). Not the first entry: that one is the live file. Without this or `--before`, the version saved just before the live one is compared.',
     },
     {
       name: 'before',

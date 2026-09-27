@@ -25,20 +25,29 @@ const schema = z.object({
 });
 
 type ListedVersion = { readonly id?: unknown; readonly lastModifiedDateTime?: unknown };
+type SavedVersion = { readonly id: string; readonly lastModifiedDateTime: string };
 
 type PickedVersion = { readonly id: string; readonly current: boolean };
+
+/** The file's versions, newest first; an entry without an id or a save time is dropped. */
+const listVersions = async (graph: GraphClient, driveId: string, itemId: string): Promise<Result<ReadonlyArray<SavedVersion>, GraphError>> => {
+  const listed = await graph.get(`/drives/${driveId}/items/${itemId}/versions?$select=id,lastModifiedDateTime`);
+  if (!listed.ok) return listed;
+  return ok(
+    ((listed.value as { readonly value?: ReadonlyArray<ListedVersion> }).value ?? [])
+      .filter((v): v is SavedVersion => typeof v.id === 'string' && typeof v.lastModifiedDateTime === 'string')
+      .toSorted((a, b) => b.lastModifiedDateTime.localeCompare(a.lastModifiedDateTime))
+  );
+};
 
 // `--before` picks the newest version saved strictly before an instant, so a
 // caller comparing "what changed in the window" no longer lists the versions
 // and chooses by hand. `current` says that version is still the live file:
 // nothing was saved after the instant.
 const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: string, before: string): Promise<Result<PickedVersion, GraphError>> => {
-  const listed = await graph.get(`/drives/${driveId}/items/${itemId}/versions?$select=id,lastModifiedDateTime`);
-  if (!listed.ok) return listed;
-  const versions = ((listed.value as { readonly value?: ReadonlyArray<ListedVersion> }).value ?? [])
-    .filter((v): v is { id: string; lastModifiedDateTime: string } => typeof v.id === 'string' && typeof v.lastModifiedDateTime === 'string')
-    .toSorted((a, b) => b.lastModifiedDateTime.localeCompare(a.lastModifiedDateTime));
-  const newest = versions.find((v) => v.lastModifiedDateTime < before);
+  const versions = await listVersions(graph, driveId, itemId);
+  if (!versions.ok) return versions;
+  const newest = versions.value.find((v) => v.lastModifiedDateTime < before);
   if (newest === undefined)
     return err({
       type: 'api_error',
@@ -46,7 +55,18 @@ const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: st
       message: `NotFound: no version of this file saved before ${before} remains (it was created later, or its older versions were trimmed): list-drive-item-versions shows what exists, and download-drive-item-as-markdown reads the file whole`,
       code: 'cli_no_version_before',
     });
-  return ok({ id: newest.id, current: newest === versions[0] });
+  return ok({ id: newest.id, current: newest === versions.value[0] });
+};
+
+// With neither flag, the version diff answers what the last save changed: the
+// version saved just before the live one. A file saved once has only the live one.
+const pickPreviousVersion = async (graph: GraphClient, driveId: string, itemId: string): Promise<Result<PickedVersion, GraphError>> => {
+  const versions = await listVersions(graph, driveId, itemId);
+  if (!versions.ok) return versions;
+  const [live, previous] = versions.value;
+  if (live === undefined)
+    return err({ type: 'api_error', status: 404, message: 'NotFound: Graph listed no version of this file; list-drive-item-versions shows what exists', code: 'cli_no_versions' });
+  return ok(previous === undefined ? { id: live.id, current: true } : { id: previous.id, current: false });
 };
 
 // An explicit `--version-id` wins and skips the listing (its `current` is unknown,
@@ -67,10 +87,14 @@ const resolveVersion = async (
   return pickVersionBefore(graph, driveId, itemId, before);
 };
 
-const fetchOriginal = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> =>
-  inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
+// Graph refuses `/versions/{live}/content` ("You cannot get the content of the
+// current version"), so the live version is read as the file itself.
+const contentPathOf = (driveId: string, itemId: string, picked: PickedVersion): string =>
+  picked.current ? `/drives/${driveId}/items/${itemId}/content` : `/drives/${driveId}/items/${itemId}/versions/${picked.id}/content`;
 
-const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, versionId: string): Promise<Result<unknown, GraphError>> => {
+const fetchOriginal = async (graph: GraphClient, contentPath: string): Promise<Result<unknown, GraphError>> => inlineBinary(graph, contentPath, { elevated: true });
+
+const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, contentPath: string, versionId: string): Promise<Result<unknown, GraphError>> => {
   // Pre-fetch the driveItem for its filename. Plain-text / pdf sources
   // short-circuit to raw bytes (Graph's `?format=pdf` does not list `pdf`
   // in its supported input set — the CDN responds 406 InputFormatNotSupported
@@ -80,7 +104,7 @@ const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, ver
   const name = (meta.value as { name?: string }).name ?? '';
 
   if (isPlainTextFilename(name) || isPdfSource(name)) {
-    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, { elevated: true });
+    const raw = await inlineBinary(graph, contentPath, { elevated: true });
     if (!raw.ok) return raw;
     return ok({
       ...raw.value,
@@ -90,10 +114,7 @@ const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, ver
         : `source is plain-text (${name}); raw bytes returned without Graph format=pdf conversion`,
     });
   }
-  return tagPdfPassthrough(
-    await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content?format=pdf`, { elevated: true }),
-    `version ${versionId} of ${name}`
-  );
+  return tagPdfPassthrough(await inlineBinary(graph, `${contentPath}?format=pdf`, { elevated: true }), `version ${versionId} of ${name}`);
 };
 
 // Graph answers `?format=html` on a historical version with the CURRENT page,
@@ -106,42 +127,50 @@ const refuseVersionRender = (name: string, rawBytes = "Use `--format original` f
     message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. ${rawBytes}, or \`download-drive-item-as-markdown\` for the current page.`,
   });
 
-const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, versionId: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
+const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, contentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const name = (meta.value as { name?: string }).name ?? '';
   if (rendersThroughGraph(name)) return refuseVersionRender(name);
-  return officeToMarkdown(graph, `/drives/${driveId}/items/${itemId}/versions/${versionId}/content`, name, { elevated: true, includeMetadata });
+  return officeToMarkdown(graph, contentPath, name, { elevated: true, includeMetadata });
 };
 
 type FetchRequest = {
   readonly driveId: string;
   readonly itemId: string;
   readonly versionId: string;
+  readonly contentPath: string;
   readonly format: 'original' | 'pdf' | 'markdown';
   readonly includeMetadata: boolean;
 };
 
 const fetchByFormat = (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
-  if (r.format === 'original') return fetchOriginal(graph, r.driveId, r.itemId, r.versionId);
-  if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.versionId);
-  return fetchMarkdown(graph, r.driveId, r.itemId, r.versionId, r.includeMetadata);
+  if (r.format === 'original') return fetchOriginal(graph, r.contentPath);
+  if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.contentPath, r.versionId);
+  return fetchMarkdown(graph, r.driveId, r.itemId, r.contentPath, r.includeMetadata);
+};
+
+// A PDF passthrough already carries a note; the live-file sentence joins it.
+const withNote = (value: Record<string, unknown>, note: string): Record<string, unknown> => {
+  const existing = value['note'];
+  return { ...value, note: typeof existing === 'string' ? `${existing} ${note}` : note };
 };
 
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { driveId, itemId } = parsed.data;
-  const resolved = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, parsed.data.before);
+  const { driveId, itemId, before } = parsed.data;
+  const resolved = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
   if (!resolved.ok) return resolved;
-  const versionId = resolved.value.id;
+  const picked = resolved.value;
   const format = parsed.data.format ?? 'original';
   const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId, format, includeMetadata });
-  if (!fetched.ok || parsed.data.before === undefined) return fetched;
+  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath: contentPathOf(driveId, itemId, picked), format, includeMetadata });
+  if (!fetched.ok || before === undefined) return fetched;
   // Say which version `--before` chose: the caller never saw the listing.
-  return ok({ ...(fetched.value as Record<string, unknown>), versionId });
+  const chosen = { ...(fetched.value as Record<string, unknown>), versionId: picked.id };
+  return ok(picked.current ? withNote({ ...chosen, current: true }, `Nothing was saved after ${before}: this is the live file.`) : chosen);
 };
 
 const meta: CommandMeta = {
@@ -170,7 +199,7 @@ const meta: CommandMeta = {
       name: 'before',
       key: 'before',
       required: false,
-      description: `Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as \`versionId\`. ${RELATIVE_DATE_DESCRIPTION}`,
+      description: `Instead of --version-id: pick the newest version saved strictly before this instant (one versions listing, then the download); the chosen id comes back as \`versionId\`. When nothing was saved after the instant, that version is the live file, which is read as the file itself and flagged \`current: true\` with a note. ${RELATIVE_DATE_DESCRIPTION}`,
     },
     {
       name: 'format',
@@ -196,5 +225,4 @@ const meta: CommandMeta = {
   producesBytes: true,
 };
 
-export { execute, meta, refuseVersionRender, resolveVersion, schema };
-export type { PickedVersion };
+export { execute, meta, pickPreviousVersion, refuseVersionRender, resolveVersion, schema };
