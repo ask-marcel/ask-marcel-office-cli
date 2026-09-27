@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 import { DUE_BEFORE_OPTION, dueBeforeField, withDueBefore } from './todo-due-before.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
+import { withTaskLinks } from './todo-web-url.ts';
 
 const schema = z.object({ todoTaskListId: z.string().min(1), dueBefore: dueBeforeField }).extend(odataQuerySchema.shape);
 
@@ -13,7 +14,7 @@ const execute: Command['execute'] = async (graph, params) => {
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks`, { ...parsed.data, filter: withDueBefore(parsed.data.filter, parsed.data.dueBefore) });
   const result = await graph.get(path);
-  if (result.ok) return result;
+  if (result.ok) return ok(withTaskLinks(result.value));
   // Graph's RequestBroker--ParseUri title quirk on this endpoint — rewrite the
   // opaque error to an actionable hint via the shared helper.
   const rewritten = rewriteTodoTitleQuirk(result.error, parsed.data);
@@ -38,7 +39,8 @@ const meta: CommandMeta = {
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
-  responseShape: 'collection of Microsoft Graph `todoTask` resources under `value[]`',
+  responseShape:
+    'collection of Microsoft Graph `todoTask` resources under `value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
   pagination: true,
 };
 

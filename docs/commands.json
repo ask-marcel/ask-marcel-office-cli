@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.7.0",
-  "generatedAt": "2026-09-27T12:42:30.108Z",
+  "generatedAt": "2026-09-27T13:14:04.545Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -3111,7 +3111,7 @@
         }
       ],
       "example": "ask-marcel-office get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied)"
+      "responseShape": "single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied), with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)"
     },
     {
       "name": "get-user",
@@ -5250,7 +5250,7 @@
         }
       ],
       "example": "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
-      "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]` where `status != \"completed\"`",
+      "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]` where `status != \"completed\"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
       "pagination": true
     },
     {
@@ -8138,7 +8138,7 @@
         }
       ],
       "example": "ask-marcel-office list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
-      "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]`",
+      "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
       "pagination": true
     },
     {
@@ -8157,7 +8157,7 @@
         }
       ],
       "example": "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
-      "responseShape": "collection of Microsoft Graph `todoTask` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
+      "responseShape": "collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
       "pagination": true
     },
     {

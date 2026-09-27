@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { map } from '../../domain/result.ts';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { Command, CommandMeta } from './command-types.ts';
+import { withTaskLinks } from './todo-web-url.ts';
 
 const schema = z.object({ todoTaskListId: z.string().min(1) });
-const { execute } = buildCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/delta()`, schema);
+const delta = buildCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/delta()`, schema);
+const execute: Command['execute'] = async (graph, params) => map(await delta.execute(graph, params), withTaskLinks);
 
 const meta: CommandMeta = {
   summary:
@@ -22,7 +25,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
   responseShape:
-    'collection of Microsoft Graph `todoTask` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
+    'collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,
   paginationStrategy: 'deltaLink',
 };

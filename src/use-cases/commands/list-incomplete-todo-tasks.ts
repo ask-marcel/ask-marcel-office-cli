@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 import { DUE_BEFORE_OPTION, dueBeforeClause, dueBeforeField } from './todo-due-before.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
+import { withTaskLinks } from './todo-web-url.ts';
 
 // Hardcoded `$filter=status ne 'completed'` in the path means a user-supplied
 // `--filter` would cause Graph to receive two `$filter` query params and
@@ -28,7 +29,7 @@ const execute: Command['execute'] = async (graph, params) => {
   const due = parsed.data.dueBefore === undefined ? '' : ` and ${dueBeforeClause(parsed.data.dueBefore)}`;
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks?$filter=status ne 'completed'${due}`, parsed.data);
   const result = await graph.get(path);
-  if (result.ok) return result;
+  if (result.ok) return ok(withTaskLinks(result.value));
   // Same /tasks endpoint as the all-tasks sibling, so the same RequestBroker--
   // ParseUri title quirk applies — rewrite via the shared helper.
   const rewritten = rewriteTodoTitleQuirk(result.error, parsed.data);
@@ -54,7 +55,8 @@ const meta: CommandMeta = {
     ...odataQueryOptions,
   ],
   example: "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
-  responseShape: 'collection of Microsoft Graph `todoTask` resources under `value[]` where `status != "completed"`',
+  responseShape:
+    'collection of Microsoft Graph `todoTask` resources under `value[]` where `status != "completed"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
   pagination: true,
 };
 

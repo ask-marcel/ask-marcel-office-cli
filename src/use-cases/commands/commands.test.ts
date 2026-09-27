@@ -520,7 +520,7 @@ describe('commands', () => {
   it('list-incomplete-todo-tasks filters To Do tasks by status ne completed within a list', async () => {
     const result = await callCommand('list-incomplete-todo-tasks', { todoTaskListId: 'tl1' }, { value: [{ id: 'tt1', status: 'inProgress' }] });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ value: [{ id: 'tt1', status: 'inProgress' }] });
+    if (result.ok) expect(result.value).toEqual({ value: [{ id: 'tt1', status: 'inProgress', webUrl: 'https://to-do.office.com/tasks/id/tt1/details' }] });
   });
 
   it('next-page strips the Graph v1.0 prefix and GETs the rest of the supplied URL', async () => {

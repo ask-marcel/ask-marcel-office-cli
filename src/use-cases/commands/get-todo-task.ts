@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
+import { withTaskLinks } from './todo-web-url.ts';
 
 // sibling single-resource GETs (get-my-manager,
 // get-user-manager, get-mail-message, etc.) all expose `--select`/`--expand`
@@ -18,7 +19,7 @@ const execute: Command['execute'] = async (graph, params) => {
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks/${parsed.data.todoTaskId}`, parsed.data);
   const result = await graph.get(path);
-  if (result.ok) return result;
+  if (result.ok) return ok(withTaskLinks(result.value));
   const rewritten = rewriteTodoTitleQuirk(result.error, parsed.data);
   return rewritten ? err(rewritten) : result;
 };
@@ -46,7 +47,8 @@ const meta: CommandMeta = {
     ...selectExpandOptions,
   ],
   example: "ask-marcel-office get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
-  responseShape: 'single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied)',
+  responseShape:
+    'single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied), with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
 };
 
 export { execute, meta, schema };
