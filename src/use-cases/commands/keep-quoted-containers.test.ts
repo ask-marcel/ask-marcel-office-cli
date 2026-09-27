@@ -19,7 +19,11 @@ const asAttachment = (name: string, bytes: Uint8Array): ReturnType<typeof fakeGr
 type Case = { readonly name: string; readonly graph: () => Promise<ReturnType<typeof fakeGraphClient>>; readonly params: Record<string, string> };
 
 const CASES: ReadonlyArray<Case> = [
-  { name: 'convert-calendar-event-attachment-to-markdown', graph: async () => asAttachment('reply.msg', await buildQuotedSampleMsg()), params: { eventId: 'e1', attachmentId: 'a1' } },
+  {
+    name: 'convert-calendar-event-attachment-to-markdown',
+    graph: async () => asAttachment('reply.msg', await buildQuotedSampleMsg()),
+    params: { eventId: 'e1', attachmentId: 'a1' },
+  },
   {
     name: 'convert-group-post-attachment-to-markdown',
     graph: async () => asAttachment('reply.msg', await buildQuotedSampleMsg()),
