@@ -101,7 +101,14 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // Set before any subcommand exists: a subcommand copies the setting when created.
   program.showSuggestionAfterError(false);
   const globalFlags = (): ReadonlyArray<string> => program.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
-  const suggestionFor = (err: CommanderError, optionFlags: ReadonlyArray<string>): string => {
+  // Commander reports a missing required flag before an unknown one, so a mistyped
+  // required flag (`--folder` for `--mail-folder-id`) is only in what was typed.
+  const typoedFlagHint = (optionFlags: ReadonlyArray<string>, typed: ReadonlyArray<string>): string => {
+    const unknown = typed.find((arg) => arg.startsWith('--') && !optionFlags.includes(arg.split('=', 1)[0] ?? arg));
+    return unknown === undefined ? '' : didYouMean(unknown, optionFlags, `\`${unknown}\` is not a flag of this command. Did you mean`);
+  };
+  const suggestionFor = (err: CommanderError, optionFlags: ReadonlyArray<string>, typed: ReadonlyArray<string>): string => {
+    if (err.code === 'commander.missingMandatoryOptionValue') return typoedFlagHint(optionFlags, typed);
     const command = /^error: unknown command '([^']+)'/.exec(err.message)?.[1];
     if (command !== undefined)
       return didYouMean(
@@ -112,8 +119,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
     return flag === undefined ? '' : didYouMean(flag, optionFlags);
   };
   // `optionFlags`: the flags a mistyped one is compared with — the command's own
-  // plus the global ones for a registry command, the global ones at the top level.
-  const onCommanderError = (err: CommanderError, optionFlags: ReadonlyArray<string>): void => {
+  // plus the global ones for a subcommand, the global ones at the top level.
+  // `typed`: the command's leftover arguments, where a mistyped flag waits.
+  const onCommanderError = (err: CommanderError, optionFlags: ReadonlyArray<string>, typed: ReadonlyArray<string> = []): void => {
     if (err.code === 'commander.helpDisplayed' || err.code === 'commander.help') return;
     // Commander prefixes its messages with `error: ` (e.g. "error: unknown option '--foo'"),
     // but the JSON envelope's outer `ok: false` already conveys errorness — strip the
@@ -128,7 +136,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     // also stamp `source: 'cli'` explicitly
     // so the envelope shape stays stable even if a future Commander error
     // code variant doesn't have a matching rule yet.
-    const suggestion = suggestionFor(err, optionFlags);
+    const suggestion = suggestionFor(err, optionFlags, typed);
     fail(suggestion === '' ? stripped : `${stripped}.${suggestion}`, err.code, 'cli');
     throw err;
   };
@@ -517,7 +525,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
           commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
         }
       }
-      commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()]));
+      commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()], commandDef.args));
       const helpLines = [
         `\nGraph endpoint: ${cmd.meta.graphMethod} ${cmd.meta.graphPathTemplate}`,
         `Microsoft Learn: ${cmd.meta.graphDocsUrl}`,
@@ -541,6 +549,13 @@ const buildCli = (deps: BuildCliDeps): Command => {
         fail(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
       });
     }
+  }
+
+  // The lifecycle commands (help-json, login, docs…) suggest from their own flags too.
+  for (const sub of program.commands) {
+    if (sub.name() in cmdRegistry) continue;
+    const own = sub.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
+    sub.exitOverride((err) => onCommanderError(err, [...own, ...globalFlags()], sub.args));
   }
 
   return program;
