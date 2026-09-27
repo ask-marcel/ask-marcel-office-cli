@@ -188,6 +188,9 @@ Shipped 2026-09-27, after a fresh login: chat `files` and `reactions` on every s
 mris with epoch times) and `extract-teams-chat-message-images` (56; probed: Teams' media service
 answers the IC3 bearer and refuses every other token); a default page of 100 mail folders (57).
 
+Shipped 2026-09-27: `extract-mail-attachment-images` opens a forwarded mail and returns the pages of
+the scanned PDFs it carries (62, second half), and Graph byte reads got the five-minute budget (a
+20 MB `$value` had outlived the 60-second one).
+
 Still open: the To Do link shape (46) opens To Do but not the task, so tasks stay without a
-`webUrl`; a scanned PDF inside an embedded mail is named but its pages cannot yet be extracted
-(save the embedded mail as `.eml`, then extract images from it).
+`webUrl`.

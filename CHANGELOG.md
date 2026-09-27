@@ -130,7 +130,12 @@ The attachment reads answered every embedded Outlook item with
 "itemAttachment missing inner item": Graph sends the item only with
 `$expand`. An embedded item is now expanded, and an embedded mail is read from
 its MIME source through the `.eml` reader, its own attachments converted in
-turn.
+turn. `extract-mail-attachment-images` opens a forwarded mail too: its image
+files come back as they are and its PDFs and Office files through the
+extractor, each named after its file, `--pages` narrowing the PDFs, so a
+scanned contract inside a forwarded mail reaches a vision model. A byte read
+straight from Graph (an attachment's `$value`) now has the five-minute transfer
+budget instead of the 60-second one of a JSON read.
 
 ### Fixed: the mail-folder listings ask for a hundred folders a page
 
