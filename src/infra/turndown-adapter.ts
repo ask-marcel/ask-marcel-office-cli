@@ -187,6 +187,14 @@ const tagInsertsNewline = (rawTag: string): boolean => {
   return BLOCK_END_TAGS.has(lower);
 };
 
+// A table row's cells stay on its line, apart: `North | 12`, not `North12`.
+const CELL_END_TAGS = new Set(['/td', '/th']);
+
+const separatorFor = (rawTag: string): string => {
+  if (tagInsertsNewline(rawTag)) return '\n';
+  return CELL_END_TAGS.has(rawTag.toLowerCase()) ? ' | ' : '';
+};
+
 /**
  * Walk the HTML byte-by-byte and emit either the character (when outside a
  * tag) or a newline (when closing a block tag / hitting <br>). Avoids the
@@ -218,11 +226,12 @@ const stripHtmlToText = (html: string): string => {
       cursor = closer === -1 ? html.length : closer + tagName.length + 3;
       continue;
     }
-    if (tagInsertsNewline(rawTag)) out += '\n';
+    out += separatorFor(rawTag);
     cursor = gt + 1;
   }
   return decodeBasicEntities(out)
     .replaceAll(/[ \t]+/g, ' ')
+    .replaceAll(/ \| ?(?=\n|$)/g, '')
     .replaceAll(/\n{3,}/g, '\n\n')
     .trim();
 };
@@ -261,4 +270,4 @@ const htmlToMarkdown = (html: string): Result<string, GraphError> => {
   }
 };
 
-export { htmlToMarkdown };
+export { htmlToMarkdown, stripHtmlToText };

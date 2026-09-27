@@ -1,9 +1,9 @@
 import type { Result } from '../../domain/result.ts';
 import { err, map, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
+import { htmlToMarkdown, stripHtmlToText } from '../../infra/turndown-adapter.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
-import { docxToMarkdown } from './docx-to-markdown.ts';
+import { docxToMarkdown, stripInlineImages } from './docx-to-markdown.ts';
 import { emlToMarkdown } from './eml-to-markdown.ts';
 import { msgToMarkdown } from './msg-to-markdown.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
@@ -71,7 +71,23 @@ const csvEnvelope = (bytes: Uint8Array, maxCells: number | undefined): Result<un
 // the title as a stray first line. `[\s>]` keeps a body <header> element.
 const withoutHead = (html: string): string => html.replace(/<head[\s>][\s\S]*?<\/head>/i, '');
 
-const htmlEnvelope = (bytes: Uint8Array): Result<unknown, GraphError> => map(htmlToMarkdown(withoutHead(new TextDecoder().decode(bytes))), markdownEnvelope);
+// turndown builds a DOM of the whole page: a 1 MB table page took 4 s and half a
+// gigabyte of memory. Past this size the page is flattened to text in one pass.
+const HTML_MARKDOWN_CAP = 1_000_000;
+
+// An embedded `data:` image becomes `[image: alt]`, as in a Word file, unless
+// `--inline-images true` asks for the base64.
+const htmlEnvelope = (bytes: Uint8Array, inlineImages: boolean | undefined): Result<unknown, GraphError> => {
+  const html = withoutHead(new TextDecoder().decode(bytes));
+  if (bytes.byteLength <= HTML_MARKDOWN_CAP) return map(htmlToMarkdown(html), (md) => markdownEnvelope(inlineImages === true ? md : stripInlineImages(md)));
+  const text = stripHtmlToText(html);
+  return ok({
+    contentType: 'text/plain',
+    size: new TextEncoder().encode(text).byteLength,
+    text,
+    note: `This page is ${(bytes.byteLength / 1_000_000).toFixed(1)} MB, over the 1 MB cap for a markdown render, so it is flattened to plain text: each table row comes out on one line, its cells separated by |.`,
+  });
+};
 
 /**
  * The single extension→converter dispatch for every markdown command, operating on
@@ -87,7 +103,7 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
   if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
-  if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(bytes);
+  if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(bytes, opts.inlineImages);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
   if (XLSX_FAMILY.has(ext)) return xlsxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, maxCells: opts.maxCells, sheet: opts.sheet });
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
