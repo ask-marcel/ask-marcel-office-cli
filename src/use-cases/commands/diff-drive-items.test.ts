@@ -58,7 +58,7 @@ describe('diff-drive-items', () => {
       contentType: 'text/x-diff',
       size: 0,
       text: '',
-      note: 'The two files differ in more than 1,000 lines, so they are different documents rather than two states of one: read each with download-drive-item-as-markdown.',
+      note: 'The two renders differ by more than 1,000 added or removed lines (a changed line counts once each way), too many for a useful diff: read each file with download-drive-item-as-markdown.',
     });
   });
 

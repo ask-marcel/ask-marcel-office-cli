@@ -43,7 +43,7 @@ const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: st
     return err({
       type: 'api_error',
       status: 404,
-      message: `NotFound: no version of this file was saved before ${before}; list-drive-item-versions shows what exists`,
+      message: `NotFound: no version of this file saved before ${before} remains (it was created later, or its older versions were trimmed): list-drive-item-versions shows what exists, and download-drive-item-as-markdown reads the file whole`,
       code: 'cli_no_version_before',
     });
   return ok({ id: newest.id, current: newest === versions[0] });
@@ -98,12 +98,12 @@ const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, ver
 
 // Graph answers `?format=html` on a historical version with the CURRENT page,
 // so rendering an old Loop version would silently return the wrong page.
-const refuseVersionRender = (name: string): Result<never, GraphError> =>
+const refuseVersionRender = (name: string, rawBytes = "Use `--format original` for this version's raw bytes"): Result<never, GraphError> =>
   err({
     type: 'api_error',
     status: 415,
     code: 'unsupported_version_render',
-    message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. Use \`--format original\` for this version's raw bytes, or \`download-drive-item-as-markdown\` for the current page.`,
+    message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. ${rawBytes}, or \`download-drive-item-as-markdown\` for the current page.`,
   });
 
 const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, versionId: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {

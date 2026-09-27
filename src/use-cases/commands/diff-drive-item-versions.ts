@@ -21,6 +21,11 @@ const schema = z.object({
   sheet: z.string().min(1).optional(),
 });
 
+const WORDING = {
+  same: 'This version and the live file render to the same markdown.',
+  readWhole: 'read the version with download-drive-item-version --format markdown and the live file with download-drive-item-as-markdown',
+};
+
 const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -28,7 +33,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const file = await readDriveFile(graph, driveId, itemId);
   if (!file.ok) return file;
   const { name } = file.value;
-  if (rendersThroughGraph(name)) return refuseVersionRender(name);
+  if (rendersThroughGraph(name)) return refuseVersionRender(name, 'Use `download-drive-item-version --format original` for an old version\'s raw bytes');
   const version = await resolveVersion(graph, driveId, itemId, parsed.data.versionId, before);
   if (!version.ok) return version;
   const { id, current } = version.value;
@@ -48,7 +53,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (!old.ok) return old;
   const live = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
   if (!live.ok) return live;
-  const diff = diffEnvelope(`a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, 'This version and the live file render to the same markdown.');
+  const diff = diffEnvelope(`a/${name} (version ${id})`, old.value, `b/${name} (current)`, live.value, WORDING);
   return ok({ ...diff, versionId: id });
 };
 
@@ -56,6 +61,7 @@ const meta: CommandMeta = {
   summary:
     'What changed in a OneDrive or SharePoint file since an instant: the version saved before `--before` (or the one named by `--version-id`) and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.',
   category: 'drive',
+  producesBytes: true,
   graphMethod: 'GET',
   graphPathTemplate: '/drives/{drive-id}/items/{item-id}/versions/{version-id}/content and /drives/{drive-id}/items/{item-id}/content',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/driveitemversion-get-content',

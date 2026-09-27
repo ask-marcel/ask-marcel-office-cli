@@ -62,7 +62,11 @@ const cappedTables = (text: string): ReadonlyArray<string> => {
 const notComparedNote = (tables: ReadonlyArray<string>): string =>
   `Not compared: ${tables.join(', ')} exceeded the --max-cells cap, so each side shows a one-line hint instead of the cells, and a change inside would not show. Raise --max-cells, or compare one sheet of a workbook alone with --sheet.`;
 
-const TOO_DIFFERENT = `The two files differ in more than ${MAX_EDITS.toLocaleString('en-US')} lines, so they are different documents rather than two states of one: read each with download-drive-item-as-markdown.`;
+/** What a diff command says when the renders match, and where to read both whole when they differ too much. */
+type DiffWording = { readonly same: string; readonly readWhole: string };
+
+const tooDifferent = (readWhole: string): string =>
+  `The two renders differ by more than ${MAX_EDITS.toLocaleString('en-US')} added or removed lines (a changed line counts once each way), too many for a useful diff: ${readWhole}.`;
 
 const labelled = (label: string, side: Render): string | undefined => (side.note === undefined ? undefined : `${label}: ${side.note}`);
 
@@ -71,14 +75,14 @@ const joinNotes = (notes: ReadonlyArray<string | undefined>): { readonly note?: 
   return present.length === 0 ? {} : { note: present.join(' ') };
 };
 
-const diffEnvelope = (fromLabel: string, from: Render, toLabel: string, to: Render, sameNote: string): DiffEnvelope => {
+const diffEnvelope = (fromLabel: string, from: Render, toLabel: string, to: Render, wording: DiffWording): DiffEnvelope => {
   const capped = [...new Set([...cappedTables(from.text), ...cappedTables(to.text)])];
   const cappedNote = capped.length === 0 ? undefined : notComparedNote(capped);
   const sideNotes = [labelled(fromLabel, from), labelled(toLabel, to)];
   const diff = lineDiff(fromLabel, from.text, toLabel, to.text);
-  if (diff === undefined) return { contentType: 'text/x-diff', size: 0, text: '', ...joinNotes([TOO_DIFFERENT, cappedNote, ...sideNotes]) };
+  if (diff === undefined) return { contentType: 'text/x-diff', size: 0, text: '', ...joinNotes([tooDifferent(wording.readWhole), cappedNote, ...sideNotes]) };
   // An empty patch means "unchanged" only when every table was compared.
-  const same = diff.patch === '' && cappedNote === undefined ? sameNote : undefined;
+  const same = diff.patch === '' && cappedNote === undefined ? wording.same : undefined;
   return {
     contentType: 'text/x-diff',
     size: new TextEncoder().encode(diff.patch).byteLength,
