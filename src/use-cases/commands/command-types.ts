@@ -132,6 +132,13 @@ type CommandMeta = {
    */
   readonly producesBytes?: true;
   /**
+   * `true` when the command's `text` answer is the file's own bytes (a UTF-8 file
+   * returned as text), never a conversion, so `--output-path` saves it under any
+   * name, the file's own `.xls` or `.doc` included. Converted answers stay barred
+   * from binary names (see output-path.ts).
+   */
+  readonly returnsSourceText?: true;
+  /**
    * `true` if the command returns a `media` array (`{ count, media: [{ path,
    * contentType, sizeBytes, base64 }] }`) and is therefore a valid target for
    * the global `--output-dir` flag, which writes each image to a directory.

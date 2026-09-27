@@ -51,9 +51,10 @@ const looksLikeDirectoryPath = (path: string): boolean => path.endsWith('/') || 
 const isPdfExtension = (path: string): boolean => path.toLowerCase().endsWith('.pdf');
 const isPdfContentType = (ct: string): boolean => ct.toLowerCase().startsWith('application/pdf');
 
-// A text envelope is never the content of these formats: their bytes always come back
-// as `base64`. Converted markdown or a PDF text layer saved as `.pdf` / `.xlsx` makes a
-// file no reader can open (a 24 Sep register entry), so the text branch refuses them.
+// A converted text envelope is never the content of these formats: markdown or a PDF
+// text layer saved as `.pdf` / `.xlsx` makes a file no reader can open (a 24 Sep
+// register entry), so the text branch refuses them, unless the text IS the file's
+// bytes (`sourceText`: an HTML "Excel" export named `.xls`).
 const BINARY_SAVE_EXTENSIONS: ReadonlySet<string> = new Set([
   ...DOCX_FAMILY,
   ...XLSX_FAMILY,
@@ -70,7 +71,12 @@ const BINARY_SAVE_EXTENSIONS: ReadonlySet<string> = new Set([
 // the image-extraction `media` arrays go through persistMediaIfRequested.
 const INLINE_BASE64_LIMIT = 1_000_000;
 
-export const persistIfRequested = async (fs: FileSystem, outputPath: string | undefined, data: unknown): Promise<Result<unknown, OutputPathError>> => {
+export const persistIfRequested = async (
+  fs: FileSystem,
+  outputPath: string | undefined,
+  data: unknown,
+  opts: { readonly sourceText?: boolean } = {}
+): Promise<Result<unknown, OutputPathError>> => {
   if (outputPath === undefined) {
     const inline = isPlainRecord(data) ? data['base64'] : undefined;
     if (typeof inline === 'string' && inline.length > INLINE_BASE64_LIMIT) return err({ type: 'inline_too_large', base64Length: inline.length });
@@ -106,7 +112,7 @@ export const persistIfRequested = async (fs: FileSystem, outputPath: string | un
   const text = data['text'];
   if (typeof text === 'string') {
     const extension = extensionOf(outputPath);
-    if (BINARY_SAVE_EXTENSIONS.has(extension)) {
+    if (opts.sourceText !== true && BINARY_SAVE_EXTENSIONS.has(extension)) {
       const contentType = typeof data['contentType'] === 'string' ? data['contentType'] : 'text/plain';
       return err({ type: 'text_under_binary_extension', contentType, requestedExtension: `.${extension}` });
     }

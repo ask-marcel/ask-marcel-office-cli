@@ -188,7 +188,7 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
     // `write_failed`) so an agent routes on the code instead of substring-matching the message.
     return err({ message: formatOutputDirError(persistedMedia.error, name), code: persistedMedia.error.type });
   }
-  const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value);
+  const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value, { sourceText: command.meta.returnsSourceText === true });
   if (persisted.ok) return ok(persisted.value);
   // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
   // `passthrough_extension_mismatch`, `text_under_binary_extension`, `inline_too_large`, `empty_path`, `write_failed`.
