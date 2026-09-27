@@ -111,21 +111,7 @@ const enrichSubstrateMessage = (chatId: string, m: SubstrateMessage, people: Peo
   };
 };
 
-const mentionMris = (m: SubstrateMessage): ReadonlyArray<string> => {
-  const props = m['properties'];
-  if (props === null || typeof props !== 'object') return [];
-  const raw = (props as Record<string, unknown>)['mentions'];
-  let list: unknown = raw;
-  if (typeof raw === 'string') {
-    try {
-      list = JSON.parse(raw) as unknown;
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(list)) return [];
-  return list.map((x) => String((x as { mri?: unknown })?.mri ?? ''));
-};
+const mentionMris = (m: SubstrateMessage): ReadonlyArray<string> => propertyList(m, 'mentions').map((mention) => text(mention['mri']) ?? '');
 
 /** Whether the message @mentions the user whose directory object id is given (`8:orgid:<id>` in the substrate). */
 const mentionsUser = (m: SubstrateMessage, userObjectId: string): boolean => mentionMris(m).some((mri) => mri.endsWith(`:${userObjectId}`));

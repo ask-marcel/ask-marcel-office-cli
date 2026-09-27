@@ -678,7 +678,6 @@ const buildImageXObject = (): Buffer => {
   ]);
 };
 
-// `withImage` paints one 2x2 RGB image (FlateDecode); no-image paints an empty text object.
 // A scanned document: `pageCount` pages, each painting one 2x2 image and no text,
 // the shape a scanner produces (one raster per page, no text layer).
 const buildScannedPdf = (pageCount: number): Uint8Array => {
@@ -709,6 +708,7 @@ const buildScannedPdf = (pageCount: number): Uint8Array => {
   return new Uint8Array(Buffer.concat([pdf, xref, enc(`trailer\n<</Size ${ids.length + 1}/Root 1 0 R>>\nstartxref\n${xrefAt}\n%%EOF`)]));
 };
 
+// The image builder paints one 2x2 RGB image (FlateDecode); the no-image one paints an empty text object.
 const buildPdfWithImage = (): Uint8Array => buildPdf(enc('q 50 0 0 50 25 25 cm /Im0 Do Q'), '<</XObject<</Im0 5 0 R>>>>', buildImageXObject());
 const buildPdfNoImages = (): Uint8Array => buildPdf(enc('BT ET'), '<<>>');
 // A born-digital PDF with a real text layer (Helvetica + a Tj string) — extractable by pdfjs/unpdf.

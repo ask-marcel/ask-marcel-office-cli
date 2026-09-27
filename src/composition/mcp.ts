@@ -34,8 +34,9 @@ import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
-import { didYouMean } from '../domain/closest-names.ts';
+import { unknownCommandMessage } from '../domain/closest-names.ts';
 
+const MCP_REMEDY = 'Call list-commands to see every command.';
 const PACKAGE_NAME = 'ask-marcel-office-cli';
 
 type BuildMcpServerDeps = {
@@ -124,11 +125,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
       // get renderSingleCommand's own `available` list.
       const resolved = resolveCommand(cmdRegistry, command);
       const result = renderSingleCommand(cmdRegistry, resolved.ok ? resolved.value.name : command);
-      if (!result.ok)
-        return errText(
-          `Unknown command "${result.error.name}".${didYouMean(result.error.name, result.error.available)} Call list-commands to see every command.`,
-          'cli_unknown_command'
-        );
+      if (!result.ok) return errText(unknownCommandMessage(result.error.name, result.error.available, MCP_REMEDY), 'cli_unknown_command');
       return okText(result.value);
     }
   );
@@ -154,11 +151,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     wantMutating: boolean
   ): Promise<CallToolResult> => {
     const resolved = resolveCommand(cmdRegistry, commandName);
-    if (!resolved.ok)
-      return errText(
-        `Unknown command "${resolved.error.name}".${didYouMean(resolved.error.name, resolved.error.available)} Call list-commands to see every command.`,
-        'cli_unknown_command'
-      );
+    if (!resolved.ok) return errText(unknownCommandMessage(resolved.error.name, resolved.error.available, MCP_REMEDY), 'cli_unknown_command');
     const isMutating = resolved.value.command.meta.mutates === true;
     // Gate BEFORE executing: a write routed through run-command would silently
     // mutate under a `readOnlyHint: true` tool the client may have auto-approved.

@@ -82,4 +82,7 @@ const didYouMean = (wanted: string, candidates: ReadonlyArray<string>, lead = 'D
   return ` ${lead} ${listed}?`;
 };
 
-export { closestNames, didYouMean };
+/** `Unknown command "x". Did you mean …? <remedy>`, the one sentence every front end answers an unknown name with. */
+const unknownCommandMessage = (name: string, available: ReadonlyArray<string>, remedy: string): string => `Unknown command "${name}".${didYouMean(name, available)} ${remedy}`;
+
+export { closestNames, didYouMean, unknownCommandMessage };

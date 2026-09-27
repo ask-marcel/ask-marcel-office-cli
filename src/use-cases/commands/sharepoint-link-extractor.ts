@@ -127,4 +127,4 @@ const resolveSharepointUrls = async (graph: GraphClient, urls: ReadonlyArray<str
 };
 
 export { buildShareToken, extractSharepointUrls, resolveSharepointUrls };
-export type { LinkLocation, ResolvedLink, ResolvedLinks };
+export type { ResolvedLink, ResolvedLinks };

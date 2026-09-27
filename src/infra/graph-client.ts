@@ -278,14 +278,6 @@ const truncateScopeDump = (message: string): string => {
 const synthesizeEmptyBodyMessage = (status: number, url: string): string =>
   `HTTP ${status} with no error body (path: ${new URL(url).pathname}; the endpoint may have moved — see the command's "best-effort" note in --help)`;
 
-// when an `ErrorInvalidIdMalformed`
-// happens against a `/mailFolders/` URL, surface a more specific code so
-// the presenter's hint table can recommend the well-known folder names
-// (inbox, sentitems, drafts, …) instead of the generic "use a list-*
-// command" advice. The Graph error message itself doesn't carry the URL,
-// so the URL → code suffix happens here at the infra boundary where the
-// URL IS still in scope (`res.url` / `fallbackUrl`). Pattern is the same
-// idea as `asSubstrateError` but for path-aware error refinement.
 // The Teams media service hosts that may receive the IC3 bearer; a chat image
 // URL is read out of message content, so nothing else is trusted with it.
 const TEAMS_MEDIA_HOST = /^[a-z0-9-]+\.(?:asm\.skype\.com|asyncgw\.teams\.microsoft\.com)$/i;
@@ -299,6 +291,14 @@ const teamsMediaHost = (url: string): string | undefined => {
   }
 };
 
+// when an `ErrorInvalidIdMalformed`
+// happens against a `/mailFolders/` URL, surface a more specific code so
+// the presenter's hint table can recommend the well-known folder names
+// (inbox, sentitems, drafts, …) instead of the generic "use a list-*
+// command" advice. The Graph error message itself doesn't carry the URL,
+// so the URL → code suffix happens here at the infra boundary where the
+// URL IS still in scope (`res.url` / `fallbackUrl`). Pattern is the same
+// idea as `asSubstrateError` but for path-aware error refinement.
 const contextualizeCode = (code: string | undefined, url: string): string | undefined => {
   if (code !== 'ErrorInvalidIdMalformed' && code !== 'InvalidIdMalformed') return code;
   if (!url.includes('/mailFolders/') && !url.includes('mailFolders%2F')) return code;

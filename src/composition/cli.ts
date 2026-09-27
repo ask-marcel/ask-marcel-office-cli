@@ -1,6 +1,6 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
-import { didYouMean } from '../domain/closest-names.ts';
+import { didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
@@ -57,6 +57,8 @@ type BuildCliDeps = {
  */
 const AUTH_CANCELLED_MESSAGE =
   'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g ask-marcel-office-cli`, then `ask-marcel-office login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
+
+const CLI_REMEDY = 'Run `ask-marcel-office --help` to list every command.';
 
 const buildCli = (deps: BuildCliDeps): Command => {
   const { auth, graph, logger, processRunner, fs, version } = deps;
@@ -320,10 +322,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       // pass an explicit `cli_unknown_command`
       // code so error-hints can match it structurally — gives the same
       // envelope shape as Commander's own `commander.unknownCommand` path.
-      fail(
-        `Unknown command "${result.error.name}".${didYouMean(result.error.name, result.error.available)} Run \`ask-marcel-office --help\` to list every command.`,
-        'cli_unknown_command'
-      );
+      fail(unknownCommandMessage(result.error.name, result.error.available, CLI_REMEDY), 'cli_unknown_command');
     });
 
   program
@@ -479,10 +478,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
         // structured `cli_unknown_command`
         // code so the envelope matches the `help <unknown>` and
         // `commander.unknownCommand` paths — single branch for LLM consumers.
-        fail(
-          `Unknown command "${result.error.name}".${didYouMean(result.error.name, result.error.available)} Run \`ask-marcel-office --help\` to list every command.`,
-          'cli_unknown_command'
-        );
+        fail(unknownCommandMessage(result.error.name, result.error.available, CLI_REMEDY), 'cli_unknown_command');
         return;
       }
       await writeOrPrintText(result.value, 'text/markdown', 'docs');
