@@ -39,7 +39,37 @@ F.msg = await write('f.msg', await buildSampleMsg());
 F.eml = await write('f.eml', buildSampleEml());
 F.zip = await write('f.zip', await buildSampleZipArchive());
 F.csv = await write('f.csv', new TextEncoder().encode('a,b,c\n1,2,3\n'));
+// HTML goes through turndown in the bundle since 2.8, head dropped and data: images placeholdered.
+F.html = await write('f.html', new TextEncoder().encode('<html><head><title>t</title></head><body><h1>Q3</h1><table><tr><th>A</th></tr><tr><td>1</td></tr></table><img src="data:image/png;base64,AAAA" alt="c"></body></html>'));
 const pdfImg = await write('img.pdf', await buildPdfWithImage());
+// The vendored image-bearing docx: an image extractor answering media=0 here is a failure, not a pass.
+const imageDocx = 'src/test-helpers/assets/image-sample.docx';
+
+// A flag the bundle must thread end to end: argv beyond `--path`, with what the answer must hold.
+const probeArgs = (rt: string, args: ReadonlyArray<string>, expect: (d: { ok: boolean; data?: { text?: string; media?: ReadonlyArray<unknown> }; error?: string }) => boolean): boolean => {
+  const p = spawnSync(rt, ['dist/cli.js', ...args, '--output', 'json'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
+  try {
+    return expect(JSON.parse(p.stdout?.toString() || ''));
+  } catch {
+    return false;
+  }
+};
+
+// The `diff` package is bundled (not --external) and only Graph-backed commands reach
+// it, so drive diff-drive-items through the library bundle against a stub client.
+const DIFF_PROBE = `import { commands } from './dist/index.js';
+const graph = { get: async () => ({ ok: true, value: { name: 'plan.md' } }), getBinary: async (p) => ({ ok: true, value: { contentType: 'text/plain', size: 3, text: p.includes('/i6/') ? 'one\\ntwo' : 'one\\n2' } }) };
+const r = await commands['diff-drive-items'].execute(graph, { driveId: 'd1', itemId: 'i6', otherDriveId: 'd1', otherItemId: 'i7' });
+process.stdout.write(JSON.stringify({ ok: r.ok, added: r.value?.added, removed: r.value?.removed }));`;
+const probeDiff = (rt: string): boolean => {
+  const p = spawnSync(rt, rt === 'node' ? ['--input-type=module', '-e', DIFF_PROBE] : ['-e', DIFF_PROBE], { timeout: 60000 });
+  try {
+    const d = JSON.parse(p.stdout?.toString() || '') as { ok: boolean; added?: number; removed?: number };
+    return d.ok && d.added === 1 && d.removed === 1;
+  } catch {
+    return false;
+  }
+};
 
 const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: string } => {
   const p = spawnSync(rt, ['dist/cli.js', cmd, '--path', path, '--output', 'json'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
@@ -69,10 +99,12 @@ const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: stri
  */
 const MCP_INIT = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'qa', version: '1' } } };
 const MCP_LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
+// A tool call that needs no login: an unknown command answers a tool error naming the right one.
+const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'run-command', arguments: { command: 'lsit-drives', params: {} } } };
 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
-    input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n`,
+    input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n${JSON.stringify(MCP_CALL)}\n`,
     timeout: 60000,
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -92,6 +124,8 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const listReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { tools?: ReadonlyArray<{ name: string }> } }).find((m) => m.id === 2);
   const tools = listReply?.result?.tools ?? [];
   if (tools.length !== 5) return { ok: false, note: `expected 5 gateway tools, got ${tools.length}` };
+  const callReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { isError?: boolean; content?: ReadonlyArray<{ text?: string }> } }).find((m) => m.id === 3);
+  if (callReply?.result?.isError !== true || !(callReply.result.content?.[0]?.text ?? '').includes('Did you mean')) return { ok: false, note: 'tools/call on a mistyped command did not answer a did-you-mean tool error' };
   return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };
 };
 
@@ -101,6 +135,21 @@ for (const rt of ['node', 'bun']) {
   for (const [fmt, path] of Object.entries(F)) { const r = probe(rt, 'convert-local-file-to-markdown', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
   console.log(`=== extract-local-file-images @ ${rt} ===`);
   for (const [fmt, path] of [['docx', F.docx], ['xlsx', F.xlsx], ['pptx', F.pptx], ['pdf', pdfImg]]) { const r = probe(rt, 'extract-local-file-images', path); if (!r.ok) fails++; console.log(`  ${r.ok ? '✓' : '✗'} ${fmt.padEnd(5)} -> ${r.note}`); }
+  const img = probe(rt, 'extract-local-file-images', imageDocx);
+  const imgOk = img.ok && img.note !== 'media=0';
+  if (!imgOk) fails++;
+  console.log(`  ${imgOk ? '✓' : '✗'} image-docx -> ${img.note} (must be > 0)`);
+  console.log(`=== flags and bundled libraries @ ${rt} ===`);
+  const checks: ReadonlyArray<[string, boolean]> = [
+    ['--max-cells caps a sheet', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.csv ?? '', '--max-cells', '1'], (d) => d.ok && (d.data?.text ?? '').includes('Table omitted'))],
+    ['--sheet names the sheets', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.xlsx ?? '', '--sheet', 'NoSuchSheet'], (d) => !d.ok && (d.error ?? '').includes('no sheet named'))],
+    ['html: data image placeholder', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.html ?? ''], (d) => d.ok && (d.data?.text ?? '').includes('[image: c]'))],
+    ['diff package (library bundle)', probeDiff(rt)],
+  ];
+  for (const [label, passed] of checks) {
+    if (!passed) fails++;
+    console.log(`  ${passed ? '✓' : '✗'} ${label}`);
+  }
   console.log(`=== mcp stdio handshake @ ${rt} ===`);
   const m = probeMcp(rt); if (!m.ok) fails++; console.log(`  ${m.ok ? '✓' : '✗'} mcp   -> ${m.note}`);
 }

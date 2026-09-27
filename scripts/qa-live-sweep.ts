@@ -62,6 +62,8 @@ for (const src of [
   }
 }
 const anyFile = items.find((x) => x.isFile) || items[0];
+// diff-drive-items compares two files: a second one, not the first again.
+const otherFile = items.find((x) => x.isFile && x.itemId !== anyFile?.itemId);
 const xlsx = items.find((x) => /\.xlsx$/i.test(x.name)) || anyFile;
 const pairs = { file: anyFile, xlsx, folder: rootItemId ? { driveId: pool['drive-id'], itemId: rootItemId } : undefined };
 
@@ -116,6 +118,8 @@ for (const g of unifiedGroups) {
 }
 P('team-id', first(run(['list-joined-teams']))?.id);
 if (pool['team-id']) for (const ch of val(run(['list-team-channels', '--team-id', pool['team-id']]))) { if (run(['get-channel-files-folder', '--team-id', pool['team-id'], '--channel-id', ch.id]).ok) { P('channel-id', ch.id); break; } P('channel-id', ch.id); }
+// a CHANNEL message id: the channel-message commands must never get the mail message id
+const channelMsgId = pool['team-id'] && pool['channel-id'] ? first(run(['list-team-channel-messages', '--team-id', pool['team-id'], '--channel-id', pool['channel-id'], '--top', '5']))?.id : undefined;
 const chatId = first(run(['list-chats', '--top', '5']))?.id;
 P('chat-id', chatId);
 // a chat MESSAGE id (get-teams-chat-message needs one) — try a few chats for a non-empty one
@@ -132,6 +136,8 @@ for (const plan of val(run(['list-planner-plans'])).slice(0, 8)) {
   if (b) P('planner-bucket-id', b.id);
   if (pool['planner-task-id'] && pool['planner-bucket-id']) break;
 }
+// a group's plan when the user shares none directly (list-planner-plans can answer empty)
+if (!pool['planner-plan-id']) for (const g of unifiedGroups.slice(0, 15)) { const plan = first(run(['list-group-planner-plans', '--group-id', g.id])); if (plan) { P('planner-plan-id', plan.id); break; } }
 // onenote (personal)
 P('notebook-id', first(run(['list-onenote-notebooks']))?.id);
 if (pool['notebook-id']) { P('onenote-section-id', first(run(['list-onenote-notebook-sections', '--notebook-id', pool['notebook-id']]))?.id);
@@ -185,7 +191,10 @@ const argFor = (cmd: string, opt: string): string[] | null => {
     : cmd === 'resolve-mail-link' ? ['--url', 'https://outlook.office.com/mail/inbox/id/AAQkAGnope']
     : cmd === 'resolve-teams-link' ? ['--url', 'https://teams.microsoft.com/l/message/19:x@thread.v2/1700000000000']
     : ['--url', 'https://outlook.office365.com/calendar/item/AAMknope'];
-  if (opt === 'message-id' && cmd === 'get-teams-chat-message') return chatMsgId ? ['--message-id', chatMsgId] : null;
+  if (opt === 'message-id' && (cmd === 'get-teams-chat-message' || cmd === 'extract-teams-chat-message-images')) return chatMsgId ? ['--message-id', chatMsgId] : null;
+  if (opt === 'message-id' && /team-channel-message/.test(cmd)) return channelMsgId ? ['--message-id', channelMsgId] : null;
+  if (opt === 'other-drive-id') return otherFile ? ['--other-drive-id', otherFile.driveId] : null;
+  if (opt === 'other-item-id') return otherFile ? ['--other-item-id', otherFile.itemId] : null;
   if (opt === 'notebook-id' && /sharepoint-site/.test(cmd)) return siteNb.notebookId ? ['--notebook-id', siteNb.notebookId] : null;
   if (opt === 'onenote-section-id' && /sharepoint-site/.test(cmd)) return siteNb.sectionId ? ['--onenote-section-id', siteNb.sectionId] : null;
   if (opt === 'onenote-page-id' && /sharepoint-site/.test(cmd)) return siteNb.pageId ? ['--onenote-page-id', siteNb.pageId] : null;
@@ -200,7 +209,7 @@ const argFor = (cmd: string, opt: string): string[] | null => {
     ...pool,
     'start-date-time': DS, 'end-date-time': DE,
     query: 'report', 'title-substring': 'meeting', name: pool['user-id'] ? 'user' : 'user', 'folder-name': 'documents',
-    address: 'A1:C5', range: 'A1:C5', schedules: qc.user?.userPrincipalName || 'me',
+    address: 'A1:C5', range: 'A1:C5', schedules: qc.user?.userPrincipalName || 'me', since: '7d',
   };
   const v = map[opt];
   return v ? [`--${opt}`, v] : null;
@@ -216,6 +225,8 @@ for (const c of manifest.commands) {
   let unresolved: string | null = null;
   for (const o of (c.options || []).filter((x: any) => x.required)) { const a = argFor(c.name, o.name); if (!a) { unresolved = o.name; break; } argv.push(...a); }
   if ((c.options || []).some((o: any) => o.name === 'top') && !argv.includes('--top')) argv.push('--top', '3');
+  // --version-id is optional since --before joined it, and the download needs one of the two
+  if (c.name === 'download-drive-item-version' && pool['version-id']) argv.push('--version-id', pool['version-id']);
   if (unresolved) { ledger[c.name] = `NODATA-${unresolved}`; nodataOpts.add(unresolved); continue; }
   const r = run(argv);
   ledger[c.name] = r.ok ? 'ok' : `ERR:${r.code}`;
