@@ -116,8 +116,13 @@ transcripts say who reacted and when. A SharePoint link the user cannot open
 names its OneDrive owner or its site, with a hint on asking for access. A
 mistyped command, flag or parameter ends with "Did you mean ...?" on the CLI,
 over MCP and in the library. A Loop page saved in the last 30 minutes carries
-a note that its render may trail the saves. New runtime dependency: `diff`
-(jsdiff, BSD-3-Clause, no dependencies of its own).
+a note that its render may trail the saves. Teams chat messages carry
+`files` (name, type, and the links `resolve-drive-share-link` resolves) and
+`reactions` (type, who, when) when they have any, and
+`extract-teams-chat-message-images --chat-id --message-id` downloads a
+message's pasted screenshots from Teams' media service as a media list for
+`--output-dir`. New runtime dependency: `diff` (jsdiff, BSD-3-Clause, no
+dependencies of its own).
 
 ### Fixed: an Outlook item attached to a mail could never be read
 
@@ -126,6 +131,12 @@ The attachment reads answered every embedded Outlook item with
 `$expand`. An embedded item is now expanded, and an embedded mail is read from
 its MIME source through the `.eml` reader, its own attachments converted in
 turn.
+
+### Fixed: the mail-folder listings ask for a hundred folders a page
+
+Graph answers ten mail folders a page, so a mailbox's eleventh top-level
+folder sat unseen behind a cursor. `list-mail-folders` and
+`list-mail-child-folders` now ask for 100 unless `--top` says otherwise.
 
 ### Fixed: a text answer saved under a binary file name
 

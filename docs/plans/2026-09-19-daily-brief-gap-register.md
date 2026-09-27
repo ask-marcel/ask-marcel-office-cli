@@ -1,6 +1,6 @@
 # Daily-brief gap register, verified against 2.7.0
 
-Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E shipped 2026-09-26 from the register of 24 September, its chat probes still waiting on a fresh login; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
+Status: **plan, 2026-09-19; slices A, B and C shipped on main 2026-09-19, 2026-09-26 and 2026-09-26, slice D probed 2026-09-26, slice E shipped 2026-09-26 and 2026-09-27 from the register of 24 September; unreleased**. The daily-brief skill keeps a register of what it needed from the CLI and
 could not get. This document checks every entry against the shipped CLI (`ask-marcel-office` 2.7.0,
 204 commands) and turns the real ones into an ordered build plan. Verification method: the command
 registry and `--help`, the source, and live read-only probes on 2026-09-19 (one tenant).
@@ -183,8 +183,11 @@ through the `.eml` reader. The missing folder (57) was the eleventh top-level fo
 that Graph pages ten at a time; `list-mail-folders-delta` walked all fourteen, nested ones
 included. The reply without its file (59) was not a gap: the file sat on a sibling reply.
 
-Still open: chat files and reactions on substrate messages (40, 41 chat half) and chat images
-(56) need the chat tokens a browser `login` captures; the To Do link shape (46) needs one click;
-a scanned PDF inside an embedded mail is named but its pages cannot yet be extracted (save the
-embedded mail as `.eml`, then extract images from it); a default page of 100 mail folders would
-remove the ten-folder trap (57) but changes pinned test paths.
+Shipped 2026-09-27, after a fresh login: chat `files` and `reactions` on every substrate message
+(40, 41 chat half; probed: `properties.files` is a JSON string, `properties.emotions` an array of
+mris with epoch times) and `extract-teams-chat-message-images` (56; probed: Teams' media service
+answers the IC3 bearer and refuses every other token); a default page of 100 mail folders (57).
+
+Still open: the To Do link shape (46) opens To Do but not the task, so tasks stay without a
+`webUrl`; a scanned PDF inside an embedded mail is named but its pages cannot yet be extracted
+(save the embedded mail as `.eml`, then extract images from it).
