@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
+import { err, map } from '../../domain/result.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
+import { topOnlyShape } from './odata-query.ts';
 import { brandTenantId, tenantIdShape } from './tenant-option.ts';
+import { withTaskLinks } from './todo-web-url.ts';
 
 const PREFIX = 'https://graph.microsoft.com/v1.0';
 
@@ -25,7 +27,13 @@ const schema = z.object({
     .min(1)
     .refine((v) => v.startsWith(`${PREFIX}/`), { message: `must be a Microsoft Graph v1.0 URL starting with ${PREFIX}/` }),
   ...tenantIdShape,
+  ...topOnlyShape,
 });
+
+// A To Do page gets each task's web link, as the To Do listings give page one.
+const TODO_TASKS = /^\/me\/todo\/lists\/[^/?]+\/tasks(?:\/delta)?(?:\?|$)/;
+
+const TOP_REFUSED = '--top applies to a cursor read on the basic token (mail, files, To Do and the like); a chat or partner-tenant cursor keeps the page size it was given.';
 
 const execute: Command['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
@@ -35,17 +43,23 @@ const execute: Command['execute'] = async (graph, params) => {
   // wins over the elevated/basic split (a chat cursor never carries one). The
   // cursor URL itself has no tenant, which is why the flag must supply it;
   // without it page 2 would 401 with `invalidAudienceUri` even after page 1 ok.
-  if (parsed.data.tenantId !== undefined) {
-    const branded = brandTenantId(parsed.data.tenantId);
+  const { top, tenantId } = parsed.data;
+  if (top !== undefined && (tenantId !== undefined || requiresElevated(path))) return err({ type: 'validation_error', message: TOP_REFUSED });
+  if (tenantId !== undefined) {
+    const branded = brandTenantId(tenantId);
     if (!branded.ok) return branded;
     return graph.getGuest(path, branded.value);
   }
-  return requiresElevated(path) ? graph.getElevated(path) : graph.get(path);
+  if (requiresElevated(path)) return graph.getElevated(path);
+  // Graph honours a page-size preference only on the request that carries it: a
+  // delta walk that asked for 100 gets 10 a page on every continuation without it.
+  const page = await graph.get(path, top === undefined ? undefined : { Prefer: `odata.maxpagesize=${top}` });
+  return TODO_TASKS.test(path) ? map(page, withTaskLinks) : page;
 };
 
 const meta: CommandMeta = {
   summary:
-    'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url \'<url>\'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`.',
+    'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url \'<url>\'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`. `--top` keeps a page size on the continuation (Graph drops it after page one otherwise), and a To Do task page gets the `webUrl` of each task, as the To Do listings give page one.',
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '{url}',
@@ -70,6 +84,13 @@ const meta: CommandMeta = {
         'Tenant GUID of a PARTNER tenant you are a guest in. Pass it only to continue a partner-tenant drive listing (a folder / `*-drive-item` cursor whose file lives in another tenant), using the same `--tenant-id` you gave the originating command (ultimately from `resolve-drive-share-link`). ' +
         'The page is then signed with a guest token for that tenant; without it a partner-tenant cursor 401s with `invalidAudienceUri` on page 2 even though page 1 succeeded. ' +
         'Omit it for your own tenant and for every `/me/...` and chat cursor (the normal case).',
+    },
+    {
+      name: 'top',
+      key: 'top',
+      required: false,
+      description:
+        'Page size for this continuation (positive integer, ≤ 1000), sent as `Prefer: odata.maxpagesize=N`: Graph honours a page size only on the request that carries it, so a mail delta walk that asked for `--top 100` gets 10 a page on every continuation without it. Basic-token cursors only: a chat or partner-tenant cursor is refused with it.',
     },
   ],
   example: "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
