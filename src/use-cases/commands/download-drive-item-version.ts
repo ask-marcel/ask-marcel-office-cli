@@ -10,6 +10,7 @@ import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 import { normalizeVersionId } from './version-id.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
+import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
 
 // v1.4.0 surface-consolidation: the three historical-version downloads
 // (`-content`, `-as-pdf`, `-as-markdown`) shared the exact same schema +
@@ -22,6 +23,7 @@ const schema = z.object({
   before: isoDateTimeField.optional(),
   format: z.enum(['original', 'pdf', 'markdown']).optional(),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  maxCells: maxCellsField,
 });
 
 type ListedVersion = { readonly id?: unknown; readonly lastModifiedDateTime?: unknown };
@@ -127,14 +129,6 @@ const refuseVersionRender = (name: string, rawBytes = "Use `--format original` f
     message: `Graph cannot render a historical version of ${name}: its HTML conversion of a version answers the current page. ${rawBytes}, or \`download-drive-item-as-markdown\` for the current page.`,
   });
 
-const fetchMarkdown = async (graph: GraphClient, driveId: string, itemId: string, contentPath: string, includeMetadata: boolean): Promise<Result<unknown, GraphError>> => {
-  const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
-  if (!meta.ok) return meta;
-  const name = (meta.value as { name?: string }).name ?? '';
-  if (rendersThroughGraph(name)) return refuseVersionRender(name);
-  return officeToMarkdown(graph, contentPath, name, { elevated: true, includeMetadata });
-};
-
 type FetchRequest = {
   readonly driveId: string;
   readonly itemId: string;
@@ -142,12 +136,22 @@ type FetchRequest = {
   readonly contentPath: string;
   readonly format: 'original' | 'pdf' | 'markdown';
   readonly includeMetadata: boolean;
+  readonly maxCells?: number;
+};
+
+const fetchMarkdown = async (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+  const { driveId, itemId, contentPath, includeMetadata, maxCells } = r;
+  const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
+  if (!meta.ok) return meta;
+  const name = (meta.value as { name?: string }).name ?? '';
+  if (rendersThroughGraph(name)) return refuseVersionRender(name);
+  return officeToMarkdown(graph, contentPath, name, { elevated: true, includeMetadata, maxCells });
 };
 
 const fetchByFormat = (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
   if (r.format === 'original') return fetchOriginal(graph, r.contentPath);
   if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.contentPath, r.versionId);
-  return fetchMarkdown(graph, r.driveId, r.itemId, r.contentPath, r.includeMetadata);
+  return fetchMarkdown(graph, r);
 };
 
 // A PDF passthrough already carries a note; the live-file sentence joins it.
@@ -166,7 +170,8 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   const format = parsed.data.format ?? 'original';
   const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath: contentPathOf(driveId, itemId, picked), format, includeMetadata });
+  const contentPath = contentPathOf(driveId, itemId, picked);
+  const fetched = await fetchByFormat(graph, { driveId, itemId, versionId: picked.id, contentPath, format, includeMetadata, maxCells: parsed.data.maxCells });
   if (!fetched.ok || before === undefined) return fetched;
   // Say which version `--before` chose: the caller never saw the listing.
   const chosen = { ...(fetched.value as Record<string, unknown>), versionId: picked.id };
@@ -217,6 +222,7 @@ const meta: CommandMeta = {
         'Pass `--include-metadata true` to surface side-channel content (only meaningful with `--format markdown` AND a docx / xlsx / pptx / odt / ods / odp source — silently ignored otherwise). docx → `## DOCX metadata` (properties, people, hyperlinks, comments, tracked changes, hidden text, fields, bookmarks); xlsx → `## Workbook metadata` (properties, external relationships, defined names, hidden / very-hidden sheets, cell + threaded comments, persons); pptx → `## PPTX metadata` (properties, external relationships, slide tags, comment authors + comments, per-slide title / speaker notes / hidden flag); odt/ods/odp → `## OpenDocument metadata` (Dublin Core + ODF properties, keywords, user-defined fields). Each OOXML family covers its macro-enabled and template variants too, with a `### Macros (VBA)` section flagging an embedded `vbaProject.bin`.',
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
+    MAX_CELLS_OPTION,
   ],
   example: "ask-marcel-office download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
   responseShape:

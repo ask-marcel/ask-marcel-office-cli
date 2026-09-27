@@ -7,6 +7,7 @@ import { convertAttachmentToMarkdown } from './convert-mail-attachment-to-markdo
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
+import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
 
 // Every hint names a command that can actually address a POST. Borrowing the
 // mail wording would name commands that cannot. The unconvertible cases route
@@ -30,6 +31,7 @@ const schema = z.object({
   postId: z.string().min(1),
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  maxCells: maxCellsField,
   keepQuoted: keepQuotedSchemaField,
 });
 
@@ -40,7 +42,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return convertAttachmentToMarkdown(
     graph,
     `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`,
-    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true' },
+    { includeMetadata: parsed.data.includeMetadata === 'true', keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells },
     POST_HINTS
   );
 };
@@ -86,6 +88,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     keepQuotedOption,
+    MAX_CELLS_OPTION,
   ],
   example: "ask-marcel-office convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
   responseShape:

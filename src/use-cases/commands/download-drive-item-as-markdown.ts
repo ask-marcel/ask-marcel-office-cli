@@ -92,7 +92,7 @@ const meta: CommandMeta = {
       key: 'maxCells',
       required: false,
       description:
-        'Per-sheet cell cap (positive integer; default 50 000) for xlsx sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on non-xlsx sources.',
+        'Per-sheet cell cap (positive integer; default 50 000) for workbook (xlsx, xls) and CSV sources. A worksheet whose used range (rows × cols) exceeds the cap is rendered as its `## SheetName` header plus a one-line hint pointing at `get-excel-used-range` / `get-excel-range` for band-by-band reads, instead of a full markdown table — a genuinely dense 49 MB workbook otherwise builds a multi-hundred-MB string and OOMs the process. Raise it to force a larger render. No-op on other sources.',
     },
     SHEET_OPTION,
   ],

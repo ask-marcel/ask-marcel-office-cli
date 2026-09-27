@@ -7,6 +7,7 @@ import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
+import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
 
 /**
  * Unzips a `.zip` Outlook mail attachment and converts every contained file in one
@@ -22,6 +23,7 @@ const schema = z.object({
   messageId: z.string().min(1),
   attachmentId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  maxCells: maxCellsField,
   keepQuoted: keepQuotedSchemaField,
 });
 
@@ -47,7 +49,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   if (typeof contentBytes !== 'string') {
     return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
   }
-  return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true' });
+  return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
 };
 
 const meta: CommandMeta = {
@@ -69,6 +71,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     keepQuotedOption,
+    MAX_CELLS_OPTION,
   ],
   example: "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:

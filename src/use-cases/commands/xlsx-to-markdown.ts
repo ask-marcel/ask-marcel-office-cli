@@ -134,8 +134,8 @@ const SHEET_OPTION: CommandOptionMeta = {
     'Workbooks only: render one sheet by name (case-insensitive) instead of every sheet, so a 14 MB workbook can be read a sheet at a time. An unknown name answers with the list of sheets; on anything but a workbook the flag is refused.',
 };
 
-// `--max-cells` on the commands that read an attachment: the drive and local commands
-// carry their own wording, written before this was shared.
+// `--max-cells` wherever a workbook or CSV is rendered: the drive and local
+// commands carry their own wording, written before this was shared.
 const maxCellsField = z
   .string()
   .regex(/^[1-9]\d*$/, 'must be a positive integer')
@@ -147,7 +147,7 @@ const MAX_CELLS_OPTION: CommandOptionMeta = {
   key: 'maxCells',
   required: false,
   description:
-    'Per-sheet cell cap (positive integer; default 50 000) for workbook and CSV attachments. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with `--output-path` to land the render on disk; `--sheet` narrows to one sheet first.',
+    'Per-sheet cell cap (positive integer; default 50 000) for a workbook (xlsx, xls) or a CSV. A sheet whose used range (rows × cols) exceeds it renders as its `## SheetName` header plus a hint instead of a table that could run to hundreds of MB. Raise it to render a large sheet, with the global `--output-path` to land the render on disk.',
 };
 
 /** `--sheet` narrows a workbook; on anything else it is refused rather than silently ignored. */

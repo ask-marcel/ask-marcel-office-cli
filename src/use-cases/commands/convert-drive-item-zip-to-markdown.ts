@@ -9,6 +9,7 @@ import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.t
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
+import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
 
 /**
  * Unzips a `.zip` from a OneDrive / SharePoint item and runs each contained
@@ -26,6 +27,7 @@ const schema = z.object({
   driveId: z.string().min(1),
   itemId: z.string().min(1),
   includeMetadata: z.enum(['true', 'false']).optional(),
+  maxCells: maxCellsField,
   keepQuoted: keepQuotedSchemaField,
   ...tenantIdShape,
 });
@@ -41,7 +43,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
 
   const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
   if (!bytes.ok) return bytes;
-  return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true' });
+  return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
 };
 
 const meta: CommandMeta = {
@@ -69,6 +71,7 @@ const meta: CommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
     keepQuotedOption,
+    MAX_CELLS_OPTION,
   ],
   example: "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
