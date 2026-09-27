@@ -139,15 +139,34 @@ const withoutKeys = (data: Record<string, unknown>, keys: ReadonlyArray<string>)
 
 const isMediaItem = (value: unknown): value is MediaItem => isPlainRecord(value) && typeof value['path'] === 'string' && typeof value['base64'] === 'string';
 
+// The full media path is flattened (`pdf/page2/Im0.png` → `pdf_page2_Im0.png`),
+// not reduced to its basename, because PDF page-image keys (`Im0`, …) repeat
+// across pages. A name that still repeats (two `image.png` in one forwarded
+// mail) is numbered, `image-2.png`, so no image overwrites another.
+const withDestinations = (outputDir: string, media: ReadonlyArray<MediaItem>): ReadonlyArray<{ readonly item: MediaItem; readonly dest: string }> => {
+  const used = new Set<string>();
+  return media.map((item) => {
+    const flat = item.path.replace(/\//g, '_');
+    const dot = flat.lastIndexOf('.');
+    const stem = dot > 0 ? flat.slice(0, dot) : flat;
+    const ext = dot > 0 ? flat.slice(dot) : '';
+    let name = flat;
+    let copy = 1;
+    while (used.has(name)) {
+      copy += 1;
+      name = `${stem}-${copy}${ext}`;
+    }
+    used.add(name);
+    return { item, dest: posix.join(outputDir, name) };
+  });
+};
+
 /**
  * Sibling of `persistIfRequested` for the global `--output-dir` flag. When a
  * command returns a `media` array (`{ count, media: [{ path, base64, ... }] }`,
  * from the image-extraction commands) and `--output-dir` is set, write each
- * image to `<dir>/<flattened-path>` and replace its `base64` with `savedTo`.
- * The media `path` is flattened (`pdf/page2/Im0.png` → `pdf_page2_Im0.png`)
- * rather than reduced to its basename, because PDF page-image keys (`Im0`, …)
- * repeat across pages — `basename` alone would collide and silently overwrite.
- * The filesystem port auto-creates the directory. Anything without a media
+ * image to `<dir>/<flattened-path>` (see withDestinations) and replace its
+ * `base64` with `savedTo`. The filesystem port auto-creates the directory. Anything without a media
  * array returns `no_media` so the CLI can surface a clear error.
  */
 export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string | undefined, data: unknown): Promise<Result<unknown, OutputDirError>> => {
@@ -157,16 +176,12 @@ export const persistMediaIfRequested = async (fs: FileSystem, outputDir: string 
   const media = data['media'];
   if (!Array.isArray(media) || !media.every(isMediaItem)) return err({ type: 'no_media' });
 
-  // Flatten the full media path (not basename) so page-scoped PDF images with
-  // repeating XObject keys (pdf/page1/Im0.png, pdf/page2/Im0.png) don't collide.
-  const destOf = (item: MediaItem): string => posix.join(outputDir, item.path.replace(/\//g, '_'));
-  const writes = await Promise.all(media.map((item) => fs.writeBytes(destOf(item), base64ToBytes(item.base64))));
+  const planned = withDestinations(outputDir, media);
+  const writes = await Promise.all(planned.map(({ item, dest }) => fs.writeBytes(dest, base64ToBytes(item.base64))));
   const failed = writes.find((w) => !w.ok);
   if (failed !== undefined && !failed.ok) return err({ type: 'write_failed', message: failed.error.type === 'io_failed' ? failed.error.message : failed.error.type });
 
-  const saved = media.map((item) => ({ ...withoutKey(item, 'base64'), savedTo: destOf(item) }));
-  // The media envelope is exactly `{ count, media }` — rebuild it directly
-  // rather than spreading `data` (which would only re-introduce the unsaved
-  // `media`, immediately overridden — an equivalent-mutant trap).
-  return ok({ count: saved.length, media: saved });
+  const saved = planned.map(({ item, dest }) => ({ ...withoutKey(item, 'base64'), savedTo: dest }));
+  // Everything else the answer carried (a `note`, the `skipped` files) stays.
+  return ok({ ...data, count: saved.length, media: saved });
 };

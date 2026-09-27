@@ -139,7 +139,11 @@ const renderEnveloped = (data: Record<string, unknown>, tenantId?: string): stri
     return `${data.text as string}${note}\n`;
   }
   if (isBinaryPayload(data)) return `binary: ${data.contentType as string}, ${data.size as number} bytes — use --output-path to save\n`;
-  if (isUnsavedMediaPayload(data)) return mediaHintLine(data.media as ReadonlyArray<unknown>);
+  if (isUnsavedMediaPayload(data)) {
+    // A media answer's note (the files a forwarded mail held that were skipped) is kept too.
+    const note = typeof data.note === 'string' && data.note !== '' ? `note: ${data.note}\n` : '';
+    return `${mediaHintLine(data.media as ReadonlyArray<unknown>)}${note}`;
+  }
   const { stripped, cursors } = extractCursors(data);
   // A `value: []` envelope whose only other keys are scalars (`count`,
   // `truncated`, …) is a collection: render the items as top-level blocks and
