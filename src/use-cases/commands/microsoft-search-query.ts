@@ -44,7 +44,7 @@ const execute: Command['execute'] = async (graph, params) => {
 
 const meta: CommandMeta = {
   summary:
-    "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph v1.0 rejects multi-entity search bodies on most tenants (`Multiple entity search is not supported in v1.0`), so this command issues SIX parallel POSTs — one per entityType — and merges the per-entity `searchHits` containers into a single `value[]`. Each container is identifiable by the resource type inside `hits[].resource`. If a sub-request fails (e.g. tenant lacks the scope for one entity), the others still return; failures show up in `partialErrors[]`. Page size is fixed at 25 per sub-request and `top` is NOT exposed (Graph rejects $top in /search/query bodies). `chatMessage` is excluded since `Chat.Read*` is unavailable. To find Microsoft Loop pages (`.loop`) for markdown conversion, query `filetype:loop`: each `driveItem` hit carries `resource.id` plus `resource.parentReference.driveId`, the exact pair `download-drive-item-as-markdown` needs to render the page via Graph `?format=html`. (`filetype:fluid` returns nothing on this corpus; Loop pages index as `.loop`.)",
+    "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph v1.0 rejects multi-entity search bodies on most tenants (`Multiple entity search is not supported in v1.0`), so this command issues SIX parallel POSTs — one per entityType — and merges the per-entity `searchHits` containers into a single `value[]`. Each container is identifiable by the resource type inside `hits[].resource`. If a sub-request fails (e.g. tenant lacks the scope for one entity), the others still return; failures show up in `partialErrors[]`. Each sub-request asks for 25 hits, or `--top` of them (1 to 25); Graph takes the page size as the body's `size`, since it rejects $top in /search/query bodies. `chatMessage` is excluded since `Chat.Read*` is unavailable. To find Microsoft Loop pages (`.loop`) for markdown conversion, query `filetype:loop`: each `driveItem` hit carries `resource.id` plus `resource.parentReference.driveId`, the exact pair `download-drive-item-as-markdown` needs to render the page via Graph `?format=html`. (`filetype:fluid` returns nothing on this corpus; Loop pages index as `.loop`.)",
   category: 'meta',
   graphMethod: 'POST',
   graphPathTemplate: '/search/query',
@@ -62,12 +62,12 @@ const meta: CommandMeta = {
       key: 'top',
       required: false,
       description:
-        'Hits per entity type, 1 to 25 (default 25, the most Graph search returns per request). Six entity types are searched, so the response holds up to six times this many hits.',
+        'Hits per entity type, 1 to 25 (default 25). Six entity types are searched, so the response holds up to six times this many hits; for a deep file search, `search-all-files` pages 200 at a time.',
     },
   ],
   example: "ask-marcel-office microsoft-search-query --query 'q3 budget'",
   bodyTemplate:
-    "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType",
+    "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given",
   responseShape:
     'merged Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …], partialErrors?: [{ entityType, error }] }`. value[] holds one container per entityType that succeeded; partialErrors[] (only present when at least one sub-request failed) lists which entityTypes returned errors.',
 };

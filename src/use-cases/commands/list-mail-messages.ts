@@ -15,7 +15,7 @@ const execute = withMeetingResponseFilter(schema, inner.execute);
 
 const meta: CommandMeta = {
   summary:
-    "List the most recent messages from across the signed-in user's entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (`conversationId` groups messages into a thread and can be handed to `list-conversation-messages`) so a page of 25 messages stays ~30-60 KB instead of ~1 MB. Pass `--select id,subject,body` (or any other comma-separated field list) to override. Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
+    "List the most recent messages from across the signed-in user's entire Outlook mailbox (every folder including Sent, Archive, Junk; default sort `receivedDateTime` desc). The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId,webLink` (`conversationId` groups messages into a thread and can be handed to `list-conversation-messages`) so a page of 25 messages stays ~30-60 KB instead of ~1 MB. Pass `--select id,subject,body` (or any other comma-separated field list) to override. Use `list-mail-folder-messages` to scope to a single folder such as Inbox.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages',

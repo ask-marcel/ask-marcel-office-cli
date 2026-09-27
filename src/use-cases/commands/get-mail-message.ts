@@ -12,7 +12,7 @@ const { execute, schema } = buildSelectableCommand((p) => `/me/messages/${p.mess
 
 const meta: CommandMeta = {
   summary:
-    "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId` (`conversationId` gives you the thread, e.g. for `list-conversation-messages`) so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
+    "Get a single Outlook message by ID. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId,webLink` (`conversationId` gives you the thread, e.g. for `list-conversation-messages`) so an LLM caller doesn't pull a 41 KB resource just to read a subject line. Pass `--select id,subject,body` (or any other comma-separated field list) to override; for the raw RFC-822 source use `get-mail-message-mime` instead.",
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/messages/{message-id}',

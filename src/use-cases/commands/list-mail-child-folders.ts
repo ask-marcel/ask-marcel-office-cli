@@ -14,7 +14,8 @@ const { execute, schema } = buildListCommand(
 );
 
 const meta: CommandMeta = {
-  summary: 'List the subfolders of a single Outlook mail folder (e.g. subfolders of Inbox).',
+  summary:
+    'List the subfolders of a single Outlook mail folder (e.g. subfolders of Inbox). The CLI asks for 100 a page, where Graph would answer 10, unless `--top` says otherwise.',
   category: 'mail',
   graphMethod: 'GET',
   graphPathTemplate: '/me/mailFolders/{mail-folder-id}/childFolders',
