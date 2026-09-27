@@ -6,6 +6,11 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [mistake] 2026-09-28 | A live probe's value pasted into a test fixture put the signed-in user's real directory id in a public repo
+
+The chat commits of 2026-09-19 took the signed-in user's object id straight from a live substrate probe and used it as the `OID` fixture of three chat tests, where it stood for "the signed-in user" in the mentions and `--mentions-me` scenarios. Every gate passed it: the tests were right, lint had nothing to say, and gitleaks does not flag a GUID, which is an identifier rather than a secret. It was pushed and public for nine days. The pre-release audit caught it only because a reviewer noticed that the GUID did not look like the repo's patterned placeholders, and it was confirmed by comparing it with `get-current-user`'s id in the shell without printing either. The fix was the canonical placeholder at the tip and a targeted history rewrite of every commit since, force-pushed; npm was never affected, since tests are outside the package's `files`.
+Rule for next time: a value copied out of a live response is tenant data, whatever its shape. Replace it with the placeholder vocabulary (`aaaaaaaa-1111-2222-3333-444444444444`, Contoso, Robin Chen) before the first commit, and compare any random-looking GUID in a new fixture with the user's own ids before committing it (QA playbook, ground rule 9).
+
 ## [gotcha] 2026-09-27 | Chat files, reactions and pasted images: the substrate's own shapes, and the one token the media service takes
 
 Probed on 25 live chats. `properties.files` is a JSON STRING (`"[]"` on most messages) of `{ fileName, fileType, itemid, fileInfo: { fileUrl, shareUrl, siteUrl, serverRelativeUrl, shareID } }`; `itemid` is a SharePoint GUID, not a Graph driveItem id, so the links are what resolves. `properties.emotions` is an already-parsed ARRAY of `{ key, users: [{ mri: '8:orgid:<id>', time: <epoch ms>, value }] }`. A pasted image is an `<img itemtype="http://schema.skype.com/AMSImage" src="https://<x>.asm.skype.com|asyncgw.teams.microsoft.com/v1/objects/<id>/views/imgo">`; the media service answers the IC3 bearer (200) and 401s the chatsvcagg, basic and skype_token forms. IC3 also serves one message at `/v1/users/ME/conversations/{chat}/messages/{id}`.
