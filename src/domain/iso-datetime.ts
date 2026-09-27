@@ -66,6 +66,16 @@ const isoDateAtMidnightUtc = (raw: string): Result<IsoDateTime, DateParseError> 
   return d.toISOString().startsWith(raw) ? ok(toIso(d)) : err(invalid(raw));
 };
 
+// The same round trip guards an explicit instant: `2026-13-01T00:00:00Z` or
+// `2026-02-30T08:00:00Z` passes the shape check, then crashes (or silently
+// shifts) whatever computes with it. The input comes back as typed, so its
+// fraction digits survive.
+const strictIsoInstant = (raw: string): Result<IsoDateTime, DateParseError> => {
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) return err(invalid(raw));
+  return new Date(t).toISOString().startsWith(raw.slice(0, 19)) ? ok(raw as IsoDateTime) : err(invalid(raw));
+};
+
 type OffsetUnit = 'd' | 'w' | 'h' | 'm';
 
 const UNIT_MS: Readonly<Record<OffsetUnit, number>> = {
@@ -212,7 +222,7 @@ export const parseIsoDateTime = (rawInput: string, now: Date = new Date(), zone:
   const input = rawInput.trim();
   if (input.length === 0) return err(invalid(rawInput));
 
-  if (STRICT_ISO_RE.test(input)) return ok(input as IsoDateTime);
+  if (STRICT_ISO_RE.test(input)) return strictIsoInstant(input);
   if (DATE_ONLY_RE.test(input)) return isoDateAtMidnightUtc(input);
 
   const lower = input.toLowerCase();
