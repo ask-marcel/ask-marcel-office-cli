@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-09-28T12:55:00.506Z",
+  "generatedAt": "2026-09-28T14:18:51.263Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -6246,7 +6246,7 @@
     },
     {
       "name": "list-relevant-people",
-      "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc.",
+      "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `scoredEmailAddresses`, `jobTitle`, `companyName`, etc.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/people",

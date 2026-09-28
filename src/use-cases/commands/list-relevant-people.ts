@@ -16,7 +16,7 @@ const { execute, schema } = buildListCommand(() => '/me/people', baseSchema, { d
 
 const meta: CommandMeta = {
   summary:
-    "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc.",
+    "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `scoredEmailAddresses`, `jobTitle`, `companyName`, etc.",
   category: 'user',
   graphMethod: 'GET',
   graphPathTemplate: '/me/people',
