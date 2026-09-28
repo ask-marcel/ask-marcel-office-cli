@@ -2,7 +2,7 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
-## Unreleased
+## 2.8.0
 
 ### Added: what changed in a file, as a line diff
 
