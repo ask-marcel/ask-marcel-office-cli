@@ -262,21 +262,30 @@ read server says to register the write server; auth failures name the auth serve
 - **Per folder**: lint, typecheck, tests, 100% coverage on every tier, Stryker with a folder-scoped
   test command, the doc-number gate, `build`, the bundle smoke test (including MCP stdout purity) and
   a packed-install smoke: `bun pm pack`, install the tarball into an empty directory outside the
-  repo, run `--version`, one offline command and the MCP handshake under Node and Bun. Packed output
+  repo, load every package the bundle imports at run time, run `--version`, the library by name and
+  the bundle smoke under Node and Bun (shipped in phase 1 step 1, in a CI `smoke` job on Node 20,
+  separate from mutation so a registry outage cannot leave a pushed range unmutated). Packed output
   is also asserted: no `@ask-marcel/office-core` outside `devDependencies`, no `.d.ts` mentioning
   `office-core` or `../core`, expected file list.
 - **Coverage preload** enumerates itself per folder (`Bun.Glob` over the tier directories, minus
   tests and ports) instead of a hand-kept list; today's list already misses 16 files.
-- **Fail closed**: the coverage check errors when a changed file maps to no tier;
-  `mutate-changed.sh` / `mutate-staged.sh` run one diff from the repo root
-  (`git diff -M --numstat -I'(^(import|export)\b.*\bfrom\b)|(^\} from )'`), drop rows that are 0/0
-  (a move or an import-only edit), filter by `<folder>/` and strip the prefix, and exit 1 when a
-  non-test, non-port file under `<folder>/src/{domain,use-cases}` changed but the scope is empty.
-  Self-tests: a pure cross-folder move yields an empty scope; a moved file with a logic edit stays in
-  scope; the script works when run from a subfolder.
+- **Fail closed** (shipped in phase 1 step 1): the coverage check fails on a report row that matches
+  no tier and on a report with no checked rows. The mutation scope (`scripts/mutation-scope.sh`,
+  shared by both mutate scripts) runs its diffs from the repo root with `-M` and `-I` set to a
+  whole-statement import / export-from pattern (POSIX ERE: macOS git has no `\b`), drops files whose
+  only change is import lines (a move), maps repo-root paths through the caller's folder prefix, and
+  fails the run when any diff fails. `mutation-scope-selftest.sh` proves a pure cross-folder move
+  mutates nothing, a logic edit in a moved file is mutated from its folder only, a sub-folder run maps
+  its paths, untracked and unstaged files are mutated, and a failing diff fails. The planned "exit 1
+  when a folder's sources changed but its scope is empty" was not added: with paths mapped through
+  the prefix, a folder's run cannot drop its own changes, so the gap that remains is a folder no CI
+  job mutates. Phase 2 closes it before phase 3's first move: CI asserts its matrix covers every
+  workspace folder.
 - **ESLint**: each folder's config spreads the root base. One violation fixture per path-scoped rule
-  (stdout write in a core MCP file, `WriteGraph` import in `read/`, an unnecessary type assertion
-  under `LINT_STRICT`) proves each rule can fail.
+  proves each rule can fail (`scripts/check-lint-fixtures.ts`, shipped in phase 1 step 1 for the MCP
+  stdout ban and the `lint:strict` type-aware rules; a fixture fails when the file its rule guards
+  moves). The `WriteGraph`-import fixture lands with step 12; at step 13 the MCP stdout ban becomes an
+  allowlist (stdout banned everywhere except the CLI writers), so new MCP files are covered by default.
 - **`check-package-json.sh`** loops over the root and every folder `package.json`.
 - **Root pre-commit hook** is the one dispatcher: it runs the fast checks for each folder with staged
   changes, and a staged change under `core/` also runs the fast checks of auth, read and write.
@@ -384,8 +393,9 @@ flags are fixed); helper latency measured against the 150 ms target.
 
 **Phase 2: workspace skeleton** (no code moves). Root `package.json` private with
 `workspaces: ["core", "auth", "read", "write"]`; per-folder configs from the template; a
-walking-skeleton test per folder; CI matrix, root-`src/` job and Windows job; hook dispatch; the
-`.d.ts` spike and the packed-output assertions. Exit: four skeleton packages green in CI, packed
+walking-skeleton test per folder; CI matrix, root-`src/` job and Windows job, plus a check that the
+matrix covers every workspace folder (no folder's sources go unmutated); hook dispatch; the `.d.ts`
+spike and the packed-output assertions. Exit: four skeleton packages green in CI, packed
 output clean, consumer typecheck reports the deliberate errors.
 
 **Phase 3: core.** Mass-move procedure. Exit: core at 100% coverage on every tier, mutation at or
