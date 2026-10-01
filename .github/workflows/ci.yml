@@ -45,7 +45,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile # lockfile drift fails here (rule 5.3)
       - name: package.json (no latest / * / bare dist-tag)
-        run: bash scripts/check-package-json.sh
+        run: |
+          bash scripts/check-package-json.sh --selftest
+          bash scripts/check-package-json.sh
       - name: install gitleaks
         env:
           GITLEAKS_VERSION: 8.21.2
@@ -60,16 +62,22 @@ jobs:
         run: gitleaks detect --redact --no-banner
       - name: lint (strict, type-aware, zero errors AND zero warnings)
         run: bun run lint:strict
+      - name: lint fixtures (every path-scoped rule still fires on its files, and only there)
+        run: bun run scripts/check-lint-fixtures.ts
       - name: typecheck
         run: bun run typecheck
       - name: tests
         run: bun test
+      - name: coverage gate selftest (a file below its tier and a file outside every tier are rejected)
+        run: bun run scripts/check-coverage.ts --selftest
       - name: coverage (per-tier thresholds)
         run: bun run coverage
       - name: doc numbers match the registry (selftest first, so the gate proves it can fail)
         run: |
           bun run scripts/check-doc-numbers.ts --selftest
           bun run check:docs
+      - name: mutation scope selftest (a pure move mutates nothing, a sub-folder run maps its paths)
+        run: bash scripts/mutation-scope-selftest.sh
       - name: mutation (changed files; see deviation 3 in the header)
         env:
           # The branch tip BEFORE this push. Read via env rather than inlined,
@@ -88,3 +96,28 @@ jobs:
           fi
       - name: dependency CVEs (fails on high)
         run: bun audit --audit-level=high
+  smoke:
+    # The shipped bundle, run the way users run it: from dist, and installed from
+    # the packed tarball into an empty directory outside the repo. A separate job
+    # with no `needs`: the packed install pulls dependencies fresh from the
+    # registry, so an outage or a broken upstream release fails this job without
+    # blocking mutation and the audit in `gates` (a red push there would leave its
+    # range unmutated). Node 20 is the floor `engines` promises. The smokes run as
+    # `bun <file>`, not `bun run <file>`, so bun never puts its own `node` shim on
+    # PATH and the node probes really run on node.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: bun install --frozen-lockfile
+      - name: build (the bundle the package ships)
+        run: bun run build
+      - name: bundle smoke (every converter and the MCP stdout handshake, from dist, under node and bun)
+        timeout-minutes: 10
+        run: bun scripts/qa-bundle-smoke.ts
+      - name: packed-install smoke (the tarball installs and runs outside the repo)
+        timeout-minutes: 10
+        run: bun scripts/qa-packed-install-smoke.ts
