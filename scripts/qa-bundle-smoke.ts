@@ -11,10 +11,15 @@
  * This generates a real on-disk fixture for every format from the repo's own
  * fixture builders, then runs the built `dist/cli.js` on each under BOTH `node`
  * and `bun`, asserting `ok`. Run: `bun run build && bun scripts/qa-bundle-smoke.ts`.
+ * `--package-root <dir>` runs the same probes against another copy of the
+ * package (its `dist/` under <dir>), which is how qa-packed-install-smoke.ts
+ * checks the tarball as installed outside the repo.
  * Exit non-zero on any bundler-interop failure.
  */
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import type { SpawnSyncReturns } from 'node:child_process';
 import {
   buildRichDocx, buildRichXlsx, buildRichPptx, buildRichOdt, buildRichOds, buildRichOdp,
   buildPdfWithText, buildPdfWithImage, buildSampleDoc, buildLegacyXls, buildSampleMsg, buildSampleEml, buildSampleZipArchive,
@@ -43,13 +48,40 @@ F.csv = await write('f.csv', new TextEncoder().encode('a,b,c\n1,2,3\n'));
 F.html = await write('f.html', new TextEncoder().encode('<html><head><title>t</title></head><body><h1>Q3</h1><table><tr><th>A</th></tr><tr><td>1</td></tr></table><img src="data:image/png;base64,AAAA" alt="c"></body></html>'));
 const pdfImg = await write('img.pdf', await buildPdfWithImage());
 // The vendored image-bearing docx: an image extractor answering media=0 here is a failure, not a pass.
-const imageDocx = 'src/test-helpers/assets/image-sample.docx';
+const imageDocx = resolve('src/test-helpers/assets/image-sample.docx');
+
+// Every probe runs with the package root as its working directory, so `dist/cli.js`
+// and the library probe's `./dist/index.js` resolve inside the copy under test. A
+// flag given without a usable value is an error, never a silent fall back to the
+// repo's own dist.
+const packageRoot = (argv: ReadonlyArray<string>): string | undefined => {
+  const inline = argv.find((a) => a.startsWith('--package-root='));
+  if (inline !== undefined) return inline.slice('--package-root='.length) || undefined;
+  const at = argv.indexOf('--package-root');
+  if (at === -1) return '.';
+  const value = argv[at + 1];
+  return value === undefined || value.startsWith('--') ? undefined : value;
+};
+const rootArg = packageRoot(process.argv);
+const ROOT = resolve(rootArg ?? '.');
+if (rootArg === undefined || !existsSync(join(ROOT, 'dist/cli.js'))) {
+  console.error(`bundle smoke: no dist/cli.js under ${rootArg === undefined ? '(missing --package-root value)' : ROOT}; build first, or check --package-root`);
+  process.exit(1);
+}
+const runtimeVersion = (rt: string): string => spawnSync(rt, ['--version']).stdout?.toString().trim() || 'missing';
+console.log(`bundle smoke: package root ${ROOT}, node ${runtimeVersion('node')}, bun ${runtimeVersion('bun')}`);
+
+// A probe passes only when its process ended by itself with the expected status:
+// a right answer from a process that then crashed, hung or exited non-zero is a failure.
+const PROBE_TIMEOUT_MS = 20000;
+const exited = (p: SpawnSyncReturns<Buffer>, status: number): boolean => p.error === undefined && p.signal === null && p.status === status;
+const exitNote = (p: SpawnSyncReturns<Buffer>): string => p.error?.message ?? (p.signal === null ? `exit ${p.status}` : `signal ${p.signal}`);
 
 // A flag the bundle must thread end to end: argv beyond `--path`, with what the answer must hold.
-const probeArgs = (rt: string, args: ReadonlyArray<string>, expect: (d: { ok: boolean; data?: { text?: string; media?: ReadonlyArray<unknown> }; error?: string }) => boolean): boolean => {
-  const p = spawnSync(rt, ['dist/cli.js', ...args, '--output', 'json'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
+const probeArgs = (rt: string, args: ReadonlyArray<string>, expect: (d: { ok: boolean; data?: { text?: string; media?: ReadonlyArray<unknown> }; error?: string }) => boolean, status = 0): boolean => {
+  const p = spawnSync(rt, ['dist/cli.js', ...args, '--output', 'json'], { cwd: ROOT, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
   try {
-    return expect(JSON.parse(p.stdout?.toString() || ''));
+    return exited(p, status) && expect(JSON.parse(p.stdout?.toString() || ''));
   } catch {
     return false;
   }
@@ -62,17 +94,18 @@ const graph = { get: async () => ({ ok: true, value: { name: 'plan.md' } }), get
 const r = await commands['diff-drive-items'].execute(graph, { driveId: 'd1', itemId: 'i6', otherDriveId: 'd1', otherItemId: 'i7' });
 process.stdout.write(JSON.stringify({ ok: r.ok, added: r.value?.added, removed: r.value?.removed }));`;
 const probeDiff = (rt: string): boolean => {
-  const p = spawnSync(rt, rt === 'node' ? ['--input-type=module', '-e', DIFF_PROBE] : ['-e', DIFF_PROBE], { timeout: 60000 });
+  const p = spawnSync(rt, rt === 'node' ? ['--input-type=module', '-e', DIFF_PROBE] : ['-e', DIFF_PROBE], { cwd: ROOT, timeout: PROBE_TIMEOUT_MS });
   try {
     const d = JSON.parse(p.stdout?.toString() || '') as { ok: boolean; added?: number; removed?: number };
-    return d.ok && d.added === 1 && d.removed === 1;
+    return exited(p, 0) && d.ok && d.added === 1 && d.removed === 1;
   } catch {
     return false;
   }
 };
 
 const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: string } => {
-  const p = spawnSync(rt, ['dist/cli.js', cmd, '--path', path, '--output', 'json'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
+  const p = spawnSync(rt, ['dist/cli.js', cmd, '--path', path, '--output', 'json'], { cwd: ROOT, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+  if (!exited(p, 0)) return { ok: false, note: `${exitNote(p)}: ${(p.stdout?.toString() || p.stderr?.toString() || '').slice(0, 60)}` };
   try { const d = JSON.parse(p.stdout?.toString() || ''); return { ok: d.ok === true, note: d.ok ? (d.data?.media ? `media=${d.data.media.length}` : `${d.data?.contentType || ''}`) : `ERR:${d.errorCode || String(d.error).slice(0, 40)}` }; }
   catch { return { ok: false, note: 'CRASH/non-JSON: ' + (p.stdout?.toString() || p.stderr?.toString() || '').slice(0, 60) }; }
 };
@@ -104,10 +137,12 @@ const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 
 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
+    cwd: ROOT,
     input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n${JSON.stringify(MCP_CALL)}\n`,
-    timeout: 60000,
+    timeout: PROBE_TIMEOUT_MS,
     maxBuffer: 64 * 1024 * 1024,
   });
+  if (!exited(p, 0)) return { ok: false, note: `the server did not exit cleanly when its input closed (${exitNote(p)})` };
   const stdout = p.stdout?.toString() ?? '';
   const lines = stdout.split('\n').filter((l) => l.trim() !== '');
   if (lines.length === 0) return { ok: false, note: `no stdout (stderr: ${(p.stderr?.toString() ?? '').slice(0, 60)})` };
@@ -142,7 +177,7 @@ for (const rt of ['node', 'bun']) {
   console.log(`=== flags and bundled libraries @ ${rt} ===`);
   const checks: ReadonlyArray<[string, boolean]> = [
     ['--max-cells caps a sheet', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.csv ?? '', '--max-cells', '1'], (d) => d.ok && (d.data?.text ?? '').includes('Table omitted'))],
-    ['--sheet names the sheets', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.xlsx ?? '', '--sheet', 'NoSuchSheet'], (d) => !d.ok && (d.error ?? '').includes('no sheet named'))],
+    ['--sheet names the sheets', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.xlsx ?? '', '--sheet', 'NoSuchSheet'], (d) => !d.ok && (d.error ?? '').includes('no sheet named'), 1)],
     ['html: data image placeholder', probeArgs(rt, ['convert-local-file-to-markdown', '--path', F.html ?? ''], (d) => d.ok && (d.data?.text ?? '').includes('[image: c]'))],
     ['diff package (library bundle)', probeDiff(rt)],
   ];
