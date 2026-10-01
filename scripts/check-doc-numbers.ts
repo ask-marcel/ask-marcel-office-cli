@@ -38,9 +38,9 @@ type Claim = {
 const entries = Object.entries(commands);
 const manifest = buildManifest(commands, 'ask-marcel-office-cli', '0.0.0');
 
-// The six lifecycle stubs (`login`, `logout`, `update`, `docs`, `help-json`,
+// The five lifecycle stubs (`login`, `logout`, `docs`, `help-json`,
 // `mcp`) each carry `graphMethod: 'GET'` although none calls Graph, so counting
-// verbs or categories over the whole manifest inflates GET by six and invents a
+// verbs or categories over the whole manifest inflates GET by five and invents a
 // twelfth category. Every verb and category claim in the docs is about the Graph
 // surface, which is what `docs/commands.json` holds: the manifest minus these.
 const graphCommands = manifest.commands.filter((entry) => entry.category !== 'lifecycle');

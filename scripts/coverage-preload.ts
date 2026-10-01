@@ -37,7 +37,6 @@ import '../src/infra/process-runner-bun.ts';
 import '../src/infra/process-runner-node.ts';
 
 import '../src/index.ts';
-import '../src/composition/package-manager.ts';
 
 import '../src/composition/build-deps.ts';
 import '../src/composition/cli.ts';

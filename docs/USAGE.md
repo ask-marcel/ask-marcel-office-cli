@@ -23,7 +23,7 @@ ask-marcel-office help-json --terse --category mail     # ~8 KB JSON for one cat
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
 
-`ask-marcel-office update` auto-detects whether the CLI was installed via npm or bun (based on the bin path) and reinstalls globally with the matching tool. From a clone you can keep using `bun run src/main.ts <command>` directly.
+To upgrade, re-install from npm with the tool you installed with: `npm i -g ask-marcel-office-cli@latest` or `bun add -g ask-marcel-office-cli@latest`. From a clone you can keep using `bun run src/main.ts <command>` directly.
 
 The first launch prints a one-time notice if a newer version is on npm.
 
@@ -219,7 +219,7 @@ Notes:
   command, or check `scopes-check`, before calling `login` a second time.
 - **Log in from a terminal first** (`ask-marcel-office login`). A first-time MFA prompt adds minutes on top
   of the above. After that the `login` tool covers the hourly elevated-token refresh.
-- `logout` and `update` are deliberately CLI-only.
+- `logout` is deliberately CLI-only.
 - Results are text (the same YAML-ish rendering the CLI prints, `hint:` / `source:` remedies
   included). Two known v1 warts: paginated results print `next: ask-marcel-office next-page --url '...'`,
   which maps to `run-command { "command": "next-page", "params": { "url": "..." } }`; and

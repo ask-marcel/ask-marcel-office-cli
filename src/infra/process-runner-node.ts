@@ -2,9 +2,8 @@
  * Node.js process runner — atelier rule-20 quarantine companion.
  *
  * This is the ONLY file under `src/**` that may import `node:child_process`.
- * It exists so the published `dist/cli.js` can spawn child processes (used
- * by the `ask-marcel-office update` command to invoke `npm` or `bun`) when running
- * under plain Node, where `Bun.spawn` is not available.
+ * It exists so the published `dist/cli.js` can spawn child processes when
+ * running under plain Node, where `Bun.spawn` is not available.
  *
  * The composition root selects between this and `process-runner-bun.ts` at
  * runtime via `typeof globalThis.Bun`. All other production code consumes

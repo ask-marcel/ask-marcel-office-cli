@@ -37,4 +37,3 @@ export type { Command, CommandExecute, CommandSchema } from './use-cases/command
 
 export { buildDeps } from './composition/build-deps.ts';
 export type { BuildDepsConfig, BuiltDeps } from './composition/build-deps.ts';
-export { detectPackageManager } from './composition/package-manager.ts';
