@@ -6,6 +6,21 @@ Each entry is one of `[mistake]`, `[decision]`, or `[gotcha]`. Newest first.
 
 ---
 
+## [gotcha] 2026-10-01 | `bun run <file>` puts a bun-backed `node` on PATH when no real node is installed, so "under node" probes silently run on bun
+
+The bundle smokes spawn `node` and `bun` to test both runtimes the package promises. Started as `bun run scripts/x.ts`, bun injects its own `node` shim into PATH on a machine with no node, and every node probe then runs on bun while the log still says node. CI's ubuntu image ships a real node and the smoke job pins Node 20 with setup-node, so no run was affected, but the gate would fail open on a bun-only machine. The smokes now run as `bun scripts/x.ts` and print the node and bun versions they found.
+Rule for next time: start a script that must exercise node as `bun <file>`, never `bun run <file>`, and have it log `node --version`.
+
+## [gotcha] 2026-10-01 | errexit is off inside `$(...)`, so a failing `git diff` in a grouped command substitution read as "nothing changed" and the mutation gate passed
+
+`mutate-changed.sh` built its scope as `files=$( { diff1; diff2; diff3; untracked; } | filter )` under `set -euo pipefail`. Inside a command substitution bash turns errexit off and the group returns its last command's status, so a diff that failed (no merge base on a shallow checkout, a base from rewritten history) printed git's error, then "no files in mutation scope changed", and exited 0 having mutated nothing; the script had the flaw before the split work too. The sources are now chained with `&&`, and `mutation-scope-selftest.sh` runs the real caller against an unrelated base and expects a non-zero exit.
+Rule for next time: inside `$(...)`, chain commands with `&&` or give each its own assignment, and test a gate script's failure path through its caller, not only through its helpers.
+
+## [gotcha] 2026-10-01 | `git diff -I` hands its pattern to the platform regex, and macOS has no `\b`, so an import filter written with `\b` matches nothing there
+
+The mutation scope drops files whose only change is import lines with `git diff -I<regex>`. The plan's first pattern used `\b`; on macOS (Apple git 2.39 and Homebrew git 2.55 alike) a pure path change still reported `1 1`, so the filter silently did nothing. The shipped pattern in `scripts/mutation-scope.sh` is plain POSIX ERE that anchors the whole statement and allows no quote before ` from `, checked on both macOS gits and against GNU ERE. `mutation-scope-selftest.sh` pins it both ways: an import-only move mutates nothing, and an exported string that reads like an import stays in scope.
+Rule for next time: write patterns handed to git (`-I`, `-G`, `--grep`, `log -E`) in POSIX ERE without `\b`, `\d` or lookarounds, and prove them in a selftest that runs on macOS and Linux.
+
 ## [decision] 2026-10-01 | split into @ask-marcel/office-auth, -read and -write plus a private core/; read and write get tokens only from env vars or auth's token helper
 
 The single package is to be replaced by three independently published packages, for release cadence first, reuse by other products second, and agent safety third (a read-only install contains no write command and no write-capable Graph code). It is a packaging boundary, not a privilege boundary: the Teams client token keeps its write scopes whichever package is installed. Shared code lives in a private `core/` inlined into each bundle; the folders sit at the top level because the atelier skill reads `packages/*` with Bun workspaces as its Next.js variant. Read and write take a token from an `ASKMARCEL_TOKEN_<TIER>` variable or spawn `ask-marcel-office-auth token`, so auth is the only writer of the token cache, and the three `*-to-pdf` converters move to write because they PUT and DELETE a temporary OneDrive file. Plan and rejected options: `docs/plans/2026-10-01-package-split.md` and `docs/adr/0003-split-into-auth-read-write-packages.md`; this supersedes the 2026-04-29 "do not split" distribution decision.
