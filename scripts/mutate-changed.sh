@@ -12,6 +12,9 @@
 # A repo with no `origin/main` yet (greenfield, before the first push) must set
 # BASE to a local ref; an unknown base fails loudly rather than passing empty.
 #
+# Stage a move (git mv, or git add -A) before running this: to git an unstaged
+# move is a new untracked file, so it is mutated in full.
+#
 # See skills/atelier/references/workflow.md (Mutation testing).
 
 set -euo pipefail
@@ -26,9 +29,8 @@ if [ -z "${MUTATE_NO_FETCH:-}" ] && [ "${BASE#origin/}" != "$BASE" ]; then
   git fetch --quiet origin "${BASE#origin/}" || true
 fi
 
-# An unknown BASE makes every diff below fail, and the `|| true` on the
-# pipeline turns that into "no files changed" plus exit 0: a green run that
-# mutated nothing. Fail loudly instead.
+# An unknown BASE makes every diff below fail. The diffs fail the run on their
+# own (see below); this check names the cause before git's error does.
 if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
   echo "mutate:changed: base ref '$BASE' does not exist (fetch it, or set BASE=)" >&2
   exit 1
@@ -37,17 +39,15 @@ fi
 echo "mutate:changed: base ${BASE} $(git rev-parse --short "$BASE")" \
      "($(git log -1 --format=%cr "$BASE")), HEAD +$(git rev-list --count "$BASE"..HEAD)"
 
+# shellcheck source=scripts/mutation-scope.sh
+. "$(dirname "$0")/mutation-scope.sh"
+
 # Files that differ from BASE, plus uncommitted and staged edits, plus
 # untracked files. Untracked matters: a brand-new source file appears in NO
 # diff, so without it a new domain or use-case file is never mutated and the run
-# still exits 0.
-changed=$( {
-  git diff --name-only --diff-filter=ACMR "$BASE"...HEAD
-  git diff --name-only --diff-filter=ACMR HEAD
-  git diff --cached --name-only --diff-filter=ACMR
-  git ls-files --others --exclude-standard
-} | sort -u)
-
+# still exits 0. A file whose only change is its import lines (a move) is left
+# out, and paths are mapped to the folder this runs in (mutation-scope.sh).
+#
 # A changed test file pulls in the source it covers. Test files carry no
 # mutants, so a commit touching ONLY tests used to present zero files: the gate
 # printed "no files in mutation scope changed" and passed having run nothing.
@@ -55,17 +55,17 @@ changed=$( {
 # against production code nobody edited, and it hid a real 89.14 behind a green
 # run on 2026-08-30. Partial by construction: a shared test file with no sibling
 # source (commands.test.ts covers ~180 command modules) still maps to nothing.
-covered=$(echo "$changed" | grep -E '\.test\.ts$' | sed -E 's/\.test\.ts$/.ts/' || true)
-
-# `-f` filters the mapping's misses (a test whose sibling source does not
-# exist); the diffs themselves are already ACMR, so nothing deleted reaches it.
-files=$( { echo "$changed"; echo "$covered"; } | sort -u \
-  | grep -E '^src/(domain|use-cases)/' \
-  | grep -E '\.ts$' \
-  | grep -vE '\.test\.ts$' \
-  | grep -vE '/ports/' \
-  | while IFS= read -r f; do [ -f "$f" ] && echo "$f"; done \
-  || true)
+#
+# The sources are chained with && because errexit is off inside $(...): run as
+# separate lines, a failing diff (no merge base on a shallow clone, a base from
+# rewritten history) left only the last command's status, and the run printed
+# "no files in mutation scope changed" and exited 0 having mutated nothing.
+files=$( {
+  scope_changed_paths "$BASE"...HEAD &&
+    scope_changed_paths HEAD &&
+    scope_changed_paths --cached &&
+    scope_untracked
+} | scope_filter)
 
 if [ -z "$files" ]; then
   echo "mutate:changed: no files in mutation scope changed since ${BASE}"

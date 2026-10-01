@@ -11,22 +11,14 @@
 
 set -euo pipefail
 
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+# shellcheck source=scripts/mutation-scope.sh
+. "$(dirname "$0")/mutation-scope.sh"
 
 # A staged test file pulls in the source it covers. Test files carry no mutants,
 # so staging ONLY tests used to skip the gate entirely — exactly when it matters
-# most, since a WEAKENED test lowers the score of source nobody edited. Partial
-# by construction: a shared test file with no sibling source maps to nothing.
-covered=$(echo "$staged" | grep -E '\.test\.ts$' | sed -E 's/\.test\.ts$/.ts/' || true)
-
-# `-f` drops the mapping's misses (a test whose sibling source does not exist).
-files=$( { echo "$staged"; echo "$covered"; } | sort -u \
-  | grep -E '^src/(domain|use-cases)/' \
-  | grep -E '\.ts$' \
-  | grep -vE '\.test\.ts$' \
-  | grep -vE '/ports/' \
-  | while IFS= read -r f; do [ -f "$f" ] && echo "$f"; done \
-  || true)
+# most, since a WEAKENED test lowers the score of source nobody edited. A staged
+# move whose only edits are import lines is left out (mutation-scope.sh).
+files=$(scope_changed_paths --cached | scope_filter)
 
 if [ -z "$files" ]; then
   echo "mutate:staged: no staged files in mutation scope, skipping"
