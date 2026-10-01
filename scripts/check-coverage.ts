@@ -8,7 +8,17 @@
  *
  * Exit codes:
  *   0  every non-skipped file meets its tier's threshold
- *   1  at least one file is below gate, or `bun test` failed
+ *   1  at least one file is below gate, a file matches no tier, or `bun test`
+ *      failed
+ *
+ *   --selftest  proves the gate rejects a file below its threshold and a file
+ *               outside every tier, without running the suite (rule 15.10: a
+ *               gate only ever seen green is a hypothesis)
+ *
+ * A file that matches no tier and no skip rule is a violation, not a pass.
+ * Tiers are path prefixes, so moving sources (the package split moves
+ * `src/` into per-package folders) would otherwise drop every moved file from
+ * the gate while it kept printing "all files meet their tier gate".
  *
  * Tune per-project by editing COVERAGE_RULES and SKIPPED below.
  *
@@ -47,6 +57,9 @@ const SKIPPED: ReadonlyArray<SkipRule> = [
   { name: 'production-wiring', match: (p) => p === 'src/infra/playwright-loader.ts' },
   // public library barrel: re-exports only — no executable logic to cover.
   { name: 'library barrel', match: (p) => p === 'src/index.ts' },
+  // the coverage and no-network preloads: test plumbing that loads with the suite.
+  // Named exactly, so any other non-src row still surfaces as a file with no tier.
+  { name: 'test preloads', match: (p) => p === 'scripts/coverage-preload.ts' || p === 'scripts/no-network-preload.ts' },
 ];
 // NOTE: src/composition/build-deps.ts USED to be skipped here. It is now
 // fully unit-testable via the optional `BuildDepsConfig` argument pattern
@@ -63,7 +76,7 @@ type Violation = {
   readonly file: FileRow;
   readonly tier: string;
   readonly threshold: number;
-  readonly metric: 'funcs' | 'lines';
+  readonly metric: 'funcs' | 'lines' | 'no tier';
   readonly actual: number;
 };
 
@@ -82,7 +95,9 @@ const parseRow = (line: string): FileRow | undefined => {
     const path = parts[layout.path];
     if (!path) continue;
     if (path === 'File' || path === 'All files' || path.startsWith('-')) continue;
-    if (!path.endsWith('.ts') && !path.endsWith('.tsx')) continue;
+    // Every source extension Bun can report, so a non-TS source in a tier is
+    // classified like any other file rather than dropped before the check.
+    if (!/\.(c|m)?[jt]sx?$/.test(path)) continue;
     const funcs = Number.parseFloat(parts[layout.funcs] ?? '');
     const lines = Number.parseFloat(parts[layout.lines] ?? '');
     if (Number.isNaN(funcs) || Number.isNaN(lines)) continue;
@@ -142,7 +157,10 @@ const collectViolations = (rows: ReadonlyArray<FileRow>): ReadonlyArray<Violatio
   for (const row of rows) {
     if (isSkipped(row.path)) continue;
     const tier = findTier(row.path);
-    if (!tier) continue;
+    if (!tier) {
+      violations.push({ file: row, tier: 'none', threshold: 0, metric: 'no tier', actual: 0 });
+      continue;
+    }
     if (row.funcs < tier.threshold) {
       violations.push({ file: row, tier: tier.name, threshold: tier.threshold, metric: 'funcs', actual: row.funcs });
     }
@@ -156,6 +174,10 @@ const collectViolations = (rows: ReadonlyArray<FileRow>): ReadonlyArray<Violatio
 const printViolations = (violations: ReadonlyArray<Violation>): void => {
   console.error('\ncoverage: per-file gate violations:');
   for (const v of violations) {
+    if (v.metric === 'no tier') {
+      console.error(`  ${v.file.path}  matches no tier: add it to COVERAGE_RULES or SKIPPED, it is otherwise unchecked`);
+      continue;
+    }
     console.error(
       `  ${v.file.path}  [${v.tier}]  ${v.metric}=${v.actual.toFixed(1)}%  required=${v.threshold}%`
     );
@@ -166,18 +188,48 @@ const printViolations = (violations: ReadonlyArray<Violation>): void => {
   );
 };
 
+const parseReport = (output: string): ReadonlyArray<FileRow> =>
+  output
+    .split('\n')
+    .map(parseRow)
+    .filter((r): r is FileRow => r !== undefined);
+
+// A canned report in Bun's text layout, run through the same parse and check
+// as a real run. Each case must produce exactly the violations listed.
+const SELFTEST_HEADER = [
+  '----------------------------------|---------|---------|-------------------',
+  'File                              | % Funcs | % Lines | Uncovered Line #s',
+  '----------------------------------|---------|---------|-------------------',
+  'All files                         |   99.00 |   99.00 |',
+  ' scripts/coverage-preload.ts      |  100.00 |  100.00 | ',
+  ' src/main.ts                      |    0.00 |    0.00 | 1-9',
+];
+const SELFTEST_CASES: ReadonlyArray<{ readonly name: string; readonly row: string; readonly expected: number }> = [
+  { name: 'a clean table', row: ' ./src/domain/a.ts               |  100.00 |  100.00 | ', expected: 0 },
+  { name: 'a file below on funcs', row: ' src/use-cases/b.ts               |   99.00 |  100.00 | ', expected: 1 },
+  { name: 'a file below on lines', row: ' src/infra/c.ts                   |  100.00 |   99.00 | 7', expected: 1 },
+  { name: 'a file outside every tier', row: ' read/src/domain/a.ts             |  100.00 |  100.00 | ', expected: 1 },
+  { name: 'a JavaScript file outside every tier', row: ' src/legacy.js                    |  100.00 |  100.00 | ', expected: 1 },
+];
+
+const runSelftest = (): number => {
+  const wrong = SELFTEST_CASES.filter((c) => collectViolations(parseReport([...SELFTEST_HEADER, c.row].join('\n'))).length !== c.expected);
+  for (const c of wrong) console.error(`coverage: SELFTEST FAILED, ${c.name} did not produce ${c.expected} violation(s)`);
+  if (wrong.length > 0) return 1;
+  console.log('coverage: selftest passed (below on funcs, below on lines, and outside every tier are rejected; a clean table passes).');
+  return 0;
+};
+
 const main = async (): Promise<number> => {
+  if (process.argv.includes('--selftest')) return runSelftest();
   const { status, output } = await runTestsWithCoverage();
   if (status !== 0) {
     console.error('\ncoverage: `bun test --coverage` exited non-zero; fix test failures first.');
     return status;
   }
-  const rows = output
-    .split('\n')
-    .map(parseRow)
-    .filter((r): r is FileRow => r !== undefined);
-  if (rows.length === 0) {
-    console.error('\ncoverage: no file rows parsed from the coverage report. Check that `bun test --coverage` is producing a text table.');
+  const rows = parseReport(output);
+  if (rows.filter((r) => !isSkipped(r.path)).length === 0) {
+    console.error('\ncoverage: no checked file rows in the coverage report. Check that `bun test --coverage` is producing a text table.');
     return 1;
   }
   printTierSummary(rows);
