@@ -112,21 +112,9 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     responseShape: '{ status: "logged_out" } on success.',
   },
   {
-    name: 'update',
-    summary:
-      'Re-install the latest published ask-marcel-office from npm, in place. Auto-detects whether you originally installed via npm or bun based on the bin path. Token cache is preserved. Do NOT use from a local clone — pull and re-run `bun install` instead.',
-    category: 'lifecycle',
-    graphMethod: 'GET',
-    graphPathTemplate: '(lifecycle) shells out to `npm i -g` or `bun add -g`; not a Graph endpoint',
-    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/',
-    options: [],
-    example: 'ask-marcel-office update',
-    responseShape: '{ status: "updated", via: "npm" | "bun" } on success.',
-  },
-  {
     name: 'docs',
     summary:
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/logout/update/docs) prints the same --help that command would.',
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/logout/docs) prints the same --help that command would.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',

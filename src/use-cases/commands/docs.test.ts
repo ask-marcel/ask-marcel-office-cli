@@ -19,7 +19,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   },
 });
 
-const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'mcp', 'update'] as const;
+const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'mcp'] as const;
 
 describe('buildManifest', () => {
   it('builds a manifest with package name, version, generatedAt, and registry+lifecycle commands sorted alphabetically', () => {
@@ -28,7 +28,7 @@ describe('buildManifest', () => {
     expect(manifest.package).toBe('fake-pkg');
     expect(manifest.version).toBe('0.0.1');
     expect(manifest.generatedAt).toBe('2026-04-30T12:00:00.000Z');
-    expect(manifest.commands.map((c) => c.name)).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp', 'update']);
+    expect(manifest.commands.map((c) => c.name)).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp']);
   });
 
   it('marks every lifecycle entry with category `lifecycle` so consumers can filter them', () => {
@@ -105,7 +105,7 @@ describe('buildTerseManifest — discovery view', () => {
     expect(foo?.summary).toBe('Lists the foos.');
   });
 
-  it('still includes lifecycle entries with their canonical summaries so a discovery-mode consumer sees login/logout/update/docs/help-json', () => {
+  it('still includes lifecycle entries with their canonical summaries so a discovery-mode consumer sees login/logout/docs/help-json', () => {
     const manifest = buildTerseManifest({}, 'fake-pkg', '0.0.1');
     const names = manifest.commands.map((c) => c.name);
     for (const lifecycle of LIFECYCLE_NAMES) expect(names).toContain(lifecycle);
@@ -212,7 +212,7 @@ describe('renderSingleCommand', () => {
     }
   });
 
-  it('returns Markdown for a lifecycle command (login/logout/update/docs/help-json) even when the registry is empty', () => {
+  it('returns Markdown for a lifecycle command (login/logout/docs/help-json) even when the registry is empty', () => {
     const result = renderSingleCommand({}, 'login');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -227,7 +227,7 @@ describe('renderSingleCommand', () => {
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'unknown_command') {
       expect(result.error.name).toBe('list-banana');
-      expect(result.error.available).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp', 'update']);
+      expect(result.error.available).toEqual(['docs', 'help-json', 'list-apple', 'list-zebra', 'login', 'logout', 'mcp']);
     }
   });
 });

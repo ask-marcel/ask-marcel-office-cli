@@ -1,6 +1,6 @@
 # Command reference
 
-All 212 commands across 11 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint. The six lifecycle commands (`login`, `logout`, `update`, `docs`, `help-json`, `mcp`) are listed separately in the **Authentication & lifecycle** section below — `help-json` counts them in its manifest total (218), so a 212-vs-218 gap is those six, not a drift.
+All 212 commands across 11 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint. The five lifecycle commands (`login`, `logout`, `docs`, `help-json`, `mcp`) are listed separately in the **Authentication & lifecycle** section below — `help-json` counts them in its manifest total (217), so a 212-vs-217 gap is those five, not a drift.
 
 The auto-generated tables below are rebuilt from the live command registry on every `bun run docs:gen` / `bun run build` — they cannot drift from the actual surface.
 
@@ -17,7 +17,6 @@ For everything else:
 |---------|-------------|
 | `login` | Authenticate (cached → refresh → browser fallback) |
 | `logout` | Clear cached tokens |
-| `update` | Update ask-marcel-office to the latest version on npm (auto-detects npm vs bun) |
 | `docs <cmd>` | Print Markdown docs for a single command |
 | `help-json [--terse] [--category <name>]` | Machine-readable manifest, full or filtered |
 | `mcp` | Serve the command registry to an MCP client over stdio (five gateway tools) |

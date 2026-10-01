@@ -271,7 +271,7 @@ describe('command meta — invariants on every registered command', () => {
     // does not exist (e.g. the plugin once taught `get-event` for `get-calendar-event`)
     // ships silently — meta.test previously validated only per-command FLAGS. Validate
     // every command-shaped reference against the registry + lifecycle names.
-    const valid = new Set<string>(['docs', 'help-json', 'login', 'logout', 'update']);
+    const valid = new Set<string>(['docs', 'help-json', 'login', 'logout']);
     for (const [name] of populated) valid.add(name);
     const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
     const phantom: string[] = [];

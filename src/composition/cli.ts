@@ -18,13 +18,11 @@ import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
 import { resolveDateZone } from './date-zone.ts';
-import * as update from '../use-cases/commands/update.ts';
 import { buildRenderContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
-import { detectPackageManager } from './package-manager.ts';
 
 type BuildCliDeps = {
   readonly auth: AuthManager;
@@ -33,7 +31,6 @@ type BuildCliDeps = {
   readonly processRunner: ProcessRunner;
   readonly fs: FileSystem;
   readonly version?: string;
-  readonly packageManager?: 'npm' | 'bun';
   readonly onCommandError?: () => void;
   /**
    * Builds the AuthManager for an interactive `login` run (it may recapture
@@ -61,7 +58,7 @@ const AUTH_CANCELLED_MESSAGE =
 const CLI_REMEDY = 'Run `ask-marcel-office --help` to list every command.';
 
 const buildCli = (deps: BuildCliDeps): Command => {
-  const { auth, graph, logger, processRunner, fs, version } = deps;
+  const { auth, graph, logger, fs, version } = deps;
   const program = new Command();
 
   const getFormat = (): OutputFormat => {
@@ -443,33 +440,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
-  const updateCmd = program
-    .command('update')
-    .description('Re-install the latest published ask-marcel-office from npm, in place. Auto-detects whether you originally installed via npm or bun.')
-    .action(async () => {
-      const manager = deps.packageManager ?? detectPackageManager(process.argv[1] ?? '');
-      const result = await update.execute(processRunner, manager);
-      if (result.ok) renderOut({ status: 'updated', via: manager });
-      else if (result.error.type === 'spawn_failed') fail(`update failed: ${result.error.message}`);
-      else fail(`update install exited with code ${result.error.exitCode}`);
-    });
-  updateCmd.addHelpText(
-    'after',
-    [
-      '',
-      'Example:      ask-marcel-office update',
-      'Detection:    based on the bin path of the running CLI.',
-      '              `/usr/local/lib/node_modules/...` -> npm, `~/.bun/install/...` -> bun.',
-      'Side effect:  shells out to `npm i -g ask-marcel-office-cli@latest` or `bun add -g ...`.',
-      'Token cache:  preserved (this only re-installs the JS bundle).',
-      'Local clone:  do NOT use `update` — pull and re-run `bun install` instead.',
-    ].join('\n  ')
-  );
-
   const docsCmd = program
     .command('docs')
     .description(
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/update/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
     )
     .argument('<command>', 'Command name to show docs for (run `ask-marcel-office --help` to list every command).')
     .action(async (commandName: string) => {
@@ -488,7 +462,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     [
       '',
       'Example:       ask-marcel-office docs list-mail-messages',
-      'Lifecycle:     `ask-marcel-office docs login` (or logout / update / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
+      'Lifecycle:     `ask-marcel-office docs login` (or logout / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
     ].join('\n  ')
   );
 

@@ -629,55 +629,6 @@ describe('buildCli command surface', () => {
     expect(out).toContain('not found');
   });
 
-  it('runs npm install when the user invokes `update` and the manager is npm (under --output json)', async () => {
-    const logger = createLoggerFake();
-    const runner = createProcessRunnerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'update']));
-    expect(runner.calls[0]).toEqual({ command: 'npm', args: ['i', '-g', 'ask-marcel-office-cli@latest'] });
-    expect(out).toContain('"status":"updated"');
-    expect(out).toContain('"via":"npm"');
-  });
-
-  it('runs `bun add -g` when the user invokes `update` and the manager is bun (under --output json)', async () => {
-    const logger = createLoggerFake();
-    const runner = createProcessRunnerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'bun', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'update']));
-    expect(runner.calls[0]).toEqual({ command: 'bun', args: ['add', '-g', 'ask-marcel-office-cli@latest'] });
-    expect(out).toContain('"via":"bun"');
-  });
-
-  it('renders the install exit code when the update install exits non-zero', async () => {
-    const logger = createLoggerFake();
-    const runner = createProcessRunnerFake({ resultPerCall: [{ exitCode: 7 }] });
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
-    expect(out).toContain('exited with code 7');
-  });
-
-  it('renders the spawn-failed message when the update install cannot be spawned', async () => {
-    const logger = createLoggerFake();
-    const runner = createProcessRunnerFake({ throwOn: [0] });
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, packageManager: 'npm', fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
-    expect(out).toContain('update failed');
-  });
-
-  it('auto-detects the package manager from the bin path when packageManager is not supplied', async () => {
-    const logger = createLoggerFake();
-    const runner = createProcessRunnerFake();
-    const previousArgv = process.argv[1];
-    process.argv[1] = '/Users/anyone/.bun/install/global/node_modules/ask-marcel-office-cli/dist/cli.js';
-    try {
-      const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: runner, fs: createFileSystemFake() });
-      await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'update']));
-      expect(runner.calls[0]).toEqual({ command: 'bun', args: ['add', '-g', 'ask-marcel-office-cli@latest'] });
-    } finally {
-      process.argv[1] = previousArgv;
-    }
-  });
-
   it('prints Markdown for a single command when the user runs `docs <cmd>`', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });

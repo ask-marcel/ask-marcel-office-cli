@@ -34,7 +34,6 @@ export type { ProcessRunner, ProcessRunnerError, ProcessRunResult } from './use-
 
 export { commands } from './use-cases/commands/index.ts';
 export type { Command, CommandExecute, CommandSchema } from './use-cases/commands/command-types.ts';
-export type { PackageManager, UpdateError } from './use-cases/commands/update.ts';
 
 export { buildDeps } from './composition/build-deps.ts';
 export type { BuildDepsConfig, BuiltDeps } from './composition/build-deps.ts';
