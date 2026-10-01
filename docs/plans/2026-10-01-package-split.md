@@ -256,3 +256,192 @@ did-you-mean, the `meta.test` phantom-command guard and the `hasActionableAdvice
 names map too: `scopes-check` to `{auth-bin} status`, `update` to the install command. Each package
 has its own MCP server name, and MCP messages use per-server wording (a write command named on the
 read server says to register the write server; auth failures name the auth server's `login` tool).
+
+## Checks and CI (D7)
+
+- **Per folder**: lint, typecheck, tests, 100% coverage on every tier, Stryker with a folder-scoped
+  test command, the doc-number gate, `build`, the bundle smoke test (including MCP stdout purity) and
+  a packed-install smoke: `bun pm pack`, install the tarball into an empty directory outside the
+  repo, run `--version`, one offline command and the MCP handshake under Node and Bun. Packed output
+  is also asserted: no `@ask-marcel/office-core` outside `devDependencies`, no `.d.ts` mentioning
+  `office-core` or `../core`, expected file list.
+- **Coverage preload** enumerates itself per folder (`Bun.Glob` over the tier directories, minus
+  tests and ports) instead of a hand-kept list; today's list already misses 16 files.
+- **Fail closed**: the coverage check errors when a changed file maps to no tier;
+  `mutate-changed.sh` / `mutate-staged.sh` run one diff from the repo root
+  (`git diff -M --numstat -I'(^(import|export)\b.*\bfrom\b)|(^\} from )'`), drop rows that are 0/0
+  (a move or an import-only edit), filter by `<folder>/` and strip the prefix, and exit 1 when a
+  non-test, non-port file under `<folder>/src/{domain,use-cases}` changed but the scope is empty.
+  Self-tests: a pure cross-folder move yields an empty scope; a moved file with a logic edit stays in
+  scope; the script works when run from a subfolder.
+- **ESLint**: each folder's config spreads the root base. One violation fixture per path-scoped rule
+  (stdout write in a core MCP file, `WriteGraph` import in `read/`, an unnecessary type assertion
+  under `LINT_STRICT`) proves each rule can fail.
+- **`check-package-json.sh`** loops over the root and every folder `package.json`.
+- **Root pre-commit hook** is the one dispatcher: it runs the fast checks for each folder with staged
+  changes, and a staged change under `core/` also runs the fast checks of auth, read and write.
+- **CI**: a matrix with one job per folder; a root-`src/` job keeps running every current gate until
+  phase 6 deletes `src/`; a `windows-latest` job runs the helper round trip (`token --tier basic`
+  against a fixture cache, spawned the way read spawns it).
+- **Scripts ownership**: shared at the root and run with the folder as working directory:
+  `check-coverage.ts`, `no-network-preload.ts`, `mutate-*.sh`, `check-commit-size.sh`,
+  `check-package-json.sh`, `lint-staged.sh`, `gen-docs.ts` and `check-doc-numbers.ts` (both take the
+  registry and doc paths as arguments), `add-shebang.ts`, `fix-dts-extensions.ts`,
+  `qa-bundle-smoke.ts` (per bin). `qa-param-matrix.ts` and `qa-live-sweep.ts` go with read;
+  `qa-write-smoke.ts` and `qa-dedup-smoke.ts` with write; `probe-*` and `spike-headless-elevated.ts`
+  with auth or deleted.
+
+## Build and publish
+
+`bun build` per package with core inlined; auth builds two entries (`cli.js` and the small
+`token.js`). The `.d.ts` must not reference the private core: phase 2 spikes the approach (per-file
+`tsc` output with core imports rewritten, or a declaration bundler) on a real surface, with at least
+one core type re-exported through a package's public entry. Exit check: install the packed tarball
+into a clean consumer and run `tsc --noEmit --skipLibCheck false` on a file that misuses each
+exported type on purpose; it must report the expected type error, not TS2307 and not pass silently.
+
+Publishing: `bun publish` from each folder without `--otp`, so bun prompts for web 2FA after
+`prepublishOnly` finishes (a code typed up front expires during the build and checks); or run the
+checks first, then `bun publish --ignore-scripts --otp <fresh code>`. `npm publish` would ship a
+literal `workspace:*`. No published package depends on another at runtime, so order does not
+matter. Prerequisite: the `ask-marcel` npm org exists and the publishing account is a member (not
+verifiable offline; npmjs.com answers 403 to curl).
+
+Versioning: independent semver from 1.0.0, a `CHANGELOG.md` per folder, git tags
+`office-auth-vX.Y.Z`, `office-read-vX.Y.Z`, `office-write-vX.Y.Z`, one GitHub release per tag, read
+marked Latest. The root `CHANGELOG.md` stays as the frozen 2.8.0 history that the new changelogs
+link to.
+
+## Migration sequence
+
+Trunk-based on `main`, fetch and rebase before every push (another session pushes to this repo).
+Every step leaves all checks green. Normal commits respect the 10-file / 300-line gate; phase 2 is
+split into one green commit per folder plus root and CI commits.
+
+**Mass-move procedure** (phases 3 to 6), two commits per package:
+
+1. A normal-size commit that removes the package's commands from the root registry and shells,
+   updates the pinned test assertions (asked as one rule-24 batch per phase) and the root doc-number
+   counts.
+2. A pure move: `git mv` plus import-path edits, committed with `--no-verify` and the justification
+   in the body, as `check-commit-size.sh` allows for mass renames. Because the hook is skipped, these
+   run explicitly first and are listed in the body: `gitleaks protect --staged`,
+   `check-package-json.sh`, lint, typecheck, the folder's tests and coverage, and the folder's full
+   Stryker run. Each move is pushed on its own.
+
+**Phase 0: records.** ADR 0003 (supersedes ADR 0001's "one bin the whole story", which is marked
+partially superseded, and the 2026-04-29 "do not split" distribution decision), a `[decision]`
+entry in `.claude/LESSONS.md`, the `CLAUDE.md` variant line, this plan.
+
+**Phase 1: seams inside the single package** (TDD, normal commits, nothing moves; the package stays
+releasable and keeps the in-process token path as its default):
+
+1. Checks first: fail-closed coverage and mutation with rename-aware scope, ESLint violation
+   fixtures, `check-package-json.sh` loop, CI gains `build`, the bundle smoke test and the
+   packed-install smoke.
+2. Remove `update`, package-manager detection and `build:bin`; the notifier takes an injected
+   package name.
+3. ProcessRunner: `run(cmd, args, { stdin, timeoutMs, maxStdoutBytes })` returning
+   `{ exitCode, signal, stdout, timedOut }` replaces `runInherit` (its only user was `update`); any
+   signal is a failure (today the Node adapter maps a signal kill to 0); both adapters and the fake.
+4. FileSystem: `writeTextAtomic` and `createExclusive`; both adapters.
+5. Auth hardening: lock, single-flight, atomic persists with propagated `Result`, merging
+   `persistTeams`, one cache-path resolver, `browserProfileDir`, Singleton cleanup under the lock,
+   `DEFAULT_SECONDARY_TOKEN_COMMANDS` deleted, redaction keys.
+6. Split `auth.ts` into a headless module (cache, refresh, status) and a browser module that only
+   `login` and `token` reach.
+7. `TokenSource` port; `GraphClient` consumes it through an adapter over `AuthManager`; the region
+   becomes its own value.
+8. `status` lifecycle command built from auth's `TokenInfo` (moved out of `graph-client.ts`); the
+   login summary uses it; `scopes-check` removed with a directory entry pointing to `status` and its
+   hint references repointed.
+9. `token` lifecycle command and its small entry: per-tier policy, `--reject`, JSON contract, error
+   codes, locator file.
+10. Env and helper `TokenSource` implementations: resolution order, env validation, Windows
+    resolution, stdio and deadline rules, single-flight, 5-minute reuse cap, failure reporting.
+11. Effect class replaces `meta.mutates` (before step 12, which needs it); PDF converters become
+    `transient-upload`, which moves them from MCP `run-command` to `run-write-command` (recorded in
+    the CHANGELOG as an intended behaviour change); `graph-scopes.ts` dissolved; `qa-live-sweep`
+    allow-list.
+12. `ReadGraph` / `WriteGraph` factories; each command typed against the narrower one; empty-body
+    handling; registry test; bundle check; the graph fake split in two.
+13. Registry and lifecycle injection: the CLI builder, MCP builder, `run-registry-command`,
+    `buildManifest`, `gen-docs` and `check-doc-numbers` take `{ registry, lifecycle, binName,
+    packageName }`; no module-level registry constants; an ESLint `no-restricted-imports` rule bars
+    future core files from the registry and lifecycle commands. Core gets tests against a small fake
+    registry; the real-registry suites stay with read.
+14. Placeholder names and the command-to-package directory; remedies split (auth remedy plus the
+    caller's command list); per-server MCP wording.
+15. Shared helpers extracted into the modules core will own.
+16. Tests that mix read and write cases (`commands.test.ts`, `draft-dedup-docs.test.ts`, lifecycle
+    pins, MCP tool counts) split by future package: one rule-24 batch, so phases 5 and 6 stay pure
+    moves.
+
+Exit: every check green; a live smoke passes twice, once on the default in-process path and once
+with `ASKMARCEL_TOKEN_COMMAND` pointing at the single bin's `token` entry: `login --force`, `token`
+for each tier, one read per tier, `scripts/qa-write-smoke.ts` (after its stale `--body-content`
+flags are fixed); helper latency measured against the 150 ms target.
+
+**Phase 2: workspace skeleton** (no code moves). Root `package.json` private with
+`workspaces: ["core", "auth", "read", "write"]`; per-folder configs from the template; a
+walking-skeleton test per folder; CI matrix, root-`src/` job and Windows job; hook dispatch; the
+`.d.ts` spike and the packed-output assertions. Exit: four skeleton packages green in CI, packed
+output clean, consumer typecheck reports the deliberate errors.
+
+**Phase 3: core.** Mass-move procedure. Exit: core at 100% coverage on every tier, mutation at or
+above threshold.
+
+**Phase 4: auth.** Mass-move procedure; bin `ask-marcel-office-auth`. Live: `login --force`,
+`status`, `token` per tier, the MCP `login` tool, two parallel `token` calls on an expired access
+token (one redemption, no `invalid_grant`), and a helper killed mid-refresh followed by a successful
+`token` (stale lock recovered, cache intact).
+
+**Phase 5: write.** Mass-move procedure; bin and MCP server. Live: `qa-write-smoke.ts`, one PDF
+conversion.
+
+**Phase 6: read.** Mass-move procedure for the rest of `src/`, then delete the root `src/` and its CI
+job, and point the doc-number gate at read's registry in the same push. Live:
+`scripts/qa-live-sweep.ts` across all tiers through the helper, and a read MCP server registered via
+npx and launched with a minimal PATH.
+
+**Phase 7: docs.** Per-package README, USAGE and COMMANDS via the per-folder `gen-docs`; the root
+README becomes an index. `docs/COMMANDS.md`, `docs/USAGE.md` and `docs/demo.gif` stay reachable at
+their current paths until the old package is deprecated. `docs/QA-PLAYBOOK.md`, the `qa-audit`
+skill and the shipped agent skill (`skills/`) move to the new bins, and the shipped skill states
+which packages it needs.
+
+**Phase 8: release** (steps marked "you" need the account owner):
+
+1. You: confirm or create the `ask-marcel` npm org.
+2. You: `bun publish` in `auth/`, `read/`, `write/` (web 2FA prompt after the checks).
+3. Tags and GitHub releases for the three 1.0.0 versions.
+4. You: swap the global install and re-register MCP (three servers; register read and auth only on
+   hosts that must not write).
+5. After confirmation: `npm deprecate ask-marcel-office-cli` with a pointer to the new packages.
+
+## Risks
+
+- **Refresh-token rotation race.** Parallel helpers redeem the same single-use refresh token.
+  Covered by the lock, single-flight and fingerprinted replay; tested live in phase 4.
+- **Windows.** Spawning through npm `.cmd` shims fails without a shell and is unsafe with one.
+  Covered by the locator file and the Windows CI job.
+- **Declaration output.** Broken `.d.ts` hides behind `skipLibCheck`. Covered by the consumer check
+  in phase 2.
+- **Packages that install but crash.** The hoisted linker resolves everything from the root, so a
+  missing runtime dependency passes in-repo checks. Covered by the packed-install smoke.
+- **Silent checks.** Covered by phase 1 step 1, before any file leaves `src/`.
+- **CI mutation on mass moves.** Covered by the rename-aware scope and one push per move.
+- **Elevated token lapse.** Unchanged: it lapses roughly hourly and only a browser recaptures it;
+  the MCP `login` tool timeout note (`MCP_TOOL_TIMEOUT` around 300000) moves to the auth server.
+- **npx-only MCP setups.** The locator file points into the npx cache, which can be evicted; the PATH
+  lookup and `ASKMARCEL_TOKEN_COMMAND` are the fallbacks, and the error says so.
+- **Atelier rule 26 (D13).** The new packages name the maintainer in `LICENSE` and `package.json`,
+  as the current package does. Accepted.
+- **History.** `git mv` keeps history (`git log --follow`); mass-move commits carry no logic changes,
+  so `git blame -C` stays useful.
+
+## Out of scope
+
+Migrating Studio, ask-marcel-claude-code-plugin and ask-marcel-plugin to the new packages. Adding a
+`commit-msg` hook and a CI commit-message check (atelier rule 23 is not enforced today; a separate
+task).
