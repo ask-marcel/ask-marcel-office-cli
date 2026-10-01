@@ -84,8 +84,7 @@
     "build:types": "bun --bun x tsc -p tsconfig.build.json",
     "docs:gen": "bun run scripts/gen-docs.ts",
     "build": "rm -rf dist && bun run docs:gen && bun run build:js && bun run build:types && bun run scripts/fix-dts-extensions.ts && bun run scripts/add-shebang.ts && cp docs/commands.json dist/commands.json",
-    "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage",
-    "build:bin": "mkdir -p dist/bin && bun build src/main.ts --compile --target=bun-darwin-arm64 --external playwright --outfile dist/bin/ask-marcel-office-mac-arm64 && bun build src/main.ts --compile --target=bun-darwin-x64 --external playwright --outfile dist/bin/ask-marcel-office-mac-x64 && bun build src/main.ts --compile --target=bun-linux-x64 --external playwright --outfile dist/bin/ask-marcel-office-linux && bun build src/main.ts --compile --target=bun-windows-x64 --external playwright --outfile dist/bin/ask-marcel-office-windows.exe"
+    "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
