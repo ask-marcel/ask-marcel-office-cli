@@ -81,7 +81,7 @@ const main = async (): Promise<void> => {
     const candidateSubject = stringField(candidate, 'subject') ?? '';
     const candidateC0 = stringField(candidate, 'conversationId');
     if (id === undefined || candidateC0 === undefined || candidateSubject.length === 0) continue;
-    const reply = run(['create-reply-draft', '--reply-to-message-id', id, '--body-content', `SMOKE dedup ${stamp} #0`]);
+    const reply = run(['create-reply-draft', '--reply-to-message-id', id, '--comment', `SMOKE dedup ${stamp} #0`]);
     const draftId = stringField(reply.data, 'id');
     if (reply.ok && draftId !== undefined) {
       createdDraftIds.push(draftId);
@@ -101,7 +101,7 @@ const main = async (): Promise<void> => {
   // Create 2 more reply drafts on the SAME inbound message; record each returned
   // conversationId (they may split off the inbound C0 — that is the finding).
   for (let i = 1; i < 3; i += 1) {
-    const reply = run(['create-reply-draft', '--reply-to-message-id', replyTargetId, '--body-content', `SMOKE dedup ${stamp} #${i}`]);
+    const reply = run(['create-reply-draft', '--reply-to-message-id', replyTargetId, '--comment', `SMOKE dedup ${stamp} #${i}`]);
     const draftId = stringField(reply.data, 'id');
     if (!reply.ok || draftId === undefined) {
       process.stdout.write(`follow-up create-reply-draft #${i} failed (ok=${reply.ok}, err=${reply.error ?? '-'}). Continuing with ${createdDraftIds.length} draft(s).\n`);

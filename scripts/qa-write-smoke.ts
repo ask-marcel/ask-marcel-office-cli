@@ -88,7 +88,7 @@ const main = async (): Promise<void> => {
 
   // 1) create-reply-draft: body MUST be comment + quoted original (P1-DRAFT-01).
   const replyComment = `SMOKE reply ${stamp}`;
-  const reply = run(['create-reply-draft', '--reply-to-message-id', srcId, '--body-content', replyComment]);
+  const reply = run(['create-reply-draft', '--reply-to-message-id', srcId, '--comment', replyComment]);
   const replyId = idOf(reply.data);
   if (reply.ok && replyId) {
     createdDraftIds.push(replyId);
@@ -101,7 +101,7 @@ const main = async (): Promise<void> => {
 
   // 2) create-forward-draft: body MUST be comment + quoted original, recipients set.
   const fwdComment = `SMOKE forward ${stamp}`;
-  const fwd = run(['create-forward-draft', '--forward-message-id', srcId, '--to-recipients', me, '--body-content', fwdComment]);
+  const fwd = run(['create-forward-draft', '--forward-message-id', srcId, '--to-recipients', me, '--comment', fwdComment]);
   const fwdId = idOf(fwd.data);
   if (fwd.ok && fwdId) {
     createdDraftIds.push(fwdId);
