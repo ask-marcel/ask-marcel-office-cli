@@ -8,6 +8,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import type { AuthManager } from './auth.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth.ts';
+import { createTokenCacheLock } from './token-cache-lock.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 
 // `getCachedElevatedInfo` is an optional AuthManager capability (only the real
@@ -187,6 +188,13 @@ const jwtWithScopes = (scopes: ReadonlyArray<string>): string => {
   const header = btoa(JSON.stringify({ alg: 'RS256' }));
   const payload = btoa(JSON.stringify({ exp: future, scp: scopes.join(' ') }));
   return `${header}.${payload}.sig`;
+};
+
+// A fresh Graph token of one account (object id `robin`, tenant `tenant-1`).
+const robin = (): AccessToken => {
+  const header = btoa(JSON.stringify({ alg: 'RS256' }));
+  const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://graph.microsoft.com', oid: 'robin', tid: 'tenant-1' }));
+  return accessTokenUnsafe(`${header}.${payload}.sig`);
 };
 
 describe('auth manager recovery ladder', () => {
@@ -2572,11 +2580,6 @@ describe('token cache writes', () => {
 
 describe('one refresh-token redemption at a time', () => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const robin = (): AccessToken => {
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', oid: 'robin', tid: 'tenant-1' }));
-    return accessTokenUnsafe(`${header}.${payload}.sig`);
-  };
   // A token endpoint that rotates the refresh token on every redemption and
   // records which refresh token each redemption spent.
   const createRotatingTokenEndpoint = (spent: string[]): ((url: string, init?: RequestInit) => Promise<Response>) => {
@@ -2647,5 +2650,97 @@ describe('one refresh-token redemption at a time', () => {
     const [first, second] = await Promise.all([auth.getChatsvcaggAccessToken({ ignoreCache: true }), auth.getChatsvcaggAccessToken({ ignoreCache: true })]);
     expect(spent).toEqual(['rt-1']);
     expect(first.ok && second.ok && first.value === second.value).toBe(true);
+  });
+});
+
+describe('the token cache lock around redemptions, sign-ins and sign-outs', () => {
+  const LOCK = `${CACHE_PATH}.lock`;
+  const expiredSession = JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' });
+
+  it('holds the lock while it redeems the refresh token, and releases it after', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, expiredSession);
+    let lockedDuringRedemption = false;
+    const fetchFn = async (): Promise<Response> => {
+      lockedDuringRedemption = fs.has(LOCK);
+      return new Response(JSON.stringify({ access_token: robin(), expires_in: 3600, refresh_token: 'rt-2' }), { status: 200 });
+    };
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, false, false, fetchFn);
+    expect((await auth.getAccessToken()).ok).toBe(true);
+    expect(lockedDuringRedemption).toBe(true);
+    expect(fs.has(LOCK)).toBe(false);
+  });
+
+  it('holds the lock for a browser sign-in, so the profile is never driven by two browsers', async () => {
+    const fs = createFileSystemFake();
+    const base = fakeBrowserAuth({ acquireResult: futureToken() });
+    let lockedDuringSignIn = false;
+    const browser: BrowserAuth = {
+      ...base,
+      acquireBothTokens: async (url, options) => {
+        lockedDuringSignIn = fs.has(LOCK);
+        return base.acquireBothTokens(url, options);
+      },
+    };
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, true, false, refusingTokenEndpoint);
+    expect((await auth.getAccessToken()).ok).toBe(true);
+    expect(lockedDuringSignIn).toBe(true);
+    expect(fs.has(LOCK)).toBe(false);
+  });
+
+  it('answers sign_in_in_progress when another process keeps signing in past the wait budget', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, expiredSession);
+    fs.seed(LOCK, JSON.stringify({ owner: 'other', pid: 4242, host: 'elsewhere', startedAt: 0, purpose: 'browser' }));
+    let clock = 0;
+    const lock = createTokenCacheLock({
+      fs,
+      lockPath: LOCK,
+      pid: 1000,
+      host: 'here',
+      now: () => clock,
+      isProcessAlive: () => true,
+      wait: async (ms) => {
+        clock += ms;
+      },
+      newOwnerId: () => 'me',
+    });
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, false, false, refusingTokenEndpoint, lock);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.code).toBe('sign_in_in_progress');
+      expect(result.error.message).toContain('signing in');
+    }
+  });
+
+  it('reports a token cache whose lock cannot be created as unwritable', async () => {
+    const inner = createFileSystemFake();
+    inner.seed(CACHE_PATH, expiredSession);
+    const fs = { ...inner, createExclusive: async () => err({ type: 'io_failed' as const, message: 'read-only folder' }) };
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, false, false, refusingTokenEndpoint);
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.code).toBe('token_cache_unwritable');
+      expect(result.error.message).toContain('lock could not be taken (read-only folder)');
+    }
+  });
+
+  it('holds the lock while signing out, so the profile is not wiped under a running sign-in', async () => {
+    const inner = createFileSystemFake();
+    inner.seed(CACHE_PATH, expiredSession);
+    let lockedDuringWipe = false;
+    const fs = {
+      ...inner,
+      deleteDirIfExists: async (path: string) => {
+        lockedDuringWipe = inner.has(LOCK);
+        return inner.deleteDirIfExists(path);
+      },
+    };
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    expect((await auth.logout()).ok).toBe(true);
+    expect(lockedDuringWipe).toBe(true);
+    expect(inner.has(LOCK)).toBe(false);
   });
 });

@@ -13,6 +13,8 @@ import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 import { REQUEST_TIMEOUT_MS } from './network-error.ts';
 import { homedir } from 'node:os';
+import type { LockPurpose, TokenCacheLock } from './token-cache-lock.ts';
+import { createSystemTokenCacheLock } from './token-cache-lock.ts';
 
 type CachedToken = {
   access_token: string;
@@ -296,7 +298,27 @@ const NOT_AUTHENTICATED_CODE = 'not_authenticated';
 // rotated refresh token was not saved leaves a spent one on disk, and the next
 // command dead-ends in a login unless this one says why.
 const CACHE_UNWRITABLE_CODE = 'token_cache_unwritable';
-const isCacheUnwritable = (r: Result<unknown, AuthError>): boolean => !r.ok && r.error.type === 'auth_failed' && r.error.code === CACHE_UNWRITABLE_CODE;
+
+// Another process holds the token-cache lock (signing in, refreshing, signing
+// out) past this call's wait budget. Reported as itself too: "run login" would
+// start a second sign-in on top of the one in progress.
+const SIGN_IN_IN_PROGRESS_CODE = 'sign_in_in_progress';
+
+// The two failures a caller reports as they are, rather than trying the next
+// rung of the ladder (a browser, or the generic "run login" message).
+const mustReportAsIs = (r: Result<unknown, AuthError>): boolean =>
+  !r.ok && r.error.type === 'auth_failed' && (r.error.code === CACHE_UNWRITABLE_CODE || r.error.code === SIGN_IN_IN_PROGRESS_CODE);
+
+// How long a call waits for the lock: up to a whole sign-in where a person can
+// see what is going on (a terminal, `login`), twenty seconds for an agent.
+const LOCK_WAIT_INTERACTIVE_MS = 7 * 60_000;
+const LOCK_WAIT_UNATTENDED_MS = 20_000;
+const HOLDER_ACTIVITY: Readonly<Record<LockPurpose | 'unknown', string>> = {
+  browser: 'signing in',
+  refresh: 'refreshing its tokens',
+  logout: 'signing out',
+  unknown: 'using the token cache',
+};
 
 // Two Graph tokens of the same account: the same object id in the same tenant.
 // A token without these claims never matches, so the caller replaces rather
@@ -336,8 +358,26 @@ const createAuthManagerFromApi = (
   // the 5s test limit depending on Microsoft's latency (2026-08-31), which made
   // the suite's result a property of the network. Defaults to the global, so
   // every existing caller is unchanged.
-  fetchFn: FetchFn = globalThis.fetch
+  fetchFn: FetchFn = globalThis.fetch,
+  // The machine-wide lock around every redemption, sign-in and sign-out.
+  // Injectable so a test can stand in another process and a clock it controls.
+  lock: TokenCacheLock = createSystemTokenCacheLock(fs, `${cachePath}.lock`)
 ): AuthManager => {
+  const lockWaitMs = acquireBasicViaBrowser ? LOCK_WAIT_INTERACTIVE_MS : LOCK_WAIT_UNATTENDED_MS;
+  const underLock = async <T>(purpose: LockPurpose, task: () => Promise<Result<T, AuthError>>): Promise<Result<T, AuthError>> => {
+    const locked = await lock.withLock(purpose, lockWaitMs, task);
+    if (locked.ok) return locked.value;
+    if (locked.error.type === 'lock_failed') {
+      return err({ type: 'auth_failed', message: `the token-cache lock could not be taken (${locked.error.message})`, code: CACHE_UNWRITABLE_CODE });
+    }
+    const waited = Math.round(lockWaitMs / 1000);
+    return err({
+      type: 'auth_failed',
+      message: `Another ask-marcel-office process is ${HOLDER_ACTIVITY[locked.error.purpose]}; this call waited ${waited} s for it. Retry once it finishes.`,
+      code: SIGN_IN_IN_PROGRESS_CODE,
+    });
+  };
+
   const readCache = async (): Promise<CachedToken | null> => {
     const r = await fs.readJson<CachedToken>(cachePath);
     return r.ok ? r.value : null;
@@ -488,16 +528,18 @@ const createAuthManagerFromApi = (
   // saved a fresh token, and redeeming again would spend its rotated refresh
   // token for nothing.
   const refreshBasicInTurn = (): Promise<Result<AccessToken, AuthError>> =>
-    oneRedemptionAtATime(async () => {
-      const latest = await readCache();
-      const saved = accessToken(latest?.access_token ?? '');
-      if (saved.ok) {
-        logger.info('auth.ladder.rung', { rung: 'cache_after_wait' });
-        return ok(saved.value);
-      }
-      if (!latest?.refresh_token) return err({ type: 'auth_failed', message: 'the cached session ended while this call waited for its turn' });
-      return refreshToken(latest);
-    });
+    oneRedemptionAtATime(async () =>
+      underLock('refresh', async () => {
+        const latest = await readCache();
+        const saved = accessToken(latest?.access_token ?? '');
+        if (saved.ok) {
+          logger.info('auth.ladder.rung', { rung: 'cache_after_wait' });
+          return ok(saved.value);
+        }
+        if (!latest?.refresh_token) return err({ type: 'auth_failed', message: 'the cached session ended while this call waited for its turn' });
+        return refreshToken(latest);
+      })
+    );
 
   // Substrate tokens (chatsvcagg / ic3) carry the SAME Teams appid as the Graph
   // token, so the shared refresh_token redeems for their audiences too — a
@@ -543,13 +585,15 @@ const createAuthManagerFromApi = (
   // The same turn-taking for a substrate token. A token saved while this call
   // waited is used, unless it is the very one the caller found dead.
   const refreshSubstrateInTurn = (tier: SubstrateTier, dead: string | undefined): Promise<Result<AccessToken, AuthError>> =>
-    oneRedemptionAtATime(async () => {
-      const latest = await readCache();
-      const saved = tier.fresh(latest);
-      if (saved !== undefined && saved.startsWith('eyJ') && saved !== dead) return ok(accessTokenUnsafe(saved));
-      if (!latest?.refresh_token) return err({ type: 'auth_failed', message: `${tier.rung}: the cached session ended while this call waited for its turn` });
-      return refreshSubstrateToken(latest, tier.resource, tier.persist, tier.rung);
-    });
+    oneRedemptionAtATime(async () =>
+      underLock('refresh', async () => {
+        const latest = await readCache();
+        const saved = tier.fresh(latest);
+        if (saved !== undefined && saved.startsWith('eyJ') && saved !== dead) return ok(accessTokenUnsafe(saved));
+        if (!latest?.refresh_token) return err({ type: 'auth_failed', message: `${tier.rung}: the cached session ended while this call waited for its turn` });
+        return refreshSubstrateToken(latest, tier.resource, tier.persist, tier.rung);
+      })
+    );
 
   // Track the elevated-capture outcome from the most recent
   // browser-acquired session so the login command can surface it to the
@@ -563,13 +607,17 @@ const createAuthManagerFromApi = (
   // traffic that may not occur in the settle window — ic3 needs a chat-history load).
   // Redeem any the dance missed from the freshly-minted refresh token, headlessly —
   // the same path the on-demand getters use, so no second browser is needed.
+  // One missed substrate token, redeemed in its turn and under the lock, from
+  // the refresh token as it is then (`fresh` only if the cache vanished).
+  const redeemMissedTier = async (resource: string, persist: SubstrateTier['persist'], rung: string, fresh: CachedToken): Promise<unknown> =>
+    oneRedemptionAtATime(async () => underLock('refresh', async () => refreshSubstrateToken((await readCache()) ?? fresh, resource, persist, rung)));
+
   const redeemMissedSubstrateAtLogin = async (chatsvcaggCaptured: boolean, ic3Captured: boolean): Promise<void> => {
     if (chatsvcaggCaptured && ic3Captured) return;
     const fresh = await readCache();
     if (!fresh?.refresh_token) return;
-    if (!chatsvcaggCaptured)
-      await oneRedemptionAtATime(async () => refreshSubstrateToken((await readCache()) ?? fresh, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem'));
-    if (!ic3Captured) await oneRedemptionAtATime(async () => refreshSubstrateToken((await readCache()) ?? fresh, IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem'));
+    if (!chatsvcaggCaptured) await redeemMissedTier(CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem', fresh);
+    if (!ic3Captured) await redeemMissedTier(IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem', fresh);
   };
 
   // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
@@ -592,7 +640,12 @@ const createAuthManagerFromApi = (
     return persistIc3(ic3.token, ic3.region);
   };
 
-  const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
+  type SignedIn = { readonly token: AccessToken; readonly substrateCaptured: { readonly chatsvcagg: boolean; readonly ic3: boolean } | null };
+
+  // The browser leg, run while holding the lock: Chromium's own Singleton lock
+  // files are cleared at every launch, so only the lock keeps a second browser
+  // off the profile.
+  const signInViaBrowser = async (force: boolean): Promise<Result<SignedIn, AuthError>> => {
     try {
       // Single-session capture: one Playwright-driven browser window does
       // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
@@ -617,7 +670,7 @@ const createAuthManagerFromApi = (
       // elevated/chatsvcagg outcomes null: no browser-tested state to report.
       if (fromCache === true) {
         logger.info('auth.ladder.rung', { rung: 'browser_cache_short_circuit' });
-        return ok(result.accessToken);
+        return ok({ token: result.accessToken, substrateCaptured: null });
       }
       const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
       if (elevated.ok) {
@@ -631,13 +684,22 @@ const createAuthManagerFromApi = (
       if (!savedTeams.ok) return savedTeams;
       const savedSubstrate = await persistSubstrateCaptures(chatsvcagg, ic3);
       if (!savedSubstrate.ok) return savedSubstrate;
-      if (force) await redeemMissedSubstrateAtLogin(chatsvcagg.ok, ic3.ok);
       logger.info('auth.ladder.rung', { rung: 'browser' });
-      return ok(result.accessToken);
+      return ok({ token: result.accessToken, substrateCaptured: { chatsvcagg: chatsvcagg.ok, ic3: ic3.ok } });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return err({ type: 'auth_failed', message: msg });
     }
+  };
+
+  // A forced login redeems the substrate tokens the browser missed AFTER the
+  // sign-in released the lock: the redemptions take the lock themselves.
+  const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
+    const signedIn = await underLock('browser', async () => signInViaBrowser(force));
+    if (!signedIn.ok) return signedIn;
+    const captured = signedIn.value.substrateCaptured;
+    if (force && captured !== null) await redeemMissedSubstrateAtLogin(captured.chatsvcagg, captured.ic3);
+    return ok(signedIn.value.token);
   };
 
   // Concurrent first-time auth was racing — two parallel commands would
@@ -674,7 +736,7 @@ const createAuthManagerFromApi = (
       }
       if (cached?.refresh_token) {
         const refreshed = await refreshBasicInTurn();
-        if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
+        if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
       }
     }
     // Command path: never launch an interactive browser for the basic token —
@@ -725,7 +787,7 @@ const createAuthManagerFromApi = (
       return ok(accessTokenUnsafe(fresh));
     }
     if (!cached?.refresh_token) return noGuestCredentials(tenant);
-    return oneRedemptionAtATime(async () => redeemGuestToken(tenant));
+    return oneRedemptionAtATime(async () => underLock('refresh', async () => redeemGuestToken(tenant)));
   };
 
   // Runs in its turn, so it reads the cache again: a guest token or a rotated
@@ -814,7 +876,9 @@ const createAuthManagerFromApi = (
     return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${elevatedCommands}.)`;
   };
 
-  const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+  const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> =>
+    underLock('browser', async () => recaptureElevatedHoldingLock(options));
+  const recaptureElevatedHoldingLock = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     try {
       const captured = await browserAuth.acquireElevatedToken(options);
       if (!captured.ok) {
@@ -898,7 +962,8 @@ const createAuthManagerFromApi = (
     return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${chatsvcaggCommands}.)`;
   };
 
-  const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => {
+  const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureChatsvcaggHoldingLock());
+  const recaptureChatsvcaggHoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
       const captured = await browserAuth.acquireChatsvcaggToken();
       if (!captured.ok) {
@@ -954,7 +1019,7 @@ const createAuthManagerFromApi = (
     if (cached?.refresh_token) {
       const tier = { fresh: freshChatsvcaggToken, resource: CHATSVCAGG_RESOURCE, persist: persistChatsvcagg, rung: 'auth.chatsvcagg.refresh' };
       const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
-      if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
+      if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {
       return err({
@@ -1005,7 +1070,8 @@ const createAuthManagerFromApi = (
     return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${ic3Commands}.)`;
   };
 
-  const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => {
+  const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureIc3HoldingLock());
+  const recaptureIc3HoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
     try {
       const captured = await browserAuth.acquireIc3Token();
       if (!captured.ok) {
@@ -1051,7 +1117,7 @@ const createAuthManagerFromApi = (
     if (cached?.refresh_token) {
       const tier = { fresh: freshIc3Token, resource: IC3_RESOURCE, persist: persistIc3, rung: 'auth.ic3.refresh' };
       const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
-      if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
+      if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {
       return err({
@@ -1063,7 +1129,10 @@ const createAuthManagerFromApi = (
     return recaptureIc3Shared();
   };
 
-  const logout = async (): Promise<Result<void, AuthError>> => {
+  // Signing out holds the lock too, so the profile is never wiped under a
+  // sign-in another process is running.
+  const logout = async (): Promise<Result<void, AuthError>> => underLock('logout', async () => logoutHoldingLock());
+  const logoutHoldingLock = async (): Promise<Result<void, AuthError>> => {
     try {
       await fs.deleteIfExists(cachePath);
       // Wipe the Playwright persistent browser profile too. Previously
