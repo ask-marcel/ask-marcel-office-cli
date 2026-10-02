@@ -50,6 +50,17 @@ jobs:
           bash scripts/check-package-json.sh
       - name: commit-msg hook selftest (a non-conventional header is rejected)
         run: bash scripts/commit-msg-selftest.sh
+      - name: commit messages (every pushed commit passes the commit-msg hook, --no-verify included)
+        env:
+          # The branch tip BEFORE this push. On a push the script's default
+          # range, origin/main..HEAD, is empty and would pass having checked nothing.
+          PUSHED_FROM: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            bash scripts/check-commit-messages.sh
+          else
+            bash scripts/check-commit-messages.sh "${PUSHED_FROM}..HEAD"
+          fi
       - name: install gitleaks
         env:
           GITLEAKS_VERSION: 8.21.2

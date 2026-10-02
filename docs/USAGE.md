@@ -327,6 +327,6 @@ The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → packa
 git config core.hooksPath .githooks
 ```
 
-The same setting wires `.githooks/commit-msg`, which rejects a commit whose header is not a Conventional Commit: `type(scope)!: subject`, the type one of `feat fix docs style refactor perf test build ci chore revert`, a lowercase scope and the `!` optional, no trailing period, at most 100 characters. Headers git writes itself (Merge, Revert, fixup!, squash!) pass. CI runs the hook against its fixtures (`scripts/commit-msg-selftest.sh`) but does not re-check pushed messages, so a commit made with `--no-verify` is not caught.
+The same setting wires `.githooks/commit-msg`, which rejects a commit whose header is not a Conventional Commit: `type(scope)!: subject`, the type one of `feat fix docs style refactor perf test build ci chore revert`, a lowercase scope and the `!` optional, no trailing period, at most 100 characters. Headers git writes itself (Merge, Revert, fixup!, squash!) pass. CI runs the hook against its fixtures (`scripts/commit-msg-selftest.sh`), then re-checks every pushed commit with it (`scripts/check-commit-messages.sh`), so a header that skipped the hook with `--no-verify` still turns CI red.
 
 Optional but recommended: install [gitleaks](https://github.com/gitleaks/gitleaks) (`brew install gitleaks`) to enable gate 3. The hook degrades gracefully if it's missing.
