@@ -42,6 +42,13 @@ describe('winston logger adapter', () => {
     expect(out).toContain('[REDACTED]');
   });
 
+  it("redacts the token cache's own field names, whatever their case", async () => {
+    const logger = createWinstonLogger({ logLevel: 'info' });
+    const meta = { access_token: 'secret-a', accessToken: 'secret-b', refresh_token: 'secret-c', RefreshToken: 'secret-d' };
+    const out = await captureStream('stderr', () => logger.info('auth.debug', meta));
+    for (const secret of ['secret-a', 'secret-b', 'secret-c', 'secret-d']) expect(out).not.toContain(secret);
+  });
+
   it('emits warn and error levels', async () => {
     const logger = createWinstonLogger({ logLevel: 'warn' });
     const out = await captureStream('stderr', () => {

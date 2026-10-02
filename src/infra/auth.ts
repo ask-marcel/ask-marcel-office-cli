@@ -246,18 +246,16 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
  * preflight so an unattended agent can re-auth up front rather than discover the
  * lapse mid-run.
  */
-const failFastSecondaryMessage = (token: string, commands: string, remedy: string): string =>
-  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office scopes-check\` (no Graph call) before a long unattended run. (Commands that need it: ${commands}.)`;
+const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>, remedy: string): string =>
+  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office scopes-check\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
 
 /**
  * Command names quoted in the secondary-token error messages, per token kind.
  * The composition root derives these from the command registry
- * (`needsElevatedToken` / `needsSubstrateToken` flags) and injects them; the
- * defaults below are the corrected registry sets at the time of writing, so
- * direct `createAuthManagerFromApi` callers still get accurate messages. The
- * registry sets are pinned in meta.test.ts and the wiring in
- * build-deps.test.ts, so drift surfaces there, not in a stale user message
- * (the old hardcoded elevated list omitted `get-user`).
+ * (`needsElevatedToken` / `needsSubstrateToken` flags) and injects them. A
+ * caller that injects none gets messages that name the token only: auth knows
+ * which tokens exist, not which commands need them, and the hard-coded default
+ * that used to stand in had already drifted from the registry.
  */
 type SecondaryTokenCommands = {
   readonly elevated: ReadonlyArray<string>;
@@ -265,13 +263,13 @@ type SecondaryTokenCommands = {
   readonly ic3: ReadonlyArray<string>;
 };
 
-const DEFAULT_SECONDARY_TOKEN_COMMANDS: SecondaryTokenCommands = {
-  elevated: ['download-drive-item-version', 'get-chat', 'get-user', 'list-chats'],
-  chatsvcagg: ['find-chats-with-user', 'get-teams-chat-message', 'list-teams-chat-messages', 'list-teams-chats-with-messages'],
-  ic3: ['list-teams-chat-history'],
-};
+const NO_SECONDARY_TOKEN_COMMANDS: SecondaryTokenCommands = { elevated: [], chatsvcagg: [], ic3: [] };
 
 const commandList = (names: ReadonlyArray<string>): string => names.join(', ');
+
+// The "(Commands that need this token: …)" tail of a token-failure message,
+// empty when the caller named no commands.
+const neededByNote = (names: ReadonlyArray<string>, token: string = 'this token'): string => (names.length === 0 ? '' : ` (Commands that need ${token}: ${commandList(names)}.)`);
 
 const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
 const RECAPTURE_ELEVATED_VIA_LOGIN =
@@ -341,7 +339,7 @@ const createAuthManagerFromApi = (
   logger: Logger,
   fs: FileSystem & AtomicFileWrites,
   recaptureSecondaryViaBrowser: boolean = true,
-  secondaryTokenCommands: SecondaryTokenCommands = DEFAULT_SECONDARY_TOKEN_COMMANDS,
+  secondaryTokenCommands: SecondaryTokenCommands = NO_SECONDARY_TOKEN_COMMANDS,
   acquireBasicViaBrowser: boolean = true,
   // Elevated gets its OWN browser gate, separate from chatsvcagg / ic3. Those two
   // self-heal by redeeming the shared refresh token from INSIDE the
@@ -866,14 +864,14 @@ const createAuthManagerFromApi = (
   // failure, silent-SSO timeout) so an LLM gets actionable remediation
   // rather than a one-size-fits-all message.
   const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
-    const elevatedCommands = commandList(secondaryTokenCommands.elevated);
+    const needed = neededByNote(secondaryTokenCommands.elevated);
     if (reason === 'launch_timeout') {
-      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser. (Commands that need this token: ${elevatedCommands}.)`;
+      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser.${needed}`;
     }
     if (reason === 'navigation_failed') {
-      return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the elevated commands (${elevatedCommands}) will be unavailable.`;
+      return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the commands that need the elevated token will be unavailable.${needed}`;
     }
-    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${elevatedCommands}.)`;
+    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> =>
@@ -923,7 +921,7 @@ const createAuthManagerFromApi = (
     if (!recaptureElevatedViaBrowser)
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('Elevated (M365)', commandList(secondaryTokenCommands.elevated), RECAPTURE_ELEVATED_VIA_LOGIN),
+        message: failFastSecondaryMessage('Elevated (M365)', secondaryTokenCommands.elevated, RECAPTURE_ELEVATED_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     // Normally the persistent profile cookies do the silent SSO with no UI
@@ -952,14 +950,14 @@ const createAuthManagerFromApi = (
   };
 
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
-    const chatsvcaggCommands = commandList(secondaryTokenCommands.chatsvcagg);
+    const needed = neededByNote(secondaryTokenCommands.chatsvcagg);
     if (reason === 'launch_timeout') {
-      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry. (Commands that need this token: ${chatsvcaggCommands}.)`;
+      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
     }
     if (reason === 'navigation_failed') {
       return 'chatsvcagg capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
     }
-    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${chatsvcaggCommands}.)`;
+    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureChatsvcaggHoldingLock());
@@ -1024,7 +1022,7 @@ const createAuthManagerFromApi = (
     if (!recaptureSecondaryViaBrowser) {
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('chatsvcagg (Teams chat)', commandList(secondaryTokenCommands.chatsvcagg), RECAPTURE_VIA_LOGIN),
+        message: failFastSecondaryMessage('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }
@@ -1060,14 +1058,14 @@ const createAuthManagerFromApi = (
   };
 
   const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
-    const ic3Commands = commandList(secondaryTokenCommands.ic3);
+    const needed = neededByNote(secondaryTokenCommands.ic3);
     if (reason === 'launch_timeout') {
-      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry. (Commands that need this token: ${ic3Commands}.)`;
+      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
     }
     if (reason === 'navigation_failed') {
       return 'ic3 capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
     }
-    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too. (Commands that need this token: ${ic3Commands}.)`;
+    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureIc3HoldingLock());
@@ -1122,7 +1120,7 @@ const createAuthManagerFromApi = (
     if (!recaptureSecondaryViaBrowser) {
       return err({
         type: 'auth_failed',
-        message: failFastSecondaryMessage('ic3 (Teams chat history)', commandList(secondaryTokenCommands.ic3), RECAPTURE_VIA_LOGIN),
+        message: failFastSecondaryMessage('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }

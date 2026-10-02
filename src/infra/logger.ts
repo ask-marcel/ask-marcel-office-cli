@@ -1,7 +1,9 @@
 import { createLogger, format, transports } from 'winston';
 import type { Logger } from '../use-cases/ports/logger.ts';
 
-const REDACTED_KEYS = new Set(['password', 'token', 'authorization', 'apikey', 'secret']);
+// Matched case-insensitively. The token cache's own field names are listed too,
+// so a cache record passed as meta never reaches a log in clear.
+const REDACTED_KEYS = new Set(['password', 'token', 'authorization', 'apikey', 'secret', 'access_token', 'accesstoken', 'refresh_token', 'refreshtoken']);
 
 const ALL_LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
 

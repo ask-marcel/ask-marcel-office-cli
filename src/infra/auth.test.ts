@@ -304,16 +304,24 @@ describe('auth manager recovery ladder', () => {
     }
   });
 
-  it('defaults the elevated fail-fast list to the four registry-flagged commands, including get-user (previously omitted from the hardcoded list)', async () => {
+  it('names the elevated token, and the commands that need it only when the caller says which', async () => {
     const fs = createFileSystemFake();
     const tok = futureElevated();
     const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
-    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
-    const result = await auth.getElevatedAccessToken();
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'auth_failed') {
-      expect(result.error.message).toContain('get-user');
-      expect(result.error.message).toContain('download-drive-item-version');
+    const told = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, {
+      elevated: ['get-user', 'list-chats'],
+      chatsvcagg: [],
+      ic3: [],
+    });
+    const toldResult = await told.getElevatedAccessToken();
+    expect(toldResult.ok).toBe(false);
+    if (!toldResult.ok && toldResult.error.type === 'auth_failed') expect(toldResult.error.message).toContain('(Commands that need it: get-user, list-chats.)');
+    const untold = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false);
+    const untoldResult = await untold.getElevatedAccessToken();
+    expect(untoldResult.ok).toBe(false);
+    if (!untoldResult.ok && untoldResult.error.type === 'auth_failed') {
+      expect(untoldResult.error.message).toContain('Elevated (M365) token');
+      expect(untoldResult.error.message).not.toContain('Commands that need');
     }
   });
 
@@ -1105,7 +1113,11 @@ describe('auth manager elevated token', () => {
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r' }));
 
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ elevatedResult: null }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, true, {
+      elevated: ['list-chats'],
+      chatsvcagg: [],
+      ic3: [],
+    });
     const result = await auth.getElevatedAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1507,7 +1519,11 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('reports the launch_timeout-specific message when the chatsvcagg re-capture browser launch times out', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ chatsvcaggFailure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, true, {
+      elevated: [],
+      chatsvcagg: ['list-teams-chats-with-messages'],
+      ic3: [],
+    });
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
@@ -1754,7 +1770,8 @@ describe('auth manager — IC3-tier (Teams chat-history substrate)', () => {
 
   it('reports the launch_timeout-specific message when the IC3 re-capture browser launch times out', async () => {
     const fs = createFileSystemFake();
-    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
+    const ic3Commands = { elevated: [], chatsvcagg: [], ic3: ['list-teams-chat-history'] };
+    const auth = createAuthManagerFromApi(fakeBrowserAuth({ ic3Failure: 'launch_timeout' }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, true, ic3Commands);
     const result = await auth.getIc3AccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
