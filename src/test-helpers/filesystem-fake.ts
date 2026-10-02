@@ -1,14 +1,15 @@
 import { err, ok } from '../domain/result.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 
-export type FileSystemFake = FileSystem & {
-  readonly seed: (path: string, content: string) => void;
-  readonly seedBytes: (path: string, bytes: Uint8Array) => void;
-  readonly snapshot: (path: string) => string | undefined;
-  readonly snapshotBytes: (path: string) => Uint8Array | undefined;
-  readonly snapshotMode: (path: string) => number | undefined;
-  readonly has: (path: string) => boolean;
-};
+export type FileSystemFake = FileSystem &
+  AtomicFileWrites & {
+    readonly seed: (path: string, content: string) => void;
+    readonly seedBytes: (path: string, bytes: Uint8Array) => void;
+    readonly snapshot: (path: string) => string | undefined;
+    readonly snapshotBytes: (path: string) => Uint8Array | undefined;
+    readonly snapshotMode: (path: string) => number | undefined;
+    readonly has: (path: string) => boolean;
+  };
 
 export const createFileSystemFake = (): FileSystemFake => {
   const store = new Map<string, string>();
@@ -35,6 +36,20 @@ export const createFileSystemFake = (): FileSystemFake => {
     writeText: async (path, content) => {
       store.set(path, content);
       bytesStore.delete(path);
+      return ok(undefined);
+    },
+    // The atomic pair behaves like a plain write and an exclusive create: the
+    // fake has no concurrency to guard against, only the outcome to record.
+    writeTextAtomic: async (path, content, mode) => {
+      store.set(path, content);
+      bytesStore.delete(path);
+      modes.set(path, mode);
+      return ok(undefined);
+    },
+    createExclusive: async (path, content, mode) => {
+      if (store.has(path) || bytesStore.has(path)) return err({ type: 'already_exists' });
+      store.set(path, content);
+      modes.set(path, mode);
       return ok(undefined);
     },
     writeBytes: async (path, bytes) => {

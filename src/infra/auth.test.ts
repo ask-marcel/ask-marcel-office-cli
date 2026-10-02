@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { AccessToken } from '../domain/access-token.ts';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
+import { err, ok } from '../domain/result.ts';
 import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
@@ -2422,5 +2422,97 @@ describe('createAuthManager', () => {
     await auth.logout();
     expect(profiles).toEqual(['/virtual/profile']);
     expect(fs.has('/virtual/profile/Cookies')).toBe(false);
+  });
+});
+
+describe('token cache writes', () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const accountToken = (oid: string): AccessToken => {
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', oid, tid: 'tenant-1' }));
+    return accessTokenUnsafe(`${header}.${payload}.sig`);
+  };
+  const createIssuingTokenEndpoint = (token: string, refresh: string): (() => Promise<Response>) => {
+    return async () => new Response(JSON.stringify({ access_token: token, expires_in: 3600, refresh_token: refresh }), { status: 200 });
+  };
+  const expiredSession = JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' });
+  const failingSaves = (inner: ReturnType<typeof createFileSystemFake>): ReturnType<typeof createFileSystemFake> => ({
+    ...inner,
+    writeTextAtomic: async () => err({ type: 'io_failed' as const, message: 'disk full' }),
+  });
+
+  it('writes the token cache in one atomic step, owner-only', async () => {
+    const inner = createFileSystemFake();
+    inner.seed(CACHE_PATH, expiredSession);
+    const writes: string[] = [];
+    const fs = {
+      ...inner,
+      writeText: async (path: string, content: string) => {
+        writes.push('plain');
+        return inner.writeText(path, content);
+      },
+      writeTextAtomic: async (path: string, content: string, mode: number) => {
+        writes.push(`atomic ${mode.toString(8)}`);
+        return inner.writeTextAtomic(path, content, mode);
+      },
+    };
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      false,
+      undefined,
+      false,
+      false,
+      createIssuingTokenEndpoint(accountToken('robin'), 'rt-2')
+    );
+    expect((await auth.getAccessToken()).ok).toBe(true);
+    expect(writes).toEqual(['atomic 600']);
+    expect(inner.snapshotMode(CACHE_PATH)).toBe(0o600);
+  });
+
+  it('reports a refresh it could not save instead of handing out a token whose rotated refresh token is lost', async () => {
+    const inner = createFileSystemFake();
+    inner.seed(CACHE_PATH, expiredSession);
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      failingSaves(inner),
+      false,
+      undefined,
+      false,
+      false,
+      createIssuingTokenEndpoint(accountToken('robin'), 'rt-2')
+    );
+    const result = await auth.getAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') {
+      expect(result.error.code).toBe('token_cache_unwritable');
+      expect(result.error.message).toContain('could not be saved (disk full)');
+    }
+  });
+
+  it('reports a Teams chat token refresh it could not save, not a missing sign-in', async () => {
+    const inner = createFileSystemFake();
+    inner.seed(CACHE_PATH, JSON.stringify({ access_token: accountToken('robin'), expires_on: future, refresh_token: 'rt-1' }));
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      failingSaves(inner),
+      false,
+      undefined,
+      false,
+      false,
+      createIssuingTokenEndpoint(accountToken('robin'), 'rt-2')
+    );
+    const result = await auth.getChatsvcaggAccessToken();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'auth_failed') expect(result.error.code).toBe('token_cache_unwritable');
   });
 });

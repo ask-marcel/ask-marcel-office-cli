@@ -11,7 +11,7 @@ import { createGraphClient } from '../infra/graph-client.ts';
 import { createWinstonLogger } from '../infra/logger.ts';
 import { createBunProcessRunner } from '../infra/process-runner-bun.ts';
 import { createNodeProcessRunner } from '../infra/process-runner-node.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
 
@@ -20,7 +20,7 @@ export type BuildDepsConfig = {
   readonly cachePath?: string;
   readonly home?: string;
   readonly env?: Readonly<Record<string, string | undefined>>;
-  readonly fs?: FileSystem;
+  readonly fs?: FileSystem & AtomicFileWrites;
   readonly processRunner?: ProcessRunner;
   readonly createAuth?: typeof createAuthManager;
   /**
@@ -62,7 +62,7 @@ const secondaryTokenCommands: SecondaryTokenCommands = {
   ic3: commandNamesWhere((meta) => meta.needsSubstrateToken === 'ic3'),
 };
 
-const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
+const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
 const defaultProcessRunner = (): ProcessRunner => (typeof globalThis.Bun !== 'undefined' ? createBunProcessRunner() : createNodeProcessRunner());
 

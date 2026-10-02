@@ -4,9 +4,9 @@ import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
+import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
@@ -290,6 +290,14 @@ const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
 // here instead; an interactive terminal keeps the auto-browser, and the explicit
 // `login` command always has it.
 const NOT_AUTHENTICATED_CODE = 'not_authenticated';
+
+// A token the CLI obtained but could not save. Reported as itself, never as a
+// missing sign-in: Entra single-uses the refresh token, so a redemption whose
+// rotated refresh token was not saved leaves a spent one on disk, and the next
+// command dead-ends in a login unless this one says why.
+const CACHE_UNWRITABLE_CODE = 'token_cache_unwritable';
+const isCacheUnwritable = (r: Result<unknown, AuthError>): boolean => !r.ok && r.error.type === 'auth_failed' && r.error.code === CACHE_UNWRITABLE_CODE;
+
 const NOT_AUTHENTICATED_MESSAGE =
   'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';
 
@@ -300,7 +308,7 @@ const createAuthManagerFromApi = (
   cachePath: string,
   browserProfileDir: string,
   logger: Logger,
-  fs: FileSystem,
+  fs: FileSystem & AtomicFileWrites,
   recaptureSecondaryViaBrowser: boolean = true,
   secondaryTokenCommands: SecondaryTokenCommands = DEFAULT_SECONDARY_TOKEN_COMMANDS,
   acquireBasicViaBrowser: boolean = true,
@@ -326,14 +334,17 @@ const createAuthManagerFromApi = (
     return r.ok ? r.value : null;
   };
 
-  const writeCache = async (next: CachedToken): Promise<void> => {
-    await fs.writeText(cachePath, JSON.stringify(next));
-    // The cache holds access + refresh tokens — owner-only. Best-effort:
-    // a chmod failure must not fail the auth flow (the write itself succeeded).
-    await fs.chmod(cachePath, 0o600);
+  // The cache holds access and refresh tokens: replaced in one atomic step, so
+  // a concurrent reader never sees half a file, and owner-only from the first
+  // byte. A failed save is an error the caller reports (see CACHE_UNWRITABLE_CODE).
+  const writeCache = async (next: CachedToken): Promise<Result<void, AuthError>> => {
+    const written = await fs.writeTextAtomic(cachePath, JSON.stringify(next), 0o600);
+    if (written.ok) return ok(undefined);
+    const detail = 'message' in written.error ? written.error.message : written.error.type;
+    return err({ type: 'auth_failed', message: `the token cache could not be saved (${detail})`, code: CACHE_UNWRITABLE_CODE });
   };
 
-  const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<void> => {
+  const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<Result<void, AuthError>> => {
     const claims = decodeJwtPayload(access);
     const exp = claims.exp as number | undefined;
     const cached: CachedToken = { access_token: access, expires_on: exp ?? 0, refresh_token: refresh ?? '' };
@@ -343,18 +354,18 @@ const createAuthManagerFromApi = (
       cached.elevated_access_token = elevated;
       cached.elevated_expires_on = elevatedExp ?? 0;
     }
-    await writeCache(cached);
+    return writeCache(cached);
   };
 
-  const persistElevated = async (elevated: AccessToken): Promise<void> => {
+  const persistElevated = async (elevated: AccessToken): Promise<Result<void, AuthError>> => {
     const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
     const elevatedClaims = decodeJwtPayload(elevated);
     const elevatedExp = elevatedClaims.exp as number | undefined;
     const next: CachedToken = { ...existing, elevated_access_token: elevated, elevated_expires_on: elevatedExp ?? 0 };
-    await writeCache(next);
+    return writeCache(next);
   };
 
-  const persistChatsvcagg = async (chatsvcagg: AccessToken, region: string): Promise<void> => {
+  const persistChatsvcagg = async (chatsvcagg: AccessToken, region: string): Promise<Result<void, AuthError>> => {
     const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
     const claims = decodeJwtPayload(chatsvcagg);
     const exp = claims.exp as number | undefined;
@@ -364,10 +375,10 @@ const createAuthManagerFromApi = (
       chatsvcagg_expires_on: exp ?? 0,
       chatsvcagg_region: region,
     };
-    await writeCache(next);
+    return writeCache(next);
   };
 
-  const persistIc3 = async (ic3: AccessToken, region: string): Promise<void> => {
+  const persistIc3 = async (ic3: AccessToken, region: string): Promise<Result<void, AuthError>> => {
     const existing = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
     const claims = decodeJwtPayload(ic3);
     const exp = claims.exp as number | undefined;
@@ -380,7 +391,7 @@ const createAuthManagerFromApi = (
       // path may run standalone (e.g. cached IC3 expired but chatsvcagg fine).
       chatsvcagg_region: region,
     };
-    await writeCache(next);
+    return writeCache(next);
   };
 
   /**
@@ -439,7 +450,8 @@ const createAuthManagerFromApi = (
       expires_on: Math.floor(Date.now() / 1000) + json.expires_in,
       refresh_token: json.refresh_token ?? cached.refresh_token,
     };
-    await writeCache(token);
+    const saved = await writeCache(token);
+    if (!saved.ok) return saved;
     logger.info('auth.ladder.rung', { rung: 'refresh' });
     return ok(validated.value);
   };
@@ -456,7 +468,7 @@ const createAuthManagerFromApi = (
   const refreshSubstrateToken = async (
     cached: CachedToken,
     resource: string,
-    persist: (token: AccessToken, region: string) => Promise<void>,
+    persist: (token: AccessToken, region: string) => Promise<Result<void, AuthError>>,
     rung: string
   ): Promise<Result<AccessToken, AuthError>> => {
     const redeemed = await redeemRefreshToken(cached.refresh_token, 'common', `${resource}/.default offline_access`);
@@ -467,10 +479,12 @@ const createAuthManagerFromApi = (
     // validator) would reject them — accept any well-formed JWT AAD just minted.
     if (!raw.startsWith('eyJ')) return err({ type: 'auth_failed', message: `${rung} returned an unusable token` });
     const substrateToken = accessTokenUnsafe(raw);
-    await persist(substrateToken, cached.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION);
+    const saved = await persist(substrateToken, cached.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION);
+    if (!saved.ok) return saved;
     if (json.refresh_token && json.refresh_token !== cached.refresh_token) {
       const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
-      await writeCache({ ...latest, refresh_token: json.refresh_token });
+      const savedRefresh = await writeCache({ ...latest, refresh_token: json.refresh_token });
+      if (!savedRefresh.ok) return savedRefresh;
     }
     logger.info('auth.ladder.rung', { rung });
     return ok(substrateToken);
@@ -494,6 +508,26 @@ const createAuthManagerFromApi = (
     if (!fresh?.refresh_token) return;
     if (!chatsvcaggCaptured) await refreshSubstrateToken(fresh, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem');
     if (!ic3Captured) await refreshSubstrateToken(fresh, IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem');
+  };
+
+  // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
+  // the first save that fails stops the login with its error.
+  const persistSubstrateCaptures = async (chatsvcagg: ChatsvcaggTokenResult, ic3: Ic3TokenResult): Promise<Result<void, AuthError>> => {
+    if (chatsvcagg.ok) {
+      logger.info('auth.chatsvcagg.captured_at_login', { region: chatsvcagg.region });
+      lastChatsvcaggOutcome = { captured: true };
+      const saved = await persistChatsvcagg(chatsvcagg.token, chatsvcagg.region);
+      if (!saved.ok) return saved;
+    } else {
+      logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
+      lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
+    }
+    if (!ic3.ok) {
+      logger.info('auth.ic3.skipped_at_login', { reason: ic3.reason });
+      return ok(undefined);
+    }
+    logger.info('auth.ic3.captured_at_login', { region: ic3.region });
+    return persistIc3(ic3.token, ic3.region);
   };
 
   const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
@@ -531,21 +565,10 @@ const createAuthManagerFromApi = (
         logger.info('auth.elevated.skipped_at_login', { reason: elevated.reason });
         lastElevatedOutcome = { captured: false, reason: elevated.reason };
       }
-      await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
-      if (chatsvcagg.ok) {
-        logger.info('auth.chatsvcagg.captured_at_login', { region: chatsvcagg.region });
-        lastChatsvcaggOutcome = { captured: true };
-        await persistChatsvcagg(chatsvcagg.token, chatsvcagg.region);
-      } else {
-        logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
-        lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
-      }
-      if (ic3.ok) {
-        logger.info('auth.ic3.captured_at_login', { region: ic3.region });
-        await persistIc3(ic3.token, ic3.region);
-      } else {
-        logger.info('auth.ic3.skipped_at_login', { reason: ic3.reason });
-      }
+      const savedTeams = await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
+      if (!savedTeams.ok) return savedTeams;
+      const savedSubstrate = await persistSubstrateCaptures(chatsvcagg, ic3);
+      if (!savedSubstrate.ok) return savedSubstrate;
       if (force) await redeemMissedSubstrateAtLogin(chatsvcagg.ok, ic3.ok);
       logger.info('auth.ladder.rung', { rung: 'browser' });
       return ok(result.accessToken);
@@ -589,7 +612,7 @@ const createAuthManagerFromApi = (
       }
       if (cached?.refresh_token) {
         const refreshed = await refreshToken(cached);
-        if (refreshed.ok) return refreshed;
+        if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
       }
     }
     // Command path: never launch an interactive browser for the basic token —
@@ -660,13 +683,14 @@ const createAuthManagerFromApi = (
     // LATEST, never into the `cached` snapshot taken before the await — that is
     // the 2026-07-15 clobber, which silently dropped sibling tokens.
     const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
-    await writeCache({
+    const saved = await writeCache({
       ...latest,
       guest_tokens: { ...latest.guest_tokens, [tenant]: { access_token: validated.value, expires_on: Math.floor(Date.now() / 1000) + redeemed.value.expiresIn } },
       // Entra single-uses and rotates the SPA refresh token. Dropping the rotated
       // one leaves a spent RT on disk and the next command dead-ends in a login.
       refresh_token: redeemed.value.refreshToken ?? latest.refresh_token,
     });
+    if (!saved.ok) return saved;
     logger.info('auth.ladder.rung', { rung: 'guest', tenant });
     return ok(validated.value);
   };
@@ -723,7 +747,8 @@ const createAuthManagerFromApi = (
       if (!captured.ok) {
         return err({ type: 'auth_failed', message: recoverableElevatedFailureMessage(captured.reason) });
       }
-      await persistElevated(captured.token);
+      const saved = await persistElevated(captured.token);
+      if (!saved.ok) return saved;
       logger.info('auth.elevated.recaptured');
       return ok(captured.token);
     } catch (e) {
@@ -806,7 +831,8 @@ const createAuthManagerFromApi = (
       if (!captured.ok) {
         return err({ type: 'auth_failed', message: recoverableChatsvcaggFailureMessage(captured.reason) });
       }
-      await persistChatsvcagg(captured.token, captured.region);
+      const saved = await persistChatsvcagg(captured.token, captured.region);
+      if (!saved.ok) return saved;
       logger.info('auth.chatsvcagg.recaptured', { region: captured.region });
       return ok(captured.token);
     } catch (e) {
@@ -854,7 +880,7 @@ const createAuthManagerFromApi = (
     // refresh entirely and opened a window for a token an HTTP call could mint.
     if (cached?.refresh_token) {
       const refreshed = await refreshSubstrateToken(cached, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.refresh');
-      if (refreshed.ok) return refreshed;
+      if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {
       return err({
@@ -911,7 +937,8 @@ const createAuthManagerFromApi = (
       if (!captured.ok) {
         return err({ type: 'auth_failed', message: recoverableIc3FailureMessage(captured.reason) });
       }
-      await persistIc3(captured.token, captured.region);
+      const saved = await persistIc3(captured.token, captured.region);
+      if (!saved.ok) return saved;
       logger.info('auth.ic3.recaptured', { region: captured.region });
       return ok(captured.token);
     } catch (e) {
@@ -949,7 +976,7 @@ const createAuthManagerFromApi = (
     // Headless first, same reasoning as chatsvcagg above.
     if (cached?.refresh_token) {
       const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
-      if (refreshed.ok) return refreshed;
+      if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {
       return err({
@@ -1013,7 +1040,7 @@ const createAuthManagerFromApi = (
   };
 };
 
-const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
+const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
 // The same resolver `browser-auth.ts` and the composition root use, so `logout`
 // wipes the folder `login` signs in with.
@@ -1044,7 +1071,7 @@ const stderrProgress = (line: string): void => {
 const createAuthManager = (deps: {
   cachePath: string;
   logger: Logger;
-  fs?: FileSystem;
+  fs?: FileSystem & AtomicFileWrites;
   browserProfileDir?: string;
   recaptureSecondaryViaBrowser?: boolean;
   secondaryTokenCommands?: SecondaryTokenCommands;
