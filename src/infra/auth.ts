@@ -353,6 +353,18 @@ const createAuthManagerFromApi = (
     return err({ type: 'auth_failed', message: `the token cache could not be saved (${detail})`, code: CACHE_UNWRITABLE_CODE });
   };
 
+  // Entra single-uses the refresh token, so this process redeems it one call at
+  // a time: a redemption queued behind another must spend the refresh token
+  // that one saved, never the spent one both read before. Every task re-reads
+  // the cache when its turn comes.
+  const settled = (): void => undefined;
+  let redemptionTail: Promise<void> = Promise.resolve();
+  const oneRedemptionAtATime = <T>(task: () => Promise<T>): Promise<T> => {
+    const run = redemptionTail.then(task);
+    redemptionTail = run.then(settled, settled);
+    return run;
+  };
+
   // A sign-in keeps the other tokens of the SAME account (its chat, guest and
   // elevated tokens are still good) and drops everything of another account, so
   // one account's Graph token never sits next to another's chat token.
@@ -472,6 +484,21 @@ const createAuthManagerFromApi = (
     return ok(validated.value);
   };
 
+  // Waits its turn, then looks again: a redemption that ran meanwhile may have
+  // saved a fresh token, and redeeming again would spend its rotated refresh
+  // token for nothing.
+  const refreshBasicInTurn = (): Promise<Result<AccessToken, AuthError>> =>
+    oneRedemptionAtATime(async () => {
+      const latest = await readCache();
+      const saved = accessToken(latest?.access_token ?? '');
+      if (saved.ok) {
+        logger.info('auth.ladder.rung', { rung: 'cache_after_wait' });
+        return ok(saved.value);
+      }
+      if (!latest?.refresh_token) return err({ type: 'auth_failed', message: 'the cached session ended while this call waited for its turn' });
+      return refreshToken(latest);
+    });
+
   // Substrate tokens (chatsvcagg / ic3) carry the SAME Teams appid as the Graph
   // token, so the shared refresh_token redeems for their audiences too — a
   // headless HTTP refresh, no browser. This lets the command path self-heal a
@@ -506,6 +533,24 @@ const createAuthManagerFromApi = (
     return ok(substrateToken);
   };
 
+  type SubstrateTier = {
+    readonly fresh: (cached: CachedToken | null) => string | undefined;
+    readonly resource: string;
+    readonly persist: (token: AccessToken, region: string) => Promise<Result<void, AuthError>>;
+    readonly rung: string;
+  };
+
+  // The same turn-taking for a substrate token. A token saved while this call
+  // waited is used, unless it is the very one the caller found dead.
+  const refreshSubstrateInTurn = (tier: SubstrateTier, dead: string | undefined): Promise<Result<AccessToken, AuthError>> =>
+    oneRedemptionAtATime(async () => {
+      const latest = await readCache();
+      const saved = tier.fresh(latest);
+      if (saved !== undefined && saved.startsWith('eyJ') && saved !== dead) return ok(accessTokenUnsafe(saved));
+      if (!latest?.refresh_token) return err({ type: 'auth_failed', message: `${tier.rung}: the cached session ended while this call waited for its turn` });
+      return refreshSubstrateToken(latest, tier.resource, tier.persist, tier.rung);
+    });
+
   // Track the elevated-capture outcome from the most recent
   // browser-acquired session so the login command can surface it to the
   // user via `getLastElevatedOutcome()`. Reset to null on every fresh
@@ -522,8 +567,9 @@ const createAuthManagerFromApi = (
     if (chatsvcaggCaptured && ic3Captured) return;
     const fresh = await readCache();
     if (!fresh?.refresh_token) return;
-    if (!chatsvcaggCaptured) await refreshSubstrateToken(fresh, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem');
-    if (!ic3Captured) await refreshSubstrateToken(fresh, IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem');
+    if (!chatsvcaggCaptured)
+      await oneRedemptionAtATime(async () => refreshSubstrateToken((await readCache()) ?? fresh, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.login_rt_redeem'));
+    if (!ic3Captured) await oneRedemptionAtATime(async () => refreshSubstrateToken((await readCache()) ?? fresh, IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem'));
   };
 
   // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
@@ -627,7 +673,7 @@ const createAuthManagerFromApi = (
         }
       }
       if (cached?.refresh_token) {
-        const refreshed = await refreshToken(cached);
+        const refreshed = await refreshBasicInTurn();
         if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
       }
     }
@@ -664,6 +710,13 @@ const createAuthManagerFromApi = (
    * `/shares` — which is why the drive-item family takes `--tenant-id` rather
    * than this shipping as a one-shot share-URL download command.
    */
+  const noGuestCredentials = (tenant: TenantId): Result<AccessToken, AuthError> =>
+    err({
+      type: 'auth_failed',
+      message: `no cached credentials to obtain a guest token for tenant ${tenant} — run \`ask-marcel-office login\``,
+      code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+    });
+
   const getGuestAccessToken = async (tenant: TenantId): Promise<Result<AccessToken, AuthError>> => {
     const cached = await readCache();
     const fresh = freshGuestToken(cached, tenant);
@@ -671,14 +724,18 @@ const createAuthManagerFromApi = (
       logger.info('auth.guest.cache_hit', { tenant });
       return ok(accessTokenUnsafe(fresh));
     }
-    if (!cached?.refresh_token) {
-      return err({
-        type: 'auth_failed',
-        message: `no cached credentials to obtain a guest token for tenant ${tenant} — run \`ask-marcel-office login\``,
-        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
-      });
-    }
-    const redeemed = await redeemRefreshToken(cached.refresh_token, tenant, SCOPES);
+    if (!cached?.refresh_token) return noGuestCredentials(tenant);
+    return oneRedemptionAtATime(async () => redeemGuestToken(tenant));
+  };
+
+  // Runs in its turn, so it reads the cache again: a guest token or a rotated
+  // refresh token saved while it waited is the one to use.
+  const redeemGuestToken = async (tenant: TenantId): Promise<Result<AccessToken, AuthError>> => {
+    const current = await readCache();
+    const savedMeanwhile = freshGuestToken(current, tenant);
+    if (savedMeanwhile !== undefined) return ok(accessTokenUnsafe(savedMeanwhile));
+    if (!current?.refresh_token) return noGuestCredentials(tenant);
+    const redeemed = await redeemRefreshToken(current.refresh_token, tenant, SCOPES);
     if (!redeemed.ok) {
       // Naming the tenant matters: the caller passed a `--tenant-id` (or resolved
       // one from a sharing URL) and needs to know WHICH tenant refused, not that
@@ -895,7 +952,8 @@ const createAuthManagerFromApi = (
     // fail-fast branch below, a manager that was ALLOWED a browser skipped the
     // refresh entirely and opened a window for a token an HTTP call could mint.
     if (cached?.refresh_token) {
-      const refreshed = await refreshSubstrateToken(cached, CHATSVCAGG_RESOURCE, persistChatsvcagg, 'auth.chatsvcagg.refresh');
+      const tier = { fresh: freshChatsvcaggToken, resource: CHATSVCAGG_RESOURCE, persist: persistChatsvcagg, rung: 'auth.chatsvcagg.refresh' };
+      const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
       if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {
@@ -991,7 +1049,8 @@ const createAuthManagerFromApi = (
     }
     // Headless first, same reasoning as chatsvcagg above.
     if (cached?.refresh_token) {
-      const refreshed = await refreshSubstrateToken(cached, IC3_RESOURCE, persistIc3, 'auth.ic3.refresh');
+      const tier = { fresh: freshIc3Token, resource: IC3_RESOURCE, persist: persistIc3, rung: 'auth.ic3.refresh' };
+      const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
       if (refreshed.ok || isCacheUnwritable(refreshed)) return refreshed;
     }
     if (!recaptureSecondaryViaBrowser) {

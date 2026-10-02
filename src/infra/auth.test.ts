@@ -2569,3 +2569,83 @@ describe('token cache writes', () => {
     expect(saved.guest_tokens?.['tenant-2']?.access_token).toBe('eyJguest');
   });
 });
+
+describe('one refresh-token redemption at a time', () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const robin = (): AccessToken => {
+    const header = btoa(JSON.stringify({ alg: 'RS256' }));
+    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', oid: 'robin', tid: 'tenant-1' }));
+    return accessTokenUnsafe(`${header}.${payload}.sig`);
+  };
+  // A token endpoint that rotates the refresh token on every redemption and
+  // records which refresh token each redemption spent.
+  const createRotatingTokenEndpoint = (spent: string[]): ((url: string, init?: RequestInit) => Promise<Response>) => {
+    return async (_url, init) => {
+      spent.push(new URLSearchParams(String(init?.body)).get('refresh_token') ?? '');
+      await Promise.resolve();
+      return new Response(JSON.stringify({ access_token: robin(), expires_in: 3600, refresh_token: `rt-${spent.length + 1}` }), { status: 200 });
+    };
+  };
+
+  it('redeems the refresh token once when two calls find the Graph token expired at the same time', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' }));
+    const spent: string[] = [];
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      false,
+      undefined,
+      false,
+      false,
+      createRotatingTokenEndpoint(spent)
+    );
+    const [first, second] = await Promise.all([auth.getAccessToken(), auth.getAccessToken()]);
+    expect(first.ok && second.ok).toBe(true);
+    expect(spent).toEqual(['rt-1']);
+  });
+
+  it('redeems, for a Teams chat token queued behind a Graph refresh, the refresh token that refresh saved', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' }));
+    const spent: string[] = [];
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      false,
+      undefined,
+      false,
+      false,
+      createRotatingTokenEndpoint(spent)
+    );
+    await Promise.all([auth.getAccessToken(), auth.getChatsvcaggAccessToken()]);
+    expect(spent).toEqual(['rt-1', 'rt-2']);
+  });
+
+  it('hands a forced Teams chat refresh queued behind another the token that one just saved', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, JSON.stringify({ access_token: robin(), expires_on: future, refresh_token: 'rt-1', chatsvcagg_access_token: 'eyJdead', chatsvcagg_expires_on: future }));
+    const spent: string[] = [];
+    const auth = createAuthManagerFromApi(
+      fakeBrowserAuth(),
+      CACHE_PATH,
+      BROWSER_PROFILE_DIR,
+      createLoggerFake(),
+      fs,
+      false,
+      undefined,
+      false,
+      false,
+      createRotatingTokenEndpoint(spent)
+    );
+    const [first, second] = await Promise.all([auth.getChatsvcaggAccessToken({ ignoreCache: true }), auth.getChatsvcaggAccessToken({ ignoreCache: true })]);
+    expect(spent).toEqual(['rt-1']);
+    expect(first.ok && second.ok && first.value === second.value).toBe(true);
+  });
+});
