@@ -2436,10 +2436,22 @@ describe('token cache writes', () => {
     return async () => new Response(JSON.stringify({ access_token: token, expires_in: 3600, refresh_token: refresh }), { status: 200 });
   };
   const expiredSession = JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' });
+  const robinWithChatAndGuest = (): string =>
+    JSON.stringify({
+      access_token: accountToken('robin'),
+      expires_on: future,
+      refresh_token: 'rt-1',
+      chatsvcagg_access_token: 'eyJchat',
+      chatsvcagg_expires_on: future,
+      chatsvcagg_region: 'amer',
+      guest_tokens: { 'tenant-2': { access_token: 'eyJguest', expires_on: future } },
+    });
   const failingSaves = (inner: ReturnType<typeof createFileSystemFake>): ReturnType<typeof createFileSystemFake> => ({
     ...inner,
     writeTextAtomic: async () => err({ type: 'io_failed' as const, message: 'disk full' }),
   });
+  const savedCache = (fs: ReturnType<typeof createFileSystemFake>): Record<string, unknown> & { guest_tokens?: Record<string, { access_token: string }> } =>
+    JSON.parse(fs.snapshot(CACHE_PATH) ?? '{}');
 
   it('writes the token cache in one atomic step, owner-only', async () => {
     const inner = createFileSystemFake();
@@ -2514,5 +2526,46 @@ describe('token cache writes', () => {
     const result = await auth.getChatsvcaggAccessToken();
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') expect(result.error.code).toBe('token_cache_unwritable');
+  });
+
+  it('keeps the Teams chat and guest tokens of the same account when a sign-in replaces its Graph token', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, robinWithChatAndGuest());
+    const browser = fakeBrowserAuth({ acquireResult: { accessToken: accountToken('robin'), refreshToken: 'rt-2' } });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, true, false, refusingTokenEndpoint);
+    expect((await auth.getAccessToken({ force: true })).ok).toBe(true);
+    const saved = savedCache(fs);
+    expect(saved['refresh_token']).toBe('rt-2');
+    expect(saved['chatsvcagg_access_token']).toBe('eyJchat');
+    expect(saved['chatsvcagg_region']).toBe('amer');
+    expect(saved.guest_tokens?.['tenant-2']?.access_token).toBe('eyJguest');
+  });
+
+  it('drops every token of the previous account when a sign-in brings another account', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, robinWithChatAndGuest());
+    const alex = accountToken('alex');
+    const browser = fakeBrowserAuth({ acquireResult: { accessToken: alex, refreshToken: 'rt-alex' } });
+    const auth = createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, true, false, refusingTokenEndpoint);
+    expect((await auth.getAccessToken({ force: true })).ok).toBe(true);
+    const saved = savedCache(fs);
+    expect(saved['access_token']).toBe(alex);
+    expect(saved['chatsvcagg_access_token']).toBeUndefined();
+    expect(saved.guest_tokens).toBeUndefined();
+  });
+
+  it('keeps a token another process saved while a refresh was on the network', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, expiredSession);
+    const fetchFn = async (): Promise<Response> => {
+      // Another process lands a guest token while this refresh waits on the network.
+      fs.seed(CACHE_PATH, JSON.stringify({ ...JSON.parse(expiredSession), guest_tokens: { 'tenant-2': { access_token: 'eyJguest', expires_on: future } } }));
+      return new Response(JSON.stringify({ access_token: accountToken('robin'), expires_in: 3600, refresh_token: 'rt-2' }), { status: 200 });
+    };
+    const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, false, undefined, false, false, fetchFn);
+    expect((await auth.getAccessToken()).ok).toBe(true);
+    const saved = savedCache(fs);
+    expect(saved['refresh_token']).toBe('rt-2');
+    expect(saved.guest_tokens?.['tenant-2']?.access_token).toBe('eyJguest');
   });
 });

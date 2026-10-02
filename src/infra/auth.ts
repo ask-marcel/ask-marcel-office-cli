@@ -298,6 +298,15 @@ const NOT_AUTHENTICATED_CODE = 'not_authenticated';
 const CACHE_UNWRITABLE_CODE = 'token_cache_unwritable';
 const isCacheUnwritable = (r: Result<unknown, AuthError>): boolean => !r.ok && r.error.type === 'auth_failed' && r.error.code === CACHE_UNWRITABLE_CODE;
 
+// Two Graph tokens of the same account: the same object id in the same tenant.
+// A token without these claims never matches, so the caller replaces rather
+// than merges.
+const sameAccount = (cachedAccess: string | undefined, access: string): boolean => {
+  if (!cachedAccess) return false;
+  const before = decodeJwtPayload(cachedAccess);
+  const after = decodeJwtPayload(access);
+  return typeof before['oid'] === 'string' && before['oid'] === after['oid'] && typeof before['tid'] === 'string' && before['tid'] === after['tid'];
+};
 const NOT_AUTHENTICATED_MESSAGE =
   'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';
 
@@ -344,10 +353,15 @@ const createAuthManagerFromApi = (
     return err({ type: 'auth_failed', message: `the token cache could not be saved (${detail})`, code: CACHE_UNWRITABLE_CODE });
   };
 
+  // A sign-in keeps the other tokens of the SAME account (its chat, guest and
+  // elevated tokens are still good) and drops everything of another account, so
+  // one account's Graph token never sits next to another's chat token.
   const persistTeams = async (access: AccessToken, refresh: string | null, elevated?: AccessToken | null): Promise<Result<void, AuthError>> => {
+    const existing = await readCache();
+    const kept: Partial<CachedToken> = existing !== null && sameAccount(existing.access_token, access) ? existing : {};
     const claims = decodeJwtPayload(access);
     const exp = claims.exp as number | undefined;
-    const cached: CachedToken = { access_token: access, expires_on: exp ?? 0, refresh_token: refresh ?? '' };
+    const cached: CachedToken = { ...kept, access_token: access, expires_on: exp ?? 0, refresh_token: refresh ?? '' };
     if (elevated) {
       const elevatedClaims = decodeJwtPayload(elevated);
       const elevatedExp = elevatedClaims.exp as number | undefined;
@@ -440,15 +454,17 @@ const createAuthManagerFromApi = (
     const json = { access_token: redeemed.value.accessToken, expires_in: redeemed.value.expiresIn, refresh_token: redeemed.value.refreshToken };
     const validated = accessToken(json.access_token ?? '');
     if (!validated.ok) return err({ type: 'auth_failed', message: 'invalid token from refresh' });
+    // Merge into the cache as it is NOW, not the snapshot read before the
+    // network call: another process may have saved a token meanwhile. Spreading
+    // the existing cache keeps the elevated / chatsvcagg / ic3 / guest tokens;
+    // elevated carries no refresh token of its own, so wiping it would cost a
+    // forced browser re-login.
+    const latest = (await readCache()) ?? cached;
     const token: CachedToken = {
-      // Spread the existing cache FIRST so a basic-token refresh preserves the
-      // elevated / chatsvcagg / ic3 tokens (and chatsvcagg_region). Without this,
-      // every silent refresh wiped them — and elevated, carrying no refresh token
-      // of its own, could then only be recovered by a forced browser re-login.
-      ...cached,
+      ...latest,
       access_token: validated.value,
       expires_on: Math.floor(Date.now() / 1000) + json.expires_in,
-      refresh_token: json.refresh_token ?? cached.refresh_token,
+      refresh_token: json.refresh_token ?? latest.refresh_token,
     };
     const saved = await writeCache(token);
     if (!saved.ok) return saved;
