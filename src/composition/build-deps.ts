@@ -1,6 +1,7 @@
-import { join } from 'node:path';
+import { homedir } from 'node:os';
 import type { AuthManager, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth.ts';
+import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import type { CommandMeta } from '../use-cases/commands/command-types.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
@@ -18,6 +19,7 @@ export type BuildDepsConfig = {
   readonly logLevel?: string;
   readonly cachePath?: string;
   readonly home?: string;
+  readonly env?: Readonly<Record<string, string | undefined>>;
   readonly fs?: FileSystem;
   readonly processRunner?: ProcessRunner;
   readonly createAuth?: typeof createAuthManager;
@@ -43,8 +45,6 @@ export type LoginAuthFactory = () => AuthManager;
 
 export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem; makeLoginAuth: LoginAuthFactory }>;
 
-const defaultCachePath = (home: string): string => join(home, '.ask-marcel', 'token-cache.json');
-
 // The secondary-token error messages name the commands that need each token.
 // Deriving the lists from the registry flags here (instead of hardcoding them
 // inside infra/auth.ts, which cannot import the registry) keeps the messages
@@ -67,8 +67,9 @@ const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefine
 const defaultProcessRunner = (): ProcessRunner => (typeof globalThis.Bun !== 'undefined' ? createBunProcessRunner() : createNodeProcessRunner());
 
 export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
-  const home = config.home ?? process.env.HOME ?? process.env.USERPROFILE ?? '';
-  const cachePath = config.cachePath ?? defaultCachePath(home);
+  const paths = resolveAuthPaths(config.home ?? homedir(), config.env ?? process.env);
+  const cachePath = config.cachePath ?? paths.tokenCache;
+  const browserProfileDir = paths.browserProfile;
   const logLevel = config.logLevel ?? process.env.ASKMARCEL_LOG_LEVEL ?? 'error';
   const fs = config.fs ?? defaultFileSystem();
   const processRunner = config.processRunner ?? defaultProcessRunner();
@@ -92,6 +93,7 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // instant, self-explaining error rather than waiting on a browser it cannot see.
   const auth = makeAuth({
     cachePath,
+    browserProfileDir,
     logger,
     fs,
     recaptureSecondaryViaBrowser: false,
@@ -100,6 +102,6 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
     secondaryTokenCommands,
   });
   const graph = createGraphClient(auth);
-  const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, logger, fs, secondaryTokenCommands });
+  const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, browserProfileDir, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };

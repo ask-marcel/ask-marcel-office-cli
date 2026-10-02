@@ -2403,3 +2403,24 @@ describe('guest access tokens for a partner tenant', () => {
     expect(mock.calls.length).toBe(0);
   });
 });
+
+describe('createAuthManager', () => {
+  it('opens the sign-in browser in the same profile folder that logout wipes', async () => {
+    const fs = createFileSystemFake();
+    fs.seed('/virtual/profile/Cookies', 'session');
+    const profiles: Array<string | undefined> = [];
+    const auth = createAuthManager({
+      cachePath: CACHE_PATH,
+      logger: createLoggerFake(),
+      fs,
+      browserProfileDir: '/virtual/profile',
+      createBrowser: (deps) => {
+        profiles.push(deps.profileDir);
+        return fakeBrowserAuth();
+      },
+    });
+    await auth.logout();
+    expect(profiles).toEqual(['/virtual/profile']);
+    expect(fs.has('/virtual/profile/Cookies')).toBe(false);
+  });
+});

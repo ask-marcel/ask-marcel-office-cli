@@ -91,6 +91,19 @@ describe('buildDeps composition root', () => {
     }
   });
 
+  it('hands both auth managers the token cache and the browser profile from the same home folder', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+    const deps = buildDeps({ home: '/virtual/home', env: {}, logLevel: 'error', fs, createAuth: recordingCreateAuth });
+    deps.makeLoginAuth();
+    const home = ['/virtual/home/.ask-marcel/token-cache.json', '/virtual/home/.ask-marcel/browser-profile'];
+    expect(calls.map((c) => [c.cachePath, c.browserProfileDir])).toEqual([home, home]);
+  });
+
   it('falls back to a home-derived cache path when none is provided', () => {
     const fs = createFileSystemFake();
     const deps = buildDeps({ home: '/virtual/home', logLevel: 'error', fs });

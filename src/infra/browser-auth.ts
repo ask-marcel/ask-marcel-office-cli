@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { AccessToken } from '../domain/access-token.ts';
 import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
@@ -6,6 +7,7 @@ import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
+import { resolveAuthPaths } from './auth-paths.ts';
 import { loadPlaywright } from './playwright-loader.ts';
 
 type BrowserTokenResult = { accessToken: AccessToken; refreshToken: string | null };
@@ -440,12 +442,7 @@ const closeBrowserSession = async (page: PageLike, context: ContextLike): Promis
   }
 };
 
-const defaultProfileDir = (): string => {
-  const envOverride = process.env.ASKMARCEL_BROWSER_PROFILE;
-  if (envOverride) return envOverride;
-  const base = process.env.USERPROFILE ?? process.env.HOME ?? '';
-  return join(base, '.ask-marcel', 'browser-profile');
-};
+const defaultProfileDir = (): string => resolveAuthPaths(homedir(), process.env).browserProfile;
 
 const cleanupSingletonLocks = async (dir: string, fs: FileSystem): Promise<void> => {
   for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
@@ -1183,7 +1180,13 @@ const enableTraceFromEnv = (logger: Logger): { logger: Logger; trace?: TraceFn }
   return { logger: wrapped, trace };
 };
 
-const createBrowserAuth = (deps: { logger: Logger; fs?: FileSystem; freshCachedToken?: () => Promise<string | null>; onProgress?: (line: string) => void }): BrowserAuth => {
+const createBrowserAuth = (deps: {
+  logger: Logger;
+  fs?: FileSystem;
+  freshCachedToken?: () => Promise<string | null>;
+  onProgress?: (line: string) => void;
+  profileDir?: string;
+}): BrowserAuth => {
   const { logger, trace } = enableTraceFromEnv(deps.logger);
   return createBrowserAuthFromApi(createPlaywrightApi(loadPlaywright), {
     logger,
@@ -1191,6 +1194,7 @@ const createBrowserAuth = (deps: { logger: Logger; fs?: FileSystem; freshCachedT
     ...(trace ? { trace } : {}),
     ...(deps.freshCachedToken ? { freshCachedToken: deps.freshCachedToken } : {}),
     ...(deps.onProgress ? { onProgress: deps.onProgress } : {}),
+    ...(deps.profileDir ? { profileDir: deps.profileDir } : {}),
   });
 };
 

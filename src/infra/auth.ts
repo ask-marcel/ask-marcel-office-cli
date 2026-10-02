@@ -8,9 +8,11 @@ import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
+import { resolveAuthPaths } from './auth-paths.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 import { REQUEST_TIMEOUT_MS } from './network-error.ts';
+import { homedir } from 'node:os';
 
 type CachedToken = {
   access_token: string;
@@ -1013,15 +1015,9 @@ const createAuthManagerFromApi = (
 
 const defaultFileSystem = (): FileSystem => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
 
-// Matches the convention in `browser-auth.ts:defaultProfileDir`. Kept in
-// sync so `logout` wipes the same directory that `acquireElevatedToken`
-// reads/writes.
-const defaultBrowserProfileDir = (): string => {
-  const envOverride = process.env['ASKMARCEL_BROWSER_PROFILE'];
-  if (envOverride) return envOverride;
-  const base = process.env['USERPROFILE'] ?? process.env['HOME'] ?? '';
-  return `${base}/.ask-marcel/browser-profile`;
-};
+// The same resolver `browser-auth.ts` and the composition root use, so `logout`
+// wipes the folder `login` signs in with.
+const defaultBrowserProfileDir = (): string => resolveAuthPaths(homedir(), process.env).browserProfile;
 
 /**
  * Probe the token cache for a fresh access token. Handed to the browser
@@ -1054,14 +1050,20 @@ const createAuthManager = (deps: {
   secondaryTokenCommands?: SecondaryTokenCommands;
   acquireBasicViaBrowser?: boolean;
   recaptureElevatedViaBrowser?: boolean;
+  // The seam a test uses to see how the browser is built; production uses Playwright.
+  createBrowser?: typeof createBrowserAuth;
 }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
-  const browserAuth = createBrowserAuth({
+  // `profileDir` here too: the sign-in browser used its own default while
+  // `logout` wiped this folder, so a custom profile was signed into in one place
+  // and wiped in another.
+  const browserAuth = (deps.createBrowser ?? createBrowserAuth)({
     logger: deps.logger,
     fs,
     freshCachedToken: createFreshCachedTokenProbe(fs, deps.cachePath),
     onProgress: stderrProgress,
+    profileDir: browserProfileDir,
   });
   return createAuthManagerFromApi(
     browserAuth,
