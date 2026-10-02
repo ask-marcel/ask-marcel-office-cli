@@ -11,17 +11,23 @@
  */
 
 import { spawn } from 'node:child_process';
-import { err, ok } from '../domain/result.ts';
+import { err } from '../domain/result.ts';
 import { formatError } from '../domain/utilities/format-error.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
+import { createChildWatch } from './child-process-watch.ts';
 
+// `close`, not `exit`: it fires once stdout is drained, so nothing printed is
+// lost. A spawn that fails (no such command) emits `error`; the first resolve
+// wins, so a `close` that follows it changes nothing.
 export const createNodeProcessRunner = (): ProcessRunner => ({
-  runInherit: async (command, args) =>
+  run: async (command, args, options) =>
     new Promise((resolve) => {
       try {
-        const child = spawn(command, [...args], { stdio: 'inherit' });
-        child.on('exit', (exitCode) => resolve(ok({ exitCode: exitCode ?? 0 })));
-        child.on('error', (e) => resolve(err({ type: 'spawn_failed', message: formatError(e) })));
+        const child = spawn(command, [...args], { stdio: [options.stdin, 'pipe', 'inherit'] });
+        const watch = createChildWatch(options, () => child.kill('SIGKILL'));
+        child.stdout?.on('data', (chunk: Uint8Array) => watch.capture(chunk));
+        child.on('error', (e) => resolve(watch.fail(formatError(e))));
+        child.on('close', (exitCode, signal) => resolve(watch.settle(exitCode, signal)));
       } catch (e) {
         resolve(err({ type: 'spawn_failed', message: formatError(e) }));
       }

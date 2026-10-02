@@ -14,7 +14,7 @@ describe('buildDeps composition root', () => {
     expect(typeof deps.auth.getAccessToken).toBe('function');
     expect(typeof deps.auth.logout).toBe('function');
     expect(typeof deps.graph.get).toBe('function');
-    expect(typeof deps.processRunner.runInherit).toBe('function');
+    expect(typeof deps.processRunner.run).toBe('function');
   });
 
   it('exposes a login-auth factory that builds an auth manager for the interactive login flow', () => {
