@@ -47,7 +47,6 @@ const main = async (): Promise<void> => {
     auth: deps.auth,
     graph: deps.graph,
     logger: deps.logger,
-    processRunner: deps.processRunner,
     fs: deps.fs,
     makeLoginAuth: deps.makeLoginAuth,
     version: pkg.version,

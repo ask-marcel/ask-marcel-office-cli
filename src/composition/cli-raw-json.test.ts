@@ -4,7 +4,6 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { buildCli } from './cli.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
@@ -29,7 +28,6 @@ const cliServing = (body: unknown): ReturnType<typeof buildCli> =>
     auth: fakeAuthManager(),
     graph: fakeGraphClient({ get: async () => ok(body) }),
     logger: createLoggerFake(),
-    processRunner: createProcessRunnerFake(),
     fs: createFileSystemFake(),
   });
 

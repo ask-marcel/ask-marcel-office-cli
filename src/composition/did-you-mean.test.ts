@@ -5,7 +5,6 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
 import { buildMcpServer } from './mcp.ts';
@@ -28,7 +27,7 @@ const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
 };
 
 const runCli = (...args: ReadonlyArray<string>): Promise<string> => {
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
   return captureStdout(() => cli.parseAsync(['node', 'ask-marcel-office', ...args]));
 };
 

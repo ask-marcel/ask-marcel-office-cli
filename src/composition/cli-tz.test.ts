@@ -3,7 +3,6 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { currentDateZone, setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildCli } from './cli.ts';
 import { machineTimeZone } from './date-zone.ts';
@@ -27,7 +26,7 @@ const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
 
 const cliWith = (): { cli: ReturnType<typeof buildCli>; logger: ReturnType<typeof createLoggerFake> } => {
   const logger = createLoggerFake();
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger, processRunner: createProcessRunnerFake(), fs: createFileSystemFake() });
+  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger, fs: createFileSystemFake() });
   return { cli, logger };
 };
 

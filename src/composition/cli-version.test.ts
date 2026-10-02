@@ -3,7 +3,6 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { buildCli } from './cli.ts';
 
 const run = async (args: ReadonlyArray<string>): Promise<{ readonly out: string; readonly threw: boolean; readonly graphCalls: number }> => {
@@ -14,7 +13,7 @@ const run = async (args: ReadonlyArray<string>): Promise<{ readonly out: string;
       return { ok: true, value: {} };
     },
   });
-  const cli = buildCli({ auth: fakeAuthManager(), graph, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs: createFileSystemFake(), version: '9.8.7' });
+  const cli = buildCli({ auth: fakeAuthManager(), graph, logger: createLoggerFake(), fs: createFileSystemFake(), version: '9.8.7' });
   const original = process.stdout.write.bind(process.stdout);
   let out = '';
   process.stdout.write = (chunk: string | Uint8Array): boolean => {

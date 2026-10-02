@@ -4,7 +4,6 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
 import { buildCli } from './cli.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
@@ -33,7 +32,7 @@ const exportOnDrive = fakeGraphClient({
 
 const save = async (command: string, outputPath: string): Promise<{ readonly out: Record<string, unknown>; readonly saved: string | undefined }> => {
   const fs = createFileSystemFake();
-  const cli = buildCli({ auth: fakeAuthManager(), graph: exportOnDrive, logger: createLoggerFake(), processRunner: createProcessRunnerFake(), fs });
+  const cli = buildCli({ auth: fakeAuthManager(), graph: exportOnDrive, logger: createLoggerFake(), fs });
   const out = await captureStdout(() =>
     cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', outputPath, command, '--drive-id', 'd1', '--item-id', 'i1'])
   );

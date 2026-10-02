@@ -21,14 +21,12 @@ import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
 
 type BuildCliDeps = {
   readonly auth: AuthManager;
   readonly graph: GraphClient;
   readonly logger: Logger;
-  readonly processRunner: ProcessRunner;
   readonly fs: FileSystem;
   readonly version?: string;
   readonly onCommandError?: () => void;
