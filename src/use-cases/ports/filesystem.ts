@@ -25,3 +25,19 @@ export type FileSystem = {
    */
   readonly deleteDirIfExists: (path: string) => Promise<Result<void, FileSystemError>>;
 };
+
+/**
+ * Writes that other processes race on: the token cache, replaced whole so a
+ * reader never sees half a file, and its lock, created only when absent. Kept
+ * apart from FileSystem because only the auth code needs them.
+ */
+export type AtomicFileWrites = {
+  /**
+   * Writes `content` to a temp file in the same folder, created with `mode`
+   * (a secret is never readable by others, not even briefly) and flushed to
+   * disk, then renames it over `path`. The temp file never outlives a failure.
+   */
+  readonly writeTextAtomic: (path: string, content: string, mode: number) => Promise<Result<void, FileSystemError>>;
+  /** Creates `path` with `content` and `mode` only when nothing is there; answers `already_exists` otherwise. */
+  readonly createExclusive: (path: string, content: string, mode: number) => Promise<Result<void, FileSystemError | { readonly type: 'already_exists' }>>;
+};

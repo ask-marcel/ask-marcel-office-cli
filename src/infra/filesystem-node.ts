@@ -13,15 +13,63 @@
  * either runtime directly.
  */
 
-import { chmod, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { chmod, mkdir, open, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
+import { renameWithRetry } from './rename-with-retry.ts';
 
 const isNodeError = (e: unknown): e is NodeJS.ErrnoException => e instanceof Error && 'code' in e;
 
-export const createNodeFileSystem = (): FileSystem => ({
+// Creates `path`, which must not exist, with `mode` set at creation, writes
+// `content` and flushes it to disk before closing.
+const writeNewFile = async (path: string, content: string, mode: number): Promise<void> => {
+  const handle = await open(path, 'wx', mode);
+  try {
+    await handle.writeFile(content, 'utf-8');
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+};
+
+// The token cache's writes (AtomicFileWrites). Bun has neither a rename nor an
+// exclusive create, so the Bun adapter delegates to these two.
+export const writeTextAtomic: AtomicFileWrites['writeTextAtomic'] = async (path, content, mode) => {
+  const temp = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await writeNewFile(temp, content, mode);
+    await renameWithRetry(rename, temp, path);
+    return ok(undefined);
+  } catch (e) {
+    await rm(temp, { force: true });
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+// Only the exclusive open's EEXIST means "already there": `mkdir -p` also
+// answers EEXIST when a regular file sits where the folder should be, and
+// reading that as a held lock would make a caller wait on a lock nobody holds.
+export const createExclusive: AtomicFileWrites['createExclusive'] = async (path, content, mode) => {
+  try {
+    await mkdir(dirname(path), { recursive: true });
+  } catch (e) {
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+  try {
+    await writeNewFile(path, content, mode);
+    return ok(undefined);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'EEXIST') return err({ type: 'already_exists' });
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+export const createNodeFileSystem = (): FileSystem & AtomicFileWrites => ({
+  writeTextAtomic,
+  createExclusive,
   readJson: async <T>(path: string) => {
     let raw: string;
     try {

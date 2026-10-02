@@ -35,6 +35,7 @@ import '../src/infra/graph-client.ts';
 import '../src/infra/network-error.ts';
 import '../src/infra/child-process-watch.ts';
 import '../src/infra/process-runner-bun.ts';
+import '../src/infra/rename-with-retry.ts';
 import '../src/infra/process-runner-node.ts';
 
 import '../src/index.ts';

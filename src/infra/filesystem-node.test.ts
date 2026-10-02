@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describeAtomicFileWritesContract } from '../test-helpers/atomic-file-writes-contract.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 
 let tmp: string;
@@ -199,3 +200,5 @@ describe('Node filesystem adapter — chmod', () => {
     if (!result.ok) expect(result.error.type).toBe('io_failed');
   });
 });
+
+describeAtomicFileWritesContract('Node filesystem adapter', createNodeFileSystem);
