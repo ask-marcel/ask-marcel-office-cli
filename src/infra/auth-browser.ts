@@ -5,22 +5,30 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { AuthError, AuthManager, BrowserRungs, FetchFn, SecondaryTokenCommands, TokenCacheAccess } from './auth.ts';
+import type { AuthError, AuthManager, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess } from './auth.ts';
 import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
-import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
+import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 import type { TokenCacheLock } from './token-cache-lock.ts';
 
-// Wires the auth ladder (auth.ts) to the Playwright sign-in browser
-// (browser-auth.ts).
+// The browser half of auth: the rungs of the ladder that drive the Playwright
+// sign-in browser (browser-auth.ts), and the factories that build an auth manager
+// from the ladder (auth.ts) and those rungs. auth.ts never imports this file.
+
+// Microsoft moved the Teams web app here; `teams.microsoft.com` now 302s to it.
+// Navigating straight to the destination drops a redirect hop from every
+// capture, and keeps the whole session on the host the substrate calls use
+// (probed live 2026-08-31).
+const TEAMS_URL = 'https://teams.cloud.microsoft/';
 
 type BrowserRungsDeps = {
   readonly browserAuth: BrowserAuth;
   readonly logger: Logger;
   readonly secondaryTokenCommands: SecondaryTokenCommands;
+  readonly acquireBasicViaBrowser: boolean;
   readonly recaptureElevatedViaBrowser: boolean;
   readonly recaptureSecondaryViaBrowser: boolean;
 };
@@ -29,7 +37,115 @@ type BrowserRungsDeps = {
 // through the ladder's cache access. A rung this session may not use is left out.
 const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): BrowserRungs => {
   const { browserAuth, logger, secondaryTokenCommands } = deps;
-  const { underLock, persistElevated, persistChatsvcagg, persistIc3 } = cache;
+  const { underLock, persistTeams, persistElevated, persistChatsvcagg, persistIc3, redeemMissedSubstrateAtLogin } = cache;
+
+  // Track the elevated-capture outcome from the most recent
+  // browser-acquired session so the login command can surface it to the
+  // user via `getLastElevatedOutcome()`. Reset to null on every fresh
+  // `acquireViaBrowser` so stale outcomes don't leak across login attempts.
+  let lastElevatedOutcome: ElevatedOutcome | null = null;
+  let lastChatsvcaggOutcome: ElevatedOutcome | null = null;
+
+  // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
+  // the first save that fails stops the login with its error.
+  const persistSubstrateCaptures = async (chatsvcagg: ChatsvcaggTokenResult, ic3: Ic3TokenResult): Promise<Result<void, AuthError>> => {
+    if (chatsvcagg.ok) {
+      logger.info('auth.chatsvcagg.captured_at_login', { region: chatsvcagg.region });
+      lastChatsvcaggOutcome = { captured: true };
+      const saved = await persistChatsvcagg(chatsvcagg.token, chatsvcagg.region);
+      if (!saved.ok) return saved;
+    } else {
+      logger.info('auth.chatsvcagg.skipped_at_login', { reason: chatsvcagg.reason });
+      lastChatsvcaggOutcome = { captured: false, reason: chatsvcagg.reason };
+    }
+    if (!ic3.ok) {
+      logger.info('auth.ic3.skipped_at_login', { reason: ic3.reason });
+      return ok(undefined);
+    }
+    logger.info('auth.ic3.captured_at_login', { region: ic3.region });
+    return persistIc3(ic3.token, ic3.region);
+  };
+
+  type SignedIn = { readonly token: AccessToken; readonly substrateCaptured: { readonly chatsvcagg: boolean; readonly ic3: boolean } | null };
+
+  // The browser leg, run while holding the lock: Chromium's own Singleton lock
+  // files are cleared at every launch, so only the lock keeps a second browser
+  // off the profile.
+  const signInViaBrowser = async (force: boolean): Promise<Result<SignedIn, AuthError>> => {
+    try {
+      // Single-session capture: one Playwright-driven browser window does
+      // every capture leg. Opening a SECOND browser at m365.cloud.microsoft
+      // for the elevated step flashed a fresh sign-in prompt on federated
+      // tenants because the elevated identity's silent-SSO cookies hadn't
+      // settled from disk — so we reuse the same browser context: after
+      // the Teams token comes through the network listener, the SAME
+      // page navigates to m365.cloud.microsoft so cookies stay live in
+      // memory. (An earlier auto-heal profile wipe was dropped for the
+      // same reason — it wiped the freshly-authenticated Teams cookies
+      // and made federated tenants strictly worse.)
+      //
+      // Substrate (chatsvcagg) round: same teams.microsoft.com session
+      // emits the chatsvcagg-audience bearer on its initial chat-list
+      // load, so the third capture leg piggy-backs on the existing
+      // browser run — zero additional UI prompts.
+      const { teams: result, elevated, chatsvcagg, ic3, fromCache } = await browserAuth.acquireBothTokens(TEAMS_URL, { skipCacheProbe: force });
+      if (!result) return err({ type: 'auth_cancelled' });
+      // The poll short-circuited because a concurrent process landed a
+      // fresh token in the cache. Do NOT persist (refreshToken is null here —
+      // writing would clobber the winner's rotated refresh token) and leave the
+      // elevated/chatsvcagg outcomes null: no browser-tested state to report.
+      if (fromCache === true) {
+        logger.info('auth.ladder.rung', { rung: 'browser_cache_short_circuit' });
+        return ok({ token: result.accessToken, substrateCaptured: null });
+      }
+      const elevatedToken: AccessToken | null = elevated.ok ? elevated.token : null;
+      if (elevated.ok) {
+        logger.info('auth.elevated.captured_at_login');
+        lastElevatedOutcome = { captured: true };
+      } else {
+        logger.info('auth.elevated.skipped_at_login', { reason: elevated.reason });
+        lastElevatedOutcome = { captured: false, reason: elevated.reason };
+      }
+      const savedTeams = await persistTeams(result.accessToken, result.refreshToken, elevatedToken);
+      if (!savedTeams.ok) return savedTeams;
+      const savedSubstrate = await persistSubstrateCaptures(chatsvcagg, ic3);
+      if (!savedSubstrate.ok) return savedSubstrate;
+      logger.info('auth.ladder.rung', { rung: 'browser' });
+      return ok({ token: result.accessToken, substrateCaptured: { chatsvcagg: chatsvcagg.ok, ic3: ic3.ok } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: msg });
+    }
+  };
+
+  // A forced login redeems the substrate tokens the browser missed AFTER the
+  // sign-in released the lock: the redemptions take the lock themselves.
+  const acquireViaBrowser = async (force = false): Promise<Result<AccessToken, AuthError>> => {
+    const signedIn = await underLock('browser', async () => signInViaBrowser(force));
+    if (!signedIn.ok) return signedIn;
+    const captured = signedIn.value.substrateCaptured;
+    if (force && captured !== null) await redeemMissedSubstrateAtLogin(captured.chatsvcagg, captured.ic3);
+    return ok(signedIn.value.token);
+  };
+
+  // Concurrent first-time auth was racing — two parallel commands would
+  // both fall through to acquireViaBrowser, one would win and one would
+  // return `auth_cancelled` from the lost Playwright context. Cache the
+  // in-flight browser-acquire promise so concurrent callers share one
+  // login attempt. Cleared on settle (success or failure) so the next call
+  // re-checks the cache instead of returning a stale failure.
+  let inFlightBrowserAcquire: Promise<Result<AccessToken, AuthError>> | null = null;
+  const acquireViaBrowserShared = (force = false): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightBrowserAcquire !== null) {
+      logger.info('auth.ladder.rung', { rung: 'browser_shared_in_flight' });
+      return inFlightBrowserAcquire;
+    }
+    const launched = acquireViaBrowser(force);
+    inFlightBrowserAcquire = launched.finally(() => {
+      inFlightBrowserAcquire = null;
+    });
+    return inFlightBrowserAcquire;
+  };
 
   // Distinct error messages per failure mode (launch-hang, navigation
   // failure, silent-SSO timeout) so an LLM gets actionable remediation
@@ -164,9 +280,13 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   };
 
   return {
+    signIn: deps.acquireBasicViaBrowser ? acquireViaBrowserShared : undefined,
     recaptureElevated: deps.recaptureElevatedViaBrowser ? recaptureElevatedShared : undefined,
     recaptureChatsvcagg: deps.recaptureSecondaryViaBrowser ? recaptureChatsvcaggShared : undefined,
     recaptureIc3: deps.recaptureSecondaryViaBrowser ? recaptureIc3Shared : undefined,
+    close: () => browserAuth.close(),
+    lastElevatedOutcome: () => lastElevatedOutcome,
+    lastChatsvcaggOutcome: () => lastChatsvcaggOutcome,
   };
 };
 
@@ -199,16 +319,16 @@ const createAuthManagerFromApi = (
   lock?: TokenCacheLock
 ): AuthManager =>
   createAuthLadder({
-    browserAuth,
     cachePath,
     browserProfileDir,
     logger,
     fs,
     secondaryTokenCommands,
-    acquireBasicViaBrowser,
+    interactive: acquireBasicViaBrowser,
     fetchFn,
     lock,
-    browserRungs: (cache) => createBrowserRungs({ browserAuth, logger, secondaryTokenCommands, recaptureElevatedViaBrowser, recaptureSecondaryViaBrowser }, cache),
+    browserRungs: (cache) =>
+      createBrowserRungs({ browserAuth, logger, secondaryTokenCommands, acquireBasicViaBrowser, recaptureElevatedViaBrowser, recaptureSecondaryViaBrowser }, cache),
   });
 
 const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
