@@ -154,6 +154,28 @@ export default [
     },
   },
   {
+    // The auth ladder (token cache, refresh, status) never loads the browser.
+    // An unattended session runs on it alone, and the auth package's `token`
+    // entry will stand on it and must start fast. Browser rungs reach it only
+    // through the BrowserRungs port that auth-browser.ts supplies. Type imports
+    // are erased at build time, so they stay allowed.
+    files: ['src/infra/auth.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)(auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$|^playwright(-core)?(/.*)?$',
+              allowTypeImports: true,
+              message: 'auth.ts is the browser-free half of auth: take a browser rung through the BrowserRungs port that auth-browser.ts supplies, never import the browser.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];
