@@ -7,7 +7,7 @@ import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import type { AuthManager } from './auth.ts';
-import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth.ts';
+import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth-browser.ts';
 import { createTokenCacheLock } from './token-cache-lock.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 

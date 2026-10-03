@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
-import { createAuthManager } from '../infra/auth.ts';
+import { createAuthManager } from '../infra/auth-browser.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildDeps } from './build-deps.ts';
 

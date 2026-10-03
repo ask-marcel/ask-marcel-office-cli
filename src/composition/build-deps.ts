@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import type { AuthManager, SecondaryTokenCommands } from '../infra/auth.ts';
-import { createAuthManager } from '../infra/auth.ts';
+import { createAuthManager } from '../infra/auth-browser.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import type { CommandMeta } from '../use-cases/commands/command-types.ts';

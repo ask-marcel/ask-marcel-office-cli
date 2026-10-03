@@ -17,7 +17,7 @@ export { decodeJwtPayload, isGraphToken, isTokenFresh } from './domain/jwt-utils
 export { err, ok } from './domain/result.ts';
 export type { Result } from './domain/result.ts';
 
-export { createAuthManager } from './infra/auth.ts';
+export { createAuthManager } from './infra/auth-browser.ts';
 export type { AuthError, AuthManager } from './infra/auth.ts';
 export { createBunFileSystem } from './infra/filesystem-bun.ts';
 export { createNodeFileSystem } from './infra/filesystem-node.ts';
