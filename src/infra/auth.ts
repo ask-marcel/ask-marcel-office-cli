@@ -332,6 +332,8 @@ type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 // message instead.
 type BrowserRungs = {
   readonly recaptureElevated?: (options?: { readonly awaitSignIn?: boolean }) => Promise<Result<AccessToken, AuthError>>;
+  readonly recaptureChatsvcagg?: () => Promise<Result<AccessToken, AuthError>>;
+  readonly recaptureIc3?: () => Promise<Result<AccessToken, AuthError>>;
 };
 
 // What a browser rung may do with the token cache: save what it captured, under
@@ -339,6 +341,8 @@ type BrowserRungs = {
 type TokenCacheAccess = {
   readonly underLock: <T>(purpose: LockPurpose, task: () => Promise<Result<T, AuthError>>) => Promise<Result<T, AuthError>>;
   readonly persistElevated: (elevated: AccessToken) => Promise<Result<void, AuthError>>;
+  readonly persistChatsvcagg: (chatsvcagg: AccessToken, region: string) => Promise<Result<void, AuthError>>;
+  readonly persistIc3: (ic3: AccessToken, region: string) => Promise<Result<void, AuthError>>;
 };
 
 // What the ladder runs on. `fetchFn` defaults to the global and `lock` to the
@@ -349,7 +353,6 @@ type AuthLadderDeps = {
   readonly browserProfileDir: string;
   readonly logger: Logger;
   readonly fs: FileSystem & AtomicFileWrites;
-  readonly recaptureSecondaryViaBrowser: boolean;
   readonly secondaryTokenCommands?: SecondaryTokenCommands;
   readonly acquireBasicViaBrowser: boolean;
   readonly fetchFn?: FetchFn;
@@ -361,7 +364,7 @@ type AuthLadderDeps = {
 // redemption, then a browser rung or a fail-fast "run login". Built by
 // auth-browser.ts, which owns the browser.
 const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
-  const { browserAuth, cachePath, browserProfileDir, logger, fs, recaptureSecondaryViaBrowser, acquireBasicViaBrowser } = deps;
+  const { browserAuth, cachePath, browserProfileDir, logger, fs, acquireBasicViaBrowser } = deps;
   const secondaryTokenCommands = deps.secondaryTokenCommands ?? NO_SECONDARY_TOKEN_COMMANDS;
   const fetchFn = deps.fetchFn ?? globalThis.fetch;
   const lock = deps.lock ?? createSystemTokenCacheLock(fs, `${cachePath}.lock`);
@@ -623,7 +626,7 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
   };
 
   // The rungs that need a browser, when this session may open one.
-  const browser = deps.browserRungs?.({ underLock, persistElevated });
+  const browser = deps.browserRungs?.({ underLock, persistElevated, persistChatsvcagg, persistIc3 });
 
   // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
   // the first save that fails stops the login with its error.
@@ -907,47 +910,6 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     return { available: freshChatsvcaggToken(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.chatsvcagg_access_token) };
   };
 
-  const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
-    const needed = neededByNote(secondaryTokenCommands.chatsvcagg);
-    if (reason === 'launch_timeout') {
-      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
-    }
-    if (reason === 'navigation_failed') {
-      return 'chatsvcagg capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
-    }
-    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
-  };
-
-  const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureChatsvcaggHoldingLock());
-  const recaptureChatsvcaggHoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
-    try {
-      const captured = await browserAuth.acquireChatsvcaggToken();
-      if (!captured.ok) {
-        return err({ type: 'auth_failed', message: recoverableChatsvcaggFailureMessage(captured.reason) });
-      }
-      const saved = await persistChatsvcagg(captured.token, captured.region);
-      if (!saved.ok) return saved;
-      logger.info('auth.chatsvcagg.recaptured', { region: captured.region });
-      return ok(captured.token);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return err({ type: 'auth_failed', message: `chatsvcagg capture threw: ${msg}` });
-    }
-  };
-
-  let inFlightChatsvcaggRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
-  const recaptureChatsvcaggShared = (): Promise<Result<AccessToken, AuthError>> => {
-    if (inFlightChatsvcaggRecapture !== null) {
-      logger.info('auth.chatsvcagg.shared_in_flight');
-      return inFlightChatsvcaggRecapture;
-    }
-    const launched = recaptureChatsvcagg();
-    inFlightChatsvcaggRecapture = launched.finally(() => {
-      inFlightChatsvcaggRecapture = null;
-    });
-    return inFlightChatsvcaggRecapture;
-  };
-
   // `ignoreCache` is how a caller says the cached token is DEAD rather than
   // stale. A substrate token can be revoked server-side while still inside its
   // expiry window (a second sign-in invalidates the previous session's), and
@@ -977,14 +939,15 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
       const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
       if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
-    if (!recaptureSecondaryViaBrowser) {
+    const recapture = browser?.recaptureChatsvcagg;
+    if (!recapture) {
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }
-    return recaptureChatsvcaggShared();
+    return recapture();
   };
 
   const getChatsvcaggRegion = async (): Promise<string> => {
@@ -1015,47 +978,6 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     return { available: freshIc3Token(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.ic3_access_token) };
   };
 
-  const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
-    const needed = neededByNote(secondaryTokenCommands.ic3);
-    if (reason === 'launch_timeout') {
-      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
-    }
-    if (reason === 'navigation_failed') {
-      return 'ic3 capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
-    }
-    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
-  };
-
-  const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureIc3HoldingLock());
-  const recaptureIc3HoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
-    try {
-      const captured = await browserAuth.acquireIc3Token();
-      if (!captured.ok) {
-        return err({ type: 'auth_failed', message: recoverableIc3FailureMessage(captured.reason) });
-      }
-      const saved = await persistIc3(captured.token, captured.region);
-      if (!saved.ok) return saved;
-      logger.info('auth.ic3.recaptured', { region: captured.region });
-      return ok(captured.token);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return err({ type: 'auth_failed', message: `ic3 capture threw: ${msg}` });
-    }
-  };
-
-  let inFlightIc3Recapture: Promise<Result<AccessToken, AuthError>> | null = null;
-  const recaptureIc3Shared = (): Promise<Result<AccessToken, AuthError>> => {
-    if (inFlightIc3Recapture !== null) {
-      logger.info('auth.ic3.shared_in_flight');
-      return inFlightIc3Recapture;
-    }
-    const launched = recaptureIc3();
-    inFlightIc3Recapture = launched.finally(() => {
-      inFlightIc3Recapture = null;
-    });
-    return inFlightIc3Recapture;
-  };
-
   /** `ignoreCache` as on `getChatsvcaggAccessToken`: the cached token is dead, not stale. */
   const getIc3AccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // IC3 tokens carry `aud=https://ic3.teams.office.com`, not Graph — the
@@ -1075,14 +997,15 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
       const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
       if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
-    if (!recaptureSecondaryViaBrowser) {
+    const recapture = browser?.recaptureIc3;
+    if (!recapture) {
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN),
         code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
       });
     }
-    return recaptureIc3Shared();
+    return recapture();
   };
 
   // Signing out holds the lock too, so the profile is never wiped under a

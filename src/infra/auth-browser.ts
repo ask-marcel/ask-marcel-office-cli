@@ -22,13 +22,14 @@ type BrowserRungsDeps = {
   readonly logger: Logger;
   readonly secondaryTokenCommands: SecondaryTokenCommands;
   readonly recaptureElevatedViaBrowser: boolean;
+  readonly recaptureSecondaryViaBrowser: boolean;
 };
 
 // The rungs of the ladder that need a browser, each saving what it captured
 // through the ladder's cache access. A rung this session may not use is left out.
 const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): BrowserRungs => {
   const { browserAuth, logger, secondaryTokenCommands } = deps;
-  const { underLock, persistElevated } = cache;
+  const { underLock, persistElevated, persistChatsvcagg, persistIc3 } = cache;
 
   // Distinct error messages per failure mode (launch-hang, navigation
   // failure, silent-SSO timeout) so an LLM gets actionable remediation
@@ -80,7 +81,93 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
     return inFlightElevatedRecapture;
   };
 
-  return { recaptureElevated: deps.recaptureElevatedViaBrowser ? recaptureElevatedShared : undefined };
+  const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
+    const needed = neededByNote(secondaryTokenCommands.chatsvcagg);
+    if (reason === 'launch_timeout') {
+      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
+    }
+    if (reason === 'navigation_failed') {
+      return 'chatsvcagg capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
+    }
+    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+  };
+
+  const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureChatsvcaggHoldingLock());
+  const recaptureChatsvcaggHoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
+    try {
+      const captured = await browserAuth.acquireChatsvcaggToken();
+      if (!captured.ok) {
+        return err({ type: 'auth_failed', message: recoverableChatsvcaggFailureMessage(captured.reason) });
+      }
+      const saved = await persistChatsvcagg(captured.token, captured.region);
+      if (!saved.ok) return saved;
+      logger.info('auth.chatsvcagg.recaptured', { region: captured.region });
+      return ok(captured.token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `chatsvcagg capture threw: ${msg}` });
+    }
+  };
+
+  let inFlightChatsvcaggRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureChatsvcaggShared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightChatsvcaggRecapture !== null) {
+      logger.info('auth.chatsvcagg.shared_in_flight');
+      return inFlightChatsvcaggRecapture;
+    }
+    const launched = recaptureChatsvcagg();
+    inFlightChatsvcaggRecapture = launched.finally(() => {
+      inFlightChatsvcaggRecapture = null;
+    });
+    return inFlightChatsvcaggRecapture;
+  };
+
+  const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
+    const needed = neededByNote(secondaryTokenCommands.ic3);
+    if (reason === 'launch_timeout') {
+      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
+    }
+    if (reason === 'navigation_failed') {
+      return 'ic3 capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
+    }
+    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+  };
+
+  const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureIc3HoldingLock());
+  const recaptureIc3HoldingLock = async (): Promise<Result<AccessToken, AuthError>> => {
+    try {
+      const captured = await browserAuth.acquireIc3Token();
+      if (!captured.ok) {
+        return err({ type: 'auth_failed', message: recoverableIc3FailureMessage(captured.reason) });
+      }
+      const saved = await persistIc3(captured.token, captured.region);
+      if (!saved.ok) return saved;
+      logger.info('auth.ic3.recaptured', { region: captured.region });
+      return ok(captured.token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `ic3 capture threw: ${msg}` });
+    }
+  };
+
+  let inFlightIc3Recapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureIc3Shared = (): Promise<Result<AccessToken, AuthError>> => {
+    if (inFlightIc3Recapture !== null) {
+      logger.info('auth.ic3.shared_in_flight');
+      return inFlightIc3Recapture;
+    }
+    const launched = recaptureIc3();
+    inFlightIc3Recapture = launched.finally(() => {
+      inFlightIc3Recapture = null;
+    });
+    return inFlightIc3Recapture;
+  };
+
+  return {
+    recaptureElevated: deps.recaptureElevatedViaBrowser ? recaptureElevatedShared : undefined,
+    recaptureChatsvcagg: deps.recaptureSecondaryViaBrowser ? recaptureChatsvcaggShared : undefined,
+    recaptureIc3: deps.recaptureSecondaryViaBrowser ? recaptureIc3Shared : undefined,
+  };
 };
 
 const createAuthManagerFromApi = (
@@ -93,9 +180,8 @@ const createAuthManagerFromApi = (
   secondaryTokenCommands: SecondaryTokenCommands = NO_SECONDARY_TOKEN_COMMANDS,
   acquireBasicViaBrowser: boolean = true,
   // Elevated gets its OWN browser gate, separate from chatsvcagg / ic3. Those two
-  // self-heal by redeeming the shared refresh token from INSIDE the ladder's
-  // `!recaptureSecondaryViaBrowser` branch (auth.ts), so turning the shared flag on
-  // would skip that headless refresh and open a browser instead — strictly worse.
+  // self-heal headlessly from the shared refresh token, so a browser adds nothing
+  // for them until that token is dead, and then a full sign-in is due anyway.
   // Elevated carries no refresh token, so its only question is whether a browser is
   // permitted; an interactive session answers yes and refreshes it in ~17s of silent
   // SSO against the persistent profile. Defaults to the shared flag so every existing
@@ -118,12 +204,11 @@ const createAuthManagerFromApi = (
     browserProfileDir,
     logger,
     fs,
-    recaptureSecondaryViaBrowser,
     secondaryTokenCommands,
     acquireBasicViaBrowser,
     fetchFn,
     lock,
-    browserRungs: (cache) => createBrowserRungs({ browserAuth, logger, secondaryTokenCommands, recaptureElevatedViaBrowser }, cache),
+    browserRungs: (cache) => createBrowserRungs({ browserAuth, logger, secondaryTokenCommands, recaptureElevatedViaBrowser, recaptureSecondaryViaBrowser }, cache),
   });
 
 const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());
