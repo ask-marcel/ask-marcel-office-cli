@@ -2448,6 +2448,48 @@ describe('createAuthManager', () => {
     expect(profiles).toEqual(['/virtual/profile']);
     expect(fs.has('/virtual/profile/Cookies')).toBe(false);
   });
+
+  const noBrowserRung = { acquireBasicViaBrowser: false, recaptureSecondaryViaBrowser: false, recaptureElevatedViaBrowser: false } as const;
+
+  it('builds no browser for a session that may not open one, and a dead session still says to sign in', async () => {
+    const built: Array<string | undefined> = [];
+    const auth = createAuthManager({
+      cachePath: CACHE_PATH,
+      logger: createLoggerFake(),
+      fs: createFileSystemFake(),
+      ...noBrowserRung,
+      createBrowser: (deps) => {
+        built.push(deps.profileDir);
+        return fakeBrowserAuth();
+      },
+    });
+    const result = await auth.getAccessToken();
+    expect(built).toEqual([]);
+    expect(result).toMatchObject({ ok: false, error: { code: 'not_authenticated' } });
+    expect(auth.getLastElevatedOutcome()).toBeNull();
+  });
+
+  it('signs an unattended session out without a browser, and the token cache and the browser profile are both gone', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(CACHE_PATH, '{}');
+    fs.seed('/virtual/profile/Cookies', 'session');
+    const built: Array<string | undefined> = [];
+    const auth = createAuthManager({
+      cachePath: CACHE_PATH,
+      logger: createLoggerFake(),
+      fs,
+      browserProfileDir: '/virtual/profile',
+      ...noBrowserRung,
+      createBrowser: (deps) => {
+        built.push(deps.profileDir);
+        return fakeBrowserAuth();
+      },
+    });
+    expect((await auth.logout()).ok).toBe(true);
+    expect(built).toEqual([]);
+    expect(fs.has(CACHE_PATH)).toBe(false);
+    expect(fs.has('/virtual/profile/Cookies')).toBe(false);
+  });
 });
 
 describe('token cache writes', () => {

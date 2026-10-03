@@ -16,7 +16,8 @@ import type { TokenCacheLock } from './token-cache-lock.ts';
 
 // The browser half of auth: the rungs of the ladder that drive the Playwright
 // sign-in browser (browser-auth.ts), and the factories that build an auth manager
-// from the ladder (auth.ts) and those rungs. auth.ts never imports this file.
+// from the ladder (auth.ts) and those rungs. auth.ts never imports this file, so
+// a session that may not open a browser runs on the ladder alone.
 
 // Microsoft moved the Teams web app here; `teams.microsoft.com` now 302s to it.
 // Navigating straight to the destination drops a redirect hop from every
@@ -359,6 +360,14 @@ const stderrProgress = (line: string): void => {
   process.stderr.write(`${line}\n`);
 };
 
+// Every browser rung is off. An unset elevated gate follows the shared one, as
+// in createAuthManagerFromApi.
+const opensNoBrowser = (deps: {
+  readonly acquireBasicViaBrowser?: boolean;
+  readonly recaptureSecondaryViaBrowser?: boolean;
+  readonly recaptureElevatedViaBrowser?: boolean;
+}): boolean => deps.acquireBasicViaBrowser === false && deps.recaptureSecondaryViaBrowser === false && deps.recaptureElevatedViaBrowser !== true;
+
 const createAuthManager = (deps: {
   cachePath: string;
   logger: Logger;
@@ -373,6 +382,11 @@ const createAuthManager = (deps: {
 }): AuthManager => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
+  // An agent, an MCP server or a piped run: no rung may open a browser, so none
+  // is built and the ladder fails fast where a browser would have been.
+  if (opensNoBrowser(deps)) {
+    return createAuthLadder({ cachePath: deps.cachePath, browserProfileDir, logger: deps.logger, fs, secondaryTokenCommands: deps.secondaryTokenCommands, interactive: false });
+  }
   // `profileDir` here too: the sign-in browser used its own default while
   // `logout` wiped this folder, so a custom profile was signed into in one place
   // and wiped in another.
