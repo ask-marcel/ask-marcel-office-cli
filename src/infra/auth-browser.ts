@@ -1,11 +1,14 @@
 import { homedir } from 'node:os';
+import type { AccessToken } from '../domain/access-token.ts';
 import { accessToken } from '../domain/access-token.ts';
+import type { Result } from '../domain/result.ts';
+import { err, ok } from '../domain/result.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { AuthManager, FetchFn, SecondaryTokenCommands } from './auth.ts';
-import { createAuthLadder, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
+import type { AuthError, AuthManager, BrowserRungs, FetchFn, SecondaryTokenCommands, TokenCacheAccess } from './auth.ts';
+import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
-import type { BrowserAuth } from './browser-auth.ts';
+import type { BrowserAuth, ElevatedFailureReason } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
@@ -13,6 +16,72 @@ import type { TokenCacheLock } from './token-cache-lock.ts';
 
 // Wires the auth ladder (auth.ts) to the Playwright sign-in browser
 // (browser-auth.ts).
+
+type BrowserRungsDeps = {
+  readonly browserAuth: BrowserAuth;
+  readonly logger: Logger;
+  readonly secondaryTokenCommands: SecondaryTokenCommands;
+  readonly recaptureElevatedViaBrowser: boolean;
+};
+
+// The rungs of the ladder that need a browser, each saving what it captured
+// through the ladder's cache access. A rung this session may not use is left out.
+const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): BrowserRungs => {
+  const { browserAuth, logger, secondaryTokenCommands } = deps;
+  const { underLock, persistElevated } = cache;
+
+  // Distinct error messages per failure mode (launch-hang, navigation
+  // failure, silent-SSO timeout) so an LLM gets actionable remediation
+  // rather than a one-size-fits-all message.
+  const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
+    const needed = neededByNote(secondaryTokenCommands.elevated);
+    if (reason === 'launch_timeout') {
+      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser.${needed}`;
+    }
+    if (reason === 'navigation_failed') {
+      return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the commands that need the elevated token will be unavailable.${needed}`;
+    }
+    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+  };
+
+  const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> =>
+    underLock('browser', async () => recaptureElevatedHoldingLock(options));
+  const recaptureElevatedHoldingLock = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+    try {
+      const captured = await browserAuth.acquireElevatedToken(options);
+      if (!captured.ok) {
+        return err({ type: 'auth_failed', message: recoverableElevatedFailureMessage(captured.reason) });
+      }
+      const saved = await persistElevated(captured.token);
+      if (!saved.ok) return saved;
+      logger.info('auth.elevated.recaptured');
+      return ok(captured.token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return err({ type: 'auth_failed', message: `elevated capture threw: ${msg}` });
+    }
+  };
+
+  // Same in-flight serialization for the elevated path — concurrent callers
+  // share one Playwright instance instead of racing.
+  let inFlightElevatedRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
+  const recaptureElevatedShared = (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
+    // A caller willing to wait for a sign-in that JOINS a fail-fast capture
+    // already in flight inherits the fail-fast behaviour. Deliberate: the
+    // browser is already open and driving it twice is worse than one retry.
+    if (inFlightElevatedRecapture !== null) {
+      logger.info('auth.elevated.shared_in_flight');
+      return inFlightElevatedRecapture;
+    }
+    const launched = recaptureElevated(options);
+    inFlightElevatedRecapture = launched.finally(() => {
+      inFlightElevatedRecapture = null;
+    });
+    return inFlightElevatedRecapture;
+  };
+
+  return { recaptureElevated: deps.recaptureElevatedViaBrowser ? recaptureElevatedShared : undefined };
+};
 
 const createAuthManagerFromApi = (
   browserAuth: BrowserAuth,
@@ -52,9 +121,9 @@ const createAuthManagerFromApi = (
     recaptureSecondaryViaBrowser,
     secondaryTokenCommands,
     acquireBasicViaBrowser,
-    recaptureElevatedViaBrowser,
     fetchFn,
     lock,
+    browserRungs: (cache) => createBrowserRungs({ browserAuth, logger, secondaryTokenCommands, recaptureElevatedViaBrowser }, cache),
   });
 
 const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThis.Bun !== 'undefined' ? createBunFileSystem() : createNodeFileSystem());

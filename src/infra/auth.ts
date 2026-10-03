@@ -327,6 +327,20 @@ const NOT_AUTHENTICATED_MESSAGE =
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
+// The rungs of the ladder that need a browser. auth-browser.ts supplies them to
+// a session allowed to open one; a rung left out fails fast with the "run login"
+// message instead.
+type BrowserRungs = {
+  readonly recaptureElevated?: (options?: { readonly awaitSignIn?: boolean }) => Promise<Result<AccessToken, AuthError>>;
+};
+
+// What a browser rung may do with the token cache: save what it captured, under
+// the machine-wide lock.
+type TokenCacheAccess = {
+  readonly underLock: <T>(purpose: LockPurpose, task: () => Promise<Result<T, AuthError>>) => Promise<Result<T, AuthError>>;
+  readonly persistElevated: (elevated: AccessToken) => Promise<Result<void, AuthError>>;
+};
+
 // What the ladder runs on. `fetchFn` defaults to the global and `lock` to the
 // machine-wide lock beside the cache; see createAuthManagerFromApi.
 type AuthLadderDeps = {
@@ -338,16 +352,16 @@ type AuthLadderDeps = {
   readonly recaptureSecondaryViaBrowser: boolean;
   readonly secondaryTokenCommands?: SecondaryTokenCommands;
   readonly acquireBasicViaBrowser: boolean;
-  readonly recaptureElevatedViaBrowser: boolean;
   readonly fetchFn?: FetchFn;
   readonly lock?: TokenCacheLock;
+  readonly browserRungs?: (cache: TokenCacheAccess) => BrowserRungs;
 };
 
 // The recovery ladder over the token cache: the cached token, a refresh-token
 // redemption, then a browser rung or a fail-fast "run login". Built by
 // auth-browser.ts, which owns the browser.
 const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
-  const { browserAuth, cachePath, browserProfileDir, logger, fs, recaptureSecondaryViaBrowser, acquireBasicViaBrowser, recaptureElevatedViaBrowser } = deps;
+  const { browserAuth, cachePath, browserProfileDir, logger, fs, recaptureSecondaryViaBrowser, acquireBasicViaBrowser } = deps;
   const secondaryTokenCommands = deps.secondaryTokenCommands ?? NO_SECONDARY_TOKEN_COMMANDS;
   const fetchFn = deps.fetchFn ?? globalThis.fetch;
   const lock = deps.lock ?? createSystemTokenCacheLock(fs, `${cachePath}.lock`);
@@ -608,6 +622,9 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     if (!ic3Captured) await redeemMissedTier(IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem', fresh);
   };
 
+  // The rungs that need a browser, when this session may open one.
+  const browser = deps.browserRungs?.({ underLock, persistElevated });
+
   // The chatsvcagg / ic3 bearers a sign-in captured on the side, saved in turn;
   // the first save that fails stops the login with its error.
   const persistSubstrateCaptures = async (chatsvcagg: ChatsvcaggTokenResult, ic3: Ic3TokenResult): Promise<Result<void, AuthError>> => {
@@ -850,56 +867,6 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     return { available: freshElevatedToken(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.elevated_access_token) };
   };
 
-  // Distinct error messages per failure mode (launch-hang, navigation
-  // failure, silent-SSO timeout) so an LLM gets actionable remediation
-  // rather than a one-size-fits-all message.
-  const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
-    const needed = neededByNote(secondaryTokenCommands.elevated);
-    if (reason === 'launch_timeout') {
-      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser.${needed}`;
-    }
-    if (reason === 'navigation_failed') {
-      return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the commands that need the elevated token will be unavailable.${needed}`;
-    }
-    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
-  };
-
-  const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> =>
-    underLock('browser', async () => recaptureElevatedHoldingLock(options));
-  const recaptureElevatedHoldingLock = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
-    try {
-      const captured = await browserAuth.acquireElevatedToken(options);
-      if (!captured.ok) {
-        return err({ type: 'auth_failed', message: recoverableElevatedFailureMessage(captured.reason) });
-      }
-      const saved = await persistElevated(captured.token);
-      if (!saved.ok) return saved;
-      logger.info('auth.elevated.recaptured');
-      return ok(captured.token);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return err({ type: 'auth_failed', message: `elevated capture threw: ${msg}` });
-    }
-  };
-
-  // Same in-flight serialization for the elevated path — concurrent callers
-  // share one Playwright instance instead of racing.
-  let inFlightElevatedRecapture: Promise<Result<AccessToken, AuthError>> | null = null;
-  const recaptureElevatedShared = (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
-    // A caller willing to wait for a sign-in that JOINS a fail-fast capture
-    // already in flight inherits the fail-fast behaviour. Deliberate: the
-    // browser is already open and driving it twice is worse than one retry.
-    if (inFlightElevatedRecapture !== null) {
-      logger.info('auth.elevated.shared_in_flight');
-      return inFlightElevatedRecapture;
-    }
-    const launched = recaptureElevated(options);
-    inFlightElevatedRecapture = launched.finally(() => {
-      inFlightElevatedRecapture = null;
-    });
-    return inFlightElevatedRecapture;
-  };
-
   const getElevatedAccessToken = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     const fresh = freshElevatedToken(await readCache());
     const validated = fresh !== undefined ? accessToken(fresh) : null;
@@ -908,7 +875,8 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
       return ok(validated.value);
     }
     // Elevated absent, expired, or malformed; need to re-capture.
-    if (!recaptureElevatedViaBrowser)
+    const recapture = browser?.recaptureElevated;
+    if (!recapture)
       return err({
         type: 'auth_failed',
         message: failFastSecondaryMessage('Elevated (M365)', secondaryTokenCommands.elevated, RECAPTURE_ELEVATED_VIA_LOGIN),
@@ -917,7 +885,7 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     // Normally the persistent profile cookies do the silent SSO with no UI
     // prompt. When they have lapsed the tenant serves a sign-in form instead,
     // and `awaitSignIn` decides whether we wait for it to be filled in.
-    return recaptureElevatedShared(options);
+    return recapture(options);
   };
 
   // chatsvcagg shares the elevated expiry buffer. The token itself carries no
@@ -1172,5 +1140,5 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
   };
 };
 
-export { createAuthLadder, NO_SECONDARY_TOKEN_COMMANDS };
-export type { AuthError, AuthManager, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands };
+export { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS };
+export type { AuthError, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess };
