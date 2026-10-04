@@ -24,6 +24,12 @@
       "sourceType": "github",
       "skillPath": "skills/atelier-review-me/SKILL.md",
       "computedHash": "b15c9e0bf873625a491ed5740b8c5effe938dfed1823c05aee6bcc1cf465b2c1"
+    },
+    "simplified-technical-english": {
+      "source": "0xpili/simplified-technical-english",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "10105781a0199f803d158acdff2ea43f941ec1648582d76dc9ff2bf6ce055ee3"
     }
   }
 }

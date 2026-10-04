@@ -19,6 +19,11 @@ Before Commit always use Atelier Review Me
 When user Ask Questions or want to change anything, always use Atelier Grill Me
 
 
+## Writing style
+
+Use the simplified-technical-english skill for all text: chat, docs, comments, commit messages, and
+error messages. Do not apply it to code, commands, or quoted text.
+
 ## Commits
 
 Use **conventional commit** messages (e.g. `feat:`, `fix:`, `chore:`, `docs:`).
