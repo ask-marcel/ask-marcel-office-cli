@@ -250,7 +250,14 @@ node <install>/dist/token.js --tier basic
   for a new one; if the cache holds a newer token, that one comes back. A replay never opens a
   browser; elevated, which has no refresh token, fails with `secondary_token_unavailable`.
 - A browser opens only for `basic` and `elevated`, and only when stdin is a terminal. Every other
-  call fails fast with the error line, so an agent or an MCP server is never left waiting.
+  call opens no browser and fails with the error line. When another process holds the token cache
+  (a `login` in progress), a call off a terminal gives up after 20 s with `sign_in_in_progress`, so
+  an agent or an MCP server is never left waiting; a call from a terminal waits as long as a
+  sign-in may take.
+- A chatsvcagg or ic3 token is printed only with its region. If the token cache cannot be read
+  back for the region, the call fails with `secondary_token_unavailable`.
+- Every remedy names `ask-marcel-office` and `ask-marcel-office status`, except the
+  `invalid_arguments` one, which gives the call shape.
 - The token is printed in the success line and nowhere else: messages never echo an argument, and
   the helper writes no log.
 - Every run of the CLI or the helper keeps `~/.ask-marcel/token-helper.json` current

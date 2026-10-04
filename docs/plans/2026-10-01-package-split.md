@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-8 done (2026-10-04), steps 9-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-9 done (2026-10-04), steps 10-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -158,7 +158,16 @@ For a tier (basic, elevated, chatsvcagg, ic3, or guest for one partner tenant):
    `token_helper_unavailable`, remedy "install @ask-marcel/office-auth or set the tier's variable".
 3. Called as `<helper> --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`. One JSON line on
    stdout: `{ accessToken, expiresOn, region? }` (`region` for chatsvcagg and ic3), or
-   `{ errorCode, tier, message, remedy }` with a non-zero exit.
+   `{ errorCode, tier, message, remedy }` with a non-zero exit. As built in step 9:
+   - `expiresOn` is the token's JWT `exp` in seconds since the epoch, or 0 when the token has none
+     (treat 0 as already expired). The 5-minute reuse cap below compares against it in seconds.
+   - `--reject` takes the SHA-256 of the refused token as 64 lowercase hex digits, never the token.
+     `tokenFingerprint` in `src/domain/token-fingerprint.ts` is the one definition; step 10's caller
+     must use it, so both processes compute the same fingerprint.
+   - Exit 0 prints a token, exit 1 prints a failure line, and exit 2 means the helper refused its
+     arguments (`errorCode: "invalid_arguments"`). In that line `tier` is `null` when no known tier
+     was named; in every other line it is the tier asked for.
+   - `--tenant` goes with the guest tier only, and the guest tier needs it.
 
 ### Spawning
 
@@ -191,9 +200,15 @@ newer cached token. The replay path never reaches the browser and never calls to
 `getAccessToken({ force })`, which goes straight to the browser.
 
 Failure codes: `not_authenticated`, `secondary_token_unavailable`, `auth_cancelled`,
-`sign_in_in_progress` (from the helper); `token_helper_unavailable`, `env_token_invalid` (from the
-caller). Auth owns `remedy` and always names the auth bin, `status` (never `scopes-check`), and the
-auth MCP server's `login` tool when the surface is MCP. Read and write append their own
+`sign_in_in_progress`, `token_cache_unwritable` (exit 1) and `invalid_arguments` (exit 2, `tier`
+can be `null`) from the helper; `token_helper_unavailable`, `env_token_invalid` (from the caller).
+`token_cache_unwritable` is the ladder's own code for a token cache or lock that cannot be written;
+it needs a different remedy (make `~/.ask-marcel` writable), so the helper passes it through. A
+failure that carries no code gets its tier's code: `not_authenticated` for basic,
+`secondary_token_unavailable` for the other tiers. `invalid_arguments` is a caller bug, not a state
+of the session. Auth owns `remedy` and always names the auth bin, `status` (never `scopes-check`),
+and the auth MCP server's `login` tool when the surface is MCP; the `invalid_arguments` remedy names
+the bin and the call shape only, since `status` cannot help there. Read and write append their own
 registry-derived list of commands that need the tier.
 
 ### Inside auth
