@@ -29,6 +29,7 @@ import '../src/domain/jwt-utils.ts';
 import '../src/infra/logger.ts';
 import '../src/infra/auth-paths.ts';
 import '../src/infra/auth.ts';
+import '../src/infra/auth-token-source.ts';
 import '../src/infra/auth-browser.ts';
 import '../src/infra/browser-auth.ts';
 import '../src/infra/filesystem-bun.ts';

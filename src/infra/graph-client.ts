@@ -3,10 +3,11 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
-import { teamsRegion } from '../domain/teams-region.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
+import type { TokenError } from '../use-cases/ports/token-source.ts';
+import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
 type GraphError =
@@ -365,11 +366,6 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}), ...retry };
 };
 
-// The cached region is pasted into every substrate URL; one that is not a region
-// name stops the request rather than steering it to another path.
-const INVALID_REGION_MESSAGE =
-  'The token cache names a Teams region that is not a region name, so no chat request was sent. Run `ask-marcel-office login --force` to capture the region again.';
-
 /**
  * Tag an api_error returned from a Microsoft-internal chat substrate
  * (chatsvcagg `/api/csa/<region>/...` or IC3 `/api/chatsvc/<region>/...`)
@@ -391,35 +387,25 @@ const asSubstrateError = (e: GraphError, substrate: 'chatsvcagg' | 'ic3'): Graph
 };
 
 const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
-  // All four token tiers (basic / elevated / chatsvcagg / ic3) share the same
-  // "fetch a bearer, map an auth failure to a GraphError" shape — only the
-  // AuthManager getter differs. One helper, four thin bindings.
-  // Typed as a zero-arg getter rather than `AuthManager['getAccessToken']`: the
-  // helper never forwards options, and borrowing the basic getter's signature
-  // meant every tier had to accept `{ force }` it would never receive. The
-  // elevated getter now takes `{ awaitSignIn }` instead, and the call sites here
-  // deliberately pass nothing, so a background command fails fast rather than
-  // parking on a sign-in form.
-  const authHeadersFrom = async (getToken: () => ReturnType<AuthManager['getAccessToken']>): Promise<Result<{ Authorization: string }, GraphError>> => {
-    const tokenResult = await getToken();
-    if (!tokenResult.ok) {
-      const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-      // Carry the auth layer's machine-readable code (e.g. the secondary-token
-      // fail-fast) through to the envelope's `errorCode` so an agent can branch
-      // on it without substring-matching the message.
-      const code = tokenResult.error.type === 'auth_failed' ? tokenResult.error.code : undefined;
-      return err({ type: 'auth_failed', message: msg, ...(code ? { code } : {}) });
-    }
+  // Every bearer comes from the token source, which knows the tiers; this client
+  // only signs requests with them.
+  const tokens = createAuthManagerTokenSource(auth);
+  // Carry the auth layer's machine-readable code (e.g. the secondary-token
+  // fail-fast) through to the envelope's `errorCode` so an agent can branch on
+  // it without substring-matching the message.
+  const asAuthFailure = (error: TokenError): GraphError => {
+    const message = error.type === 'auth_cancelled' ? 'Auth cancelled' : error.message;
+    const code = error.type === 'auth_failed' ? error.code : undefined;
+    return { type: 'auth_failed', message, ...(code ? { code } : {}) };
+  };
+  const bearer = async (token: Promise<Result<AccessToken, TokenError>>): Promise<Result<{ Authorization: string }, GraphError>> => {
+    const tokenResult = await token;
+    if (!tokenResult.ok) return err(asAuthFailure(tokenResult.error));
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
-  const authHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getAccessToken);
-  const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(auth.getElevatedAccessToken);
-  const chatsvcaggAuthHeaders = (options?: { ignoreCache?: boolean }): Promise<Result<{ Authorization: string }, GraphError>> =>
-    authHeadersFrom(() => auth.getChatsvcaggAccessToken(options));
-  const ic3AuthHeaders = (options?: { ignoreCache?: boolean }): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(() => auth.getIc3AccessToken(options));
-  // Fifth binding, and the only parameterised one: the guest tier is per-tenant,
-  // so the getter closes over which tenant is being asked.
-  const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => authHeadersFrom(() => auth.getGuestAccessToken(tenantId));
+  const authHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.graphToken('basic'));
+  const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.graphToken('elevated'));
+  const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.guestToken(tenantId));
 
   const request = async (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
@@ -494,60 +480,54 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   // instantly). So: drop it, redeem a fresh one from the shared refresh token
   // over HTTP, replay ONCE. A second 401 is real and is surfaced. Any other
   // status returns as-is, because no amount of fresh token fixes a 404.
-  const substrateGet = async (
-    kind: 'chatsvcagg' | 'ic3',
-    prefix: 'csa' | 'chatsvc',
-    path: string,
-    headersFor: (options?: { ignoreCache?: boolean }) => Promise<Result<{ Authorization: string }, GraphError>>
-  ): Promise<Result<unknown, GraphError>> => {
-    const region = teamsRegion(await auth.getChatsvcaggRegion());
-    if (!region.ok) return err({ type: 'auth_failed', message: INVALID_REGION_MESSAGE, code: region.error.type });
-    const url = `https://teams.microsoft.com/api/${prefix}/${region.value}${path}`;
-    const send = async (ignoreCache: boolean): Promise<Result<Response, GraphError>> => {
-      const headers = await headersFor(ignoreCache ? { ignoreCache: true } : undefined);
-      if (!headers.ok) return headers;
-      return ok(
-        await fetchFn(url, {
-          method: 'GET',
-          headers: { ...headers.value, accept: 'application/json' },
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        })
-      );
+  // One request signed with a substrate bearer. A 401 sends it once more with a
+  // token the source mints past the rejected one; any other answer stands.
+  const sendWithSubstrateToken = async (kind: 'chatsvcagg' | 'ic3', send: (authorization: string) => Promise<Response>): Promise<Result<Response, GraphError>> => {
+    const attempt = async (rejected?: AccessToken): Promise<Result<{ readonly response: Response; readonly token: AccessToken }, GraphError>> => {
+      const token = await tokens.substrateToken(kind, rejected === undefined ? undefined : { rejected });
+      if (!token.ok) return err(asAuthFailure(token.error));
+      return ok({ response: await send(`Bearer ${token.value}`), token: token.value });
     };
+    const first = await attempt();
+    if (!first.ok) return first;
+    if (first.value.response.status !== 401) return ok(first.value.response);
+    const replay = await attempt(first.value.token);
+    return replay.ok ? ok(replay.value.response) : replay;
+  };
+
+  const substrateGet = async (kind: 'chatsvcagg' | 'ic3', prefix: 'csa' | 'chatsvc', path: string): Promise<Result<unknown, GraphError>> => {
+    const region = await tokens.substrateRegion();
+    if (!region.ok) return err(asAuthFailure(region.error));
+    const url = `https://teams.microsoft.com/api/${prefix}/${region.value}${path}`;
     try {
-      const first = await send(false);
-      if (!first.ok) return first;
-      const res = first.value.status === 401 ? await send(true) : first;
-      if (!res.ok) return res;
-      if (!res.value.ok) return err(asSubstrateError(await apiErrorFrom(res.value, url), kind));
-      return ok(await res.value.json());
+      const sent = await sendWithSubstrateToken(kind, (authorization) =>
+        fetchFn(url, { method: 'GET', headers: { Authorization: authorization, accept: 'application/json' }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      );
+      if (!sent.ok) return sent;
+      if (!sent.value.ok) return err(asSubstrateError(await apiErrorFrom(sent.value, url), kind));
+      return ok(await sent.value.json());
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${path} (${kind})`, 'json'));
     }
   };
 
-  const teamsChat = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('chatsvcagg', 'csa', path, chatsvcaggAuthHeaders);
-  const teamsChatIc3 = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('ic3', 'chatsvc', path, ic3AuthHeaders);
+  const teamsChat = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('chatsvcagg', 'csa', path);
+  const teamsChatIc3 = (path: string): Promise<Result<unknown, GraphError>> => substrateGet('ic3', 'chatsvc', path);
 
   const teamsChatMedia = async (url: string): Promise<Result<unknown, GraphError>> => {
     const host = teamsMediaHost(url);
     if (host === undefined)
       return err({ type: 'validation_error', message: `not a Teams media URL (https on *.asm.skype.com or *.asyncgw.teams.microsoft.com): ${url.slice(0, 120)}` });
-    const send = async (ignoreCache: boolean): Promise<Result<Response, GraphError>> => {
-      const headers = await ic3AuthHeaders(ignoreCache ? { ignoreCache: true } : undefined);
-      if (!headers.ok) return headers;
-      return ok(await fetchFn(url, { method: 'GET', headers: headers.value, signal: AbortSignal.timeout(timeoutMsFor('binary')) }));
-    };
     try {
       // A revoked substrate token still looks valid in the cache: a 401 gets one
       // replay with a freshly redeemed token, as on the other substrate reads.
-      const first = await send(false);
-      if (!first.ok) return first;
-      const res = first.value.status === 401 ? await send(true) : first;
-      if (!res.ok) return res;
-      if (!res.value.ok) return err(await apiErrorFrom(res.value, url));
-      const buffer = await res.value.arrayBuffer();
-      return ok({ contentType: res.value.headers.get('content-type') ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
+      const sent = await sendWithSubstrateToken('ic3', (authorization) =>
+        fetchFn(url, { method: 'GET', headers: { Authorization: authorization }, signal: AbortSignal.timeout(timeoutMsFor('binary')) })
+      );
+      if (!sent.ok) return sent;
+      if (!sent.value.ok) return err(await apiErrorFrom(sent.value, url));
+      const buffer = await sent.value.arrayBuffer();
+      return ok({ contentType: sent.value.headers.get('content-type') ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `${host} (teams media)`, 'binary'));
     }
