@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import type { AuthManager, SecondaryTokenCommands } from '../infra/auth.ts';
+import type { AuthLadder, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth-browser.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
@@ -41,9 +41,9 @@ export type BuildDepsConfig = {
  * `createAuthManager` wiring (cache path, env) out of `cli.ts` and the action
  * testable with an injected fake.
  */
-export type LoginAuthFactory = () => AuthManager;
+export type LoginAuthFactory = () => AuthLadder;
 
-export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthManager; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem; makeLoginAuth: LoginAuthFactory }>;
+export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthLadder; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem; makeLoginAuth: LoginAuthFactory }>;
 
 // The secondary-token error messages name the commands that need each token.
 // Deriving the lists from the registry flags here (instead of hardcoding them

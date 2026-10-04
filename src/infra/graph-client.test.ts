@@ -38,6 +38,25 @@ describe('graph client', () => {
     if (result.ok) expect(result.value).toEqual({ value: [{ id: 'drive-1', name: 'OneDrive' }] });
   });
 
+  // The README "Bring your own token" object, member for member. It must keep
+  // compiling: a library caller gives the client only these getters.
+  it('reads Graph for a library caller that brings its own token source with only the getters the README shows', async () => {
+    const cancelled = async (): Promise<{ ok: false; error: { type: 'auth_cancelled' } }> => ({ ok: false, error: { type: 'auth_cancelled' } });
+    const ownTokenSource = {
+      getAccessToken: async () => ok(accessTokenUnsafe('vault-token')),
+      logout: async () => ok(undefined),
+      getElevatedAccessToken: cancelled,
+      getGuestAccessToken: cancelled,
+      getChatsvcaggAccessToken: cancelled,
+      getIc3AccessToken: cancelled,
+      getChatsvcaggRegion: async () => 'emea',
+      getLastElevatedOutcome: () => null,
+      getLastChatsvcaggOutcome: () => null,
+    };
+    const client = createGraphClient(ownTokenSource, fakeFetch([{ match: (url) => url.endsWith('/me'), body: { id: 'me' } }]));
+    expect(await client.get('/me')).toEqual(ok({ id: 'me' }));
+  });
+
   it('returns an error when the API returns an error status', async () => {
     const fetchFn = fakeFetch([{ match: (url) => url.includes('/me/drives'), body: { error: { message: 'not found' } }, status: 404 }]);
 

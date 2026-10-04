@@ -1,5 +1,5 @@
 import { accessTokenUnsafe } from '../domain/access-token.ts';
-import type { AuthManager } from '../infra/auth.ts';
+import type { AuthLadder } from '../infra/auth.ts';
 
 /**
  * Hand-written fake for the `AuthManager` secondary port (atelier rule 13 — the
@@ -16,7 +16,7 @@ import type { AuthManager } from '../infra/auth.ts';
  *
  * Adding a method to `AuthManager` now touches THIS FILE, not five others.
  */
-export const fakeAuthManager = (overrides: Partial<AuthManager> = {}): AuthManager => ({
+export const fakeAuthManager = (overrides: Partial<AuthLadder> = {}): AuthLadder => ({
   getAccessToken: async () => ({ ok: true, value: accessTokenUnsafe('tok') }),
   getElevatedAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }),
   warmSubstrateTokens: async () => {},
@@ -27,5 +27,18 @@ export const fakeAuthManager = (overrides: Partial<AuthManager> = {}): AuthManag
   logout: async () => ({ ok: true, value: undefined }),
   getLastElevatedOutcome: () => null,
   getLastChatsvcaggOutcome: () => null,
+  // The report of a usable basic token. The cache has none of the other three tokens.
+  getTokenInfo: async () => ({
+    ok: true,
+    value: {
+      scopes: [],
+      audience: undefined,
+      expiresAt: undefined,
+      expiresInSeconds: 3600,
+      elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+      chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+    },
+  }),
   ...overrides,
 });

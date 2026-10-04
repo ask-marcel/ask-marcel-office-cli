@@ -6,6 +6,7 @@ import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
+import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
 import { REQUEST_TIMEOUT_MS } from './network-error.ts';
 import type { LockPurpose, TokenCacheLock } from './token-cache-lock.ts';
@@ -162,13 +163,13 @@ type AuthManager = {
    * and callers treat that as unavailable. Never captures or refreshes.
    */
   /**
-   * The cached BASIC token, decoded by `scopes-check` and never acquired: no
+   * The cached BASIC token, decoded by the token report and never acquired: no
    * refresh, no browser. The acquiring getter heals a dead session by opening
    * a browser and, when the persistent profile is already signed in, wiping it
    * so the grant re-fires (2026-09-02: a diagnostic did exactly that). A stale
    * token comes back as-is so its expiry can be reported; no cache at all is
-   * `undefined`. Optional: a bring-your-own-token manager omits it and callers
-   * fall back to `getAccessToken`, which is then the caller's own function.
+   * `undefined`. It is the cache read behind `getTokenInfo`. Optional: a
+   * bring-your-own-token manager has no cache, so it omits it.
    */
   getCachedBasicToken?: () => Promise<AccessToken | undefined>;
   getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
@@ -181,6 +182,21 @@ type AuthManager = {
   getCachedChatsvcaggInfo?: () => Promise<CachedTierInfo>;
   getCachedIc3Info?: () => Promise<CachedTierInfo>;
 };
+
+/**
+ * The manager this file builds: the `AuthManager` the Graph client takes, plus
+ * the token report that `status` and the login summary read. The report stays
+ * off `AuthManager`, so a bring-your-own-token caller of `createGraphClient`
+ * does not have to supply it.
+ *
+ * `getTokenInfo` decodes the cached basic token (scopes, audience, expiry) and
+ * gives one block for each of the other three tokens. It reads only the cache.
+ * It does not refresh a token and it does not open a browser, thus an expired
+ * token shows a negative `expiresInSeconds`. If the cache has no session, the
+ * error has the code `not_authenticated`. Nothing here can be cancelled, so the
+ * error is always `auth_failed`.
+ */
+type AuthLadder = AuthManager & TokenReport;
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const SCOPES = 'https://graph.microsoft.com/.default openid profile offline_access';
@@ -209,6 +225,17 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
   if (!token) return [];
   const scp = decodeJwtPayload(token)['scp'];
   return typeof scp === 'string' ? scp.split(' ').filter((s) => s.length > 0) : [];
+};
+
+// Recovery hints attached to an UNAVAILABLE tier so a bare `scopes: []` on a
+// missing token reads as "not captured yet", not "this token has no scopes".
+const TIER_REASON_INTERACTIVE =
+  'not cached (absent or expired) — run `ask-marcel-office login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
+const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `ask-marcel-office login --force`';
+
+const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {
+  if (info.available) return { ...info, refresh };
+  return { ...info, refresh, reason: refresh === 'interactive' ? TIER_REASON_INTERACTIVE : TIER_REASON_AUTOMATIC };
 };
 
 // Fail-fast (no browser) message for the secondary-token getters, used on the
@@ -280,6 +307,9 @@ const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
 // here instead; an interactive terminal keeps the auto-browser, and the explicit
 // `login` command always has it.
 const NOT_AUTHENTICATED_CODE = 'not_authenticated';
+
+// The token report has nothing to decode when the cache has no basic token.
+const NO_CACHED_SESSION_MESSAGE = 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.';
 
 // A token the CLI obtained but could not save. Reported as itself, never as a
 // missing sign-in: Entra single-uses the refresh token, so a redemption whose
@@ -365,7 +395,7 @@ type AuthLadderDeps = {
 // The recovery ladder over the token cache: the cached token, a refresh-token
 // redemption, then a browser rung or a fail-fast "run login". Built by
 // auth-browser.ts, which owns the browser.
-const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
+const createAuthLadder = (deps: AuthLadderDeps): AuthLadder => {
   const { cachePath, browserProfileDir, logger, fs } = deps;
   const secondaryTokenCommands = deps.secondaryTokenCommands ?? NO_SECONDARY_TOKEN_COMMANDS;
   const fetchFn = deps.fetchFn ?? globalThis.fetch;
@@ -873,6 +903,26 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     return { available: freshIc3Token(cached) !== undefined, expiresInSeconds, scopes: decodeScopes(cached?.ic3_access_token) };
   };
 
+  // Decode-only, like the readers above. The elevated token has no refresh token
+  // of its own, so its refresh is `interactive`. The two substrate tokens heal
+  // from the shared refresh token, so their refresh is `automatic`.
+  const getTokenInfo = async (): Promise<Result<TokenInfo, TokenReportError>> => {
+    const basic = await getCachedBasicToken();
+    if (basic === undefined) return err({ type: 'auth_failed', message: NO_CACHED_SESSION_MESSAGE, code: NOT_AUTHENTICATED_CODE });
+    const claims = decodeJwtPayload(basic);
+    const aud = claims['aud'];
+    const exp = claims['exp'];
+    return ok({
+      scopes: decodeScopes(basic),
+      audience: typeof aud === 'string' ? aud : undefined,
+      expiresAt: typeof exp === 'number' ? new Date(exp * 1000).toISOString() : undefined,
+      expiresInSeconds: typeof exp === 'number' ? Math.floor(exp - Date.now() / 1000) : undefined,
+      elevated: buildTier(await getCachedElevatedInfo(), 'interactive'),
+      chatsvcagg: buildTier(await getCachedChatsvcaggInfo(), 'automatic'),
+      ic3: buildTier(await getCachedIc3Info(), 'automatic'),
+    });
+  };
+
   /** `ignoreCache` as on `getChatsvcaggAccessToken`: the cached token is dead, not stale. */
   const getIc3AccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // IC3 tokens carry `aud=https://ic3.teams.office.com`, not Graph — the
@@ -955,8 +1005,9 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthManager => {
     getCachedElevatedInfo,
     getCachedChatsvcaggInfo,
     getCachedIc3Info,
+    getTokenInfo,
   };
 };
 
 export { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS };
-export type { AuthError, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess };
+export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess };
