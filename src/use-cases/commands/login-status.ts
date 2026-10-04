@@ -1,6 +1,6 @@
 // Slim shaper for `login`'s output: a confirmation that authentication succeeded,
 // which tokens are currently available, and where to go next. The full per-token
-// detail (scopes, expiry, refresh route) lives in `scopes-check`, so login does not
+// detail (scopes, expiry, refresh route) lives in `status`, so login does not
 // duplicate it; it just points there and to `login --force` for a refresh.
 //
 // `available` is the machine-readable tier list and is part of the documented
@@ -26,7 +26,7 @@ type LoginSummaryInput = {
   readonly ic3Available: boolean;
 };
 
-const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office scopes-check`. To re-capture every token, run `ask-marcel-office login --force`.";
+const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office status`. To re-capture every token, run `ask-marcel-office login --force`.";
 
 // Per tier, because they do not fail the same way. Elevated is browser-only and
 // simply was not captured. The two substrate tiers are only ever reported missing

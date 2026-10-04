@@ -122,10 +122,10 @@ describe('findErrorHint — Graph error translation', () => {
     expect(result?.hint).toContain('#EXT#');
   });
 
-  it('extends the existing `accessDenied` rule to also cover `ErrorAccessDenied` (Outlook / EWS spelling) so both share the same scopes-check + login hint', () => {
+  it('extends the existing `accessDenied` rule to also cover `ErrorAccessDenied` (Outlook / EWS spelling) so both share the same status + login hint', () => {
     const result = findErrorHint('ErrorAccessDenied: Access is denied.', 'ErrorAccessDenied');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('scopes-check');
+    expect(result?.hint).toContain('ask-marcel-office status');
     expect(result?.hint).toContain('ask-marcel-office login');
   });
 
@@ -171,10 +171,10 @@ describe('findErrorHint — Graph error translation', () => {
     expect(result?.hint).toContain('Source IDs from a sibling');
   });
 
-  it('detects "Missing scope" anywhere in the message (not just as a structured code) and points at scopes-check + the appid scope ceiling', () => {
+  it('detects "Missing scope" anywhere in the message (not just as a structured code) and points at status + the appid scope ceiling', () => {
     const result = findErrorHint("Missing scope permissions on the request. API: 'Read.All' on resource '/me/...'", 'Forbidden');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('scopes-check');
+    expect(result?.hint).toContain('ask-marcel-office status');
     expect(result?.hint).toContain('fixed scope ceiling');
   });
 

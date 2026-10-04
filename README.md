@@ -12,7 +12,7 @@
 
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
 
-[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 212 commands](docs/COMMANDS.md)
+[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 211 commands](docs/COMMANDS.md)
 
 </div>
 
@@ -57,11 +57,11 @@ And against the tools you already know:
 
 ### 🔑 Sign in like a human, not like an app
 
-Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `scopes-check` reports per-token scopes and expiry without a Graph call and without ever opening a browser: an expired session is reported as expired, not re-captured.
+Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `status` reports per-token scopes and expiry without a Graph call and without ever opening a browser: an expired session is reported as expired, not re-captured.
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 212 commands break down as 203 GET, 5 read-only POST (four searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
+The 211 commands break down as 202 GET, 5 read-only POST (four searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -119,7 +119,7 @@ $ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item
 | ✅ Planner + To Do | 17 | Plans (a group's too) and their label names, buckets, tasks, checklists, due dates, the web link of every To Do task |
 | 📊 Excel | 11 | Live workbook reads: worksheets, used ranges, tables (lean values, not Graph's four redundant 2D arrays) |
 | 📓 OneNote | 11 | Notebooks, sections, page content |
-| 🔎 Search + utilities | 6 | Federated Microsoft Search across the tenant, cursor pagination (`next-page`), token status (`scopes-check`), offline local-file conversion |
+| 🔎 Search + utilities | 5 | Federated Microsoft Search across the tenant, cursor pagination (`next-page`), offline local-file conversion |
 
 Full per-command tables with required parameters and Graph endpoints: **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 
@@ -199,15 +199,16 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-ma
 
 > **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
 
-You get **five gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
+You get **six gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
 
 | Tool | Does |
 |:--|:--|
 | `list-commands` | The terse manifest. Start here; `category` narrows it. |
 | `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 208 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-command` | The 207 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
+| `status` | Shows the four cached tokens: available or not, time left, scopes. Reads only the cache and never opens a browser. |
 
 **Sign in from a terminal first** — `npx -y ask-marcel-office-cli login`. Do this once before wiring up any client, and the reads just work.
 
@@ -251,7 +252,7 @@ Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Gra
 
 ## Deep docs
 
-- **[All 212 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
+- **[All 211 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
 - **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
 - **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
 - **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release

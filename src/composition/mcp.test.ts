@@ -43,10 +43,10 @@ const writeCommandNames = Object.entries(commands)
   .map(([n]) => n);
 
 describe('the MCP gateway an agent connects to', () => {
-  it('offers exactly the five gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
+  it('offers exactly the six gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'login', 'run-command', 'run-write-command']);
+    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'login', 'run-command', 'run-write-command', 'status']);
   });
 
   it('marks the read tools read-only so a client can auto-approve them, and does not mark the write tool read-only', async () => {
@@ -309,10 +309,18 @@ describe('authenticating from an MCP client', () => {
 
   it('surfaces a token-status read failure rather than reporting a sign-in that cannot be confirmed', async () => {
     const client = await connect({
-      graph: fakeGraphClient({ getCachedTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message: 'cache unreadable' } }) as never }),
+      auth: fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message: 'cache unreadable' } }) }),
     });
     const result = await client.callTool({ name: 'login', arguments: {} });
     expect(isError(result)).toBe(true);
     expect(textOf(result)).toContain('cache unreadable');
+  });
+
+  it('reports the four cached tokens through the status tool, with the refresh hint', async () => {
+    const client = await connect();
+    const result = await client.callTool({ name: 'status', arguments: {} });
+    expect(isError(result)).toBe(false);
+    for (const token of ['basic', 'elevated', 'chatsvcagg', 'ic3']) expect(textOf(result)).toContain(token);
+    expect(textOf(result)).toContain('ask-marcel-office login');
   });
 });

@@ -27,5 +27,18 @@ export const fakeAuthManager = (overrides: Partial<AuthManager> = {}): AuthManag
   logout: async () => ({ ok: true, value: undefined }),
   getLastElevatedOutcome: () => null,
   getLastChatsvcaggOutcome: () => null,
+  // The report of a usable basic token. The cache has none of the other three tokens.
+  getTokenInfo: async () => ({
+    ok: true,
+    value: {
+      scopes: [],
+      audience: undefined,
+      expiresAt: undefined,
+      expiresInSeconds: 3600,
+      elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
+      chatsvcagg: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+      ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' },
+    },
+  }),
   ...overrides,
 });

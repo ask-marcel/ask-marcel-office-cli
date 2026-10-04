@@ -6,7 +6,7 @@ import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import type { AuthManager } from './auth.ts';
+import type { AuthManager, FetchFn } from './auth.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth-browser.ts';
 import { createTokenCacheLock } from './token-cache-lock.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
@@ -255,8 +255,8 @@ describe('auth manager recovery ladder', () => {
   // the shared refresh token and self-heal headlessly. Elevated has no refresh
   // token of its own, but `login.execute` self-escalates to the browser
   // re-capture when it is missing, so a plain `login` recovers it too — no
-  // `--force` needed. Every fail-fast also names `scopes-check` for preflight.
-  it('points every secondary tier at a plain login (never --force), the elevated message flagging its no-refresh-token nature and every message naming scopes-check', async () => {
+  // `--force` needed. Every fail-fast also names `status` for preflight.
+  it('points every secondary tier at a plain login (never --force), the elevated message flagging its no-refresh-token nature and every message naming status', async () => {
     const fs = createFileSystemFake();
     const tok = futureElevated();
     const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
@@ -270,7 +270,7 @@ describe('auth manager recovery ladder', () => {
     expect(elevated.error.message).toContain('ask-marcel-office login');
     expect(elevated.error.message).not.toContain('--force');
     expect(elevated.error.message).toContain('no refresh token of its own'); // elevated-specific explanation
-    expect(elevated.error.message).toContain('scopes-check'); // preflight pointer
+    expect(elevated.error.message).toContain('ask-marcel-office status'); // preflight pointer
 
     for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
       const result = await getToken();
@@ -541,7 +541,7 @@ describe('auth manager recovery ladder', () => {
     if (result.ok || result.error.type !== 'auth_failed') return;
     expect(result.error.code).toBe('not_authenticated');
     expect(result.error.message).toContain('ask-marcel-office login');
-    expect(result.error.message).toContain('scopes-check');
+    expect(result.error.message).toContain('ask-marcel-office status');
     expect(browserLaunched).toBe(false);
   });
 
@@ -953,6 +953,130 @@ describe('auth manager cached tier scopes (decoded from each token scp claim)', 
     const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     const info = await cachedElevatedInfo(auth);
     expect(info.scopes).toEqual([]);
+  });
+});
+
+// The token report reads the cache and nothing else, like the readers above. It
+// does not refresh a token and it does not open a browser: the browser fake here
+// throws if the manager starts it.
+describe('auth manager token report (getTokenInfo)', () => {
+  const tokenWith = (claims: Record<string, unknown>): string => `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify(claims))}.sig`;
+  const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
+  const managerWith = (cache: Record<string, unknown> | undefined, fetchFn: FetchFn = refusingTokenEndpoint): AuthManager => {
+    const fs = createFileSystemFake();
+    if (cache !== undefined) fs.seed(CACHE_PATH, JSON.stringify(cache));
+    const browser = fakeBrowserAuth({ acquireError: new Error('the token report must never launch the browser') });
+    return createAuthManagerFromApi(browser, CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs, true, undefined, true, true, fetchFn);
+  };
+  const basicOnly = (): Record<string, unknown> => ({ access_token: tokenWith({ scp: 'Files.Read.All', exp: inAnHour() }), expires_on: inAnHour(), refresh_token: 'r' });
+
+  it('reports the scopes, the audience and the expiry of the cached basic token', async () => {
+    const exp = inAnHour();
+    const auth = managerWith({ access_token: tokenWith({ scp: 'Mail.Read Files.Read User.Read', aud: 'https://graph.microsoft.com', exp }), expires_on: exp, refresh_token: 'r' });
+    const result = await auth.getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual(['Mail.Read', 'Files.Read', 'User.Read']);
+      expect(result.value.audience).toBe('https://graph.microsoft.com');
+      expect(result.value.expiresAt).toBe(new Date(exp * 1000).toISOString());
+      expect(result.value.expiresInSeconds ?? 0).toBeGreaterThan(3590);
+      expect(result.value.expiresInSeconds ?? 9999).toBeLessThanOrEqual(3600);
+    }
+  });
+
+  it('reports an expired basic token with a negative expiresInSeconds, and does not refresh it', async () => {
+    const anHourAgo = Math.floor(Date.now() / 1000) - 3600;
+    // This endpoint gives a fresh token with other scopes, so a refresh would show in the report.
+    const mintingTokenEndpoint = async (): Promise<Response> =>
+      new Response(JSON.stringify({ access_token: tokenWith({ scp: 'Files.Read.All', exp: inAnHour() }), expires_in: 3600, refresh_token: 'rotated' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    const auth = managerWith({ access_token: tokenWith({ scp: 'Mail.Read', exp: anHourAgo }), expires_on: anHourAgo, refresh_token: 'live-refresh' }, mintingTokenEndpoint);
+    const result = await auth.getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual(['Mail.Read']);
+      expect(result.value.expiresInSeconds ?? 0).toBeLessThan(0);
+    }
+  });
+
+  it('gives not_authenticated, with a message that names login, when the cache has no session', async () => {
+    const result = await managerWith(undefined).getTokenInfo();
+    expect(result).toEqual(err({ type: 'auth_failed', message: expect.stringContaining('ask-marcel-office login'), code: 'not_authenticated' }));
+  });
+
+  it('reports empty scopes and no audience or expiry when the basic token has none of those claims', async () => {
+    const result = await managerWith({ access_token: tokenWith({ sub: 'me' }), expires_on: inAnHour(), refresh_token: 'r' }).getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scopes).toEqual([]);
+      expect(result.value.audience).toBeUndefined();
+      expect(result.value.expiresAt).toBeUndefined();
+      expect(result.value.expiresInSeconds).toBeUndefined();
+    }
+  });
+
+  it('reports the elevated token with its own scopes and the interactive refresh, with no reason when it is available', async () => {
+    const auth = managerWith({ ...basicOnly(), elevated_access_token: jwtWithScopes(['Chat.ReadBasic', 'Files.ReadWrite.All']), elevated_expires_on: inAnHour() });
+    const result = await auth.getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.elevated).toEqual({ available: true, expiresInSeconds: expect.any(Number), scopes: ['Chat.ReadBasic', 'Files.ReadWrite.All'], refresh: 'interactive' });
+      expect(result.value.elevated.reason).toBeUndefined();
+      expect(result.value.scopes).toEqual(['Files.Read.All']);
+    }
+  });
+
+  it('reports a missing elevated token as unavailable, with a reason that tells how to capture it again', async () => {
+    const result = await managerWith(basicOnly()).getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.elevated).toEqual({
+        available: false,
+        expiresInSeconds: undefined,
+        scopes: [],
+        refresh: 'interactive',
+        reason: expect.stringContaining('ask-marcel-office login'),
+      });
+      // Only the text for the interactive refresh has this phrase.
+      expect(result.value.elevated.reason).toContain('no refresh token of its own');
+    }
+  });
+
+  it('reports the chatsvcagg and ic3 tokens with the automatic refresh, and gives a reason only for the unavailable one', async () => {
+    const tenSecondsAgo = Math.floor(Date.now() / 1000) - 10;
+    const auth = managerWith({
+      ...basicOnly(),
+      chatsvcagg_access_token: jwtWithScopes(['user_impersonation']),
+      chatsvcagg_expires_on: inAnHour(),
+      ic3_access_token: jwtWithScopes(['Teams.AccessAsUser.All']),
+      ic3_expires_on: tenSecondsAgo,
+    });
+    const result = await auth.getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.chatsvcagg).toEqual({ available: true, expiresInSeconds: expect.any(Number), scopes: ['user_impersonation'], refresh: 'automatic' });
+      expect(result.value.chatsvcagg.reason).toBeUndefined();
+      expect(result.value.ic3).toEqual({
+        available: false,
+        expiresInSeconds: expect.any(Number),
+        scopes: ['Teams.AccessAsUser.All'],
+        refresh: 'automatic',
+        reason: expect.stringContaining('self-heals'),
+      });
+      expect(result.value.ic3.expiresInSeconds ?? 0).toBeLessThan(0);
+    }
+  });
+
+  it('reports missing chatsvcagg and ic3 tokens as unavailable, with a reason that names login --force', async () => {
+    const result = await managerWith(basicOnly()).getTokenInfo();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const missing = { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic' as const, reason: expect.stringContaining('login --force') };
+      expect(result.value.chatsvcagg).toEqual(missing);
+      expect(result.value.ic3).toEqual(missing);
+    }
   });
 });
 

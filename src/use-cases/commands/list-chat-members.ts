@@ -7,7 +7,7 @@ import { pickODataOptions } from './odata-query.ts';
 // Token: BASIC. `/chats/{id}/members` needs `ChatMember.Read`. Round-8 testing
 // found the basic Teams token lacked it (403 `Missing scope permissions`) and
 // moved this onto the elevated M365ChatClient identity. As of 2026-06 the basic
-// Teams web-client token DOES carry `ChatMember.Read` (`scopes-check` confirms;
+// Teams web-client token DOES carry `ChatMember.Read` (`status` confirms;
 // 200s verified live on 1:1 `@unq.gbl.spaces` and meeting `@thread.v2` chats —
 // the scope is per-chat-membership, not per-subtype, so group chats ride along),
 // so it is back on the basic token via `buildPickODataListCommand`. Basic is preferable: the elevated

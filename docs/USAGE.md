@@ -188,15 +188,16 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-of
 claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
 ```
 
-Five gateway tools, not one per command (one schema per command would be ~190 per session, the
+Six gateway tools, not one per command (one schema per command would be ~190 per session, the
 bloat this CLI exists to avoid). Discovery is three hops:
 
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 208 READ commands
+run-command { command, params?, outputPath?, outputDir? }        → the 207 READ commands
 run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
+status                                         → the four cached tokens (reads only the cache)
 ```
 
 `params` are the command's flags **without** the `--` prefix, keyed camelCase:
@@ -216,7 +217,7 @@ Notes:
   warm the persistent browser profile is), and the MCP default request timeout is **60 s** — so
   `login` times out intermittently at the default, right on the boundary. The server keeps running
   through a client-side timeout, so the sign-in has usually completed anyway: re-run your original
-  command, or check `scopes-check`, before calling `login` a second time.
+  command, or call the `status` tool, before calling `login` a second time.
 - **Log in from a terminal first** (`ask-marcel-office login`). A first-time MFA prompt adds minutes on top
   of the above. After that the `login` tool covers the hourly elevated-token refresh.
 - `logout` is deliberately CLI-only.
@@ -293,7 +294,7 @@ as tool content.
 
 `download-drive-item-version --format <original|pdf|markdown>` needs a Graph token whose `appid` is on Microsoft's ODSP allow-list — the Teams web client token returns 403 with `logicalPermissionAccessDenied` against historical-version bytes.
 
-Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used by the five commands that need it: `download-drive-item-version`, `diff-drive-item-versions`, `list-chats`, `get-chat`, and `get-user` as its fallback when a tenant refuses the basic token (help-json flags them `needsElevatedToken`). Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`scopes-check`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
+Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used by the five commands that need it: `download-drive-item-version`, `diff-drive-item-versions`, `list-chats`, `get-chat`, and `get-user` as its fallback when a tenant refuses the basic token (help-json flags them `needsElevatedToken`). Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`status`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
 
 ## Configuration
 

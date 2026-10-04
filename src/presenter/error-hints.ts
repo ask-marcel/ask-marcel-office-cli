@@ -221,7 +221,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchMessage: (m) => /Missing scope/i.test(m),
-    hint: "The cached token doesn't include the required scope. Run `ask-marcel-office scopes-check` to see what's granted; the Teams web-client appid has a fixed scope ceiling, so missing scopes can't be added without a different Azure registration.",
+    hint: "The cached token doesn't include the required scope. Run `ask-marcel-office status` to see what's granted; the Teams web-client appid has a fixed scope ceiling, so missing scopes can't be added without a different Azure registration.",
   },
   // ─── Graph: generic access denied / forbidden ────────────────────────────
   // user reported `ErrorAccessDenied` as a
@@ -229,7 +229,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'accessDenied' || c === 'Forbidden' || c === 'AccessDenied' || c === 'ErrorAccessDenied',
-    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel-office login` to refresh. Also run `ask-marcel-office scopes-check` to confirm the cached token actually includes the scope this endpoint needs.",
+    hint: "The signed-in user doesn't have access to this resource. For shared mailboxes this usually means no delegated read access; for SharePoint files / lists it means no view permission; for Teams chats it can mean the chat substrate dropped the token tier — try `ask-marcel-office login` to refresh. Also run `ask-marcel-office status` to confirm the cached token actually includes the scope this endpoint needs.",
   },
   // ─── Graph: unknown $select / $orderby field (RequestBroker--ParseUri) ───
   // pattern-matched on errorCode because the
@@ -291,7 +291,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   {
     source: 'graph',
     matchCode: (c) => c === 'InvalidAuthenticationToken' || c === 'TokenExpired',
-    hint: 'The cached access token is invalid or expired. Run `ask-marcel-office login` to re-authenticate, then retry. Use `ask-marcel-office scopes-check` to inspect `expiresInSeconds` ahead of time on long-running sessions.',
+    hint: 'The cached access token is invalid or expired. Run `ask-marcel-office login` to re-authenticate, then retry. Use `ask-marcel-office status` to inspect `expiresInSeconds` ahead of time on long-running sessions.',
   },
   // ─── Graph: throttling ───────────────────────────────────────────────────
   {

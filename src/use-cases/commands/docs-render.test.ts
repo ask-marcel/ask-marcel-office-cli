@@ -148,7 +148,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('**Scopes required:**');
     expect(md).toContain('`Chat.ReadBasic`');
     expect(md).toContain('`User.Read`');
-    expect(md).toContain('scopes-check');
+    expect(md).toContain('ask-marcel-office status');
   });
 
   it('renders an elevated-token warning when needsElevatedToken is true', () => {

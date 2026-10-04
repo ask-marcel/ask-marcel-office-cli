@@ -82,7 +82,18 @@ const didYouMean = (wanted: string, candidates: ReadonlyArray<string>, lead = 'D
   return ` ${lead} ${listed}?`;
 };
 
-/** `Unknown command "x". Did you mean …? <remedy>`, the one sentence every front end answers an unknown name with. */
-const unknownCommandMessage = (name: string, available: ReadonlyArray<string>, remedy: string): string => `Unknown command "${name}".${didYouMean(name, available)} ${remedy}`;
+// A removed command and the command that replaced it. A caller who types the old
+// name gets the new one, not a list of near names.
+const REPLACED_COMMANDS: ReadonlyMap<string, string> = new Map([['scopes-check', 'status']]);
 
-export { closestNames, didYouMean, unknownCommandMessage };
+/** `` `new` replaced `old`.`` for a removed command, else the did-you-mean line; both are led by a space. */
+const commandSuggestion = (name: string, available: ReadonlyArray<string>): string => {
+  const replacement = REPLACED_COMMANDS.get(name);
+  return replacement === undefined ? didYouMean(name, available) : ` \`${replacement}\` replaced \`${name}\`.`;
+};
+
+/** `Unknown command "x". Did you mean …? <remedy>`, the one sentence every front end answers an unknown name with. */
+const unknownCommandMessage = (name: string, available: ReadonlyArray<string>, remedy: string): string =>
+  `Unknown command "${name}".${commandSuggestion(name, available)} ${remedy}`;
+
+export { closestNames, commandSuggestion, didYouMean, unknownCommandMessage };

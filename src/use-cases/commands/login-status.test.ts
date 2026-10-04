@@ -20,9 +20,9 @@ describe('login summary (slim auth confirmation)', () => {
     expect(s.available).toEqual(['basic']);
   });
 
-  it('points the hint at scopes-check for detail and login --force to refresh', () => {
+  it('points the hint at status for detail and login --force to refresh', () => {
     const s = buildLoginSummary({ elevatedAvailable: true, chatsvcaggAvailable: true, ic3Available: true });
-    expect(s.hint).toContain('scopes-check');
+    expect(s.hint).toContain('ask-marcel-office status');
     expect(s.hint).toContain('login --force');
   });
 });

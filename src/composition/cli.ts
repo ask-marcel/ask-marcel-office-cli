@@ -1,6 +1,6 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
-import { didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
+import { commandSuggestion, didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
@@ -14,6 +14,7 @@ import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
+import * as status from '../use-cases/commands/status.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
@@ -108,7 +109,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     if (err.code === 'commander.missingMandatoryOptionValue') return typoedFlagHint(optionFlags, typed);
     const command = /^error: unknown command '([^']+)'/.exec(err.message)?.[1];
     if (command !== undefined)
-      return didYouMean(
+      return commandSuggestion(
         command,
         program.commands.map((c) => c.name())
       );
@@ -390,8 +391,8 @@ const buildCli = (deps: BuildCliDeps): Command => {
       }
       // Slim confirmation: which tokens are available now, and where to look next.
       // The decode-only read never opens a browser. Full per-token scopes + expiry
-      // live in `scopes-check`; login just points there (and to `login --force`).
-      const info = await graph.getCachedTokenInfo();
+      // live in `status`; login just points there (and to `login --force`).
+      const info = await loginAuth.getTokenInfo();
       if (!info.ok) {
         fail(info.error.message);
         return;
@@ -414,9 +415,24 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
       '               this CLI cannot request additional scopes. To inspect the granted set,',
-      '               run `ask-marcel-office scopes-check`.',
+      '               run `ask-marcel-office status`.',
       'Stuck flow:    `ask-marcel-office logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
     ].join('\n  ')
+  );
+
+  const statusCmd = program
+    .command('status')
+    .description(
+      'Show the four cached tokens (basic, elevated, chatsvcagg and ic3). For each token, it shows if the token is available and the seconds before its expiry. It also shows the scopes, the refresh method, and the data that the token lets you read. It reads only the token cache, and it does not make a Graph call or open a browser.'
+    )
+    .action(async () => {
+      const result = await status.execute(auth);
+      if (result.ok) renderOut(result.value);
+      else fail(result.error.message, result.error.code, 'cli');
+    });
+  statusCmd.addHelpText(
+    'after',
+    ['', 'Example:       ask-marcel-office status', 'Not signed in: the error code is `not_authenticated`. Run `ask-marcel-office login` first.'].join('\n  ')
   );
 
   const logoutCmd = program
