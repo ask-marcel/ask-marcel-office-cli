@@ -421,7 +421,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
 
   const logoutCmd = program
     .command('logout')
-    .description('Clear the cached Microsoft Graph token so the next command forces a fresh sign-in.')
+    .description('Clear the cached tokens and the browser profile so the next command forces a fresh sign-in.')
     .action(async () => {
       const result = await logout.execute(auth);
       if (result.ok) renderOut({ status: 'logged_out' });
@@ -433,8 +433,9 @@ const buildCli = (deps: BuildCliDeps): Command => {
       '',
       'Example:       ask-marcel-office logout',
       'Removes:       ~/.ask-marcel/token-cache.json (access + refresh tokens).',
-      'Leaves alone:  ~/.ask-marcel/browser-profile/ (delete it manually if you want a clean Playwright session too).',
-      'Verify clean:  ls ~/.ask-marcel/  (token-cache.json should be gone).',
+      '               ~/.ask-marcel/browser-profile/, or $ASKMARCEL_BROWSER_PROFILE when set (Playwright persistent context).',
+      'Next sign-in:  usually asks for your password again, since the "Stay signed in" cookie lived in the profile.',
+      'Verify clean:  ls ~/.ask-marcel/  (token-cache.json and browser-profile/ should both be gone).',
     ].join('\n  ')
   );
 

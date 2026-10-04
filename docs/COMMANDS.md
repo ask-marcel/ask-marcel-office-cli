@@ -16,7 +16,7 @@ For everything else:
 | Command | Description |
 |---------|-------------|
 | `login` | Authenticate (cached → refresh → browser fallback) |
-| `logout` | Clear cached tokens |
+| `logout` | Clear cached tokens and the browser profile |
 | `docs <cmd>` | Print Markdown docs for a single command |
 | `help-json [--terse] [--category <name>]` | Machine-readable manifest, full or filtered |
 | `mcp` | Serve the command registry to an MCP client over stdio (five gateway tools) |

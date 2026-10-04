@@ -102,10 +102,10 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'logout',
     summary:
-      'Clear the cached Microsoft Graph token so the next command forces a fresh sign-in. Removes ~/.ask-marcel/token-cache.json; leaves the Playwright browser profile alone.',
+      'Clear the cached tokens and the browser profile so the next command forces a fresh sign-in. Removes ~/.ask-marcel/token-cache.json and the Playwright browser profile (~/.ask-marcel/browser-profile/, or $ASKMARCEL_BROWSER_PROFILE when set). The profile holds the "Stay signed in" cookie, so the next sign-in usually asks for a password again.',
     category: 'lifecycle',
     graphMethod: 'GET',
-    graphPathTemplate: '(lifecycle) deletes ~/.ask-marcel/token-cache.json; not a Graph endpoint',
+    graphPathTemplate: '(lifecycle) deletes ~/.ask-marcel/token-cache.json and the browser profile; not a Graph endpoint',
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/auth-v2-user',
     options: [],
     example: 'ask-marcel-office logout',
