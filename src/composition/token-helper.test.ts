@@ -9,6 +9,7 @@ import { tokenFingerprint } from '../domain/token-fingerprint.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createAuthLadder } from '../infra/auth.ts';
+import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import type { BrowserLadderOptions, TokenHelperDeps } from './token-helper.ts';
 import { runTokenHelper } from './token-helper.ts';
 
@@ -148,6 +149,30 @@ describe('the token helper entry', () => {
     });
     expect(r.browserLadders).toEqual([]);
     expect(onlyLine(r)).toMatchObject({ accessToken: newer });
+  });
+
+  // Another process holds the token-cache lock (a browser `login`, say). A
+  // person at the terminal waits as long as a sign-in may take; an agent gives
+  // up after twenty seconds. Neither case opens a browser for these requests.
+  it('in a terminal, waits for a held lock as long as a sign-in may take; unattended, gives up after twenty seconds', async () => {
+    const waits: number[] = [];
+    const busy: TokenCacheLock = {
+      withLock: async (_purpose, waitBudgetMs) => {
+        waits.push(waitBudgetMs);
+        return err({ type: 'lock_busy', purpose: 'browser' });
+      },
+    };
+    const refused = graphToken('refused');
+    const replay = ['--tier', 'basic', '--reject', await tokenFingerprint(refused)];
+    const fs = (): FileSystemFake => cacheHolding({ access_token: refused, expires_on: inAnHour() });
+    for (const argv of [['--tier', 'chatsvcagg'], replay]) {
+      const attended = await run(argv, fs(), { interactive: true, lock: busy });
+      expect(onlyLine(attended)).toMatchObject({ errorCode: 'sign_in_in_progress', message: expect.stringContaining('waited 420 s') });
+      expect(attended.browserLadders).toEqual([]);
+      const unattended = await run(argv, fs(), { interactive: false, lock: busy });
+      expect(onlyLine(unattended)).toMatchObject({ errorCode: 'sign_in_in_progress', message: expect.stringContaining('waited 20 s') });
+    }
+    expect(waits).toEqual([420_000, 20_000, 420_000, 20_000]);
   });
 
   // The production browser ladder is loaded on demand; with the token cached it

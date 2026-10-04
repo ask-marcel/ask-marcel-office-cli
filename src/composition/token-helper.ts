@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { FetchFn, TokenLadder } from '../infra/auth.ts';
 import { createAuthLadder } from '../infra/auth.ts';
 import type { AuthPaths } from '../infra/auth-paths.ts';
+import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '../infra/filesystem-node.ts';
@@ -49,6 +50,7 @@ export type TokenHelperDeps = {
   readonly fs?: FileSystem & AtomicFileWrites;
   readonly print?: (line: string) => void;
   readonly fetchFn?: FetchFn;
+  readonly lock?: TokenCacheLock;
   readonly browserLadder?: (options: BrowserLadderOptions) => Promise<TokenLadder>;
 };
 
@@ -97,13 +99,14 @@ const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLa
 };
 
 // A browser only for a person at the terminal, only for the two tiers that a
-// browser renews, and never for a replay.
+// browser renews, and never for a replay. The headless ladder still knows a
+// person is there, so it waits for a held lock as long as a sign-in may take.
 const issuerFor = async (deps: TokenHelperDeps, paths: AuthPaths, fs: FileSystem & AtomicFileWrites, args: TokenArgs): Promise<TokenIssuer> => {
   const base = { cachePath: paths.tokenCache, browserProfileDir: paths.browserProfile, logger: SILENT, fs };
   const { tier } = args.request;
   const interactive = deps.interactive ?? process.stdin.isTTY === true;
   if (interactive && args.rejected === undefined && (tier === 'basic' || tier === 'elevated')) return (deps.browserLadder ?? loadBrowserLadder)({ ...base, tier });
-  return createAuthLadder({ ...base, interactive: false, fetchFn: deps.fetchFn });
+  return createAuthLadder({ ...base, interactive, fetchFn: deps.fetchFn, lock: deps.lock });
 };
 
 export const runTokenHelper = async (deps: TokenHelperDeps): Promise<number> => {
