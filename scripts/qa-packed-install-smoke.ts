@@ -46,8 +46,8 @@ const fail = (message: string): never => {
   throw new Error(message);
 };
 
-const run = (cmd: string, args: ReadonlyArray<string>, cwd: string, timeout = PROBE_TIMEOUT_MS): string => {
-  const p = spawnSync(cmd, args, { cwd, timeout, maxBuffer: 64 * 1024 * 1024 });
+const run = (cmd: string, args: ReadonlyArray<string>, cwd: string, timeout = PROBE_TIMEOUT_MS, env: NodeJS.ProcessEnv = process.env): string => {
+  const p = spawnSync(cmd, args, { cwd, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   if (p.error !== undefined || p.signal !== null || p.status !== 0) {
     const cause = p.error?.message ?? (p.signal === null ? `exit ${p.status}` : `signal ${p.signal}`);
     fail(`\`${cmd} ${args.join(' ').slice(0, 120)}\` failed (${cause}): ${(p.stderr?.toString() || p.stdout?.toString() || '').slice(0, 400)}`);
@@ -63,7 +63,7 @@ const evaluate = (rt: (typeof RUNTIMES)[number], code: string, cwd: string): str
 // dynamic imports only (the bundle also carries generated code with
 // `require("...")` inside strings, which is not an import).
 const bundleExternals = async (root: string): Promise<ReadonlyArray<string>> => {
-  const texts = await Promise.all(['dist/cli.js', 'dist/index.js'].map((f) => Bun.file(join(root, f)).text()));
+  const texts = await Promise.all(['dist/cli.js', 'dist/index.js', 'dist/token.js'].map((f) => Bun.file(join(root, f)).text()));
   const found = texts.flatMap((t) => [...t.matchAll(/^import [^;]* from "([^"]+)";$|^import "([^"]+)";$|import\("([^"]+)"\)/gm)].map((m) => m[1] ?? m[2] ?? m[3] ?? ''));
   return [...new Set(found)].filter((s) => s !== '' && !s.startsWith('.') && !s.startsWith('node:') && !builtinModules.includes(s)).toSorted();
 };
@@ -121,12 +121,16 @@ try {
   }
   console.log(`  ✓ ${undeclared}, which the tarball does not install, fails to load under node and bun (the consumer is isolated)`);
 
+  // Every CLI run records where its token helper lives under HOME, so the bin
+  // runs on a scratch home and never repoints the user's.
+  const scratchHome = join(work, 'home');
+  const binEnv = { ...process.env, HOME: scratchHome, USERPROFILE: scratchHome };
   const [binName, binPath] = Object.entries(installed.bin ?? {})[0] ?? fail('the packed manifest declares no bin');
   for (const rt of RUNTIMES) {
-    const version = run(rt, [join(root, binPath), '--version'], consumer);
+    const version = run(rt, [join(root, binPath), '--version'], consumer, PROBE_TIMEOUT_MS, binEnv);
     if (version !== installed.version) fail(`--version under ${rt} answered ${JSON.stringify(version)}, expected ${installed.version}`);
   }
-  const shimVersion = run(join(consumer, 'node_modules', '.bin', binName), ['--version'], consumer);
+  const shimVersion = run(join(consumer, 'node_modules', '.bin', binName), ['--version'], consumer, PROBE_TIMEOUT_MS, binEnv);
   if (shimVersion !== installed.version) fail(`the ${binName} shim answered ${JSON.stringify(shimVersion)}, expected ${installed.version}`);
   console.log(`  ✓ --version ${installed.version} under node, bun and the ${binName} shim`);
 

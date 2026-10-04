@@ -16,7 +16,7 @@
  * checks the tarball as installed outside the repo.
  * Exit non-zero on any bundler-interop failure.
  */
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
@@ -71,6 +71,11 @@ if (rootArg === undefined || !existsSync(join(ROOT, 'dist/cli.js'))) {
 const runtimeVersion = (rt: string): string => spawnSync(rt, ['--version']).stdout?.toString().trim() || 'missing';
 console.log(`bundle smoke: package root ${ROOT}, node ${runtimeVersion('node')}, bun ${runtimeVersion('bun')}`);
 
+// Every run of the CLI records where its token helper lives under HOME, so the
+// probes run on a scratch home: a smoke run never repoints the user's own.
+const SMOKE_HOME = mkdtempSync(join(DIR, 'home-'));
+const SMOKE_ENV = { ...process.env, HOME: SMOKE_HOME, USERPROFILE: SMOKE_HOME };
+
 // A probe passes only when its process ended by itself with the expected status:
 // a right answer from a process that then crashed, hung or exited non-zero is a failure.
 const PROBE_TIMEOUT_MS = 20000;
@@ -79,7 +84,7 @@ const exitNote = (p: SpawnSyncReturns<Buffer>): string => p.error?.message ?? (p
 
 // A flag the bundle must thread end to end: argv beyond `--path`, with what the answer must hold.
 const probeArgs = (rt: string, args: ReadonlyArray<string>, expect: (d: { ok: boolean; data?: { text?: string; media?: ReadonlyArray<unknown> }; error?: string }) => boolean, status = 0): boolean => {
-  const p = spawnSync(rt, ['dist/cli.js', ...args, '--output', 'json'], { cwd: ROOT, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+  const p = spawnSync(rt, ['dist/cli.js', ...args, '--output', 'json'], { cwd: ROOT, env: SMOKE_ENV, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
   try {
     return exited(p, status) && expect(JSON.parse(p.stdout?.toString() || ''));
   } catch {
@@ -104,7 +109,7 @@ const probeDiff = (rt: string): boolean => {
 };
 
 const probe = (rt: string, cmd: string, path: string): { ok: boolean; note: string } => {
-  const p = spawnSync(rt, ['dist/cli.js', cmd, '--path', path, '--output', 'json'], { cwd: ROOT, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+  const p = spawnSync(rt, ['dist/cli.js', cmd, '--path', path, '--output', 'json'], { cwd: ROOT, env: SMOKE_ENV, timeout: PROBE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
   if (!exited(p, 0)) return { ok: false, note: `${exitNote(p)}: ${(p.stdout?.toString() || p.stderr?.toString() || '').slice(0, 60)}` };
   try { const d = JSON.parse(p.stdout?.toString() || ''); return { ok: d.ok === true, note: d.ok ? (d.data?.media ? `media=${d.data.media.length}` : `${d.data?.contentType || ''}`) : `ERR:${d.errorCode || String(d.error).slice(0, 40)}` }; }
   catch { return { ok: false, note: 'CRASH/non-JSON: ' + (p.stdout?.toString() || p.stderr?.toString() || '').slice(0, 60) }; }
@@ -138,6 +143,7 @@ const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
     cwd: ROOT,
+    env: SMOKE_ENV,
     input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n${JSON.stringify(MCP_CALL)}\n`,
     timeout: PROBE_TIMEOUT_MS,
     maxBuffer: 64 * 1024 * 1024,
@@ -164,6 +170,53 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };
 };
 
+/*
+ * The token helper (`dist/token.js`, and `dist/cli.js token`) prints exactly one
+ * JSON line and touches only the home it is given. Each probe runs on a fresh
+ * temporary HOME: one holding a cached Graph token (a cache hit, no network),
+ * one holding nothing (stdin is not a terminal, so it must fail fast with
+ * not_authenticated rather than open a browser). The bundle must not carry the
+ * CLI's heavy modules, which is what keeps it near bare runtime startup.
+ */
+const TOKEN_EXP = Math.floor(Date.now() / 1000) + 3600;
+const TOKEN_FIXTURE = `${btoa(JSON.stringify({ alg: 'none' }))}.${btoa(JSON.stringify({ exp: TOKEN_EXP, aud: 'https://graph.microsoft.com' }))}.sig`;
+const tokenHome = (withToken: boolean): string => {
+  const home = mkdtempSync(join(DIR, 'home-'));
+  mkdirSync(join(home, '.ask-marcel'), { recursive: true });
+  if (withToken) writeFileSync(join(home, '.ask-marcel', 'token-cache.json'), JSON.stringify({ access_token: TOKEN_FIXTURE, expires_on: TOKEN_EXP, refresh_token: '' }));
+  return home;
+};
+const runToken = (rt: string, args: ReadonlyArray<string>, home: string): { p: SpawnSyncReturns<Buffer>; ms: number } => {
+  const started = performance.now();
+  const p = spawnSync(rt, args, { cwd: ROOT, env: { ...process.env, HOME: home, USERPROFILE: home }, stdio: ['ignore', 'pipe', 'pipe'], timeout: PROBE_TIMEOUT_MS });
+  return { p, ms: Math.round(performance.now() - started) };
+};
+const oneLine = (p: SpawnSyncReturns<Buffer>): Record<string, unknown> | undefined => {
+  const lines = (p.stdout?.toString() ?? '').split('\n').filter((l) => l !== '');
+  try {
+    return lines.length === 1 ? (JSON.parse(lines[0] ?? '') as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const probeToken = (rt: string): ReadonlyArray<[string, boolean, string]> => {
+  const bundle = readFileSync(join(ROOT, 'dist/token.js'), 'utf8');
+  const heavy = ['commander', 'winston', 'update-notifier'].filter((name) => bundle.includes(name));
+  const warm = tokenHome(true);
+  const hit = runToken(rt, ['dist/token.js', '--tier', 'basic'], warm);
+  const hitLine = oneLine(hit.p);
+  const locator = JSON.parse(readFileSync(join(warm, '.ask-marcel', 'token-helper.json'), 'utf8')) as { entry?: string };
+  const viaCli = runToken(rt, ['dist/cli.js', 'token', '--tier', 'basic'], warm);
+  const cold = runToken(rt, ['dist/token.js', '--tier', 'basic'], tokenHome(false));
+  return [
+    ['dist/token.js is a node script without the CLI modules', bundle.startsWith('#!/usr/bin/env node') && heavy.length === 0, heavy.length === 0 ? 'clean' : `carries ${heavy.join(', ')}`],
+    ['a cache hit prints the token line', exited(hit.p, 0) && hitLine?.accessToken === TOKEN_FIXTURE && hitLine.expiresOn === TOKEN_EXP, `${exitNote(hit.p)}, ${hit.ms} ms`],
+    ['the locator names dist/token.js', locator.entry === join(ROOT, 'dist/token.js'), String(locator.entry)],
+    ['cli.js token prints the same line', exited(viaCli.p, 0) && oneLine(viaCli.p)?.accessToken === TOKEN_FIXTURE, `${exitNote(viaCli.p)}, ${viaCli.ms} ms`],
+    ['no session fails fast, no browser', exited(cold.p, 1) && oneLine(cold.p)?.errorCode === 'not_authenticated', `${exitNote(cold.p)}, ${cold.ms} ms`],
+  ];
+};
+
 let fails = 0;
 for (const rt of ['node', 'bun']) {
   console.log(`\n=== convert-local-file-to-markdown @ ${rt} ===`);
@@ -185,8 +238,13 @@ for (const rt of ['node', 'bun']) {
     if (!passed) fails++;
     console.log(`  ${passed ? '✓' : '✗'} ${label}`);
   }
+  console.log(`=== token helper @ ${rt} ===`);
+  for (const [label, passed, note] of probeToken(rt)) {
+    if (!passed) fails++;
+    console.log(`  ${passed ? '✓' : '✗'} ${label} (${note})`);
+  }
   console.log(`=== mcp stdio handshake @ ${rt} ===`);
   const m = probeMcp(rt); if (!m.ok) fails++; console.log(`  ${m.ok ? '✓' : '✗'} mcp   -> ${m.note}`);
 }
-console.log(`\n${fails === 0 ? 'ALL CONVERTERS + MCP OK under node + bun ✓' : `!! ${fails} bundler-interop FAILURES`}`);
+console.log(`\n${fails === 0 ? 'ALL CONVERTERS + TOKEN HELPER + MCP OK under node + bun ✓' : `!! ${fails} bundler-interop FAILURES`}`);
 process.exit(fails > 0 ? 1 : 0);
