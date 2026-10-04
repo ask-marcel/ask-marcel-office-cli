@@ -5,7 +5,7 @@ import type { AuthManager } from '../infra/auth.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
-import type { TokenError } from '../use-cases/ports/token-source.ts';
+import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
 
@@ -319,10 +319,9 @@ const asSubstrateError = (e: GraphError, substrate: 'chatsvcagg' | 'ic3'): Graph
   return { ...e, code: `substrateHttp${e.status}_${substrate}` };
 };
 
-const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
-  // Every bearer comes from the token source, which knows the tiers; this client
-  // only signs requests with them.
-  const tokens = createAuthManagerTokenSource(auth);
+// Every bearer comes from the token source, which knows the tiers; this client
+// only signs requests with them.
+const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
   // Carry the auth layer's machine-readable code (e.g. the secondary-token
   // fail-fast) through to the envelope's `errorCode` so an agent can branch on
   // it without substring-matching the message.
@@ -429,7 +428,7 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
 
   const substrateGet = async (kind: 'chatsvcagg' | 'ic3', prefix: 'csa' | 'chatsvc', path: string): Promise<Result<unknown, GraphError>> => {
-    const region = await tokens.substrateRegion();
+    const region = await tokens.substrateRegion(kind);
     if (!region.ok) return err(asAuthFailure(region.error));
     const url = `https://teams.microsoft.com/api/${prefix}/${region.value}${path}`;
     try {
@@ -721,5 +720,8 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
   };
 };
 
-export { createGraphClient };
+// The default: the in-process auth ladder, or a library caller's own manager.
+const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => createTokenSourceGraphClient(createAuthManagerTokenSource(auth), fetchFn);
+
+export { createGraphClient, createTokenSourceGraphClient };
 export type { FetchFn, GraphClient, GraphError };
