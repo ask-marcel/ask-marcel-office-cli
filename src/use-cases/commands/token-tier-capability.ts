@@ -1,10 +1,10 @@
 // What each token tier lets the caller READ, in the user's words rather than the
 // tier's codename. "chatsvcagg" tells nobody outside this codebase anything; the
 // point of these strings is that a caller who has just run `login` or
-// `scopes-check` can see what they can actually reach.
+// `status` can see what they can actually reach.
 //
 // Shared by `login` (which lists them per available / missing tier) and
-// `scopes-check` (which attaches one to each tier block). It lives here rather
+// `status` (which attaches one to each tier block). It lives here rather
 // than in either command because two commands describing the same four tiers
 // differently would be a bug the type system cannot catch.
 //

@@ -269,7 +269,6 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'my-quick-context': ['User.Read', 'Files.Read', 'Mail.Read', 'Tasks.Read', 'Calendars.Read', 'Notes.Read', 'Team.ReadBasic.All'],
   // microsoft-search-query, next-page: scopes inherited from the underlying
   // entity types / cursor target — left unspecified to avoid misleading.
-  // scopes-check: cached-token introspection, no Graph call.
 };
 
 const lookupScopes = (commandName: string): ReadonlyArray<string> | undefined => GRAPH_SCOPES_BY_COMMAND[commandName];
