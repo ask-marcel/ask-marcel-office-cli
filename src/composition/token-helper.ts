@@ -64,11 +64,17 @@ const writeStdout = (line: string): void => {
   process.stdout.write(line);
 };
 
-const sameLocation = (a: Partial<TokenHelperLocation>, b: TokenHelperLocation): boolean => a.execPath === b.execPath && a.entry === b.entry && a.version === b.version;
+// The file is read as whatever it holds: `null`, a number or an array left by
+// hand or by another tool is a stale locator, never a crash.
+const sameLocation = (a: unknown, b: TokenHelperLocation): boolean => {
+  if (typeof a !== 'object' || a === null) return false;
+  const held = a as Partial<TokenHelperLocation>;
+  return held.execPath === b.execPath && held.entry === b.entry && held.version === b.version;
+};
 
 // Best effort: a home the helper cannot write to costs the locator, not the token.
 export const recordTokenHelperLocation = async (fs: FileSystem & AtomicFileWrites, path: string, location: TokenHelperLocation): Promise<void> => {
-  const current = await fs.readJson<Partial<TokenHelperLocation>>(path);
+  const current = await fs.readJson<unknown>(path);
   if (current.ok && sameLocation(current.value, location)) return;
   await fs.writeTextAtomic(path, JSON.stringify(location), 0o600);
 };

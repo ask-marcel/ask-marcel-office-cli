@@ -95,6 +95,31 @@ describe('the token helper entry', () => {
     expect(JSON.parse(fs.snapshot(LOCATOR) ?? '')).toMatchObject({ version: '2.9.0' });
   });
 
+  // A switch from node to bun, or a reinstall under another prefix, keeps the
+  // version: the locator must follow the runtime and the entry too.
+  it('rewrites the locator when the runtime or the install moved under the same version', async () => {
+    const fs = createFileSystemFake();
+    fs.seed(LOCATOR, JSON.stringify(LOCATION));
+    const bun = { ...LOCATION, execPath: '/usr/local/bin/bun' };
+    await run(['--tier', 'admin'], fs, { location: bun });
+    expect(JSON.parse(fs.snapshot(LOCATOR) ?? '')).toEqual(bun);
+    const moved = { ...bun, entry: '/elsewhere/dist/token.js' };
+    await run(['--tier', 'admin'], fs, { location: moved });
+    expect(JSON.parse(fs.snapshot(LOCATOR) ?? '')).toEqual(moved);
+  });
+
+  // The file is the user's to edit; whatever a hand or another tool left there,
+  // the helper overwrites it and answers.
+  it('overwrites a locator that is not a location, and still answers', async () => {
+    for (const stray of ['null', '[1]', '5', 'not json']) {
+      const fs = createFileSystemFake();
+      fs.seed(LOCATOR, stray);
+      const r = await run(['--tier', 'admin'], fs);
+      expect(onlyLine(r)).toMatchObject({ errorCode: 'invalid_arguments' });
+      expect(JSON.parse(fs.snapshot(LOCATOR) ?? '')).toEqual(LOCATION);
+    }
+  });
+
   it('still hands out the token when the locator cannot be written', async () => {
     const cached = graphToken('cached');
     const fs: FileSystemFake = {
