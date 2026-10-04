@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
+import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '../domain/access-token.ts';
 import { decodeJwtPayload, isTokenFresh } from '../domain/jwt-utils.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
@@ -342,7 +342,7 @@ const BASIC_TEAMS_APP_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
  * identity (IC3 messaging, Skype, Outlook). Only chatsvcagg is needed for
  * Phase C; the others are Phase D candidates.
  */
-const CHATSVCAGG_AUD = 'https://chatsvcagg.teams.microsoft.com';
+const CHATSVCAGG_AUD = SUBSTRATE_AUDIENCE.chatsvcagg;
 
 /**
  * Bearer audience Teams web uses for the IC3 (next-gen messaging)
@@ -351,7 +351,7 @@ const CHATSVCAGG_AUD = 'https://chatsvcagg.teams.microsoft.com';
  * bearer; only the audience differs. Empirically confirmed 2026-05-21
  * via Playwright bearer-trace.
  */
-const IC3_AUD = 'https://ic3.teams.office.com';
+const IC3_AUD = SUBSTRATE_AUDIENCE.ic3;
 
 /**
  * Fallback region used when no `/api/csa/<region>/` URL was observed

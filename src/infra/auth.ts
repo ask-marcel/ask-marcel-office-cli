@@ -1,5 +1,5 @@
 import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken, accessTokenUnsafe } from '../domain/access-token.ts';
+import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '../domain/access-token.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
@@ -223,8 +223,8 @@ const DEFAULT_CHATSVCAGG_REGION = 'emea';
 // Substrate resource audiences. The Teams web client (CLIENT_ID) is consented
 // for all three (it mints them in-browser), so the shared refresh_token
 // redeems for each by requesting `${resource}/.default` at the token endpoint.
-const CHATSVCAGG_RESOURCE = 'https://chatsvcagg.teams.microsoft.com';
-const IC3_RESOURCE = 'https://ic3.teams.office.com';
+const CHATSVCAGG_RESOURCE = SUBSTRATE_AUDIENCE.chatsvcagg;
+const IC3_RESOURCE = SUBSTRATE_AUDIENCE.ic3;
 
 // Decode the scopes granted to a cached token from its `scp` claim (space-separated).
 // Empty when the token is absent or carries no `scp` (decodeJwtPayload returns {} on
