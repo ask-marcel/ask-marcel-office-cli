@@ -188,7 +188,7 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-of
 claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
 ```
 
-Five gateway tools, not one per command (one schema per command would be ~190 per session, the
+Six gateway tools, not one per command (one schema per command would be ~190 per session, the
 bloat this CLI exists to avoid). Discovery is three hops:
 
 ```
@@ -197,6 +197,7 @@ get-command-docs { command: string }           → full docs for one command
 run-command { command, params?, outputPath?, outputDir? }        → the 208 READ commands
 run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
+status                                         → the four cached tokens (reads only the cache)
 ```
 
 `params` are the command's flags **without** the `--` prefix, keyed camelCase:
@@ -216,7 +217,7 @@ Notes:
   warm the persistent browser profile is), and the MCP default request timeout is **60 s** — so
   `login` times out intermittently at the default, right on the boundary. The server keeps running
   through a client-side timeout, so the sign-in has usually completed anyway: re-run your original
-  command, or check `scopes-check`, before calling `login` a second time.
+  command, or call the `status` tool, before calling `login` a second time.
 - **Log in from a terminal first** (`ask-marcel-office login`). A first-time MFA prompt adds minutes on top
   of the above. After that the `login` tool covers the hourly elevated-token refresh.
 - `logout` is deliberately CLI-only.

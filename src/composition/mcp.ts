@@ -1,7 +1,7 @@
 /*
  * The MCP gateway — `ask-marcel-office mcp`.
  *
- * Five tools, not 184. The registry already carries everything a tool manifest
+ * Six tools, not one per command. The registry already carries everything a tool manifest
  * needs, but exposing one MCP tool per command would inject hundreds of KB of
  * schema into every client session — the exact token bloat this CLI exists to
  * avoid. So discovery is three hops (list -> docs -> run) and the tool list is
@@ -20,7 +20,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import type { AuthManager } from '../infra/auth.ts';
+import type { AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
@@ -30,6 +30,7 @@ import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
+import * as status from '../use-cases/commands/status.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
 import { resolveDateZone } from './date-zone.ts';
@@ -40,7 +41,7 @@ const MCP_REMEDY = 'Call list-commands to see every command.';
 const PACKAGE_NAME = 'ask-marcel-office-cli';
 
 type BuildMcpServerDeps = {
-  readonly auth: AuthManager;
+  readonly auth: AuthLadder;
   readonly graph: GraphClient;
   readonly fs: FileSystem;
   readonly version?: string;
@@ -113,7 +114,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     {
       title: 'Get command docs',
       description:
-        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/update/docs/help-json/mcp).',
+        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/status/logout/docs/help-json/mcp).',
       inputSchema: {
         command: z.string().describe('Command name, e.g. `list-mail-messages`.'),
       },
@@ -211,7 +212,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
       const result = await login.execute(loginAuth, { force: force ?? false });
       if (!result.ok) return errText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
-      const info = await graph.getCachedTokenInfo();
+      const info = await loginAuth.getTokenInfo();
       if (!info.ok) return errText(info.error.message);
       return okText(
         renderToString(
@@ -223,6 +224,21 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
           'text'
         )
       );
+    }
+  );
+
+  server.registerTool(
+    'status',
+    {
+      title: 'Show the cached tokens',
+      description:
+        'Show the four cached tokens (basic, elevated, chatsvcagg and ic3). For each token, it shows if the token is available and the seconds before its expiry. It also shows the scopes, the refresh method, and the data that the token lets you read. It reads only the token cache, and it does not make a Graph call or open a browser. Call it before login. If the token that a command uses is available, a sign-in is not necessary.',
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async (): Promise<CallToolResult> => {
+      const result = await status.execute(auth);
+      if (!result.ok) return errText(result.error.message, result.error.code, 'cli');
+      return okText(renderToString(result.value, 'text'));
     }
   );
 

@@ -199,7 +199,7 @@ claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-ma
 
 > **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
 
-You get **five gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
+You get **six gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
 
 | Tool | Does |
 |:--|:--|
@@ -208,6 +208,7 @@ You get **five gateway tools**, not one per command — a schema per command wou
 | `run-command` | The 208 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
 | `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
+| `status` | Shows the four cached tokens: available or not, time left, scopes. Reads only the cache and never opens a browser. |
 
 **Sign in from a terminal first** — `npx -y ask-marcel-office-cli login`. Do this once before wiring up any client, and the reads just work.
 

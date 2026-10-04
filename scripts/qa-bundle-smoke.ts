@@ -158,7 +158,7 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   if (polluted.length > 0) return { ok: false, note: `STDOUT POLLUTED by ${polluted.length} non-JSON-RPC line(s): ${JSON.stringify(polluted[0]?.slice(0, 40))}` };
   const listReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { tools?: ReadonlyArray<{ name: string }> } }).find((m) => m.id === 2);
   const tools = listReply?.result?.tools ?? [];
-  if (tools.length !== 5) return { ok: false, note: `expected 5 gateway tools, got ${tools.length}` };
+  if (tools.length !== 6) return { ok: false, note: `expected 6 gateway tools, got ${tools.length}` };
   const callReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { isError?: boolean; content?: ReadonlyArray<{ text?: string }> } }).find((m) => m.id === 3);
   if (callReply?.result?.isError !== true || !(callReply.result.content?.[0]?.text ?? '').includes('Did you mean')) return { ok: false, note: 'tools/call on a mistyped command did not answer a did-you-mean tool error' };
   return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };
