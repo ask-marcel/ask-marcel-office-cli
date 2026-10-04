@@ -44,6 +44,7 @@ import '../src/infra/process-runner-node.ts';
 import '../src/infra/env-token-source.ts';
 import '../src/infra/token-helper-answer.ts';
 import '../src/infra/token-helper-locator.ts';
+import '../src/infra/token-helper-run.ts';
 
 import '../src/index.ts';
 
