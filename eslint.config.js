@@ -181,7 +181,9 @@ export default [
     // It never loads the CLI, winston, the update notifier, the renderer or,
     // statically, the browser; the browser ladder comes in by a dynamic import
     // only for a person at a terminal. Type imports are erased, so they stay
-    // allowed.
+    // allowed. src/token.ts is a bundle entry like src/main.ts, so it owns the
+    // one crash catch of its bundle (rule 17), and that catch prints only the
+    // error's type: a message can quote a token (LESSONS, 2026-10-04).
     files: ['src/token.ts', 'src/composition/token-helper.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

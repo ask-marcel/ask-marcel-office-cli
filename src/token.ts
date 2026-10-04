@@ -8,6 +8,8 @@ import { runTokenHelper } from './composition/token-helper.ts';
  * system and the token endpoint call, never the CLI (commander, winston, the
  * update notifier, the output renderer). It records itself as the helper on
  * every run. `ask-marcel-office token ...` reaches the same code through main.ts.
+ * As a bundle entry it owns its bundle's one crash catch, as main.ts does
+ * (rule 17; .claude/LESSONS.md, 2026-10-04).
  */
 try {
   process.exitCode = await runTokenHelper({
