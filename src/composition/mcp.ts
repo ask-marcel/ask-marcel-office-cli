@@ -113,7 +113,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     {
       title: 'Get command docs',
       description:
-        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/update/docs/help-json/mcp).',
+        'Full Markdown docs for ONE command: every option, its Graph endpoint, an example, and the response shape. Call this after list-commands and before run-command — it tells you exactly which params to pass. Also covers the lifecycle commands (login/logout/docs/help-json/mcp).',
       inputSchema: {
         command: z.string().describe('Command name, e.g. `list-mail-messages`.'),
       },

@@ -690,7 +690,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     expect(out).toBe('1\n2\n3\n');
   });
 
-  it('renders a single status record (login/logout/update success) as one key:value line', async () => {
+  it('renders a single status record (login/logout success) as one key:value line', async () => {
     const logger = createLoggerFake();
     const out = await captureStream('stdout', () => render({ status: 'authenticated' }, logger, 'text'));
     expect(out).toBe('status: authenticated\n');

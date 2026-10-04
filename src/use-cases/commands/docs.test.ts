@@ -284,13 +284,13 @@ describe('buildManifest — the conditional fields toEntry adds or omits', () =>
 });
 
 describe('lifecycle entries — the invariants the registry sweep never reaches', () => {
-  // login/logout/update/docs/help-json/mcp have no command file, so they are absent
+  // login/logout/docs/help-json/mcp have no command file, so they are absent
   // from the `commands` registry and skip every invariant meta.test.ts applies to
-  // the other 186. buildManifest merging them in is the only public route to them.
+  // the registered commands. buildManifest merging them in is the only public route to them.
   const lifecycle = buildManifest({}, 'fake-pkg', '0.0.1').commands;
   const byName = (name: string): CommandManifestEntry | undefined => lifecycle.find((c) => c.name === name);
 
-  it('exposes exactly the six lifecycle commands', () => {
+  it('exposes exactly the five lifecycle commands', () => {
     expect(lifecycle.map((c) => c.name)).toEqual([...LIFECYCLE_NAMES]);
   });
 
