@@ -6,6 +6,7 @@ import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
+import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
 import { REQUEST_TIMEOUT_MS } from './network-error.ts';
@@ -196,6 +197,13 @@ type AuthManager = {
  * error is always `auth_failed`.
  */
 type AuthLadder = AuthManager & TokenReport;
+
+/**
+ * The ladder as the `token` helper uses it: the manager, plus the token issuer
+ * port. Kept off `AuthLadder` so the fakes of the manager do not have to supply
+ * it.
+ */
+type TokenLadder = AuthLadder & TokenIssuer;
 
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const SCOPES = 'https://graph.microsoft.com/.default openid profile offline_access';
@@ -394,7 +402,7 @@ type AuthLadderDeps = {
 // The recovery ladder over the token cache: the cached token, a refresh-token
 // redemption, then a browser rung or a fail-fast "run login". Built by
 // auth-browser.ts, which owns the browser.
-const createAuthLadder = (deps: AuthLadderDeps): AuthLadder => {
+const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   const { cachePath, browserProfileDir, logger, fs } = deps;
   const secondaryTokenCommands = deps.secondaryTokenCommands ?? NO_SECONDARY_TOKEN_COMMANDS;
   const fetchFn = deps.fetchFn ?? globalThis.fetch;
@@ -952,6 +960,20 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthLadder => {
     return recapture();
   };
 
+  // A request climbs the ladder as a command would, with the browser rungs this
+  // ladder was built with. Where a browser may open, a person is at the
+  // terminal, so the elevated recapture waits for their sign-in.
+  const issueToken = (request: TokenRequest): Promise<Result<AccessToken, AuthError>> => {
+    if (request.tier === 'guest') return getGuestAccessToken(request.tenant);
+    if (request.tier === 'chatsvcagg') return getChatsvcaggAccessToken();
+    if (request.tier === 'ic3') return getIc3AccessToken();
+    if (request.tier === 'elevated') return getElevatedAccessToken({ awaitSignIn: true });
+    return getAccessToken();
+  };
+
+  // The region as the cache holds it: no token is fetched to refresh it.
+  const cachedRegion = async (): Promise<string> => (await readCache())?.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION;
+
   // Signing out holds the lock too, so the profile is never wiped under a
   // sign-in another process is running.
   const logout = async (): Promise<Result<void, AuthError>> => underLock('logout', async () => logoutHoldingLock());
@@ -1005,8 +1027,10 @@ const createAuthLadder = (deps: AuthLadderDeps): AuthLadder => {
     getCachedChatsvcaggInfo,
     getCachedIc3Info,
     getTokenInfo,
+    issueToken,
+    cachedRegion,
   };
 };
 
 export { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS };
-export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess };
+export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder };

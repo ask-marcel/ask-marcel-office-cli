@@ -5,7 +5,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
-import type { AuthError, AuthLadder, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess } from './auth.ts';
+import type { AuthError, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder } from './auth.ts';
 import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
 import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
@@ -318,7 +318,7 @@ const createAuthManagerFromApi = (
   // The machine-wide lock around every redemption, sign-in and sign-out.
   // Injectable so a test can stand in another process and a clock it controls.
   lock?: TokenCacheLock
-): AuthLadder =>
+): TokenLadder =>
   createAuthLadder({
     cachePath,
     browserProfileDir,
@@ -379,7 +379,7 @@ const createAuthManager = (deps: {
   recaptureElevatedViaBrowser?: boolean;
   // The seam a test uses to see how the browser is built; production uses Playwright.
   createBrowser?: typeof createBrowserAuth;
-}): AuthLadder => {
+}): TokenLadder => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
   // An agent, an MCP server or a piped run: no rung may open a browser, so none
