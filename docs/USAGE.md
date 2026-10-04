@@ -226,6 +226,37 @@ Notes:
   which maps to `run-command { "command": "next-page", "params": { "url": "..." } }`; and
   `--output-path` rejections name the CLI flag rather than the `outputPath` param.
 
+## Token helper (`ask-marcel-office token`)
+
+Hands one bearer to another process, as one JSON line on stdout. It is the helper the coming
+`@ask-marcel/office-read` and `-write` packages call (docs/plans/2026-10-01-package-split.md); it
+is not a command, so it is not in `help-json`, `docs` or the MCP tools.
+
+```bash
+ask-marcel-office token --tier <basic|elevated|chatsvcagg|ic3|guest> [--tenant <guid>] [--reject <fingerprint>]
+# the fast path: its own small entry, no CLI loaded
+node <install>/dist/token.js --tier basic
+```
+
+| Exit | stdout |
+|:--|:--|
+| 0 | `{"accessToken":"…","expiresOn":1760000000}` (`expiresOn` is the token's `exp`, seconds since the epoch); chatsvcagg and ic3 add `"region":"emea"` |
+| 1 | `{"errorCode":"…","tier":"basic","message":"…","remedy":"…"}`: `not_authenticated`, `secondary_token_unavailable`, `auth_cancelled`, `sign_in_in_progress` or `token_cache_unwritable` |
+| 2 | the same shape with `errorCode: "invalid_arguments"` and `tier: null` when no known tier was named |
+
+- `--tenant` goes with `guest` only, which needs it.
+- `--reject` replays a token a service refused with a 401: pass the SHA-256 of that token as 64
+  lowercase hex digits, never the token. If the cache still holds it, the refresh token is redeemed
+  for a new one; if the cache holds a newer token, that one comes back. A replay never opens a
+  browser; elevated, which has no refresh token, fails with `secondary_token_unavailable`.
+- A browser opens only for `basic` and `elevated`, and only when stdin is a terminal. Every other
+  call fails fast with the error line, so an agent or an MCP server is never left waiting.
+- The token is printed in the success line and nowhere else: messages never echo an argument, and
+  the helper writes no log.
+- Every run of the CLI or the helper keeps `~/.ask-marcel/token-helper.json` current
+  (`{ "execPath", "entry", "version" }`, mode `0600`, no secret; rewritten only when it
+  changes), so a caller can run `execPath entry --tier …` without PATH.
+
 ## Library API
 
 The package exports a typed library API for embedding inside your own CLI, agent, or MCP server.
@@ -288,6 +319,7 @@ as tool content.
 - **Scopes**: `https://graph.microsoft.com/.default openid profile offline_access`
 - **Token cache**: `~/.ask-marcel/token-cache.json`, written `0600` (overridable via `BuildDepsConfig.cachePath`)
 - **Browser profile**: `~/.ask-marcel/browser-profile` (overridable via `ASKMARCEL_BROWSER_PROFILE`)
+- **Token helper locator**: `~/.ask-marcel/token-helper.json`, where the `token` helper entry lives (no secret; see Token helper)
 - **Output**: YAML-ish text by default (LLM-readable, generally smaller than the JSON envelope on long listings, parity on small projected pages); compact JSON envelope via `--output json` for tool-chaining and `jq` pipelines
 
 ### Elevated token (historical-version downloads)

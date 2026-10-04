@@ -15,6 +15,27 @@ the scopes and the refresh method. It reads only the token cache. It does not
 make a Graph call, and it does not open a browser. The MCP server has a
 `status` tool with the same output, so the MCP server now has six tools.
 
+### Added: the `token` helper
+
+`ask-marcel-office token --tier <basic|elevated|chatsvcagg|ic3|guest>` gives
+one token to another process, as one JSON line on stdout:
+`{ accessToken, expiresOn, region? }`, or
+`{ errorCode, tier, message, remedy }` with exit code 1 (2 for wrong
+arguments). `--tenant <guid>` goes with the guest tier. `--reject
+<fingerprint>` (the SHA-256 of a token that a service refused) gets a newer
+token without a browser. The helper opens a browser only for the basic and
+elevated tokens, and only in a terminal. It is not a command, so it is not in
+`help-json`, in `docs` or in the MCP tools. The package also ships it as its
+own small entry, `dist/token.js`, which does not load the CLI.
+
+Each run of the CLI or of the helper writes
+`~/.ask-marcel/token-helper.json` when its content changes. The file tells
+where the helper is (`execPath`, `entry`, `version`) and holds no secret.
+
+In the library, the manager that `createAuthManager` returns also has
+`issueToken` and `cachedRegion`, and `BuiltDeps.fs` has the type
+`FileSystem & AtomicFileWrites`.
+
 ### Breaking: `scopes-check` is removed
 
 Use `status`. If you type `scopes-check`, the CLI tells you to use `status`.
