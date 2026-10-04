@@ -1,8 +1,14 @@
+import { homedir } from 'node:os';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import updateNotifier from 'update-notifier';
 import pkg from '../package.json' with { type: 'json' };
 import { buildDeps } from './composition/build-deps.ts';
+import type { BuiltDeps } from './composition/build-deps.ts';
 import { buildCli } from './composition/cli.ts';
+import { recordTokenHelperLocation, runTokenHelper, tokenHelperLocatorPath } from './composition/token-helper.ts';
 import { formatError } from './domain/utilities/format-error.ts';
+import { resolveAuthPaths } from './infra/auth-paths.ts';
 
 const ONE_WEEK_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -21,9 +27,26 @@ const ONE_WEEK_MS = 1000 * 60 * 60 * 24 * 7;
  */
 const isMcpInvocation = (argv: ReadonlyArray<string>): boolean => argv[2] === 'mcp';
 
+/*
+ * `ask-marcel-office token --tier <tier> ...` is the token helper, intercepted
+ * here like `mcp` and for the same stdout reason: its one JSON line is all it
+ * prints, so no update banner, no commander and no `help-json` entry. The fast
+ * path is its own entry, dist/token.js (src/token.ts), which sits next to this
+ * file in both the bundle and the source tree.
+ */
+const isTokenInvocation = (argv: ReadonlyArray<string>): boolean => argv[2] === 'token';
+
+const selfPath = fileURLToPath(import.meta.url);
+const TOKEN_HELPER = { execPath: process.execPath, entry: join(dirname(selfPath), `token${extname(selfPath)}`), version: pkg.version };
+
+// Every run records where the token helper lives, so read and write find it
+// after a plain `login` without PATH. Best effort: a failed write is ignored.
+const recordTokenHelper = (deps: BuiltDeps): Promise<void> => recordTokenHelperLocation(deps.fs, tokenHelperLocatorPath(resolveAuthPaths(homedir(), process.env)), TOKEN_HELPER);
+
 const serveMcp = async (): Promise<void> => {
   const [{ buildMcpServer }, { StdioServerTransport }] = await Promise.all([import('./composition/mcp.ts'), import('@modelcontextprotocol/sdk/server/stdio.js')]);
   const deps = buildDeps();
+  await recordTokenHelper(deps);
   const server = buildMcpServer({
     auth: deps.auth,
     graph: deps.graph,
@@ -37,12 +60,17 @@ const serveMcp = async (): Promise<void> => {
 };
 
 const main = async (): Promise<void> => {
+  if (isTokenInvocation(process.argv)) {
+    process.exitCode = await runTokenHelper({ argv: process.argv.slice(3), location: TOKEN_HELPER });
+    return;
+  }
   if (isMcpInvocation(process.argv)) {
     await serveMcp();
     return;
   }
   updateNotifier({ pkg: { name: pkg.name, version: pkg.version }, updateCheckInterval: ONE_WEEK_MS }).notify({ defer: false });
   const deps = buildDeps();
+  await recordTokenHelper(deps);
   const cli = buildCli({
     auth: deps.auth,
     graph: deps.graph,

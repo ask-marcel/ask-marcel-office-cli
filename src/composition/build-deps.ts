@@ -43,7 +43,14 @@ export type BuildDepsConfig = {
  */
 export type LoginAuthFactory = () => AuthLadder;
 
-export type BuiltDeps = Readonly<{ logger: Logger; auth: AuthLadder; graph: GraphClient; processRunner: ProcessRunner; fs: FileSystem; makeLoginAuth: LoginAuthFactory }>;
+export type BuiltDeps = Readonly<{
+  logger: Logger;
+  auth: AuthLadder;
+  graph: GraphClient;
+  processRunner: ProcessRunner;
+  fs: FileSystem & AtomicFileWrites;
+  makeLoginAuth: LoginAuthFactory;
+}>;
 
 // The secondary-token error messages name the commands that need each token.
 // Deriving the lists from the registry flags here (instead of hardcoding them

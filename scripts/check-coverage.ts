@@ -50,7 +50,7 @@ const COVERAGE_RULES: ReadonlyArray<Tier> = [
 
 const SKIPPED: ReadonlyArray<SkipRule> = [
   { name: 'test-helpers', match: (p) => p.startsWith('src/test-helpers/') },
-  { name: 'entry point', match: (p) => p === 'src/main.ts' },
+  { name: 'entry point', match: (p) => p === 'src/main.ts' || p === 'src/token.ts' },
   // production-wiring: a one-line dynamic-import boundary to the `playwright`
   // runtime dep. Cannot be unit-tested without launching a real browser.
   // Documented at the top of the file itself.
