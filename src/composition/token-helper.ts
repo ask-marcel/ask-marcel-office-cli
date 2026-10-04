@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { FetchFn, TokenLadder } from '../infra/auth.ts';
 import { createAuthLadder } from '../infra/auth.ts';
 import type { AuthPaths } from '../infra/auth-paths.ts';
+import type { createBrowserAuth } from '../infra/browser-auth.ts';
 import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
@@ -37,6 +38,8 @@ export type BrowserLadderOptions = {
   readonly logger: Logger;
   readonly fs: FileSystem & AtomicFileWrites;
   readonly tier: 'basic' | 'elevated';
+  // Production launches Playwright; a test records which capture was asked for.
+  readonly createBrowser?: typeof createBrowserAuth;
 };
 
 // `argv` is what follows the entry (or the `token` word). The rest default to
@@ -51,6 +54,7 @@ export type TokenHelperDeps = {
   readonly print?: (line: string) => void;
   readonly fetchFn?: FetchFn;
   readonly lock?: TokenCacheLock;
+  readonly createBrowser?: typeof createBrowserAuth;
   readonly browserLadder?: (options: BrowserLadderOptions) => Promise<TokenLadder>;
 };
 
@@ -86,12 +90,13 @@ export const tokenHelperLocatorPath = (paths: AuthPaths): string => join(dirname
 
 const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLadder> => {
   const { createAuthManager } = await import('../infra/auth-browser.ts');
-  const { cachePath, browserProfileDir, logger, fs, tier } = options;
+  const { cachePath, browserProfileDir, logger, fs, tier, createBrowser } = options;
   return createAuthManager({
     cachePath,
     browserProfileDir,
     logger,
     fs,
+    createBrowser,
     acquireBasicViaBrowser: tier === 'basic',
     recaptureElevatedViaBrowser: tier === 'elevated',
     recaptureSecondaryViaBrowser: false,
@@ -105,7 +110,8 @@ const issuerFor = async (deps: TokenHelperDeps, paths: AuthPaths, fs: FileSystem
   const base = { cachePath: paths.tokenCache, browserProfileDir: paths.browserProfile, logger: SILENT, fs };
   const { tier } = args.request;
   const interactive = deps.interactive ?? process.stdin.isTTY === true;
-  if (interactive && args.rejected === undefined && (tier === 'basic' || tier === 'elevated')) return (deps.browserLadder ?? loadBrowserLadder)({ ...base, tier });
+  if (interactive && args.rejected === undefined && (tier === 'basic' || tier === 'elevated'))
+    return (deps.browserLadder ?? loadBrowserLadder)({ ...base, tier, createBrowser: deps.createBrowser });
   return createAuthLadder({ ...base, interactive, fetchFn: deps.fetchFn, lock: deps.lock });
 };
 

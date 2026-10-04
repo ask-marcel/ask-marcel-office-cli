@@ -10,6 +10,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createAuthLadder } from '../infra/auth.ts';
 import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
+import type { BrowserAuth } from '../infra/browser-auth.ts';
 import type { BrowserLadderOptions, TokenHelperDeps } from './token-helper.ts';
 import { runTokenHelper } from './token-helper.ts';
 
@@ -17,6 +18,7 @@ const HOME = '/virtual/home';
 const CACHE = '/virtual/home/.ask-marcel/token-cache.json';
 const LOCATOR = '/virtual/home/.ask-marcel/token-helper.json';
 const LOCATION = { execPath: '/usr/local/bin/node', entry: '/opt/ask-marcel/dist/token.js', version: '2.8.0' };
+const ignore = (): void => undefined;
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
 
 const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(`${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify(claims))}.sig`);
@@ -184,6 +186,81 @@ describe('the token helper entry', () => {
     const exitCode = await runTokenHelper({ argv: ['--tier', 'elevated'], location: LOCATION, home: HOME, env: {}, interactive: true, fs, print: (line) => lines.push(line) });
     expect(exitCode).toBe(0);
     expect(JSON.parse(lines[0] ?? '')).toMatchObject({ accessToken: cached });
+  });
+
+  // A Playwright stand-in that records which capture the ladder asked for and
+  // finds no session, so nothing launches.
+  const recordingBrowser = (): { readonly create: () => BrowserAuth; readonly asked: unknown[] } => {
+    const asked: unknown[] = [];
+    const noSession = { ok: false, reason: 'sso_timeout' } as const;
+    const create = (): BrowserAuth => ({
+      acquireElevatedToken: async (options) => {
+        asked.push({ elevated: options });
+        return noSession;
+      },
+      acquireChatsvcaggToken: async () => {
+        asked.push('chatsvcagg');
+        return noSession;
+      },
+      acquireIc3Token: async () => {
+        asked.push('ic3');
+        return noSession;
+      },
+      acquireBothTokens: async () => {
+        asked.push('signIn');
+        return { teams: null, elevated: noSession, chatsvcagg: noSession, ic3: noSession };
+      },
+      close: async () => {},
+    });
+    return { create, asked };
+  };
+
+  it('in a terminal with no session, a basic request opens the sign-in and an elevated one waits for the elevated sign-in', async () => {
+    const browse = async (tier: string): Promise<unknown[]> => {
+      const browser = recordingBrowser();
+      await runTokenHelper({
+        argv: ['--tier', tier],
+        location: LOCATION,
+        home: HOME,
+        env: {},
+        interactive: true,
+        fs: createFileSystemFake(),
+        print: ignore,
+        createBrowser: browser.create,
+      });
+      return browser.asked;
+    };
+    const basic = await browse('basic');
+    expect(basic).toContain('signIn');
+    expect(basic).not.toContainEqual({ elevated: { awaitSignIn: true } });
+    const elevated = await browse('elevated');
+    expect(elevated).toContainEqual({ elevated: { awaitSignIn: true } });
+    expect(elevated).not.toContain('signIn');
+  });
+
+  // Unless told, the helper asks stdin: a terminal is a person, anything else
+  // (a pipe, a spawning MCP server) is not.
+  const withStdinTerminal = async <T>(isTTY: boolean, task: () => Promise<T>): Promise<T> => {
+    const original = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+    try {
+      return await task();
+    } finally {
+      if (original === undefined) Reflect.deleteProperty(process.stdin, 'isTTY');
+      else Object.defineProperty(process.stdin, 'isTTY', original);
+    }
+  };
+
+  it('opens no browser when stdin is not a terminal and nobody said otherwise', async () => {
+    const r = await withStdinTerminal(false, async () => run(['--tier', 'basic'], createFileSystemFake(), { interactive: undefined }));
+    expect(r.exitCode).toBe(1);
+    expect(onlyLine(r)).toMatchObject({ errorCode: 'not_authenticated', tier: 'basic' });
+    expect(r.browserLadders).toEqual([]);
+  });
+
+  it('builds the browser ladder when stdin is a terminal and nobody said otherwise', async () => {
+    const r = await withStdinTerminal(true, async () => run(['--tier', 'basic'], createFileSystemFake(), { interactive: undefined }));
+    expect(r.browserLadders).toEqual(['basic']);
   });
 
   // The defaults are this process's: the real file system (on a temporary home
