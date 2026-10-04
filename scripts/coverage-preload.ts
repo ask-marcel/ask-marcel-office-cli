@@ -50,6 +50,8 @@ import '../src/composition/cli.ts';
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively
 // imported by anything already listed here.
 import '../src/composition/mcp.ts';
+// The token helper is reached from main.ts and src/token.ts, which no test loads.
+import '../src/composition/token-helper.ts';
 
 import '../src/presenter/output.ts';
 
