@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01, not started.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-8 done (2026-10-04), steps 9-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 

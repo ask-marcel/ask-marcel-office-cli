@@ -167,26 +167,26 @@ Microsoft moves things. Each run, re-verify the full endpoint surface AND the kn
 | Archived sites | 423 `resourceLocked` on GET /sites/{id}; site-search probes & excludes | working 2026-06 |
 | Elevated-token capture (visible Edge, third-party-IdP-federated SSO) | headless refused; federated IdP needs the 5-min deadline | working 2026-05 |
 
-**E3 — Auth lifecycle.** `scopes-check` vs the scope map; expired-token behavior (clear re-login hint, no stack trace); `logout` → command → actionable "not logged in" error → `login` recovers.
+**E3 — Auth lifecycle.** `status` vs the scope map; expired-token behavior (clear re-login hint, no stack trace); `logout` → command → actionable "not logged in" error → `login` recovers.
 
-**E3b — `scopes-check` on a real TTY (added 2026-09-03).** Everything else in this playbook runs from a driver or a Bash tool, which has no TTY, and the auth layer branches on exactly that: `build-deps.ts` sets `interactive = process.stdin.isTTY`, and a non-TTY caller fails fast while a terminal user gets the interactive path (browser, and a session wipe when the persistent profile is already signed in). The 2026-08-31 audit passed E1 with `browserOpens=0` and still shipped a `scopes-check` that opened a browser in the user's terminal, because no check ever ran under a TTY. This one does, without touching the real cache or profile:
+**E3b — `status` on a real TTY (added 2026-09-03).** Everything else in this playbook runs from a driver or a Bash tool, which has no TTY, and the auth layer branches on exactly that: `build-deps.ts` sets `interactive = process.stdin.isTTY`, and a non-TTY caller fails fast while a terminal user gets the interactive path (browser, and a session wipe when the persistent profile is already signed in). The 2026-08-31 audit passed E1 with `browserOpens=0` and still shipped a `scopes-check` (now `status`) that opened a browser in the user's terminal, because no check ever ran under a TTY. This one does, without touching the real cache or profile:
 
 ```bash
 T=$(mktemp -d) && mkdir -p "$T/.ask-marcel"
 # 1. empty cache: must report not-signed-in and return within seconds, no browser
-HOME="$T" script -q /dev/null ask-marcel-office scopes-check --output json
+HOME="$T" script -q /dev/null ask-marcel-office status --output json
 # 2. expired cache (synthetic JWT, exp one hour ago): must decode it, expiresInSeconds < 0, no browser
 seg() { printf '%s' "$1" | base64 | tr '+/' '-_' | tr -d '=\n'; }
 PAST=$(( $(date +%s) - 3600 ))
 JWT="$(seg '{"alg":"none"}').$(seg "{\"scp\":\"Mail.Read\",\"aud\":\"https://graph.microsoft.com\",\"exp\":$PAST}").sig"
 printf '{"access_token":"%s","expires_on":%s,"refresh_token":"synthetic"}' "$JWT" "$PAST" > "$T/.ask-marcel/token-cache.json"
-HOME="$T" script -q /dev/null ask-marcel-office scopes-check --output json
+HOME="$T" script -q /dev/null ask-marcel-office status --output json
 ls "$T/.ask-marcel/"   # token-cache.json only: a browser launch would have created browser-profile/
 rm -rf "$T"
 ```
 
-`script -q /dev/null` allocates a pty, so `process.stdin.isTTY` is true inside the command; a temp `HOME` isolates both the token cache and the browser profile. Pass: case 1 is `ok:false` naming `login`; case 2 is `ok:true` with a negative `expiresInSeconds` and `basic.available: false`; no `browser-profile/` appears; neither case takes longer than a few seconds. Do NOT run a registry command this way unattended: those heal interactively by design and will launch a browser.
- Verify no command exceeds the Teams-token scope ceiling, and re-read the ceiling itself: run `scopes-check` and diff its `scopes` list against the last run, because the set Microsoft grants the Teams web client MOVES. 2026-09-09 it had gained `ChannelMessage.Read.All`, `TeamMember.ReadWrite.All`, `ChannelMember.ReadWrite.All` and `TeamsTab.ReadWrite.All` since the 2026-04 snapshot (the six `list-team-*` / `get-team-channel-message` commands ship on them, live-verified on three teams). Still absent, so commands needing them cannot ship: `Chat.Read*` (chat metadata stays elevated, chat content stays on the substrate), `Contacts.Read*`, `Mail.Read.Shared`, `Channel.Read.All`. A scope present in the JWT is not yet an access grant (the Outlook token carried `Mail.ReadWrite.Shared` and was refused): probe the endpoint before building on a new scope.
+`script -q /dev/null` allocates a pty, so `process.stdin.isTTY` is true inside the command; a temp `HOME` isolates both the token cache and the browser profile. Pass: case 1 is `ok:false` naming `login`; case 2 is `ok:true` with a negative `basic.expiresInSeconds` and `basic.available: false`; no `browser-profile/` appears; neither case takes longer than a few seconds. Do NOT run a registry command this way unattended: those heal interactively by design and will launch a browser.
+ Verify no command exceeds the Teams-token scope ceiling, and re-read the ceiling itself: run `status` and diff its `basic.scopes` list against the last run, because the set Microsoft grants the Teams web client MOVES. 2026-09-09 it had gained `ChannelMessage.Read.All`, `TeamMember.ReadWrite.All`, `ChannelMember.ReadWrite.All` and `TeamsTab.ReadWrite.All` since the 2026-04 snapshot (the six `list-team-*` / `get-team-channel-message` commands ship on them, live-verified on three teams). Still absent, so commands needing them cannot ship: `Chat.Read*` (chat metadata stays elevated, chat content stays on the substrate), `Contacts.Read*`, `Mail.Read.Shared`, `Channel.Read.All`. A scope present in the JWT is not yet an access grant (the Outlook token carried `Mail.ReadWrite.Shared` and was refused): probe the endpoint before building on a new scope.
 
 **E4 — Limits & failure modes.** One throttling observation if encountered (429 → message quality); one multi-MB attachment via `--output-path` (wall-clock + stdout size); folder-as-file, malformed id, foreign-tenant id → error quality.
 
