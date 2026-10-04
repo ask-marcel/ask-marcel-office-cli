@@ -175,9 +175,8 @@ type AuthManager = {
   getCachedElevatedInfo?: () => Promise<CachedTierInfo>;
   /**
    * Same decode-only preflight as `getCachedElevatedInfo`, for the chatsvcagg /
-   * ic3 Teams-chat substrate tokens. `login`'s four-token status and
-   * `scopes-check` read these; a minimal fake omits them and callers treat that
-   * as unavailable.
+   * ic3 Teams-chat substrate tokens. Only `getTokenInfo` in this file reads
+   * them now, and a later step removes them from this type.
    */
   getCachedChatsvcaggInfo?: () => Promise<CachedTierInfo>;
   getCachedIc3Info?: () => Promise<CachedTierInfo>;

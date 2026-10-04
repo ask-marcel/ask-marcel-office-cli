@@ -49,7 +49,8 @@ describe('getCachedBasicToken', () => {
 });
 
 // The chatsvcagg / ic3 substrate tokens share the same decode-only preflight
-// contract as elevated; `login`'s four-token status and `scopes-check` read them.
+// contract as elevated; the token report (`getTokenInfo`, behind `status` and the
+// login summary) reads them.
 const cachedChatsvcaggInfo = async (m: AuthManager): Promise<{ available: boolean; expiresInSeconds: number | undefined; scopes: ReadonlyArray<string> }> => {
   const read = m.getCachedChatsvcaggInfo;
   expect(read).toBeDefined();

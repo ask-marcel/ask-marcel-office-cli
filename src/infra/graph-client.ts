@@ -2,11 +2,9 @@ import type { AccessToken } from '../domain/access-token.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
-import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
-import type { TokenInfo, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { TokenError } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
@@ -128,24 +126,6 @@ type GraphClient = {
    */
   put: (basePath: string, body: Uint8Array, contentType?: string) => Promise<Result<unknown, GraphError>>;
   delete: (path: string) => Promise<Result<unknown, GraphError>>;
-  /**
-   * Decode the cached basic Teams token's JWT and return its scopes /
-   * audience / expiry. Used by the `scopes-check` self-test command so the
-   * LLM can predict `accessDenied` instead of discovering it on the next
-   * Graph call. No network IO — operates on the cached token only.
-   */
-  getCachedTokenInfo: () => Promise<Result<TokenInfo, GraphError>>;
-};
-
-// Recovery hints attached to an UNAVAILABLE tier so a bare `scopes: []` on a
-// missing token reads as "not captured yet", not "this token has no scopes".
-const TIER_REASON_INTERACTIVE =
-  'not cached (absent or expired) — run `ask-marcel-office login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
-const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `ask-marcel-office login --force`';
-
-const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {
-  if (info.available) return { ...info, refresh };
-  return { ...info, refresh, reason: refresh === 'interactive' ? TIER_REASON_INTERACTIVE : TIER_REASON_AUTOMATIC };
 };
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
@@ -722,48 +702,6 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     }
   };
 
-  // Decode-only: the basic tier is read off the cache when the manager can do
-  // that, never acquired. The acquiring getter would heal a dead session by
-  // opening a browser and wiping the persistent sign-in, which is the one thing
-  // a diagnostic must not do. A manager without the reader is a bring-your-own
-  // token one, whose `getAccessToken` is the caller's own function.
-  const basicTokenForInspection = async (): Promise<Result<AccessToken, GraphError>> => {
-    if (auth.getCachedBasicToken) {
-      const cached = await auth.getCachedBasicToken();
-      return cached === undefined ? err({ type: 'auth_failed', message: 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.' }) : ok(cached);
-    }
-    const tokenResult = await auth.getAccessToken();
-    if (tokenResult.ok) return tokenResult;
-    const msg = tokenResult.error.type === 'auth_cancelled' ? 'Auth cancelled' : tokenResult.error.message;
-    return err({ type: 'auth_failed', message: msg });
-  };
-
-  const getCachedTokenInfo = async (): Promise<Result<TokenInfo, GraphError>> => {
-    const tokenResult = await basicTokenForInspection();
-    if (!tokenResult.ok) return tokenResult;
-    const claims = decodeJwtPayload(tokenResult.value);
-    const scpRaw = claims['scp'];
-    const scopes = typeof scpRaw === 'string' ? scpRaw.split(' ').filter((s) => s.length > 0) : [];
-    const audRaw = claims['aud'];
-    const audience = typeof audRaw === 'string' ? audRaw : undefined;
-    const expRaw = claims['exp'];
-    const expiresAt = typeof expRaw === 'number' ? new Date(expRaw * 1000).toISOString() : undefined;
-    const expiresInSeconds = typeof expRaw === 'number' ? Math.floor(expRaw - Date.now() / 1000) : undefined;
-    // Decode-only elevated preflight: the real AuthManager reads its persisted
-    // elevated token; a minimal one omits the capability and we report unavailable.
-    const noTier = { available: false, expiresInSeconds: undefined, scopes: [] };
-    const elevatedInfo = auth.getCachedElevatedInfo ? await auth.getCachedElevatedInfo() : noTier;
-    const chatsvcaggInfo = auth.getCachedChatsvcaggInfo ? await auth.getCachedChatsvcaggInfo() : noTier;
-    const ic3Info = auth.getCachedIc3Info ? await auth.getCachedIc3Info() : noTier;
-    // The refresh route is a fixed per-tier property: the substrate + elevated tokens
-    // that self-heal from the shared RT are `automatic`; the elevated (M365) token has
-    // no refresh token of its own, so it is `interactive` (a browser login re-captures it).
-    const elevated = buildTier(elevatedInfo, 'interactive');
-    const chatsvcagg = buildTier(chatsvcaggInfo, 'automatic');
-    const ic3 = buildTier(ic3Info, 'automatic');
-    return ok({ scopes, audience, expiresAt, expiresInSeconds, elevated, chatsvcagg, ic3 });
-  };
-
   return {
     get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
     getElevated,
@@ -780,9 +718,8 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     fetchUrl,
     put,
     delete: deleteResource,
-    getCachedTokenInfo,
   };
 };
 
 export { createGraphClient };
-export type { FetchFn, GraphClient, GraphError, TokenInfo };
+export type { FetchFn, GraphClient, GraphError };
