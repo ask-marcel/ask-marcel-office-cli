@@ -4,6 +4,8 @@ import { decodeJwtPayload } from '../domain/jwt-utils.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
+import type { TokenFingerprint } from '../domain/token-fingerprint.ts';
+import { tokenFingerprint } from '../domain/token-fingerprint.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
@@ -570,13 +572,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
 
   // Waits its turn, then looks again: a redemption that ran meanwhile may have
   // saved a fresh token, and redeeming again would spend its rotated refresh
-  // token for nothing.
-  const refreshBasicInTurn = (): Promise<Result<AccessToken, AuthError>> =>
+  // token for nothing. That token is used unless it is the very one the caller
+  // found dead.
+  const refreshBasicInTurn = (dead?: string): Promise<Result<AccessToken, AuthError>> =>
     oneRedemptionAtATime(async () =>
       underLock('refresh', async () => {
         const latest = await readCache();
         const saved = accessToken(latest?.access_token ?? '');
-        if (saved.ok) {
+        if (saved.ok && saved.value !== dead) {
           logger.info('auth.ladder.rung', { rung: 'cache_after_wait' });
           return ok(saved.value);
         }
@@ -657,6 +660,13 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     if (!ic3Captured) await redeemMissedTier(IC3_RESOURCE, persistIc3, 'auth.ic3.login_rt_redeem', fresh);
   };
 
+  // The fail-fast errors of the three secondary tiers, where no rung is left.
+  const secondaryUnavailable = (token: string, commands: ReadonlyArray<string>, remedy: string): Result<never, AuthError> =>
+    err({ type: 'auth_failed', message: failFastSecondaryMessage(token, commands, remedy), code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
+  const elevatedUnavailable = (): Result<never, AuthError> => secondaryUnavailable('Elevated (M365)', secondaryTokenCommands.elevated, RECAPTURE_ELEVATED_VIA_LOGIN);
+  const chatsvcaggUnavailable = (): Result<never, AuthError> => secondaryUnavailable('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN);
+  const ic3Unavailable = (): Result<never, AuthError> => secondaryUnavailable('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN);
+
   // The rungs that need a browser, when this session may open one.
   const browser = deps.browserRungs?.({ underLock, persistTeams, persistElevated, persistChatsvcagg, persistIc3, redeemMissedSubstrateAtLogin });
 
@@ -731,11 +741,12 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   };
 
   // Runs in its turn, so it reads the cache again: a guest token or a rotated
-  // refresh token saved while it waited is the one to use.
-  const redeemGuestToken = async (tenant: TenantId): Promise<Result<AccessToken, AuthError>> => {
+  // refresh token saved while it waited is the one to use, unless it is the one
+  // the caller found dead.
+  const redeemGuestToken = async (tenant: TenantId, dead?: string): Promise<Result<AccessToken, AuthError>> => {
     const current = await readCache();
     const savedMeanwhile = freshGuestToken(current, tenant);
-    if (savedMeanwhile !== undefined) return ok(accessTokenUnsafe(savedMeanwhile));
+    if (savedMeanwhile !== undefined && savedMeanwhile !== dead) return ok(accessTokenUnsafe(savedMeanwhile));
     if (!current?.refresh_token) return noGuestCredentials(tenant);
     const redeemed = await redeemRefreshToken(current.refresh_token, tenant, SCOPES);
     if (!redeemed.ok) {
@@ -811,12 +822,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     }
     // Elevated absent, expired, or malformed; need to re-capture.
     const recapture = browser?.recaptureElevated;
-    if (!recapture)
-      return err({
-        type: 'auth_failed',
-        message: failFastSecondaryMessage('Elevated (M365)', secondaryTokenCommands.elevated, RECAPTURE_ELEVATED_VIA_LOGIN),
-        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
-      });
+    if (!recapture) return elevatedUnavailable();
     // Normally the persistent profile cookies do the silent SSO with no UI
     // prompt. When they have lapsed the tenant serves a sign-in form instead,
     // and `awaitSignIn` decides whether we wait for it to be filled in.
@@ -832,6 +838,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     if (Date.now() / 1000 >= cached.chatsvcagg_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
     return cached.chatsvcagg_access_token;
   };
+  const chatsvcaggTier: SubstrateTier = { fresh: freshChatsvcaggToken, resource: CHATSVCAGG_RESOURCE, persist: persistChatsvcagg, rung: 'auth.chatsvcagg.refresh' };
 
   // Decode-only preflight (mirrors getCachedElevatedInfo) so login's four-token
   // status reports the chatsvcagg substrate token without capturing or refreshing.
@@ -867,18 +874,11 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // fail-fast branch below, a manager that was ALLOWED a browser skipped the
     // refresh entirely and opened a window for a token an HTTP call could mint.
     if (cached?.refresh_token) {
-      const tier = { fresh: freshChatsvcaggToken, resource: CHATSVCAGG_RESOURCE, persist: persistChatsvcagg, rung: 'auth.chatsvcagg.refresh' };
-      const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
+      const refreshed = await refreshSubstrateInTurn(chatsvcaggTier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
       if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
     const recapture = browser?.recaptureChatsvcagg;
-    if (!recapture) {
-      return err({
-        type: 'auth_failed',
-        message: failFastSecondaryMessage('chatsvcagg (Teams chat)', secondaryTokenCommands.chatsvcagg, RECAPTURE_VIA_LOGIN),
-        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
-      });
-    }
+    if (!recapture) return chatsvcaggUnavailable();
     return recapture();
   };
 
@@ -901,6 +901,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     if (Date.now() / 1000 >= cached.ic3_expires_on - ELEVATED_BUFFER_SECONDS) return undefined;
     return cached.ic3_access_token;
   };
+  const ic3Tier: SubstrateTier = { fresh: freshIc3Token, resource: IC3_RESOURCE, persist: persistIc3, rung: 'auth.ic3.refresh' };
 
   // Decode-only preflight (mirrors getCachedElevatedInfo) for the ic3 substrate token.
   const getCachedIc3Info = async (): Promise<CachedTierInfo> => {
@@ -945,25 +946,71 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     }
     // Headless first, same reasoning as chatsvcagg above.
     if (cached?.refresh_token) {
-      const tier = { fresh: freshIc3Token, resource: IC3_RESOURCE, persist: persistIc3, rung: 'auth.ic3.refresh' };
-      const refreshed = await refreshSubstrateInTurn(tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
+      const refreshed = await refreshSubstrateInTurn(ic3Tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
       if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
     }
     const recapture = browser?.recaptureIc3;
-    if (!recapture) {
-      return err({
-        type: 'auth_failed',
-        message: failFastSecondaryMessage('ic3 (Teams chat history)', secondaryTokenCommands.ic3, RECAPTURE_VIA_LOGIN),
-        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
-      });
-    }
+    if (!recapture) return ic3Unavailable();
     return recapture();
   };
 
-  // A request climbs the ladder as a command would, with the browser rungs this
-  // ladder was built with. Where a browser may open, a person is at the
-  // terminal, so the elevated recapture waits for their sign-in.
-  const issueToken = (request: TokenRequest): Promise<Result<AccessToken, AuthError>> => {
+  // A replay: a service refused the token whose fingerprint the caller sends
+  // back. The cache's token is the answer when it is another one (a newer token
+  // saved since); otherwise the refresh token is redeemed past the refused one,
+  // in turn and under the lock, so a replay that waited uses the token the one
+  // before it saved. No replay reaches a browser.
+  const notRefused = async (token: string, refused: TokenFingerprint): Promise<boolean> => (await tokenFingerprint(token)) !== refused;
+  const notAuthenticated = (): Result<never, AuthError> => err({ type: 'auth_failed', message: NOT_AUTHENTICATED_MESSAGE, code: NOT_AUTHENTICATED_CODE });
+  // The redemption's own failure is reported when it must be; any other is the
+  // tier's fail-fast.
+  const orFailFast = (redeemed: Result<AccessToken, AuthError>, failFast: () => Result<never, AuthError>): Result<AccessToken, AuthError> =>
+    redeemed.ok || mustReportAsIs(redeemed) ? redeemed : failFast();
+
+  const replayBasic = async (refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    const cached = await readCache();
+    const current = accessToken(cached?.access_token ?? '');
+    if (current.ok && (await notRefused(current.value, refused))) return ok(current.value);
+    if (!cached?.refresh_token) return notAuthenticated();
+    return orFailFast(await refreshBasicInTurn(cached.access_token), notAuthenticated);
+  };
+
+  // Elevated carries no refresh token: past the refused one only a browser
+  // renews it.
+  const replayElevated = async (refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    const current = accessToken(freshElevatedToken(await readCache()) ?? '');
+    if (current.ok && (await notRefused(current.value, refused))) return ok(current.value);
+    return elevatedUnavailable();
+  };
+
+  const replaySubstrate = async (tier: SubstrateTier, failFast: () => Result<never, AuthError>, refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    const cached = await readCache();
+    const current = tier.fresh(cached);
+    if (current?.startsWith('eyJ') === true && (await notRefused(current, refused))) return ok(accessTokenUnsafe(current));
+    if (!cached?.refresh_token) return failFast();
+    return orFailFast(await refreshSubstrateInTurn(tier, current), failFast);
+  };
+
+  const replayGuest = async (tenant: TenantId, refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    const cached = await readCache();
+    const current = freshGuestToken(cached, tenant);
+    if (current !== undefined && (await notRefused(current, refused))) return ok(accessTokenUnsafe(current));
+    if (!cached?.refresh_token) return noGuestCredentials(tenant);
+    return oneRedemptionAtATime(async () => underLock('refresh', async () => redeemGuestToken(tenant, current)));
+  };
+
+  const replay = (request: TokenRequest, refused: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    if (request.tier === 'guest') return replayGuest(request.tenant, refused);
+    if (request.tier === 'chatsvcagg') return replaySubstrate(chatsvcaggTier, chatsvcaggUnavailable, refused);
+    if (request.tier === 'ic3') return replaySubstrate(ic3Tier, ic3Unavailable, refused);
+    if (request.tier === 'elevated') return replayElevated(refused);
+    return replayBasic(refused);
+  };
+
+  // A plain request climbs the ladder as a command would, with the browser
+  // rungs this ladder was built with. Where a browser may open, a person is at
+  // the terminal, so the elevated recapture waits for their sign-in.
+  const issueToken = (request: TokenRequest, rejected?: TokenFingerprint): Promise<Result<AccessToken, AuthError>> => {
+    if (rejected !== undefined) return replay(request, rejected);
     if (request.tier === 'guest') return getGuestAccessToken(request.tenant);
     if (request.tier === 'chatsvcagg') return getChatsvcaggAccessToken();
     if (request.tier === 'ic3') return getIc3AccessToken();

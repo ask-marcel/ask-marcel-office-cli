@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import type { AccessToken } from '../domain/access-token.ts';
 import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
+import { err, ok } from '../domain/result.ts';
 import { tenantIdUnsafe } from '../domain/tenant-id.ts';
+import { tokenFingerprint } from '../domain/token-fingerprint.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
@@ -121,5 +122,116 @@ describe('the token helper asks the ladder for a token', () => {
     expect(await ladderOn(cacheHolding({ chatsvcagg_region: 'amer' }), { fetchFn: endpoint }).cachedRegion()).toBe('amer');
     expect(await ladderOn(createFileSystemFake(), { fetchFn: endpoint }).cachedRegion()).toBe('emea');
     expect(endpoint.authorities).toEqual([]);
+  });
+});
+
+describe('the token helper replays a token a service refused', () => {
+  it('redeems the refresh token when the cache still holds the refused basic token, and never opens the browser', async () => {
+    const refused = graphToken('refused');
+    const fresh = graphToken('fresh');
+    const endpoint = tokenEndpoint([fresh]);
+    const browser = browserThatWouldSucceed();
+    const ladder = ladderOn(cacheHolding({ access_token: refused, expires_on: inAnHour() }), { fetchFn: endpoint, browserRungs: browser });
+    expect(await ladder.issueToken({ tier: 'basic' }, await tokenFingerprint(refused))).toEqual(ok(fresh));
+    expect(endpoint.authorities).toEqual(['common']);
+    expect(browser.opened).toEqual([]);
+  });
+
+  // Another process already replaced the refused token: that newer one is the
+  // answer, and the single-use refresh token is not spent again.
+  it('hands back the newer cached basic token when the cache no longer holds the refused one', async () => {
+    const newer = graphToken('newer');
+    const endpoint = tokenEndpoint([]);
+    const ladder = ladderOn(cacheHolding({ access_token: newer, expires_on: inAnHour() }), { fetchFn: endpoint });
+    expect(await ladder.issueToken({ tier: 'basic' }, await tokenFingerprint(graphToken('refused')))).toEqual(ok(newer));
+    expect(endpoint.authorities).toEqual([]);
+  });
+
+  it('redeems once when two replays of the same refused token run at once, and both get the new token', async () => {
+    const refused = graphToken('refused');
+    const fresh = graphToken('fresh');
+    const endpoint = tokenEndpoint([fresh, graphToken('second')]);
+    const ladder = ladderOn(cacheHolding({ access_token: refused, expires_on: inAnHour() }), { fetchFn: endpoint });
+    const fingerprint = await tokenFingerprint(refused);
+    const both = await Promise.all([ladder.issueToken({ tier: 'basic' }, fingerprint), ladder.issueToken({ tier: 'basic' }, fingerprint)]);
+    expect(both).toEqual([ok(fresh), ok(fresh)]);
+    expect(endpoint.authorities).toEqual(['common']);
+  });
+
+  it('reports not_authenticated, not a browser, when the basic redemption is refused or there is no refresh token', async () => {
+    const refused = graphToken('refused');
+    const browser = browserThatWouldSucceed();
+    const fingerprint = await tokenFingerprint(refused);
+    const rejectingAad = ladderOn(cacheHolding({ access_token: refused, expires_on: inAnHour() }), { fetchFn: tokenEndpoint([], 400), browserRungs: browser });
+    const noRefreshToken = ladderOn(cacheHolding({ access_token: refused, expires_on: inAnHour(), refresh_token: '' }), { browserRungs: browser });
+    for (const ladder of [rejectingAad, noRefreshToken]) {
+      const result = await ladder.issueToken({ tier: 'basic' }, fingerprint);
+      expect(result.ok ? undefined : result.error).toMatchObject({ type: 'auth_failed', code: 'not_authenticated' });
+    }
+    expect(browser.opened).toEqual([]);
+  });
+
+  it('reports another process holding the cache as it is, rather than as a missing sign-in', async () => {
+    const refused = graphToken('refused');
+    const busy: TokenCacheLock = { withLock: async () => err({ type: 'lock_busy', purpose: 'browser' }) };
+    const ladder = ladderOn(cacheHolding({ access_token: refused, expires_on: inAnHour() }), { lock: busy });
+    const result = await ladder.issueToken({ tier: 'basic' }, await tokenFingerprint(refused));
+    expect(result.ok ? undefined : result.error).toMatchObject({ code: 'sign_in_in_progress' });
+  });
+
+  // Elevated has no refresh token: past the refused one only a browser renews
+  // it, and a replay never opens one.
+  it('fails an elevated replay of the cached token without the browser, and hands back a newer elevated token', async () => {
+    const refused = graphToken('refused-elevated');
+    const browser = browserThatWouldSucceed();
+    const holdingRefused = ladderOn(cacheHolding({ elevated_access_token: refused, elevated_expires_on: inAnHour() }), { browserRungs: browser });
+    const result = await holdingRefused.issueToken({ tier: 'elevated' }, await tokenFingerprint(refused));
+    expect(result.ok ? undefined : result.error).toMatchObject({ type: 'auth_failed', code: 'secondary_token_unavailable' });
+    expect(browser.opened).toEqual([]);
+
+    const newer = graphToken('newer-elevated');
+    const holdingNewer = ladderOn(cacheHolding({ elevated_access_token: newer, elevated_expires_on: inAnHour() }), { browserRungs: browser });
+    expect(await holdingNewer.issueToken({ tier: 'elevated' }, await tokenFingerprint(refused))).toEqual(ok(newer));
+  });
+
+  it('redeems past a refused chat token, hands back a newer one, and fails without the browser when the redemption is refused', async () => {
+    const refused = chatToken('refused');
+    const minted = chatToken('minted');
+    const fingerprint = await tokenFingerprint(refused);
+    const browser = browserThatWouldSucceed();
+    const endpoint = tokenEndpoint([minted]);
+    const holdingRefused = ladderOn(cacheHolding({ chatsvcagg_access_token: refused, chatsvcagg_expires_on: inAnHour() }), { fetchFn: endpoint, browserRungs: browser });
+    expect(await holdingRefused.issueToken({ tier: 'chatsvcagg' }, fingerprint)).toEqual(ok(minted));
+    expect(endpoint.authorities).toEqual(['common']);
+
+    const newer = chatToken('newer');
+    const holdingNewer = ladderOn(cacheHolding({ ic3_access_token: newer, ic3_expires_on: inAnHour() }));
+    expect(await holdingNewer.issueToken({ tier: 'ic3' }, fingerprint)).toEqual(ok(newer));
+
+    const refusedRedemption = ladderOn(cacheHolding({ ic3_access_token: refused, ic3_expires_on: inAnHour() }), { fetchFn: tokenEndpoint([], 400), browserRungs: browser });
+    const failed = await refusedRedemption.issueToken({ tier: 'ic3' }, fingerprint);
+    expect(failed.ok ? undefined : failed.error).toMatchObject({ type: 'auth_failed', code: 'secondary_token_unavailable' });
+    const noRefreshToken = ladderOn(cacheHolding({ chatsvcagg_access_token: refused, chatsvcagg_expires_on: inAnHour(), refresh_token: '' }), { browserRungs: browser });
+    const unavailable = await noRefreshToken.issueToken({ tier: 'chatsvcagg' }, fingerprint);
+    expect(unavailable.ok ? undefined : unavailable.error).toMatchObject({ type: 'auth_failed', code: 'secondary_token_unavailable' });
+    expect(browser.opened).toEqual([]);
+  });
+
+  it('redeems a refused guest token against the partner tenant, and hands back a newer one', async () => {
+    const refused = graphToken('refused-guest');
+    const minted = graphToken('minted-guest');
+    const fingerprint = await tokenFingerprint(refused);
+    const endpoint = tokenEndpoint([minted]);
+    const holdingRefused = ladderOn(cacheHolding({ guest_tokens: { [PARTNER]: { access_token: refused, expires_on: inAnHour() } } }), { fetchFn: endpoint });
+    expect(await holdingRefused.issueToken({ tier: 'guest', tenant: PARTNER }, fingerprint)).toEqual(ok(minted));
+    expect(endpoint.authorities).toEqual([PARTNER]);
+
+    const newer = graphToken('newer-guest');
+    const holdingNewer = ladderOn(cacheHolding({ guest_tokens: { [PARTNER]: { access_token: newer, expires_on: inAnHour() } } }));
+    expect(await holdingNewer.issueToken({ tier: 'guest', tenant: PARTNER }, fingerprint)).toEqual(ok(newer));
+
+    const noRefreshToken = ladderOn(cacheHolding({ refresh_token: '' }));
+    const unavailable = await noRefreshToken.issueToken({ tier: 'guest', tenant: PARTNER }, fingerprint);
+    expect(unavailable.ok ? undefined : unavailable.error).toMatchObject({ type: 'auth_failed', code: 'secondary_token_unavailable' });
   });
 });
