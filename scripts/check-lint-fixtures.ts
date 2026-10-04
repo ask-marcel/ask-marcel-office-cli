@@ -38,12 +38,15 @@ const STDOUT_WRITE = "export const f = (): void => {\n  process.stdout.write('ba
 const NEEDLESS_ASSERTION = 'const n = 1;\nexport const f = (): number => n as number;\n';
 const STRING_REJECTION = "export const f = (): Promise<never> => Promise.reject('nope');\n";
 const BROWSER_IMPORT = "import { createBrowserAuth } from './browser-auth.ts';\nexport const f = (): unknown => createBrowserAuth;\n";
+const WINSTON_IMPORT = "import winston from 'winston';\nexport const f = (): unknown => winston;\n";
 
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'control: the CLI owns stdout', path: 'src/composition/cli.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
   { name: 'the auth ladder never loads the browser', path: 'src/infra/auth.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: the browser half of auth loads it', path: 'src/infra/auth-browser.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
+  { name: 'the token helper never loads winston', path: 'src/composition/token-helper.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'control: the logger adapter wraps winston', path: 'src/infra/logger.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'strict lint rejects a needless assertion', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true },
   { name: 'strict lint rejects a string rejection', path: 'src/domain/result.ts', source: STRING_REJECTION, rule: '@typescript-eslint/prefer-promise-reject-errors', fires: true, strict: true },
   { name: 'control: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false },

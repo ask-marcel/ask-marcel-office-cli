@@ -176,6 +176,30 @@ export default [
     },
   },
   {
+    // The `token` helper starts on its own entry (dist/token.js) and must stay
+    // near bare Node startup: read and write spawn it for every bearer they lack.
+    // It never loads the CLI, winston, the update notifier, the renderer or,
+    // statically, the browser; the browser ladder comes in by a dynamic import
+    // only for a person at a terminal. Type imports are erased, so they stay
+    // allowed.
+    files: ['src/token.ts', 'src/composition/token-helper.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex:
+                '^(commander|winston|update-notifier|playwright(-core)?)(/.*)?$|(^|/)(cli|build-deps|mcp|run-registry-command)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
+              allowTypeImports: true,
+              message: 'The token helper loads only the auth ladder, the file system and the token endpoint call; bring the browser in with a dynamic import, never the CLI.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];
