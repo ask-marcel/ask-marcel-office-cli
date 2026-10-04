@@ -338,7 +338,7 @@ describe('authenticating from an MCP client', () => {
     const client = await connect({ auth: fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message, code: 'not_authenticated' } }) }) });
     const result = await client.callTool({ name: 'status', arguments: {} });
     expect(isError(result)).toBe(true);
-    expect(textOf(result)).toBe(`error: ${message}\nsource: cli\n`);
+    expect(textOf(result)).toBe(`error: ${message}\ncode: not_authenticated\nsource: cli\n`);
   });
 
   it('reports the tokens that the sign-in just captured, read from the login-configured manager and not from the command-path one', async () => {

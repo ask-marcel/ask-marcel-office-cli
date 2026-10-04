@@ -36,6 +36,12 @@ In the library, the manager that `createAuthManager` returns also has
 `issueToken` and `cachedRegion`, and `BuiltDeps.fs` has the type
 `FileSystem & AtomicFileWrites`.
 
+### Changed: text errors give the error code
+
+A text error now has a `code:` line under the `error:` line when the error has
+a code. The JSON envelope gives the same value as `errorCode`. An MCP client
+reads text, so it can now see codes such as `not_authenticated`.
+
 ### Breaking: `scopes-check` is removed
 
 Use `status`. If you type `scopes-check`, the CLI tells you to use `status`.

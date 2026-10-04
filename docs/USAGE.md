@@ -54,6 +54,7 @@ from: bob@example.com
 
 $ ask-marcel-office get-mail-message --message-id "bad-id"
 error: ErrorInvalidIdMalformed: Id is malformed.
+code: ErrorInvalidIdMalformed
 hint: The ID you passed isn't valid for this endpoint. Source IDs from a sibling `list-*` command (e.g. `list-mail-messages`, `list-folder-files`, `list-chats`) — never construct them by hand.
 source: graph
 ```

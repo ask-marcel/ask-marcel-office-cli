@@ -189,20 +189,27 @@ describe('presenter output — JSON envelope (opt-in via --output json)', () => 
     const out = await captureStream('stdout', () => renderError('Some weird new Graph failure', 'text', 'WeirdNewCode', 'graph'));
     const lines = out.trim().split('\n');
     expect(lines[0]).toBe('error: Some weird new Graph failure');
-    expect(lines[1]).toBe('source: graph');
-    expect(lines.length).toBe(2);
+    expect(lines[1]).toBe('code: WeirdNewCode');
+    expect(lines[2]).toBe('source: graph');
+    expect(lines.length).toBe(3);
   });
 
   it('appends `hint:` and `source:` lines to text-mode errors so an LLM matching on `error:` still works but ALSO gets the remedy', async () => {
     const out = await captureStream('stdout', () => renderError('ErrorInvalidIdMalformed: Id is malformed.', 'text', 'ErrorInvalidIdMalformed'));
     const lines = out.trim().split('\n');
     expect(lines[0]).toBe('error: ErrorInvalidIdMalformed: Id is malformed.');
-    expect(lines[1]).toMatch(/^hint: The ID you passed isn't valid for this endpoint/);
-    expect(lines[2]).toBe('source: graph');
+    expect(lines[1]).toBe('code: ErrorInvalidIdMalformed');
+    expect(lines[2]).toMatch(/^hint: The ID you passed isn't valid for this endpoint/);
+    expect(lines[3]).toBe('source: graph');
   });
 
-  it('text-mode errors keep the single-line shape when nothing matches the hint table AND no explicit source was supplied (back-compat for the 3-arg form)', async () => {
-    const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'text', 'WeirdNewCode'));
+  it('text-mode errors give the `code:` line under the `error:` line, as the JSON envelope gives `errorCode`, so a client that reads text can branch on the code', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'text', 'not_authenticated'));
+    expect(out).toBe('error: Some weird new failure mode\ncode: not_authenticated\n');
+  });
+
+  it('text-mode errors keep the single-line shape when there is no code, no hint and no explicit source', async () => {
+    const out = await captureStream('stdout', () => renderError('Some weird new failure mode', 'text'));
     expect(out).toBe('error: Some weird new failure mode\n');
   });
 

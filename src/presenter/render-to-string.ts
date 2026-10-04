@@ -253,7 +253,10 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
     };
     return `${JSON.stringify(payload)}\n`;
   }
+  // `code:` gives the text reader the `errorCode` that the JSON envelope
+  // gives. Without it, an MCP client cannot see `not_authenticated`.
   const lines = [`error: ${message}`];
+  if (errorCode) lines.push(`code: ${errorCode}`);
   if (hint) lines.push(`hint: ${hint.hint}`);
   if (source) lines.push(`source: ${source}`);
   if (retryAfterSeconds !== undefined) lines.push(`retryAfter: ${retryAfterSeconds}s`);
