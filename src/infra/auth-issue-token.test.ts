@@ -207,6 +207,19 @@ describe('the token helper replays a token a service refused', () => {
     expect(await holdingNewer.issueToken({ tier: 'elevated' }, await tokenFingerprint(refused))).toEqual(ok(newer));
   });
 
+  // A cached chat token that is not a JWT is no bearer, whatever the refused
+  // one was: the replay redeems a new one rather than hand that string out.
+  it('redeems a chat token on a replay when the cached one is not a JWT', async () => {
+    const minted = chatToken('minted');
+    const fingerprint = await tokenFingerprint(chatToken('refused'));
+    for (const tier of ['chatsvcagg', 'ic3'] as const) {
+      const endpoint = tokenEndpoint([minted]);
+      const ladder = ladderOn(cacheHolding({ [`${tier}_access_token`]: 'opaque-not-a-jwt', [`${tier}_expires_on`]: inAnHour() }), { fetchFn: endpoint });
+      expect(await ladder.issueToken({ tier }, fingerprint)).toEqual(ok(minted));
+      expect(endpoint.authorities).toEqual(['common']);
+    }
+  });
+
   it('redeems past a refused chat token, hands back a newer one, and fails without the browser when the redemption is refused', async () => {
     const refused = chatToken('refused');
     const minted = chatToken('minted');
