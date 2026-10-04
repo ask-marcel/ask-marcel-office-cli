@@ -75,6 +75,17 @@ console.log(`bundle smoke: package root ${ROOT}, node ${runtimeVersion('node')},
 // probes run on a scratch home: a smoke run never repoints the user's own.
 const SMOKE_HOME = mkdtempSync(join(DIR, 'home-'));
 const SMOKE_ENV = { ...process.env, HOME: SMOKE_HOME, USERPROFILE: SMOKE_HOME };
+const homeEnv = (home: string): NodeJS.ProcessEnv => ({ ...process.env, HOME: home, USERPROFILE: home });
+
+// The locator that run left under `home` names this package's dist/token.js at
+// this version: every CLI command, the MCP server and the helper write it.
+const PACKAGE_VERSION = (JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { version?: string }).version;
+const recordsTokenHelper = (home: string): boolean => {
+  const path = join(home, '.ask-marcel', 'token-helper.json');
+  if (!existsSync(path)) return false;
+  const locator = JSON.parse(readFileSync(path, 'utf8')) as { entry?: string; version?: string };
+  return locator.entry === join(ROOT, 'dist/token.js') && locator.version === PACKAGE_VERSION;
+};
 
 // A probe passes only when its process ended by itself with the expected status:
 // a right answer from a process that then crashed, hung or exited non-zero is a failure.
@@ -141,9 +152,11 @@ const MCP_LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
 const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'run-command', arguments: { command: 'lsit-drives', params: {} } } };
 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
+  // A home of its own, so the locator check proves this server wrote it.
+  const home = mkdtempSync(join(DIR, 'home-'));
   const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
     cwd: ROOT,
-    env: SMOKE_ENV,
+    env: homeEnv(home),
     input: `${JSON.stringify(MCP_INIT)}\n${JSON.stringify(MCP_LIST)}\n${JSON.stringify(MCP_CALL)}\n`,
     timeout: PROBE_TIMEOUT_MS,
     maxBuffer: 64 * 1024 * 1024,
@@ -167,7 +180,8 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   if (tools.length !== 6) return { ok: false, note: `expected 6 gateway tools, got ${tools.length}` };
   const callReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { isError?: boolean; content?: ReadonlyArray<{ text?: string }> } }).find((m) => m.id === 3);
   if (callReply?.result?.isError !== true || !(callReply.result.content?.[0]?.text ?? '').includes('Did you mean')) return { ok: false, note: 'tools/call on a mistyped command did not answer a did-you-mean tool error' };
-  return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };
+  if (!recordsTokenHelper(home)) return { ok: false, note: 'the server did not record dist/token.js as the token helper' };
+  return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s), token helper recorded` };
 };
 
 /*
@@ -188,7 +202,7 @@ const tokenHome = (withToken: boolean): string => {
 };
 const runToken = (rt: string, args: ReadonlyArray<string>, home: string): { p: SpawnSyncReturns<Buffer>; ms: number } => {
   const started = performance.now();
-  const p = spawnSync(rt, args, { cwd: ROOT, env: { ...process.env, HOME: home, USERPROFILE: home }, stdio: ['ignore', 'pipe', 'pipe'], timeout: PROBE_TIMEOUT_MS });
+  const p = spawnSync(rt, args, { cwd: ROOT, env: homeEnv(home), stdio: ['ignore', 'pipe', 'pipe'], timeout: PROBE_TIMEOUT_MS });
   return { p, ms: Math.round(performance.now() - started) };
 };
 const oneLine = (p: SpawnSyncReturns<Buffer>): Record<string, unknown> | undefined => {
@@ -208,12 +222,20 @@ const probeToken = (rt: string): ReadonlyArray<[string, boolean, string]> => {
   const locator = JSON.parse(readFileSync(join(warm, '.ask-marcel', 'token-helper.json'), 'utf8')) as { entry?: string };
   const viaCli = runToken(rt, ['dist/cli.js', 'token', '--tier', 'basic'], warm);
   const cold = runToken(rt, ['dist/token.js', '--tier', 'basic'], tokenHome(false));
+  // main.ts on its own: a plain command, and `token` routed to the helper, each
+  // on a fresh home, so each locator is that run's.
+  const versionHome = tokenHome(false);
+  const version = runToken(rt, ['dist/cli.js', '--version'], versionHome);
+  const coldCliHome = tokenHome(false);
+  const coldCli = runToken(rt, ['dist/cli.js', 'token', '--tier', 'basic'], coldCliHome);
   return [
     ['dist/token.js is a node script without the CLI modules', bundle.startsWith('#!/usr/bin/env node') && heavy.length === 0, heavy.length === 0 ? 'clean' : `carries ${heavy.join(', ')}`],
     ['a cache hit prints the token line', exited(hit.p, 0) && hitLine?.accessToken === TOKEN_FIXTURE && hitLine.expiresOn === TOKEN_EXP, `${exitNote(hit.p)}, ${hit.ms} ms`],
     ['the locator names dist/token.js', locator.entry === join(ROOT, 'dist/token.js'), String(locator.entry)],
     ['cli.js token prints the same line', exited(viaCli.p, 0) && oneLine(viaCli.p)?.accessToken === TOKEN_FIXTURE, `${exitNote(viaCli.p)}, ${viaCli.ms} ms`],
     ['no session fails fast, no browser', exited(cold.p, 1) && oneLine(cold.p)?.errorCode === 'not_authenticated', `${exitNote(cold.p)}, ${cold.ms} ms`],
+    ['a plain command records dist/token.js', exited(version.p, 0) && recordsTokenHelper(versionHome), exitNote(version.p)],
+    ['cli.js token records dist/token.js', exited(coldCli.p, 1) && oneLine(coldCli.p)?.errorCode === 'not_authenticated' && recordsTokenHelper(coldCliHome), exitNote(coldCli.p)],
   ];
 };
 
