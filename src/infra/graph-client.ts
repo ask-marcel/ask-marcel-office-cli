@@ -3,6 +3,7 @@ import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
 import { decodeJwtPayload } from '../domain/jwt-utils.ts';
+import { teamsRegion } from '../domain/teams-region.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
@@ -364,6 +365,11 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}), ...retry };
 };
 
+// The cached region is pasted into every substrate URL; one that is not a region
+// name stops the request rather than steering it to another path.
+const INVALID_REGION_MESSAGE =
+  'The token cache names a Teams region that is not a region name, so no chat request was sent. Run `ask-marcel-office login --force` to capture the region again.';
+
 /**
  * Tag an api_error returned from a Microsoft-internal chat substrate
  * (chatsvcagg `/api/csa/<region>/...` or IC3 `/api/chatsvc/<region>/...`)
@@ -494,8 +500,9 @@ const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetc
     path: string,
     headersFor: (options?: { ignoreCache?: boolean }) => Promise<Result<{ Authorization: string }, GraphError>>
   ): Promise<Result<unknown, GraphError>> => {
-    const region = await auth.getChatsvcaggRegion();
-    const url = `https://teams.microsoft.com/api/${prefix}/${region}${path}`;
+    const region = teamsRegion(await auth.getChatsvcaggRegion());
+    if (!region.ok) return err({ type: 'auth_failed', message: INVALID_REGION_MESSAGE, code: region.error.type });
+    const url = `https://teams.microsoft.com/api/${prefix}/${region.value}${path}`;
     const send = async (ignoreCache: boolean): Promise<Result<Response, GraphError>> => {
       const headers = await headersFor(ignoreCache ? { ignoreCache: true } : undefined);
       if (!headers.ok) return headers;

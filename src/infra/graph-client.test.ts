@@ -1209,6 +1209,32 @@ describe('graph client', () => {
     expect(captured!.auth).toBe('Bearer test-chatsvcagg-token');
   });
 
+  it.each([{ region: '' }, { region: 'emea/x' }, { region: '../emea' }])(
+    'teamsChat sends nothing to a cached Teams region "$region", which is not a region name',
+    async ({ region }) => {
+      let requests = 0;
+      const fetchFn: FetchFn = async () => {
+        requests += 1;
+        return Response.json({});
+      };
+      const auth = fakeAuthManager({ getChatsvcaggRegion: async () => region, getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('chat-token')) });
+      const result = await createGraphClient(auth, fetchFn).teamsChat('/api/v2/users/me/chats');
+      expect(result).toMatchObject({ ok: false, error: { type: 'auth_failed', code: 'invalid_teams_region' } });
+      expect(requests).toBe(0);
+    }
+  );
+
+  it('teamsChat routes to the region the cache names, digits and hyphens included', async () => {
+    const urls: string[] = [];
+    const fetchFn: FetchFn = async (url) => {
+      urls.push(url);
+      return Response.json({});
+    };
+    const auth = fakeAuthManager({ getChatsvcaggRegion: async () => 'emea-02', getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('chat-token')) });
+    await createGraphClient(auth, fetchFn).teamsChat('/api/v2/users/me/chats');
+    expect(urls).toEqual(['https://teams.microsoft.com/api/csa/emea-02/api/v2/users/me/chats']);
+  });
+
   // A substrate token can be REVOKED server-side while still inside its expiry
   // window — a second sign-in invalidates the previous session's tokens, and
   // nothing in the cache records that. The tier keeps reporting available, every
