@@ -265,6 +265,32 @@ node <install>/dist/token.js --tier basic
   (`{ "execPath", "entry", "version" }`, mode `0600`, no secret; rewritten only when it
   changes), so a caller can run `execPath entry --tier …` without PATH.
 
+### Signing commands through the helper (`ASKMARCEL_TOKEN_COMMAND`)
+
+By default the CLI and the MCP server read the token cache in process. When `ASKMARCEL_TOKEN_COMMAND`
+names a token helper (an absolute path, for example `<install>/dist/token.js`), they get every
+bearer the way `@ask-marcel/office-read` and `-write` will:
+
+1. A tier variable, when it is set: `ASKMARCEL_TOKEN_BASIC`, `ASKMARCEL_TOKEN_ELEVATED`,
+   `ASKMARCEL_TOKEN_CHATSVCAGG` or `ASKMARCEL_TOKEN_IC3`, with `ASKMARCEL_TEAMS_REGION` beside a
+   chat token. The token is checked each time it is used: three base64url segments and nothing
+   else, then its expiry and audience. A token that fails gives `env_token_invalid`, which names the
+   variable and never its value. The helper is then not asked, and a chat token the service refuses
+   with a 401 is not replayed. Guest tokens have no variable.
+2. The helper, run as `<helper> --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`, never
+   through a shell. stdin goes to it only from a terminal, where it may wait up to 13 minutes (a held
+   lock plus a browser sign-in); otherwise it has 90 seconds. One run serves every concurrent call
+   for a tier (and tenant), and its token is kept in memory for 5 minutes at most, never closer than
+   5 minutes to its expiry. A failure gives the helper's exit code, the length of its stdout and its
+   `errorCode`, never what it printed; a helper that cannot be started gives
+   `token_helper_unavailable`.
+
+The read and write packages will also find a helper with no variable: through
+`~/.ask-marcel/token-helper.json`, then `ask-marcel-office-auth` on PATH (on Windows, an npm `.cmd`
+shim is read for its script, which runs with the current runtime). The source that does this is
+`createEnvThenHelperTokenSource` in `src/composition/token-source.ts`; the library does not export it
+yet.
+
 ## Library API
 
 The package exports a typed library API for embedding inside your own CLI, agent, or MCP server.
@@ -347,6 +373,8 @@ Environment variables read at composition time:
 | `ASKMARCEL_BROWSER_PROFILE` | Override Playwright user-data-dir | _(none)_ |
 | `ASKMARCEL_BINARY_TIMEOUT_MS` | Wall-clock budget for one binary download (a file's bytes, a PDF conversion) in milliseconds; a 90 MB deck on a slow link needs more than the default | `300000` (5 min) |
 | `ASKMARCEL_TZ` | IANA time zone in which named days and boundaries resolve (`today`, `yesterday`, `monday`, `start-of-week`); `--tz <zone>` on any command overrides it for one run | _(the machine's zone)_ |
+| `ASKMARCEL_TOKEN_COMMAND` | Absolute path of a token helper; when set, commands get their bearers from the tier variables, then that helper, instead of the token cache (see Token helper) | _(none: the token cache)_ |
+| `ASKMARCEL_TOKEN_BASIC` / `_ELEVATED` / `_CHATSVCAGG` / `_IC3`, `ASKMARCEL_TEAMS_REGION` | A tier's token (and the chat tiers' region), read only when `ASKMARCEL_TOKEN_COMMAND` is set | _(none)_ |
 
 `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy` are stripped from the process environment immediately before launching Playwright (see `src/infra/browser-auth.ts`).
 

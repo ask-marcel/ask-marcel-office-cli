@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-9 done (2026-10-04), steps 10-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-10 done (2026-10-04), steps 11-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -183,6 +183,38 @@ For a tier (basic, elevated, chatsvcagg, ic3, or guest for one partner tenant):
   after logout or an account switch.
 - Helper failures are reported with the exit code, the stdout byte length and the helper's own
   `errorCode` only; raw stdout is never echoed into an error, a log or an MCP result.
+
+As built in step 10 (`src/infra/env-token-source.ts`, `helper-token-source.ts` (memory and
+single-flight), `token-helper-run.ts` (one spawn), `token-helper-answer.ts`,
+`token-helper-locator.ts`, composed in `src/composition/token-source.ts`):
+
+- The single package selects this source only when `ASKMARCEL_TOKEN_COMMAND` is set; otherwise the
+  in-process ladder signs, as before.
+- `TokenSource.substrateRegion` takes the tier, so the region and the token of one chat request come
+  from one helper answer (one spawn). The region is checked (`teamsRegion`) where a URL takes it,
+  because the Teams media read uses the ic3 token with no region.
+- An env token, and a token in a helper answer, must be three base64url segments and nothing
+  else. A value that decodes but holds a line break or a space is refused as not a JWT, because the
+  runtime would refuse it as a header value and quote it whole in its error.
+- A chat tier whose token variable is set takes its region from `ASKMARCEL_TEAMS_REGION` only, and
+  fails with `env_token_invalid` without it. A 401 on an env chat token fails with
+  `env_token_invalid` (the service refused it) instead of a replay.
+- Deadlines: 13 minutes from a terminal (the 7-minute interactive lock wait plus a browser sign-in),
+  90 seconds otherwise (the 20 s unattended lock wait plus one 60 s token request). stdout cap:
+  64 KiB. Reuse margin: 5 minutes before `expiresOn`, the ladder's own freshness buffer; a token
+  with `expiresOn` 0 is used once and not kept.
+- A run that times out, is killed or prints too much gets its tier's code; a helper that cannot be
+  started gets `token_helper_unavailable`. An `errorCode` outside the protocol's list is not
+  repeated. Concurrent replays of one refused token share one `--reject` run. A replay never joins
+  a plain run in flight, and a plain run that a replay started after does not write its answer to
+  memory, so the refused token is not handed out again.
+- Off Windows, the PATH step names `ask-marcel-office-auth token` and lets the system search PATH.
+  On Windows the PATHEXT search runs a `.exe`/`.com` as it is and a `.cmd`/`.bat` npm shim's script
+  with the caller's own runtime (`process.execPath`). A locator file whose entry or runtime is
+  gone is passed over.
+- Not built in step 10: the basic and guest 401 replay (the two **new** rows of the table below).
+  `TokenSource.graphToken` and `guestToken` take no `rejected` option yet, so only the chat tiers
+  replay. Step 12 owns it. The phase 1 exit smoke does not force a 401, so it does not cover it.
 
 ### Per-tier policy (unchanged from today unless marked)
 
@@ -388,7 +420,10 @@ releasable and keeps the in-process token path as its default):
     the CHANGELOG as an intended behaviour change); `graph-scopes.ts` dissolved; `qa-live-sweep`
     allow-list.
 12. `ReadGraph` / `WriteGraph` factories; each command typed against the narrower one; empty-body
-    handling; registry test; bundle check; the graph fake split in two.
+    handling; registry test; bundle check; the graph fake split in two. The basic and guest 401
+    replay of the per-tier table (only on `InvalidAuthenticationToken` / `TokenExpired`, never on
+    `invalidAudienceUri`): `graphToken` and `guestToken` take a `rejected` option, as
+    `substrateToken` does since step 10.
 13. Registry and lifecycle injection: the CLI builder, MCP builder, `run-registry-command`,
     `buildManifest`, `gen-docs` and `check-doc-numbers` take `{ registry, lifecycle, binName,
     packageName }`; no module-level registry constants; an ESLint `no-restricted-imports` rule bars

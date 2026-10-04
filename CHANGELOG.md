@@ -36,6 +36,15 @@ In the library, the manager that `createAuthManager` returns also has
 `issueToken` and `cachedRegion`, and `BuiltDeps.fs` has the type
 `FileSystem & AtomicFileWrites`.
 
+### Added: commands can get their tokens from the helper
+
+When `ASKMARCEL_TOKEN_COMMAND` names a token helper, the CLI and the MCP server
+get each token from a tier variable (`ASKMARCEL_TOKEN_BASIC`, `_ELEVATED`,
+`_CHATSVCAGG`, `_IC3`, with `ASKMARCEL_TEAMS_REGION`) or, when that variable is
+not set, from the helper. This is how the read and write packages will get
+tokens. Without the variable, nothing changes: the token cache is read in
+process. New error codes: `env_token_invalid` and `token_helper_unavailable`.
+
 ### Changed: text errors give the error code
 
 A text error now has a `code:` line under the `error:` line when the error has
