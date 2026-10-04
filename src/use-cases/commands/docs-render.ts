@@ -121,7 +121,7 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
     const tagged = entry.scopesRequired.map((s) => `\`${s}\``).join(', ');
-    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel-office scopes-check\` to verify before invoking.`);
+    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel-office status\` to verify before invoking.`);
   }
   if (entry.needsElevatedToken) {
     lines.push(

@@ -95,7 +95,7 @@ type CommandMeta = {
   readonly paginationStrategy?: PaginationStrategy;
   /**
    * Graph permission scopes the endpoint requires. The basic Teams web-client
-   * token grants ~30 scopes (run `ask-marcel-office scopes-check` to see). Commands
+   * token grants ~30 scopes (run `ask-marcel-office status` to see). Commands
    * with unmet scopes return `403 Forbidden: Missing scope` at the wire. Use
    * this for pre-flight checks rather than failing on-the-wire. Optional —
    * populated only on commands where the audit confirmed a scope-failure

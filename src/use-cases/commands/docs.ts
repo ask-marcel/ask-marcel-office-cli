@@ -81,7 +81,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'login',
     summary:
-      "Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). On success reports which of the four tokens are currently available and points to `scopes-check` for each token's scopes + expiry; pass --force to re-capture every token via the browser in one pass. Run before any Graph command.",
+      "Authenticate against Microsoft Graph using the Teams web client (cached token → refresh → browser fallback). Stores tokens at ~/.ask-marcel/token-cache.json (0600). On success reports which of the four tokens are currently available and points to `status` for each token's scopes + expiry; pass --force to re-capture every token via the browser in one pass. Run before any Graph command.",
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) browser-OAuth via Teams web client; not a Graph endpoint',
@@ -97,7 +97,7 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     ],
     example: 'ask-marcel-office login --force',
     responseShape:
-      '{ status: "authenticated", available: string[], unlocked: Record<string,string>, missing: Record<string,string>, hint } on success. `available` lists the token tiers currently cached and fresh — always "basic", plus "elevated" / "chatsvcagg" / "ic3" when present. `unlocked` maps each AVAILABLE tier to a plain-language description of what it lets you read (e.g. `chatsvcagg` -> "Teams chat message content"), so a caller need not know what a tier codename means. `missing` maps each ABSENT tier the same way, with the re-capture remedy appended — an empty object means every tier was captured. `login` redeems the shared refresh token for the two SUBSTRATE tiers (chatsvcagg / ic3) before reporting, so finding them in `missing` means that headless attempt failed, not that nothing was tried; the elevated tier is browser-only and is re-captured by the sign-in itself. Read `missing` to learn what a partial login costs BEFORE a command fails for it. `hint` points to `scopes-check` (each token\'s scopes + expiry) and `login --force` (refresh). The detailed per-token status lives in `scopes-check`, not here. Envelope error on cancel/failure.',
+      '{ status: "authenticated", available: string[], unlocked: Record<string,string>, missing: Record<string,string>, hint } on success. `available` lists the token tiers currently cached and fresh — always "basic", plus "elevated" / "chatsvcagg" / "ic3" when present. `unlocked` maps each AVAILABLE tier to a plain-language description of what it lets you read (e.g. `chatsvcagg` -> "Teams chat message content"), so a caller need not know what a tier codename means. `missing` maps each ABSENT tier the same way, with the re-capture remedy appended — an empty object means every tier was captured. `login` redeems the shared refresh token for the two SUBSTRATE tiers (chatsvcagg / ic3) before reporting, so finding them in `missing` means that headless attempt failed, not that nothing was tried; the elevated tier is browser-only and is re-captured by the sign-in itself. Read `missing` to learn what a partial login costs BEFORE a command fails for it. `hint` points to `status` (each token\'s scopes + expiry) and `login --force` (refresh). The detailed per-token status lives in `status`, not here. Envelope error on cancel/failure.',
   },
   {
     name: 'logout',

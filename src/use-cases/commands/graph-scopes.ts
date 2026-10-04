@@ -22,7 +22,7 @@
  * Surface: this map is read by `docs.ts toEntry` at manifest-render time
  * and merged into each command's `scopesRequired`. Per-command inline
  * `meta.scopesRequired` takes precedence (so command files can override).
- * An LLM uses this with `scopes-check` to predict 403s pre-flight.
+ * An LLM uses this with `status` to predict 403s pre-flight.
  *
  * Lifecycle / meta commands intentionally absent (empty array would imply
  * "no scope needed" which is true for them but also true of `update`,
@@ -172,7 +172,7 @@ const GRAPH_SCOPES_BY_COMMAND: Readonly<Record<string, ReadonlyArray<string>>> =
   'list-group-threads': ['Group.Read.All'],
   // Posts: Graph's least-privileged delegated scope is `Group-Conversation.Read.All`,
   // which neither token carries. `Group.Read.All` is the documented higher-privileged
-  // alternative and the one the basic token holds, so it is what scopes-check predicts on.
+  // alternative and the one the basic token holds, so it is the scope that a `status` preflight compares against.
   'list-group-thread-posts': ['Group.Read.All'],
   'get-group-post': ['Group.Read.All'],
   'convert-group-post-to-markdown': ['Group.Read.All'],
