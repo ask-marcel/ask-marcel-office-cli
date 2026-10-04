@@ -1,6 +1,6 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
-import { didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
+import { commandSuggestion, didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
 import type { AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
@@ -109,7 +109,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
     if (err.code === 'commander.missingMandatoryOptionValue') return typoedFlagHint(optionFlags, typed);
     const command = /^error: unknown command '([^']+)'/.exec(err.message)?.[1];
     if (command !== undefined)
-      return didYouMean(
+      return commandSuggestion(
         command,
         program.commands.map((c) => c.name())
       );
