@@ -2,6 +2,39 @@
 
 All notable changes to `ask-marcel-office-cli` are documented here.
 
+## Unreleased
+
+These changes come from phase 1 of the package split
+(`docs/plans/2026-10-01-package-split.md`).
+
+### Added: `status` shows the cached tokens
+
+`status` shows the four cached tokens: basic, elevated, chatsvcagg and ic3. For
+each token, it shows if the token is available, the seconds before its expiry,
+the scopes and the refresh method. It reads only the token cache. It does not
+make a Graph call, and it does not open a browser. The MCP server has a
+`status` tool with the same output, so the MCP server now has six tools.
+
+### Breaking: `scopes-check` is removed
+
+Use `status`. If you type `scopes-check`, the CLI tells you to use `status`.
+The error hints and the auth remedies now name `status`.
+
+### Breaking: `update` is removed
+
+Upgrade with `npm i -g ask-marcel-office-cli@latest`, or with `bun add -g` and
+the same package name. The passive update notice stays.
+
+### Breaking: library API
+
+- `GraphClient.getCachedTokenInfo` is removed. The token report is now
+  `getTokenInfo` on the auth manager that `createAuthManager` returns. The
+  public `AuthManager` type does not include it, so a bring-your-own-token
+  manager needs only the token getters.
+- `ProcessRunner.runInherit` is removed. `run(cmd, args, options)` replaces it.
+  It has a deadline and a limit on stdout size, and it returns the captured
+  stdout. A process that a signal stops is a failure.
+
 ## 2.8.0
 
 ### Added: what changed in a file, as a line diff
