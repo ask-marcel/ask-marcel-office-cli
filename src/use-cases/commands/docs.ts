@@ -112,9 +112,22 @@ const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
     responseShape: '{ status: "logged_out" } on success.',
   },
   {
+    name: 'status',
+    summary:
+      'Show the four cached tokens (basic, elevated, chatsvcagg and ic3). For each token, the report shows if the token is available and the seconds before its expiry. It also shows the scopes, the refresh method, and the data that the token lets you read. The command reads only the token cache, and it does not make a Graph call or open a browser. Before a long run that no person watches, compare the `scopesRequired` of a command (in `help-json`) with the `scopes` of the token that the command uses. If you are not signed in, the error code is `not_authenticated`.',
+    category: 'lifecycle',
+    graphMethod: 'GET',
+    graphPathTemplate: '(lifecycle) decodes the cached tokens; not a Graph endpoint',
+    graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/permissions-reference',
+    options: [],
+    example: 'ask-marcel-office status',
+    responseShape:
+      '`{ basic: TokenTier, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }`, where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: "automatic" | "interactive", reads: string, reason?: string }` and `hint` tells how to refresh the tokens. `available` is true only when the token is in the cache and the time before its expiry is more than 5 minutes (300 seconds). `expiresInSeconds` is negative after the expiry, and the key is not there when the cache has no token. `scopes` comes from the `scp` claim of that token, and `reads` gives the data that the token lets you read. `refresh` is `automatic` when the shared refresh token can refresh the token, and `interactive` for the elevated token, which only `login` can capture again. `reason` is there only when `available` is false, and it tells why the token is not available and how to get it again.',
+  },
+  {
     name: 'docs',
     summary:
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/logout/docs) prints the same --help that command would.',
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/status/logout/docs) prints the same --help that command would.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',

@@ -1,7 +1,7 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
 import { didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
-import type { AuthManager } from '../infra/auth.ts';
+import type { AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
@@ -14,6 +14,7 @@ import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
+import * as status from '../use-cases/commands/status.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
@@ -24,7 +25,7 @@ import type { Logger } from '../use-cases/ports/logger.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
 
 type BuildCliDeps = {
-  readonly auth: AuthManager;
+  readonly auth: AuthLadder;
   readonly graph: GraphClient;
   readonly logger: Logger;
   readonly fs: FileSystem;
@@ -391,7 +392,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       // Slim confirmation: which tokens are available now, and where to look next.
       // The decode-only read never opens a browser. Full per-token scopes + expiry
       // live in `scopes-check`; login just points there (and to `login --force`).
-      const info = await graph.getCachedTokenInfo();
+      const info = await loginAuth.getTokenInfo();
       if (!info.ok) {
         fail(info.error.message);
         return;
@@ -419,6 +420,21 @@ const buildCli = (deps: BuildCliDeps): Command => {
     ].join('\n  ')
   );
 
+  const statusCmd = program
+    .command('status')
+    .description(
+      'Show the four cached tokens (basic, elevated, chatsvcagg and ic3). For each token, it shows if the token is available and the seconds before its expiry. It also shows the scopes, the refresh method, and the data that the token lets you read. It reads only the token cache, and it does not make a Graph call or open a browser.'
+    )
+    .action(async () => {
+      const result = await status.execute(auth);
+      if (result.ok) renderOut(result.value);
+      else fail(result.error.message, result.error.code, 'cli');
+    });
+  statusCmd.addHelpText(
+    'after',
+    ['', 'Example:       ask-marcel-office status', 'Not signed in: the error code is `not_authenticated`. Run `ask-marcel-office login` first.'].join('\n  ')
+  );
+
   const logoutCmd = program
     .command('logout')
     .description('Clear the cached Microsoft Graph token so the next command forces a fresh sign-in.')
@@ -441,7 +457,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
   const docsCmd = program
     .command('docs')
     .description(
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/logout/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/status/logout/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
     )
     .argument('<command>', 'Command name to show docs for (run `ask-marcel-office --help` to list every command).')
     .action(async (commandName: string) => {
