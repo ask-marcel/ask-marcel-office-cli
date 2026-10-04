@@ -65,7 +65,9 @@ const execute = async (issuer: TokenIssuer, args: TokenArgs): Promise<Result<Tok
   if (!issued.ok) return err(failureLine(tier, issued.error));
   const line = { accessToken: issued.value, expiresOn: expiresOn(issued.value) };
   if (tier !== 'chatsvcagg' && tier !== 'ic3') return ok(line);
-  const region = teamsRegion(await issuer.cachedRegion());
+  const cached = await issuer.cachedRegion();
+  if (!cached.ok) return err(failureLine(tier, cached.error));
+  const region = teamsRegion(cached.value);
   if (!region.ok) return err({ errorCode: 'secondary_token_unavailable', tier, message: INVALID_REGION_MESSAGE, remedy: INVALID_REGION_REMEDY });
   return ok({ ...line, region: region.value });
 };

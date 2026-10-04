@@ -117,11 +117,24 @@ describe('the token helper asks the ladder for a token', () => {
     expect(browser.elevatedOptions).toEqual([{ awaitSignIn: true }]);
   });
 
-  it('reads the Teams region from the cache, and the default region when none is cached, without fetching', async () => {
+  it('reads the Teams region from the cache, and the default region when the cache names none, without fetching', async () => {
     const endpoint = tokenEndpoint([]);
-    expect(await ladderOn(cacheHolding({ chatsvcagg_region: 'amer' }), { fetchFn: endpoint }).cachedRegion()).toBe('amer');
-    expect(await ladderOn(createFileSystemFake(), { fetchFn: endpoint }).cachedRegion()).toBe('emea');
+    expect(await ladderOn(cacheHolding({ chatsvcagg_region: 'amer' }), { fetchFn: endpoint }).cachedRegion()).toEqual(ok('amer'));
+    expect(await ladderOn(cacheHolding({}), { fetchFn: endpoint }).cachedRegion()).toEqual(ok('emea'));
     expect(endpoint.authorities).toEqual([]);
+  });
+
+  // The region is read after the token was issued. A cache gone by then (a
+  // logout in between) or unreadable gives no region, never the default.
+  it('reports a token cache that is gone or unreadable as no region', async () => {
+    const unreadable = createFileSystemFake();
+    unreadable.seed(CACHE_PATH, 'not json');
+    const holdingNull = createFileSystemFake();
+    holdingNull.seed(CACHE_PATH, 'null');
+    for (const fs of [createFileSystemFake(), unreadable, holdingNull]) {
+      const region = await ladderOn(fs).cachedRegion();
+      expect(region.ok ? undefined : region.error).toMatchObject({ type: 'auth_failed', code: 'secondary_token_unavailable' });
+    }
   });
 });
 

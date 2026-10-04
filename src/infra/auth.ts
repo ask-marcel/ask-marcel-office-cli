@@ -306,6 +306,7 @@ const RECAPTURE_ELEVATED_VIA_LOGIN =
 // substring-matching the human message. The message names which token, which
 // commands, and the tier-specific remedy.
 const SECONDARY_TOKEN_UNAVAILABLE_CODE = 'secondary_token_unavailable';
+const REGION_UNREADABLE_MESSAGE = 'The token cache could not be read for the Teams region, so no token was handed out.';
 
 // Machine-readable code + message for the BASIC-token fail-fast on the command
 // path. When the cached basic token is absent/expired AND its refresh fails, the
@@ -1018,8 +1019,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     return getAccessToken();
   };
 
-  // The region as the cache holds it: no token is fetched to refresh it.
-  const cachedRegion = async (): Promise<string> => (await readCache())?.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION;
+  // The region as the cache holds it: no token is fetched to refresh it. The
+  // default stands in only for a cache that names none; a cache gone since the
+  // token was issued, or unreadable, gives no region.
+  const cachedRegion = async (): Promise<Result<string, AuthError>> => {
+    const cached = await fs.readJson<Partial<CachedToken> | null>(cachePath);
+    if (!cached.ok || cached.value === null) return err({ type: 'auth_failed', message: REGION_UNREADABLE_MESSAGE, code: SECONDARY_TOKEN_UNAVAILABLE_CODE });
+    return ok(cached.value.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION);
+  };
 
   // Signing out holds the lock too, so the profile is never wiped under a
   // sign-in another process is running.

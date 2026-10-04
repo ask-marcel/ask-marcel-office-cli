@@ -18,7 +18,10 @@ const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(
 const TOKEN = jwt({ exp: EXP, aud: 'https://graph.microsoft.com' });
 
 // A hand-written issuer: answers what the test says and records what it was asked.
-const fakeIssuer = (answer: Result<AccessToken, TokenError>, region = 'emea'): TokenIssuer & { readonly asked: Array<{ request: TokenRequest; rejected?: TokenFingerprint }> } => {
+const fakeIssuer = (
+  answer: Result<AccessToken, TokenError>,
+  region: string | Result<string, TokenError> = 'emea'
+): TokenIssuer & { readonly asked: Array<{ request: TokenRequest; rejected?: TokenFingerprint }> } => {
   const asked: Array<{ request: TokenRequest; rejected?: TokenFingerprint }> = [];
   return {
     asked,
@@ -26,7 +29,7 @@ const fakeIssuer = (answer: Result<AccessToken, TokenError>, region = 'emea'): T
       asked.push(rejected === undefined ? { request } : { request, rejected });
       return answer;
     },
-    cachedRegion: async () => region,
+    cachedRegion: async () => (typeof region === 'string' ? ok(region) : region),
   };
 };
 
@@ -65,6 +68,15 @@ describe('token helper: the line it prints', () => {
     expect(line).toMatchObject({ errorCode: 'secondary_token_unavailable', tier: 'ic3', message: expect.stringContaining('not a region name') });
     expect(JSON.stringify(line)).not.toContain(TOKEN);
     expect((line as { remedy: string }).remedy).toContain('ask-marcel-office login --force');
+  });
+
+  // The region is read after the token is issued; a cache gone or unreadable
+  // by then (a logout in between) must not turn into the default region.
+  it('fails a chat token whose region cannot be read back, rather than hand it out with a guessed region', async () => {
+    const unreadable = err({ type: 'auth_failed', message: 'The token cache could not be read for the Teams region.', code: 'secondary_token_unavailable' } as const);
+    const line = await issue(['--tier', 'chatsvcagg'], fakeIssuer(ok(TOKEN), unreadable));
+    expect(line).toMatchObject({ errorCode: 'secondary_token_unavailable', tier: 'chatsvcagg', message: 'The token cache could not be read for the Teams region.' });
+    expect(JSON.stringify(line)).not.toContain(TOKEN);
   });
 
   it('reports a missing sign-in as not_authenticated, with the remedy naming login and status', async () => {

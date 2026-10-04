@@ -18,8 +18,8 @@ type TokenIssuer = {
   // redeems the refresh token, or fails.
   readonly issueToken: (request: TokenRequest, rejected?: TokenFingerprint) => Promise<Result<AccessToken, TokenError>>;
   // The Teams region segment as the token cache holds it, unchecked. It fetches
-  // no token.
-  readonly cachedRegion: () => Promise<string>;
+  // no token. A cache that cannot be read gives no region, never a default.
+  readonly cachedRegion: () => Promise<Result<string, TokenError>>;
 };
 
 export type { TokenIssuer, TokenRequest, TokenTier };
