@@ -57,6 +57,7 @@ import '../src/composition/cli.ts';
 import '../src/composition/mcp.ts';
 // The token helper is reached from main.ts and src/token.ts, which no test loads.
 import '../src/composition/token-helper.ts';
+import '../src/composition/token-source.ts';
 
 import '../src/presenter/output.ts';
 

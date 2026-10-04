@@ -7,13 +7,14 @@ import type { CommandMeta } from '../use-cases/commands/command-types.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '../infra/filesystem-node.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
-import { createGraphClient } from '../infra/graph-client.ts';
+import { createGraphClient, createTokenSourceGraphClient } from '../infra/graph-client.ts';
 import { createWinstonLogger } from '../infra/logger.ts';
 import { createBunProcessRunner } from '../infra/process-runner-bun.ts';
 import { createNodeProcessRunner } from '../infra/process-runner-node.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
+import { createEnvThenHelperTokenSource } from './token-source.ts';
 
 export type BuildDepsConfig = {
   readonly logLevel?: string;
@@ -74,7 +75,9 @@ const defaultFileSystem = (): FileSystem & AtomicFileWrites => (typeof globalThi
 const defaultProcessRunner = (): ProcessRunner => (typeof globalThis.Bun !== 'undefined' ? createBunProcessRunner() : createNodeProcessRunner());
 
 export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
-  const paths = resolveAuthPaths(config.home ?? homedir(), config.env ?? process.env);
+  const home = config.home ?? homedir();
+  const env = config.env ?? process.env;
+  const paths = resolveAuthPaths(home, env);
   const cachePath = config.cachePath ?? paths.tokenCache;
   const browserProfileDir = paths.browserProfile;
   const logLevel = config.logLevel ?? process.env.ASKMARCEL_LOG_LEVEL ?? 'error';
@@ -108,7 +111,12 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
     acquireBasicViaBrowser: interactive,
     secondaryTokenCommands,
   });
-  const graph = createGraphClient(auth);
+  // The in-process ladder signs by default. Naming a token helper in
+  // ASKMARCEL_TOKEN_COMMAND switches to the package split's source (tier
+  // variables, then that helper), the way read and write will get tokens.
+  const graph = env['ASKMARCEL_TOKEN_COMMAND']
+    ? createTokenSourceGraphClient(createEnvThenHelperTokenSource({ env, home, fs, runner: processRunner, interactive }))
+    : createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, browserProfileDir, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };
 };
