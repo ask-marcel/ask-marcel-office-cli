@@ -116,6 +116,34 @@ describe('token helper: the line it prints', () => {
     });
   });
 
+  // A caller pastes the remedy in front of a person, who may not know which
+  // program to run: every remedy names the bin and the command that checks.
+  it('names ask-marcel-office and its status command in the remedy of every failure', async () => {
+    const remedies: string[] = [];
+    const remedyOf = async (argv: ReadonlyArray<string>, issuer: TokenIssuer): Promise<void> => {
+      remedies.push(((await issue(argv, issuer)) as { remedy: string }).remedy);
+    };
+    const tiers = [
+      ['--tier', 'basic'],
+      ['--tier', 'elevated'],
+      ['--tier', 'chatsvcagg'],
+      ['--tier', 'ic3'],
+      ['--tier', 'guest', '--tenant', GUID],
+    ];
+    for (const argv of tiers) {
+      for (const code of ['not_authenticated', 'secondary_token_unavailable', 'sign_in_in_progress', 'token_cache_unwritable', undefined]) {
+        await remedyOf(argv, fakeIssuer(err({ type: 'auth_failed', message: 'm', code })));
+      }
+      await remedyOf(argv, fakeIssuer(err({ type: 'auth_cancelled' })));
+    }
+    await remedyOf(['--tier', 'ic3'], fakeIssuer(ok(TOKEN), 'emea/../admin'));
+    expect(remedies).toHaveLength(31);
+    for (const remedy of remedies) {
+      expect(remedy).toContain('`ask-marcel-office');
+      expect(remedy).toContain('ask-marcel-office status');
+    }
+  });
+
   it('tells each failure what to do next', async () => {
     const remedyOf = async (argv: ReadonlyArray<string>, code: string): Promise<string> =>
       ((await issue(argv, fakeIssuer(err({ type: 'auth_failed', message: 'm', code })))) as { remedy: string }).remedy;

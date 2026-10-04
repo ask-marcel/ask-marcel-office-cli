@@ -21,7 +21,8 @@ const FLAGS: ReadonlyArray<Flag> = ['--tier', '--tenant', '--reject'];
 const FLAGS_MESSAGE = 'The token helper takes --tier, --tenant and --reject, each at most once and each followed by its value.';
 const TIER_MESSAGE = `--tier must be one of: ${TIERS.join(', ')}.`;
 const REJECT_MESSAGE = '--reject must be the fingerprint of the refused token: its SHA-256 as 64 lowercase hex digits.';
-const USAGE_REMEDY = 'Call it as `token --tier <basic|elevated|chatsvcagg|ic3|guest> [--tenant <guid>] [--reject <fingerprint>]`; --tenant goes with the guest tier only.';
+const USAGE_REMEDY =
+  'Call it as `ask-marcel-office token --tier <basic|elevated|chatsvcagg|ic3|guest> [--tenant <guid>] [--reject <fingerprint>]`; --tenant goes with the guest tier only.';
 
 const invalid = (message: string, tier: TokenTier | null): Result<never, TokenFailureLine> => err({ errorCode: 'invalid_arguments', tier, message, remedy: USAGE_REMEDY });
 

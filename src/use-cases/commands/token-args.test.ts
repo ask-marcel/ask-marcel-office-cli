@@ -37,6 +37,12 @@ describe('token helper: what a caller asks for', () => {
     expect(line.remedy).toContain('--tier');
   });
 
+  it('names the program to call in the remedy of every refusal', () => {
+    for (const argv of [[], ['--tier', 'guest'], ['--tier', 'basic', '--reject', 'x']]) {
+      expect(refused(argv).remedy).toContain('`ask-marcel-office token --tier');
+    }
+  });
+
   it('refuses a tier it does not know without echoing it', () => {
     const line = refused(['--tier', 'admin-secret']);
     expect(line.errorCode).toBe('invalid_arguments');
