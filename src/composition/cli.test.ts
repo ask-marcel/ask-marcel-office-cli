@@ -84,7 +84,7 @@ describe('buildCli command surface', () => {
     const parsed = JSON.parse(out) as { data: { status: string; available: string[]; hint: string } };
     expect(parsed.data.status).toBe('authenticated');
     expect(parsed.data.available).toEqual(['basic', 'chatsvcagg', 'ic3']); // sampleTokenInfo has elevated unavailable → omitted
-    expect(parsed.data.hint).toContain('scopes-check');
+    expect(parsed.data.hint).toContain('ask-marcel-office status');
     expect(parsed.data.hint).toContain('login --force');
   });
 
@@ -115,7 +115,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ auth: authWithTokenInfo(sampleTokenInfo()), graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toContain('status: authenticated');
-    expect(out).toContain('scopes-check');
+    expect(out).toContain('ask-marcel-office status');
     expect(out).toContain('login --force');
   });
 

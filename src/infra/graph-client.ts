@@ -262,13 +262,13 @@ const looksEmpty = (s: string | undefined): boolean => s === undefined || s.trim
 // caller's entire granted-scope list (~30 scopes, 700+ chars) into the error
 // message. The trailing "Scopes on the request 'X,Y,Z,...'" is noise — the
 // LLM only needs the *required* scope name(s) to know what's missing.
-// Strip the granted-list suffix and replace with a pointer at scopes-check.
+// Strip the granted-list suffix and replace with a pointer at status.
 const SCOPE_DUMP_PATTERN = /^(.*Missing scope permissions[^.]*\.\s*API requires one of '[^']+'\.)\s*Scopes on the request '[^']*'.*$/i;
 
 const truncateScopeDump = (message: string): string => {
   const match = SCOPE_DUMP_PATTERN.exec(message);
   if (match === null) return message;
-  return `${match[1]} Run \`ask-marcel-office scopes-check\` to see granted scopes, or \`ask-marcel-office help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
+  return `${match[1]} Run \`ask-marcel-office status\` to see granted scopes, or \`ask-marcel-office help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
 };
 
 // HTTP/2 servers (chatsvcagg, Kestrel-fronted Teams substrates) routinely

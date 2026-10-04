@@ -123,7 +123,7 @@ describe('graph client', () => {
     if (!result.ok && result.error.type === 'api_error') {
       expect(result.error.message).toContain("API requires one of 'Chat.ReadBasic, Chat.Read, Chat.ReadWrite'");
       expect(result.error.message).not.toContain('User.Read,Mail.Read');
-      expect(result.error.message).toContain('scopes-check');
+      expect(result.error.message).toContain('ask-marcel-office status');
     }
   });
 

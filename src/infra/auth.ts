@@ -219,7 +219,7 @@ const IC3_RESOURCE = 'https://ic3.teams.office.com';
 
 // Decode the scopes granted to a cached token from its `scp` claim (space-separated).
 // Empty when the token is absent or carries no `scp` (decodeJwtPayload returns {} on
-// any malformed input). Used by the per-tier preflight getters so scopes-check can
+// any malformed input). Used by the per-tier preflight getters so status can
 // list what each token can actually do.
 const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
   if (!token) return [];
@@ -259,12 +259,12 @@ const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: Tok
  * once demanded `--force`. `login.execute` closed that loop: the login command
  * now inspects the cached elevated token and self-escalates to the forced
  * browser re-capture when it is missing, so a plain `login` recovers elevated
- * too. The remedy points there, and the message names `scopes-check` for
+ * too. The remedy points there, and the message names `status` for
  * preflight so an unattended agent can re-auth up front rather than discover the
  * lapse mid-run.
  */
 const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>, remedy: string): string =>
-  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office scopes-check\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
+  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office status\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
 
 /**
  * Command names quoted in the secondary-token error messages, per token kind.
@@ -348,7 +348,7 @@ const sameAccount = (cachedAccess: string | undefined, access: string): boolean 
   return typeof before['oid'] === 'string' && before['oid'] === after['oid'] && typeof before['tid'] === 'string' && before['tid'] === after['tid'];
 };
 const NOT_AUTHENTICATED_MESSAGE =
-  'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office scopes-check` (no Graph call).';
+  'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office status` (no Graph call).';
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 

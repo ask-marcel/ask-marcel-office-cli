@@ -255,8 +255,8 @@ describe('auth manager recovery ladder', () => {
   // the shared refresh token and self-heal headlessly. Elevated has no refresh
   // token of its own, but `login.execute` self-escalates to the browser
   // re-capture when it is missing, so a plain `login` recovers it too — no
-  // `--force` needed. Every fail-fast also names `scopes-check` for preflight.
-  it('points every secondary tier at a plain login (never --force), the elevated message flagging its no-refresh-token nature and every message naming scopes-check', async () => {
+  // `--force` needed. Every fail-fast also names `status` for preflight.
+  it('points every secondary tier at a plain login (never --force), the elevated message flagging its no-refresh-token nature and every message naming status', async () => {
     const fs = createFileSystemFake();
     const tok = futureElevated();
     const browser = fakeBrowserAuth({ elevatedResult: tok, chatsvcaggResult: tok, ic3Result: tok });
@@ -270,7 +270,7 @@ describe('auth manager recovery ladder', () => {
     expect(elevated.error.message).toContain('ask-marcel-office login');
     expect(elevated.error.message).not.toContain('--force');
     expect(elevated.error.message).toContain('no refresh token of its own'); // elevated-specific explanation
-    expect(elevated.error.message).toContain('scopes-check'); // preflight pointer
+    expect(elevated.error.message).toContain('ask-marcel-office status'); // preflight pointer
 
     for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
       const result = await getToken();
@@ -541,7 +541,7 @@ describe('auth manager recovery ladder', () => {
     if (result.ok || result.error.type !== 'auth_failed') return;
     expect(result.error.code).toBe('not_authenticated');
     expect(result.error.message).toContain('ask-marcel-office login');
-    expect(result.error.message).toContain('scopes-check');
+    expect(result.error.message).toContain('ask-marcel-office status');
     expect(browserLaunched).toBe(false);
   });
 

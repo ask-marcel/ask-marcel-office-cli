@@ -391,7 +391,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       }
       // Slim confirmation: which tokens are available now, and where to look next.
       // The decode-only read never opens a browser. Full per-token scopes + expiry
-      // live in `scopes-check`; login just points there (and to `login --force`).
+      // live in `status`; login just points there (and to `login --force`).
       const info = await loginAuth.getTokenInfo();
       if (!info.ok) {
         fail(info.error.message);
@@ -415,7 +415,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
       'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
       '               this CLI cannot request additional scopes. To inspect the granted set,',
-      '               run `ask-marcel-office scopes-check`.',
+      '               run `ask-marcel-office status`.',
       'Stuck flow:    `ask-marcel-office logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
     ].join('\n  ')
   );
