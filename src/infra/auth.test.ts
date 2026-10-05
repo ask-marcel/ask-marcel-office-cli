@@ -9,6 +9,7 @@ import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import type { AuthLadder, AuthManager, FetchFn } from './auth.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth-browser.ts';
 import { createTokenCacheLock } from './token-cache-lock.ts';
+import type { TokenCacheLock } from './token-cache-lock.ts';
 import type { BrowserAuth, BrowserTokenResult, ElevatedFailureReason } from './browser-auth.ts';
 
 // `getCachedElevatedInfo` is an optional AuthManager capability (only the real
@@ -2614,6 +2615,32 @@ describe('createAuthManager', () => {
     expect(built).toEqual([]);
     expect(fs.has(CACHE_PATH)).toBe(false);
     expect(fs.has('/virtual/profile/Cookies')).toBe(false);
+  });
+
+  // Another process holds the lock while this one must refresh. How long it
+  // waits follows the person, not the browser gates: an elevated-only or
+  // browserless session at a terminal waits as long as a sign-in may take.
+  it('waits for a held lock as long as a sign-in may take when told a person is there, and twenty seconds otherwise', async () => {
+    const waits: number[] = [];
+    const busy: TokenCacheLock = {
+      withLock: async (_purpose, waitBudgetMs) => {
+        waits.push(waitBudgetMs);
+        return err({ type: 'lock_busy', purpose: 'browser' });
+      },
+    };
+    const refreshWith = async (gates: Partial<Parameters<typeof createAuthManager>[0]>): Promise<void> => {
+      const fs = createFileSystemFake();
+      fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'expired', expires_on: 0, refresh_token: 'rt-1' }));
+      const auth = createAuthManager({ cachePath: CACHE_PATH, logger: createLoggerFake(), fs, lock: busy, createBrowser: () => fakeBrowserAuth(), ...gates });
+      expect(await auth.getAccessToken()).toMatchObject({ ok: false, error: { code: 'sign_in_in_progress' } });
+    };
+    const elevatedOnly = { acquireBasicViaBrowser: false, recaptureSecondaryViaBrowser: false, recaptureElevatedViaBrowser: true } as const;
+    await refreshWith({ ...elevatedOnly, interactive: true });
+    await refreshWith({ ...noBrowserRung, interactive: true });
+    await refreshWith(elevatedOnly);
+    await refreshWith(noBrowserRung);
+    await refreshWith({});
+    expect(waits).toEqual([420_000, 420_000, 20_000, 20_000, 420_000]);
   });
 });
 

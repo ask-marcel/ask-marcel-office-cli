@@ -101,11 +101,13 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // persistent profile refreshes it in ~17s with no prompt, so a TTY user gets the
   // command they asked for instead of "run login". An agent / MCP run keeps the
   // instant, self-explaining error rather than waiting on a browser it cannot see.
+  // The same session sets how long a held token-cache lock is waited on.
   const auth = makeAuth({
     cachePath,
     browserProfileDir,
     logger,
     fs,
+    interactive,
     recaptureSecondaryViaBrowser: false,
     recaptureElevatedViaBrowser: interactive,
     acquireBasicViaBrowser: interactive,

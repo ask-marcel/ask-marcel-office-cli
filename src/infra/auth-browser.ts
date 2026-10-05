@@ -317,7 +317,11 @@ const createAuthManagerFromApi = (
   fetchFn?: FetchFn,
   // The machine-wide lock around every redemption, sign-in and sign-out.
   // Injectable so a test can stand in another process and a clock it controls.
-  lock?: TokenCacheLock
+  lock?: TokenCacheLock,
+  // A person is watching, so a held lock is waited on as long as a sign-in may
+  // take. Its own input: an elevated-only session opens no basic sign-in, yet a
+  // person at the terminal is still there. Defaults to the basic gate, as before.
+  interactive: boolean = acquireBasicViaBrowser
 ): TokenLadder =>
   createAuthLadder({
     cachePath,
@@ -325,7 +329,7 @@ const createAuthManagerFromApi = (
     logger,
     fs,
     secondaryTokenCommands,
-    interactive: acquireBasicViaBrowser,
+    interactive,
     fetchFn,
     lock,
     browserRungs: (cache) =>
@@ -377,15 +381,21 @@ const createAuthManager = (deps: {
   secondaryTokenCommands?: SecondaryTokenCommands;
   acquireBasicViaBrowser?: boolean;
   recaptureElevatedViaBrowser?: boolean;
+  // A person at the terminal: a held lock is waited on as long as a sign-in may
+  // take, not twenty seconds. Unset, it follows the basic browser gate.
+  interactive?: boolean;
   // The seam a test uses to see how the browser is built; production uses Playwright.
   createBrowser?: typeof createBrowserAuth;
+  // The seam a test uses to stand in another process holding the lock.
+  lock?: TokenCacheLock;
 }): TokenLadder => {
   const fs = deps.fs ?? defaultFileSystem();
   const browserProfileDir = deps.browserProfileDir ?? defaultBrowserProfileDir();
   // An agent, an MCP server or a piped run: no rung may open a browser, so none
   // is built and the ladder fails fast where a browser would have been.
   if (opensNoBrowser(deps)) {
-    return createAuthLadder({ cachePath: deps.cachePath, browserProfileDir, logger: deps.logger, fs, secondaryTokenCommands: deps.secondaryTokenCommands, interactive: false });
+    const { cachePath, logger, secondaryTokenCommands, lock } = deps;
+    return createAuthLadder({ cachePath, browserProfileDir, logger, fs, secondaryTokenCommands, interactive: deps.interactive ?? false, lock });
   }
   // `profileDir` here too: the sign-in browser used its own default while
   // `logout` wiped this folder, so a custom profile was signed into in one place
@@ -406,7 +416,10 @@ const createAuthManager = (deps: {
     deps.recaptureSecondaryViaBrowser,
     deps.secondaryTokenCommands,
     deps.acquireBasicViaBrowser,
-    deps.recaptureElevatedViaBrowser
+    deps.recaptureElevatedViaBrowser,
+    undefined,
+    deps.lock,
+    deps.interactive
   );
 };
 

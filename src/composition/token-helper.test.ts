@@ -238,6 +238,36 @@ describe('the token helper entry', () => {
     expect(elevated).not.toContain('signIn');
   });
 
+  // The elevated sign-in runs on the real browser ladder, which opens no basic
+  // sign-in. A person at the terminal still waits for another process's
+  // sign-in as long as it may take, not the twenty seconds an agent gets.
+  it('in a terminal, an elevated request waits for a held lock as long as a sign-in may take', async () => {
+    const waits: number[] = [];
+    const busy: TokenCacheLock = {
+      withLock: async (_purpose, waitBudgetMs) => {
+        waits.push(waitBudgetMs);
+        return err({ type: 'lock_busy', purpose: 'browser' });
+      },
+    };
+    const lines: string[] = [];
+    const browser = recordingBrowser();
+    const exitCode = await runTokenHelper({
+      argv: ['--tier', 'elevated'],
+      location: LOCATION,
+      home: HOME,
+      env: {},
+      interactive: true,
+      fs: createFileSystemFake(),
+      print: (line) => lines.push(line),
+      lock: busy,
+      createBrowser: browser.create,
+    });
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(lines[0] ?? '')).toMatchObject({ errorCode: 'sign_in_in_progress', tier: 'elevated', message: expect.stringContaining('waited 420 s') });
+    expect(waits).toEqual([420_000]);
+    expect(browser.asked).toEqual([]);
+  });
+
   // Unless told, the helper asks stdin: a terminal is a person, anything else
   // (a pipe, a spawning MCP server) is not.
   const withStdinTerminal = async <T>(isTTY: boolean, task: () => Promise<T>): Promise<T> => {

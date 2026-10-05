@@ -38,6 +38,8 @@ export type BrowserLadderOptions = {
   readonly logger: Logger;
   readonly fs: FileSystem & AtomicFileWrites;
   readonly tier: 'basic' | 'elevated';
+  readonly interactive: boolean;
+  readonly lock?: TokenCacheLock;
   // Production launches Playwright; a test records which capture was asked for.
   readonly createBrowser?: typeof createBrowserAuth;
 };
@@ -90,12 +92,14 @@ export const tokenHelperLocatorPath = (paths: AuthPaths): string => join(dirname
 
 const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLadder> => {
   const { createAuthManager } = await import('../infra/auth-browser.ts');
-  const { cachePath, browserProfileDir, logger, fs, tier, createBrowser } = options;
+  const { cachePath, browserProfileDir, logger, fs, tier, interactive, lock, createBrowser } = options;
   return createAuthManager({
     cachePath,
     browserProfileDir,
     logger,
     fs,
+    interactive,
+    lock,
     createBrowser,
     acquireBasicViaBrowser: tier === 'basic',
     recaptureElevatedViaBrowser: tier === 'elevated',
@@ -104,15 +108,15 @@ const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLa
 };
 
 // A browser only for a person at the terminal, only for the two tiers that a
-// browser renews, and never for a replay. The headless ladder still knows a
-// person is there, so it waits for a held lock as long as a sign-in may take.
+// browser renews, and never for a replay. Either ladder knows whether a person
+// is there, so it waits for a held lock as long as a sign-in may take.
 const issuerFor = async (deps: TokenHelperDeps, paths: AuthPaths, fs: FileSystem & AtomicFileWrites, args: TokenArgs): Promise<TokenIssuer> => {
-  const base = { cachePath: paths.tokenCache, browserProfileDir: paths.browserProfile, logger: SILENT, fs };
-  const { tier } = args.request;
   const interactive = deps.interactive ?? process.stdin.isTTY === true;
+  const base = { cachePath: paths.tokenCache, browserProfileDir: paths.browserProfile, logger: SILENT, fs, interactive, lock: deps.lock };
+  const { tier } = args.request;
   if (interactive && args.rejected === undefined && (tier === 'basic' || tier === 'elevated'))
     return (deps.browserLadder ?? loadBrowserLadder)({ ...base, tier, createBrowser: deps.createBrowser });
-  return createAuthLadder({ ...base, interactive, fetchFn: deps.fetchFn, lock: deps.lock });
+  return createAuthLadder({ ...base, fetchFn: deps.fetchFn });
 };
 
 export const runTokenHelper = async (deps: TokenHelperDeps): Promise<number> => {

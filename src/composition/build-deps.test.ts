@@ -74,6 +74,21 @@ describe('buildDeps composition root', () => {
     expect(calls[1]?.recaptureSecondaryViaBrowser).toBe(false);
   });
 
+  // The lock wait follows the person, not the browser gates, so the session is
+  // handed over as itself: a terminal waits for another process's sign-in as
+  // long as it may take, an agent twenty seconds.
+  it('tells the command-path auth manager whether a person is at the terminal', () => {
+    const fs = createFileSystemFake();
+    const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
+    const recordingCreateAuth: typeof createAuthManager = (opts) => {
+      calls.push(opts);
+      return createAuthManager(opts);
+    };
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: false, createAuth: recordingCreateAuth });
+    buildDeps({ cachePath: '/virtual/cache.json', logLevel: 'error', fs, interactive: true, createAuth: recordingCreateAuth });
+    expect(calls.map((c) => c.interactive)).toEqual([false, true]);
+  });
+
   it('injects registry-derived secondary-token command lists into BOTH auth managers so the fail-fast messages track the manifest instead of a hardcoded list', () => {
     const fs = createFileSystemFake();
     const calls: Array<Parameters<typeof createAuthManager>[0]> = [];
