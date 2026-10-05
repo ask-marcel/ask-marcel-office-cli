@@ -51,6 +51,16 @@ A text error now has a `code:` line under the `error:` line when the error has
 a code. The JSON envelope gives the same value as `errorCode`. An MCP client
 reads text, so it can now see codes such as `not_authenticated`.
 
+### Fixed: a token endpoint answer that is not a token
+
+When the token endpoint answered 200 with a body that is not JSON, or JSON that
+is not a token answer (a proxy page, for example), the CLI stopped with a crash
+message that could show part of that body. Now the refresh fails as a normal
+error that gives the status and no text from the body, and the refresh token in
+the token cache does not change. If the body stalls past the 60 s deadline, the
+error says that the answer did not arrive in time. This applies to the basic,
+chat and guest tokens.
+
 ### Breaking: `scopes-check` is removed
 
 Use `status`. If you type `scopes-check`, the CLI tells you to use `status`.

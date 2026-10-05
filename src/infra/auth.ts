@@ -11,7 +11,7 @@ import type { Logger } from '../use-cases/ports/logger.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
-import { REQUEST_TIMEOUT_MS } from './network-error.ts';
+import { REQUEST_TIMEOUT_LABEL, REQUEST_TIMEOUT_MS } from './network-error.ts';
 import type { LockPurpose, TokenCacheLock } from './token-cache-lock.ts';
 import { createSystemTokenCacheLock } from './token-cache-lock.ts';
 
@@ -362,6 +362,34 @@ const NOT_AUTHENTICATED_MESSAGE =
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
+// What the token endpoint answers a redemption. Each field may be missing (the
+// callers check what they need), but none may be of another type.
+type TokenAnswer = { readonly access_token?: string; readonly expires_in?: number; readonly refresh_token?: string };
+
+const absentOr = (value: unknown, type: 'string' | 'number'): boolean => value === undefined || typeof value === type;
+
+const isTokenAnswer = (body: unknown): body is TokenAnswer => {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
+  const fields = body as Record<string, unknown>;
+  return absentOr(fields['access_token'], 'string') && absentOr(fields['expires_in'], 'number') && absentOr(fields['refresh_token'], 'string');
+};
+
+// A 200 can still carry a proxy's page or a cut-off answer, and that text can
+// hold a token, so the error names the status and never the body or the
+// parser's message (which quotes the body). The request's deadline also covers
+// the body, so a body that stalls past it is a slow endpoint, not a bad answer.
+const readTokenAnswer = async (res: Response): Promise<Result<TokenAnswer, AuthError>> => {
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch (e) {
+    const problem = e instanceof Error && e.name === 'TimeoutError' ? `did not arrive within ${REQUEST_TIMEOUT_LABEL}` : 'could not be read as JSON';
+    return err({ type: 'auth_failed', message: `refresh failed (${res.status}): its answer ${problem}` });
+  }
+  if (!isTokenAnswer(body)) return err({ type: 'auth_failed', message: `refresh failed (${res.status}): its answer is not a token response` });
+  return ok(body);
+};
+
 // The rungs of the ladder that need a browser. auth-browser.ts supplies them to
 // a session allowed to open one; a rung left out fails fast with the "run login"
 // message instead.
@@ -543,7 +571,9 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
       return err({ type: 'auth_failed', message: msg });
     }
     if (!res.ok) return err({ type: 'auth_failed', message: `refresh failed (${res.status})` });
-    const json = (await res.json()) as { access_token?: string; expires_in?: number; refresh_token?: string };
+    const answer = await readTokenAnswer(res);
+    if (!answer.ok) return answer;
+    const json = answer.value;
     return ok({ accessToken: json.access_token ?? '', expiresIn: json.expires_in ?? 0, refreshToken: json.refresh_token });
   };
 
