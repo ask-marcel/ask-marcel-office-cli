@@ -36,6 +36,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-incomplete-planner-tasks --top 25',
   responseShape: 'collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

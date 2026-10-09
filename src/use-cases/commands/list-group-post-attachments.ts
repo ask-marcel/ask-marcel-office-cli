@@ -50,6 +50,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-group-post-attachments --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
   responseShape:
     'collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body.',
+  effect: 'read',
+  scopesRequired: ['Group.Read.All'],
 };
 
 export { execute, meta, schema };

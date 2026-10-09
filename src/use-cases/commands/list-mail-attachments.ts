@@ -41,6 +41,8 @@ const meta: CommandMeta = {
   responseShape:
     "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { execute, meta, schema };

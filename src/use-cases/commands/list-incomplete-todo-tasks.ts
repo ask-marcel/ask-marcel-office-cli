@@ -58,6 +58,8 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `todoTask` resources under `value[]` where `status != "completed"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

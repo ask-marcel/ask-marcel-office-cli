@@ -16,6 +16,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-joined-teams',
   responseShape: 'collection of Microsoft Graph `team` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Team.ReadBasic.All'],
 };
 
 export { execute, meta, schema };

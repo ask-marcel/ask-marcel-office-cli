@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:37:29.384Z",
+  "generatedAt": "2026-10-09T18:38:24.823Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -5181,7 +5181,8 @@
         }
       ],
       "example": "ask-marcel-office list-group-post-attachments --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
-      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body."
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body.",
+      "effect": "read"
     },
     {
       "name": "list-group-thread-posts",
@@ -5217,7 +5218,8 @@
         }
       ],
       "example": "ask-marcel-office list-group-thread-posts --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...'",
-      "responseShape": "collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly."
+      "responseShape": "collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly.",
+      "effect": "read"
     },
     {
       "name": "list-group-threads",
@@ -5266,7 +5268,8 @@
       ],
       "example": "ask-marcel-office list-group-threads --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `conversationThread` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-groups",
@@ -5309,7 +5312,8 @@
       ],
       "example": "ask-marcel-office list-groups",
       "responseShape": "collection of Microsoft Graph `group` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-incomplete-planner-tasks",
@@ -5358,7 +5362,8 @@
       ],
       "example": "ask-marcel-office list-incomplete-planner-tasks --top 25",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-incomplete-todo-tasks",
@@ -5419,7 +5424,8 @@
       ],
       "example": "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]` where `status != \"completed\"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-joined-teams",
@@ -5431,7 +5437,8 @@
       "options": [],
       "example": "ask-marcel-office list-joined-teams",
       "responseShape": "collection of Microsoft Graph `team` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-attachments",
@@ -5486,7 +5493,8 @@
       ],
       "example": "ask-marcel-office list-mail-attachments --message-id 'AAMkAGI2...'",
       "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-child-folders",
@@ -5554,7 +5562,8 @@
       ],
       "example": "ask-marcel-office list-mail-child-folders --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-folder-messages",

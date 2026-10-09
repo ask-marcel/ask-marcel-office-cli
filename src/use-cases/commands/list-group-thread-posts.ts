@@ -35,6 +35,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-group-thread-posts --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...'",
   responseShape:
     'collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly.',
+  effect: 'read',
+  scopesRequired: ['Group.Read.All'],
 };
 
 export { execute, meta, schema };
