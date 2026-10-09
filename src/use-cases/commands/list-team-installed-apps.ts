@@ -30,6 +30,8 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['TeamsAppInstallation.ReadForTeam'],
 };
 
 export { execute, meta, schema };

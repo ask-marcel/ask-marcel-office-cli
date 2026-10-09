@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-team-channels --team-id 'abc-1234-...'",
   responseShape: 'collection of Microsoft Graph `channel` resources under `value[]`',
+  effect: 'read',
+  scopesRequired: ['Channel.ReadBasic.All'],
 };
 
 export { execute, meta, schema };

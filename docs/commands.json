@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:43:06.415Z",
+  "generatedAt": "2026-10-09T18:44:02.865Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7891,7 +7891,8 @@
       ],
       "example": "ask-marcel-office list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
       "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`: `id`, `replyToId` (null on a root post), `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-team-channel-messages-delta",
@@ -7934,7 +7935,8 @@
       ],
       "example": "ask-marcel-office list-team-channel-messages-delta --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d' --expand replies",
       "responseShape": "collection of Microsoft Graph `chatMessage` root posts under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page; feed either to `next-page`.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-team-channel-tabs",
@@ -7970,7 +7972,8 @@
         }
       ],
       "example": "ask-marcel-office list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
-      "responseShape": "collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`"
+      "responseShape": "collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`",
+      "effect": "read"
     },
     {
       "name": "list-team-channels",
@@ -8000,7 +8003,8 @@
         }
       ],
       "example": "ask-marcel-office list-team-channels --team-id 'abc-1234-...'",
-      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`"
+      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-team-installed-apps",
@@ -8019,7 +8023,8 @@
       ],
       "example": "ask-marcel-office list-team-installed-apps --team-id 'tm1'",
       "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-team-members",
@@ -8050,7 +8055,8 @@
       ],
       "example": "ask-marcel-office list-team-members --team-id 'abc-1234-...'",
       "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-teams-chat-history",
@@ -8131,6 +8137,7 @@
       ],
       "example": "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
       "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, event?, from, imdisplayname, content, webUrl, files?, reactions? }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the walk reached the start of what was asked: the chat's earliest message, or the `--since` bound. `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. **Microsoft-internal schema — fields may change without notice.**",
+      "effect": "read",
       "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
@@ -8177,6 +8184,7 @@
       ],
       "example": "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
       "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc., plus `webUrl` (the Teams deep link), `event` on a system entry, and `files` / `reactions` when it has any; `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
+      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -8203,6 +8211,7 @@
       ],
       "example": "ask-marcel-office list-teams-chats-with-messages --page-size 100",
       "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (each member's `mri` and display name; emails come from `list-chat-members`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
+      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },

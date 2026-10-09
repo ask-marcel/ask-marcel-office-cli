@@ -62,6 +62,7 @@ const meta: CommandMeta = {
   responseShape:
     '`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (each member\'s `mri` and display name; emails come from `list-chat-members`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token "$(jq -r .data.continuationToken <prev>)"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**',
   stability: 'experimental',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

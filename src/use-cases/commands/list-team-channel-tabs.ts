@@ -32,6 +32,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
   responseShape:
     'collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`',
+  effect: 'read',
+  scopesRequired: ['TeamsTab.Read.All'],
 };
 
 export { execute, meta, schema };

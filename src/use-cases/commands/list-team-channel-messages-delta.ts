@@ -45,6 +45,8 @@ const meta: CommandMeta = {
     'collection of Microsoft Graph `chatMessage` root posts under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page; feed either to `next-page`.',
   pagination: true,
   paginationStrategy: 'deltaLink',
+  effect: 'read',
+  scopesRequired: ['ChannelMessage.Read.All'],
 };
 
 export { execute, meta, schema };
