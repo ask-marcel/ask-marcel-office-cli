@@ -163,11 +163,11 @@ type CommandMeta = {
    * What the command does to the tenant. `read` changes nothing (a search POST
    * included). Every other value is a write class: `draft` creates or updates an
    * UNSENT mail draft; `transient-upload` puts a temporary file in the user's
-   * OneDrive and tries to delete it. The manifest / `help-json` carry it.
-   * Optional while the commands adopt it; it replaces `mutates` (package split,
-   * phase 1 step 11).
+   * OneDrive and tries to delete it. Required, so a new command chooses its
+   * class instead of inheriting `read`. The manifest / `help-json` carry it on
+   * every command. It replaces `mutates` (package split, phase 1 step 11).
    */
-  readonly effect?: CommandEffect;
+  readonly effect: CommandEffect;
   /**
    * Stability tier of the command. Omitted from manifest entries when the
    * command is `'stable'` (the implicit default), surfaced only on

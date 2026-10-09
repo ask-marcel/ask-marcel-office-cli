@@ -15,6 +15,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
     graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/fake',
     options: [],
     example: 'ask-marcel-office fake',
+    effect: 'read',
     ...overrides,
   },
 });

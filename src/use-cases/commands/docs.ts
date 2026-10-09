@@ -64,7 +64,7 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
     ...(cmd.meta.producesMedia ? { producesMedia: cmd.meta.producesMedia } : {}),
     ...(cmd.meta.mutates ? { mutates: cmd.meta.mutates } : {}),
-    ...(cmd.meta.effect ? { effect: cmd.meta.effect } : {}),
+    effect: cmd.meta.effect,
     ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
   };
 };
