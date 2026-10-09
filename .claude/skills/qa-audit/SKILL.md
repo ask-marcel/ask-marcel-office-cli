@@ -9,7 +9,7 @@ You are auditing the `ask-marcel-office` CLI. The authoritative procedure is **`
 
 1. **Track phases as tasks.** One task per playbook phase (A–H); mark in_progress/completed as you go. Full surface every run — no sampling, no tiers.
 2. **Report, then plan.** You find and document; you do NOT fix during the run (not even trivial P1s — note them, finish the sweep). After delivering the report, propose a severity-ordered fix plan and WAIT for approval.
-3. **Read-only tenant access.** Only GET/search commands. Respect every safety rule in playbook §0 (no external URL fetches, single-quote `b!` ids, `--output-path` for multi-MB bytes).
+3. **Read-only tenant access.** Only commands whose manifest `effect` is `read` (playbook §0 rule 1; the mail drafts and the PDF conversions write). Respect every safety rule in playbook §0 (no external URL fetches, single-quote `b!` ids, `--output-path` for multi-MB bytes).
 4. **Raw findings are private.** Write the full report to `.claude/qa-reports/YYYY-MM-DD.md` (gitignored — tenant file names/subjects/IDs may appear there). The ONLY committed artifacts of a run are: the sanitized Run-log row appended to playbook §I, plus any updates to the §E2 drift register and §G roadmap register.
 5. **Compare against the previous run.** Read the most recent `.claude/qa-reports/*.md` first; anything that passed before and fails now is a REGRESSION and outranks same-severity new findings.
 6. **Manifest-driven, not hand-typed.** Regenerate worklists from `docs/commands.json` (snippets are in the playbook) so the audit scales as commands are added.

@@ -4,10 +4,13 @@
  *
  * Manifest-driven and STATUS-ONLY BY CONSTRUCTION: for every command it records
  * only the command name + `ok`/`errorCode` — it NEVER logs tenant content
- * (names, subjects, ids). Read-only tenant access (mutating draft commands are
- * skipped). Harvests an id pool live, runs one happy-path per command, and
- * reports harvest completeness so untestable-this-run commands are explicit,
- * never silently counted as healthy.
+ * (names, subjects, ids). Read-only tenant access: it runs only the commands
+ * whose manifest `effect` is exactly `read` (the drafts and the PDF conversions,
+ * which upload a temporary file, are skipped), and it stops before the first call
+ * when a command has no `effect`, so a manifest from before the field existed
+ * cannot let a write through. Harvests an id pool live, runs one happy-path per
+ * command, and reports harvest completeness so untestable-this-run commands are
+ * explicit, never silently counted as healthy.
  *
  * Prereqs: clean `main`, `bun run build`, `npm i -g .`, a warm `ask-marcel-office
  * login`. Run: `bun scripts/qa-live-sweep.ts`. Ledger → /tmp/qa/live-ledger.json.
@@ -19,6 +22,13 @@ import { spawnSync } from 'node:child_process';
 
 const BIN = 'ask-marcel-office';
 const manifest = JSON.parse(await Bun.file('docs/commands.json').text());
+
+// An allow-list, not a deny-list: a command runs only when it says it reads.
+const withoutEffect = manifest.commands.filter((c: any) => typeof c.effect !== 'string').map((c: any) => c.name);
+if (withoutEffect.length > 0) {
+  console.log(`!! ${withoutEffect.length} commands in docs/commands.json have no effect (run \`bun run docs:gen\`): ${withoutEffect.join(', ')}`);
+  process.exit(1);
+}
 
 let browserOpens = 0;
 const run = (args: string[], timeoutMs = 90000): { ok: boolean; data?: any; code?: string } => {
@@ -216,11 +226,10 @@ const argFor = (cmd: string, opt: string): string[] | null => {
 };
 
 // ---------------- SWEEP ----------------
-const SKIP = new Set(manifest.commands.filter((c: any) => c.mutates).map((c: any) => c.name));
 const ledger: Record<string, string> = {};
 const nodataOpts = new Set<string>();
 for (const c of manifest.commands) {
-  if (SKIP.has(c.name)) { ledger[c.name] = 'SKIP-mutating'; continue; }
+  if (c.effect !== 'read') { ledger[c.name] = `SKIP-${c.effect}`; continue; }
   let argv = [c.name];
   let unresolved: string | null = null;
   for (const o of (c.options || []).filter((x: any) => x.required)) { const a = argFor(c.name, o.name); if (!a) { unresolved = o.name; break; } argv.push(...a); }
