@@ -69,6 +69,19 @@ describe('buildManifest', () => {
     expect(byName('aaa-write')?.mutates).toBe(true);
   });
 
+  it('serializes the effect of every registry command, a read included, so a reader can tell a read from a command whose effect is missing', () => {
+    const registry: Readonly<Record<string, Command>> = {
+      'aaa-plain': fakeCmd({ effect: 'read' }),
+      'aaa-write': fakeCmd({ graphMethod: 'PATCH', effect: 'draft' }),
+      'aaa-upload': fakeCmd({ effect: 'transient-upload' }),
+    };
+    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const effectOf = (n: string): unknown => manifest.commands.find((c) => c.name === n)?.effect;
+    expect(effectOf('aaa-plain')).toBe('read');
+    expect(effectOf('aaa-write')).toBe('draft');
+    expect(effectOf('aaa-upload')).toBe('transient-upload');
+  });
+
   // 2026-07-24: the manifest carries one name per command; commandAliases
   // serialization was removed with the alias system.
   it('never serializes a commandAliases key, since a command has exactly one name', () => {

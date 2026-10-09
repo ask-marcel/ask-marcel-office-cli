@@ -19,6 +19,7 @@ export type CommandManifestEntry = {
   readonly producesBytes?: CommandMeta['producesBytes'];
   readonly producesMedia?: CommandMeta['producesMedia'];
   readonly mutates?: CommandMeta['mutates'];
+  readonly effect?: CommandMeta['effect'];
   readonly stability?: CommandMeta['stability'];
 };
 

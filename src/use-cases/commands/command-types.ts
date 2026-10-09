@@ -80,6 +80,9 @@ type PaginationStrategy =
   /** `--top` translated to `Prefer: odata.maxpagesize` header; `$top` rejected as query. */
   | 'preferMaxPageSize';
 
+/** What a command does to the tenant; see `CommandMeta.effect`. Extended as the writes grow. */
+type CommandEffect = 'read' | 'draft' | 'transient-upload';
+
 type CommandMeta = {
   readonly summary: string;
   readonly category: CommandCategory;
@@ -157,6 +160,15 @@ type CommandMeta = {
    */
   readonly mutates?: true;
   /**
+   * What the command does to the tenant. `read` changes nothing (a search POST
+   * included). Every other value is a write class: `draft` creates or updates an
+   * UNSENT mail draft; `transient-upload` puts a temporary file in the user's
+   * OneDrive and tries to delete it. The manifest / `help-json` carry it.
+   * Optional while the commands adopt it; it replaces `mutates` (package split,
+   * phase 1 step 11).
+   */
+  readonly effect?: CommandEffect;
+  /**
    * Stability tier of the command. Omitted from manifest entries when the
    * command is `'stable'` (the implicit default), surfaced only on
    * `'experimental'` commands so an LLM can prefer stable siblings when they
@@ -189,6 +201,7 @@ export type {
   ArgumentHint,
   Command,
   CommandCategory,
+  CommandEffect,
   CommandExecute,
   CommandHttpMethod,
   CommandMeta,
