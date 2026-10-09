@@ -42,6 +42,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
   responseShape: 'collection of Microsoft Graph `workbookPivotTable` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

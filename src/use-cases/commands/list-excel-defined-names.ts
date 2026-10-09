@@ -35,6 +35,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-excel-defined-names --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `workbookNamedItem` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

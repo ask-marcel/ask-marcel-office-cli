@@ -35,6 +35,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-excel-comments --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `workbookComment` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

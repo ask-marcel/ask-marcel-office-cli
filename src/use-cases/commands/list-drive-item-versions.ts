@@ -30,6 +30,8 @@ const meta: CommandMeta = {
   responseShape: 'collection of Microsoft Graph `driveItemVersion` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

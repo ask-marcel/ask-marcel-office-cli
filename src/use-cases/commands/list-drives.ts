@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-drives',
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

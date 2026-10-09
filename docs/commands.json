@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:35:39.667Z",
+  "generatedAt": "2026-10-09T18:36:34.274Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -4142,7 +4142,8 @@
       ],
       "example": "ask-marcel-office list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `thumbnailSet` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-drive-item-versions",
@@ -4203,7 +4204,8 @@
       ],
       "example": "ask-marcel-office list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `driveItemVersion` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-drives",
@@ -4252,7 +4254,8 @@
       ],
       "example": "ask-marcel-office list-drives",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-comments",
@@ -4313,7 +4316,8 @@
       ],
       "example": "ask-marcel-office list-excel-comments --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `workbookComment` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-defined-names",
@@ -4374,7 +4378,8 @@
       ],
       "example": "ask-marcel-office list-excel-defined-names --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `workbookNamedItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-table-rows",
@@ -4429,7 +4434,8 @@
       ],
       "example": "ask-marcel-office list-excel-table-rows --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
       "responseShape": "collection of Microsoft Graph `workbookTableRow` resources (each `values` is a 2D array) under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-tables",
@@ -4478,7 +4484,8 @@
       ],
       "example": "ask-marcel-office list-excel-tables --drive-id 'b!1234' --item-id '01XLSX'",
       "responseShape": "collection of Microsoft Graph `workbookTable` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-worksheet-charts",
@@ -4548,7 +4555,8 @@
       ],
       "example": "ask-marcel-office list-excel-worksheet-charts --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
       "responseShape": "collection of Microsoft Graph `workbookChart` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-worksheet-pivot-tables",
@@ -4618,7 +4626,8 @@
       ],
       "example": "ask-marcel-office list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
       "responseShape": "collection of Microsoft Graph `workbookPivotTable` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-excel-worksheets",
