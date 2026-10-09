@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
   responseShape: 'single Microsoft Graph `event` resource (or projection of the requested `--select` fields)',
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

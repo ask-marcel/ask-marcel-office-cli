@@ -54,6 +54,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
   responseShape:
     '`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: "onedrive", owner }` or `{ kind: "site", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.',
+  effect: 'read',
+  scopesRequired: ['Group.Read.All', 'Files.Read.All'],
 };
 
 export { execute, meta, schema };

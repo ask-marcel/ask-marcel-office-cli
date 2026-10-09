@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

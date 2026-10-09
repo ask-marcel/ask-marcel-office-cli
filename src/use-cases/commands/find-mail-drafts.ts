@@ -91,6 +91,7 @@ const meta: CommandMeta = {
   scopesRequired: ['Mail.Read'],
   responseShape:
     '`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

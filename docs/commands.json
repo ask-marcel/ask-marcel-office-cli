@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:26:11.443Z",
+  "generatedAt": "2026-10-09T18:28:10.630Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1419,7 +1419,8 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
-      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
+      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
+      "effect": "read"
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -1437,7 +1438,8 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
-      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
+      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
+      "effect": "read"
     },
     {
       "name": "extract-teams-chat-message-images",
@@ -1463,6 +1465,7 @@
       "example": "ask-marcel-office extract-teams-chat-message-images --chat-id '19:abc@thread.v2' --message-id '1727000000000'",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }` — `path` is `image-<n>.<ext>`, in the order the images appear. Pair with the global `--output-dir <dir>` to write each image there (the response then carries `savedTo` in place of `base64`). `count: 0` with a `note` means the message holds no pasted image.",
       "producesMedia": true,
+      "effect": "read",
       "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
@@ -1495,6 +1498,7 @@
       ],
       "example": "ask-marcel-office find-chats-with-user --name 'Alex Kim'",
       "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, chatsHydrated, unresolvedMemberCount, hasMore, nextContinuationToken?, hint? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `chatsHydrated` counts the per-chat members lookups spent resolving bare cross-tenant members in direct (1:1) chats. `unresolvedMemberCount` is how many cross-tenant members are still unresolved by name (bare members in group/meeting chats, which are not deep-probed, plus any 1:1 hydration that errored); when `matchCount` is 0 and this is non-zero, a `hint` is present explaining the likely cause and the object-id / read-by-chat-id remedy — so an empty result is never silently confident. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
+      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -1520,7 +1524,8 @@
         }
       ],
       "example": "ask-marcel-office find-mail-drafts --subject \"Contoso Q3 budget\" --to-recipients \"kim@example.com\"",
-      "responseShape": "`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window."
+      "responseShape": "`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window.",
+      "effect": "read"
     },
     {
       "name": "get-calendar-event",
@@ -1550,7 +1555,8 @@
         }
       ],
       "example": "ask-marcel-office get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
-      "responseShape": "single Microsoft Graph `event` resource (or projection of the requested `--select` fields)"
+      "responseShape": "single Microsoft Graph `event` resource (or projection of the requested `--select` fields)",
+      "effect": "read"
     },
     {
       "name": "get-channel-files-folder",
@@ -1586,7 +1592,8 @@
         }
       ],
       "example": "ask-marcel-office get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
+      "responseShape": "single Microsoft Graph `driveItem` resource (folder)",
+      "effect": "read"
     },
     {
       "name": "get-chat",
@@ -1617,6 +1624,7 @@
       ],
       "example": "ask-marcel-office get-chat --chat-id '19:abc...@thread.v2'",
       "responseShape": "single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.",
+      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -3689,7 +3697,8 @@
         }
       ],
       "example": "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
-      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
+      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-calendar-view-delta",

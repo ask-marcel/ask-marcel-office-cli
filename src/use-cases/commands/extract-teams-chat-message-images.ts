@@ -68,6 +68,7 @@ const meta: CommandMeta = {
   producesMedia: true,
   needsSubstrateToken: 'ic3',
   stability: 'experimental',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

@@ -39,6 +39,8 @@ const meta: CommandMeta = {
   responseShape:
     'single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.',
   needsElevatedToken: true,
+  effect: 'read',
+  scopesRequired: ['Chat.ReadBasic'],
 };
 
 export { execute, meta, schema };
