@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:31:54.237Z",
+  "generatedAt": "2026-10-09T18:32:50.746Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2733,7 +2733,8 @@
         }
       ],
       "example": "ask-marcel-office get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...' --select 'id,subject,from'",
-      "responseShape": "single Microsoft Graph `message` resource"
+      "responseShape": "single Microsoft Graph `message` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-list-column",
@@ -2778,7 +2779,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
-      "responseShape": "single Microsoft Graph `columnDefinition` resource"
+      "responseShape": "single Microsoft Graph `columnDefinition` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site",
@@ -2808,7 +2810,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
-      "responseShape": "single Microsoft Graph `site` resource"
+      "responseShape": "single Microsoft Graph `site` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site-by-path",
@@ -2832,7 +2835,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-by-path --hostname 'contoso.sharepoint.com' --path '/sites/Marketing'",
-      "responseShape": "single Microsoft Graph `site` resource"
+      "responseShape": "single Microsoft Graph `site` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site-drive-by-id",
@@ -2868,7 +2872,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
-      "responseShape": "single Microsoft Graph `drive` resource"
+      "responseShape": "single Microsoft Graph `drive` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site-list",
@@ -2907,7 +2912,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
-      "responseShape": "single Microsoft Graph `list` resource"
+      "responseShape": "single Microsoft Graph `list` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site-list-item",
@@ -2952,7 +2958,8 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
-      "responseShape": "single Microsoft Graph `listItem` resource"
+      "responseShape": "single Microsoft Graph `listItem` resource",
+      "effect": "read"
     },
     {
       "name": "get-sharepoint-site-onenote-page-content",
@@ -2977,7 +2984,8 @@
       ],
       "example": "ask-marcel-office get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
       "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-site-analytics",
@@ -6632,7 +6640,8 @@
       ],
       "example": "ask-marcel-office list-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-insights",

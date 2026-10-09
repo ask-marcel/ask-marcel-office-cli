@@ -31,6 +31,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
   responseShape: 'single Microsoft Graph `listItem` resource',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

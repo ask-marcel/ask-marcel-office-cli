@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
   responseShape: 'single Microsoft Graph `list` resource',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

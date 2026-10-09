@@ -34,6 +34,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-sharepoint-site-by-path --hostname 'contoso.sharepoint.com' --path '/sites/Marketing'",
   responseShape: 'single Microsoft Graph `site` resource',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

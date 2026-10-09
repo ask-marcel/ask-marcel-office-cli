@@ -19,6 +19,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
   responseShape: 'single Microsoft Graph `drive` resource',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All', 'Files.Read'],
 };
 
 export { execute, meta, schema };

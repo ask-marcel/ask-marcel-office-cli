@@ -44,6 +44,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/html", size: <chars>, text: "<html>..." }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read.All', 'Sites.Read.All'],
 };
 
 export { execute, meta, schema };
