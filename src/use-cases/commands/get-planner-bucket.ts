@@ -21,6 +21,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",
   responseShape: 'single Microsoft Graph `plannerBucket` resource',
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

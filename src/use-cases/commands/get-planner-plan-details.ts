@@ -22,6 +22,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-planner-plan-details --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
   responseShape: 'single Microsoft Graph `plannerPlanDetails` resource',
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

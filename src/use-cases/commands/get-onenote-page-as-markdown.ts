@@ -73,6 +73,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read'],
 };
 
 export { execute, meta, schema };

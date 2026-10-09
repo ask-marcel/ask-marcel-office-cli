@@ -81,6 +81,7 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `scheduleInformation` resources under `value[]` — one per requested address, each `{ scheduleId, availabilityView, scheduleItems: [{ status, start, end, subject?, location? }], workingHours, error? }`',
   scopesRequired: ['Calendars.Read'],
+  effect: 'read',
 };
 
 export { execute, meta, schema };

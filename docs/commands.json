@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:30:56.994Z",
+  "generatedAt": "2026-10-09T18:31:54.237Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2518,7 +2518,8 @@
       ],
       "example": "ask-marcel-office get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-onenote-page-content",
@@ -2537,7 +2538,8 @@
       ],
       "example": "ask-marcel-office get-onenote-page-content --onenote-page-id '1-abc...'",
       "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-organization",
@@ -2561,7 +2563,8 @@
         }
       ],
       "example": "ask-marcel-office get-organization --select 'id,displayName,verifiedDomains'",
-      "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`"
+      "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`",
+      "effect": "read"
     },
     {
       "name": "get-planner-bucket",
@@ -2579,7 +2582,8 @@
         }
       ],
       "example": "ask-marcel-office get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",
-      "responseShape": "single Microsoft Graph `plannerBucket` resource"
+      "responseShape": "single Microsoft Graph `plannerBucket` resource",
+      "effect": "read"
     },
     {
       "name": "get-planner-plan",
@@ -2597,7 +2601,8 @@
         }
       ],
       "example": "ask-marcel-office get-planner-plan --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
-      "responseShape": "single Microsoft Graph `plannerPlan` resource"
+      "responseShape": "single Microsoft Graph `plannerPlan` resource",
+      "effect": "read"
     },
     {
       "name": "get-planner-plan-details",
@@ -2615,7 +2620,8 @@
         }
       ],
       "example": "ask-marcel-office get-planner-plan-details --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
-      "responseShape": "single Microsoft Graph `plannerPlanDetails` resource"
+      "responseShape": "single Microsoft Graph `plannerPlanDetails` resource",
+      "effect": "read"
     },
     {
       "name": "get-planner-task",
@@ -2633,7 +2639,8 @@
         }
       ],
       "example": "ask-marcel-office get-planner-task --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
-      "responseShape": "single Microsoft Graph `plannerTask` resource"
+      "responseShape": "single Microsoft Graph `plannerTask` resource",
+      "effect": "read"
     },
     {
       "name": "get-planner-task-details",
@@ -2651,7 +2658,8 @@
         }
       ],
       "example": "ask-marcel-office get-planner-task-details --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
-      "responseShape": "single Microsoft Graph `plannerTaskDetails` resource"
+      "responseShape": "single Microsoft Graph `plannerTaskDetails` resource",
+      "effect": "read"
     },
     {
       "name": "get-schedule",
@@ -2688,7 +2696,8 @@
       ],
       "example": "ask-marcel-office get-schedule --schedules 'alice@contoso.com,bob@contoso.com' --start-date-time today --end-date-time +1d --availability-view-interval 30",
       "responseShape": "collection of Microsoft Graph `scheduleInformation` resources under `value[]` — one per requested address, each `{ scheduleId, availabilityView, scheduleItems: [{ status, start, end, subject?, location? }], workingHours, error? }`",
-      "bodyTemplate": "{ schedules: [{schedules}], startTime: { dateTime: '{start-date-time}', timeZone: 'UTC' }, endTime: { dateTime: '{end-date-time}', timeZone: 'UTC' }, availabilityViewInterval?: {availability-view-interval} }"
+      "bodyTemplate": "{ schedules: [{schedules}], startTime: { dateTime: '{start-date-time}', timeZone: 'UTC' }, endTime: { dateTime: '{end-date-time}', timeZone: 'UTC' }, availabilityViewInterval?: {availability-view-interval} }",
+      "effect": "read"
     },
     {
       "name": "get-shared-mailbox-message",

@@ -31,6 +31,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office get-onenote-page-content --onenote-page-id '1-abc...'",
   responseShape: '`{ contentType: "text/html", size: <chars>, text: "<html>..." }` — the rendered OneNote page body wrapped in a JSON envelope',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read'],
 };
 
 export { execute, meta, schema };
