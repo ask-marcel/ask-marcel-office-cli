@@ -95,7 +95,7 @@ describe('list-changed-files', () => {
       ['query', false],
     ]);
     expect(command.meta).toMatchObject({ graphMethod: 'POST', graphPathTemplate: '/search/query', category: 'drive' });
-    expect(command.meta.mutates).toBeUndefined();
+    expect(command.meta.effect).toBe('read');
     expect(command.meta.scopesRequired).toEqual(['Files.Read', 'Sites.Read.All']);
   });
 });

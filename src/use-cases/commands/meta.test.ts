@@ -93,14 +93,6 @@ describe('command meta — invariants on every registered command', () => {
     expect(flagged).toEqual(expected);
   });
 
-  it('marks EXACTLY the four mail-draft commands as mutating writes — the read-only contract the top-level --help narrative derives from (F-03). Any new write command must be added here deliberately.', () => {
-    const mutating = Object.entries(commands)
-      .filter(([, cmd]) => cmd.meta.mutates === true)
-      .map(([name]) => name)
-      .toSorted((a, b) => a.localeCompare(b));
-    expect(mutating).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
-  });
-
   it('classifies EXACTLY the four mail-draft commands as `draft` writes and the three PDF converters as `transient-upload` writes; every other command is a `read` — the MCP routing and the --help narrative derive from this (F-03). Any new write command must be added here deliberately.', () => {
     const byEffect = (effect: string): ReadonlyArray<string> =>
       Object.entries(commands)
@@ -310,7 +302,7 @@ describe('command meta — invariants on every registered command', () => {
             for (const value of opt.argumentHint.values) expect(value.trim().length).toBeGreaterThan(0);
           }
         }
-        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.mutates, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
+        for (const flag of [cmd.meta.producesBytes, cmd.meta.producesMedia, cmd.meta.needsElevatedToken, cmd.meta.pagination]) {
           if (flag !== undefined) expect(flag).toBe(true);
         }
         // needsSubstrateToken carries the service name (truthy, so boolean

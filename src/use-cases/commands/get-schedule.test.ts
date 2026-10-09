@@ -124,8 +124,8 @@ describe('get-schedule', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('is a read-only POST (does not set the mutates flag) and documents Calendars.Read in its example', () => {
-    expect(meta.mutates).toBeUndefined();
+  it('is a read-only POST (its effect is `read`) and documents Calendars.Read in its example', () => {
+    expect(meta.effect).toBe('read');
     expect(meta.graphMethod).toBe('POST');
     expect(meta.example).toContain('ask-marcel-office get-schedule');
   });

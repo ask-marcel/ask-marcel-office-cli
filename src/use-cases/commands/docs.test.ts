@@ -53,21 +53,18 @@ describe('buildManifest', () => {
     expect(fooEntry?.responseShape).toBe('single thing');
   });
 
-  it('serializes producesBytes / producesMedia / mutates when set, and omits them otherwise (F-01 — help-json must mirror the meta, not silently drop byte/media/write flags)', () => {
+  it('serializes producesBytes / producesMedia when set, and omits them otherwise (F-01 — help-json must mirror the meta, not silently drop byte/media flags)', () => {
     const registry: Readonly<Record<string, Command>> = {
       'aaa-plain': fakeCmd(),
       'aaa-bytes': fakeCmd({ producesBytes: true }),
       'aaa-media': fakeCmd({ producesMedia: true }),
-      'aaa-write': fakeCmd({ graphMethod: 'PATCH', mutates: true }),
     };
     const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
     const byName = (n: string): (typeof manifest.commands)[number] | undefined => manifest.commands.find((c) => c.name === n);
     expect(byName('aaa-plain')).not.toHaveProperty('producesBytes');
     expect(byName('aaa-plain')).not.toHaveProperty('producesMedia');
-    expect(byName('aaa-plain')).not.toHaveProperty('mutates');
     expect(byName('aaa-bytes')?.producesBytes).toBe(true);
     expect(byName('aaa-media')?.producesMedia).toBe(true);
-    expect(byName('aaa-write')?.mutates).toBe(true);
   });
 
   it('serializes the effect of every registry command, a read included, so a reader can tell a read from a command whose effect is missing', () => {
@@ -262,10 +259,12 @@ describe('buildManifest — the conditional fields toEntry adds or omits', () =>
     expect(entryFor('aaa-plain', {})).not.toHaveProperty('paginationStrategy');
   });
 
-  it('prefers an inline scopesRequired over the central graph-scopes map', () => {
-    // `aaa-inline` is absent from GRAPH_SCOPES_BY_COMMAND, so the central lookup
-    // yields undefined: only the inline value can populate the field here.
+  it('carries the scopes a command declares in its own meta into the manifest', () => {
     expect(entryFor('aaa-inline', { scopesRequired: ['Mail.Read'] })?.scopesRequired).toEqual(['Mail.Read']);
+  });
+
+  it('omits scopesRequired when the command declares none', () => {
+    expect(entryFor('aaa-unscoped', {})).not.toHaveProperty('scopesRequired');
   });
 
   it('omits scopesRequired when the command declares an empty list', () => {
