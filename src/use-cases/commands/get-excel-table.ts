@@ -26,6 +26,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-excel-table --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
   responseShape: 'single Microsoft Graph `workbookTable` resource',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

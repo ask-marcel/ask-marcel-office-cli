@@ -69,6 +69,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "image/png", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`).',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

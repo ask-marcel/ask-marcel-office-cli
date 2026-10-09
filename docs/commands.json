@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:29:07.023Z",
+  "generatedAt": "2026-10-09T18:30:01.102Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1972,7 +1972,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-special-folder --folder-name 'documents'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
+      "responseShape": "single Microsoft Graph `driveItem` resource (folder)",
+      "effect": "read"
     },
     {
       "name": "get-excel-chart-image",
@@ -2015,7 +2016,8 @@
       ],
       "example": "ask-marcel-office get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
       "responseShape": "`{ contentType: \"image/png\", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`).",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-excel-range",
@@ -2057,7 +2059,8 @@
         }
       ],
       "example": "ask-marcel-office get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
-      "responseShape": "single Microsoft Graph `workbookRange` resource (values, formulas, format)"
+      "responseShape": "single Microsoft Graph `workbookRange` resource (values, formulas, format)",
+      "effect": "read"
     },
     {
       "name": "get-excel-table",
@@ -2087,7 +2090,8 @@
         }
       ],
       "example": "ask-marcel-office get-excel-table --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
-      "responseShape": "single Microsoft Graph `workbookTable` resource"
+      "responseShape": "single Microsoft Graph `workbookTable` resource",
+      "effect": "read"
     },
     {
       "name": "get-excel-used-range",
@@ -2132,7 +2136,8 @@
         }
       ],
       "example": "ask-marcel-office get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
-      "responseShape": "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`)."
+      "responseShape": "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`).",
+      "effect": "read"
     },
     {
       "name": "get-group",
@@ -2162,7 +2167,8 @@
         }
       ],
       "example": "ask-marcel-office get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `group` resource"
+      "responseShape": "single Microsoft Graph `group` resource",
+      "effect": "read"
     },
     {
       "name": "get-group-post",
@@ -2204,7 +2210,8 @@
         }
       ],
       "example": "ask-marcel-office get-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
-      "responseShape": "single Microsoft Graph `post` resource: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from` (normally the group address), `sender` (the person who wrote it). With `--expand attachments`, an `attachments[]` array of `fileAttachment` / `itemAttachment` / `referenceAttachment` entries, file attachments carrying `contentBytes` inline."
+      "responseShape": "single Microsoft Graph `post` resource: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from` (normally the group address), `sender` (the person who wrote it). With `--expand attachments`, an `attachments[]` array of `fileAttachment` / `itemAttachment` / `referenceAttachment` entries, file attachments carrying `contentBytes` inline.",
+      "effect": "read"
     },
     {
       "name": "get-group-post-attachment",
@@ -2253,7 +2260,8 @@
       ],
       "example": "ask-marcel-office get-group-post-attachment --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
       "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-mail-attachment",
@@ -4821,7 +4829,8 @@
       ],
       "example": "ask-marcel-office list-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-conversations",

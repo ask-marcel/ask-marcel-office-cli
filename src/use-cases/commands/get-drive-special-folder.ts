@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-drive-special-folder --folder-name 'documents'",
   responseShape: 'single Microsoft Graph `driveItem` resource (folder)',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

@@ -23,6 +23,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
   responseShape: 'single Microsoft Graph `group` resource',
+  effect: 'read',
+  scopesRequired: ['GroupMember.Read.All'],
 };
 
 export { execute, meta, schema };

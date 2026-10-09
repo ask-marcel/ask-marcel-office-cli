@@ -37,6 +37,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office get-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
   responseShape:
     'single Microsoft Graph `post` resource: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from` (normally the group address), `sender` (the person who wrote it). With `--expand attachments`, an `attachments[]` array of `fileAttachment` / `itemAttachment` / `referenceAttachment` entries, file attachments carrying `contentBytes` inline.',
+  effect: 'read',
+  scopesRequired: ['Group.Read.All'],
 };
 
 export { execute, meta, schema };

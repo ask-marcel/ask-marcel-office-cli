@@ -90,6 +90,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
   responseShape: 'single Microsoft Graph `workbookRange` resource (values, formulas, format)',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };
