@@ -63,7 +63,6 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
     ...(cmd.meta.needsSubstrateToken ? { needsSubstrateToken: cmd.meta.needsSubstrateToken } : {}),
     ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
     ...(cmd.meta.producesMedia ? { producesMedia: cmd.meta.producesMedia } : {}),
-    ...(cmd.meta.mutates ? { mutates: cmd.meta.mutates } : {}),
     effect: cmd.meta.effect,
     ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
   };

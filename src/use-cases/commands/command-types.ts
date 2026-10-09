@@ -149,23 +149,15 @@ type CommandMeta = {
    */
   readonly producesMedia?: true;
   /**
-   * `true` if the command performs a write (mutation) against Microsoft Graph
-   * rather than a read/search. Today only the two mail-draft commands
-   * (`create-mail-draft` = POST, `update-mail-draft` = PATCH) — both produce an
-   * UNSENT draft and cannot send. The CLI composition derives its read-only
-   * top-level `--help` narrative from this flag (mutating commands vs search
-   * POSTs) instead of hardcoding command names, and the manifest/`help-json`
-   * surface it so an LLM can tell at a glance which commands change state.
-   * Audit 2026-06-15 (F-03).
-   */
-  readonly mutates?: true;
-  /**
    * What the command does to the tenant. `read` changes nothing (a search POST
-   * included). Every other value is a write class: `draft` creates or updates an
-   * UNSENT mail draft; `transient-upload` puts a temporary file in the user's
-   * OneDrive and tries to delete it. Required, so a new command chooses its
-   * class instead of inheriting `read`. The manifest / `help-json` carry it on
-   * every command. It replaces `mutates` (package split, phase 1 step 11).
+   * included). Every other value is a write class, worded in `command-effect.ts`:
+   * `draft` creates or updates an UNSENT mail draft; `transient-upload` puts a
+   * temporary file in the user's OneDrive and tries to delete it. Required, so a new
+   * command chooses its class instead of inheriting `read`. The MCP routing
+   * (run-command takes only `read`), the MCP annotations, the top-level `--help`
+   * narrative and the per-command docs derive from it, and the manifest /
+   * `help-json` carry it on every command. Replaces the `mutates` flag (package
+   * split, phase 1 step 11).
    */
   readonly effect: CommandEffect;
   /**

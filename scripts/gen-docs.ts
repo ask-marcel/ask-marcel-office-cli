@@ -43,7 +43,6 @@ const buildManifest = (generatedAt: string): CommandManifest => {
       ...(m.pagination ? { pagination: m.pagination } : {}),
       ...(m.producesBytes ? { producesBytes: m.producesBytes } : {}),
       ...(m.producesMedia ? { producesMedia: m.producesMedia } : {}),
-      ...(m.mutates ? { mutates: m.mutates } : {}),
       effect: m.effect,
       ...(m.needsElevatedToken ? { needsElevatedToken: m.needsElevatedToken } : {}),
       ...(m.needsSubstrateToken ? { needsSubstrateToken: m.needsSubstrateToken } : {}),

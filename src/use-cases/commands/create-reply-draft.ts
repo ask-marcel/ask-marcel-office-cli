@@ -159,7 +159,6 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office create-reply-draft --reply-to-message-id "AAMkAD..." --comment "Confirmed for Contoso, aligned with the group choice."',
   bodyTemplate:
     "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
-  mutates: true,
   effect: 'draft',
   scopesRequired: ['Mail.ReadWrite'],
   responseShape:

@@ -19,7 +19,6 @@ export type CommandManifestEntry = {
   readonly needsElevatedToken?: CommandMeta['needsElevatedToken'];
   readonly producesBytes?: CommandMeta['producesBytes'];
   readonly producesMedia?: CommandMeta['producesMedia'];
-  readonly mutates?: CommandMeta['mutates'];
   /** Every registry command carries it; the lifecycle entries, which are not Graph commands, do not. */
   readonly effect?: CommandMeta['effect'];
   readonly stability?: CommandMeta['stability'];
