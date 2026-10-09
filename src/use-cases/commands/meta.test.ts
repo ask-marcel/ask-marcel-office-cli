@@ -132,6 +132,12 @@ describe('command meta — invariants on every registered command', () => {
     expect(malformed).toEqual([]);
   });
 
+  it('declares Files.ReadWrite on each PDF converter, because it uploads a temporary file to the OneDrive to convert it', () => {
+    for (const name of ['convert-mail-attachment-to-pdf', 'convert-calendar-event-attachment-to-pdf', 'convert-group-post-attachment-to-pdf']) {
+      expect({ name, scopes: commands[name]?.meta.scopesRequired }).toEqual({ name, scopes: expect.arrayContaining(['Files.ReadWrite']) });
+    }
+  });
+
   for (const [name, cmd] of populated) {
     describe(`meta for \`${name}\``, () => {
       it('has a non-empty summary', () => {

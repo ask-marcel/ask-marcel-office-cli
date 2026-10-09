@@ -34,7 +34,7 @@ const meta: CommandMeta = {
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
   producesBytes: true,
   effect: 'transient-upload',
-  scopesRequired: ['Calendars.Read', 'Files.Read'],
+  scopesRequired: ['Calendars.Read', 'Files.ReadWrite'],
 };
 
 export { execute, meta, schema };
