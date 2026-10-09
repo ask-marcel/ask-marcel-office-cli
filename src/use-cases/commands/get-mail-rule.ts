@@ -28,6 +28,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
   responseShape: 'single Microsoft Graph `messageRule` resource',
+  effect: 'read',
+  scopesRequired: ['MailboxSettings.Read'],
 };
 
 export { execute, meta, schema };

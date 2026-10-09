@@ -16,6 +16,8 @@ const meta: CommandMeta = {
   options: [...selectExpandOptions],
   example: "ask-marcel-office get-my-calendar --select 'id,name'",
   responseShape: 'single Microsoft Graph `calendar` resource',
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

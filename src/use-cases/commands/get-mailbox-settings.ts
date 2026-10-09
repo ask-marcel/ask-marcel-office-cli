@@ -18,6 +18,8 @@ const meta: CommandMeta = {
   options: [],
   example: 'ask-marcel-office get-mailbox-settings',
   responseShape: 'single Microsoft Graph `mailboxSettings` resource',
+  effect: 'read',
+  scopesRequired: ['MailboxSettings.Read'],
 };
 
 export { execute, meta, schema };

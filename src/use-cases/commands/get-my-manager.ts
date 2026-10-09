@@ -34,6 +34,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office get-my-manager --select 'id,displayName,mail'",
   responseShape:
     'single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description).',
+  effect: 'read',
+  scopesRequired: ['User.Read.All'],
 };
 
 export { execute, meta, schema };

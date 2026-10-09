@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:30:01.102Z",
+  "generatedAt": "2026-10-09T18:30:56.994Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -2298,7 +2298,8 @@
       ],
       "example": "ask-marcel-office get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
       "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-mail-message",
@@ -2328,7 +2329,8 @@
         }
       ],
       "example": "ask-marcel-office get-mail-message --message-id 'AAMkAGI2...'",
-      "responseShape": "single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML."
+      "responseShape": "single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML.",
+      "effect": "read"
     },
     {
       "name": "get-mail-message-mime",
@@ -2347,7 +2349,8 @@
       ],
       "example": "ask-marcel-office get-mail-message-mime --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/plain\", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-mail-rule",
@@ -2371,7 +2374,8 @@
         }
       ],
       "example": "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
-      "responseShape": "single Microsoft Graph `messageRule` resource"
+      "responseShape": "single Microsoft Graph `messageRule` resource",
+      "effect": "read"
     },
     {
       "name": "get-mail-signature",
@@ -2393,7 +2397,8 @@
       ],
       "example": "ask-marcel-office get-mail-signature",
       "responseShape": "`{ contentType: \"text/html\", size, text, sourceMessageId, sentDateTime?, inlinedImages, note? }`. `text` is the signature block itself (the `<div id=\"Signature\">` element, not the whole body), ready to append to a reply. `inlinedImages` counts the logos embedded as data: URIs; any image too large (> 2 MB) or unfetchable keeps its raw `cid:` reference and is named in `note` — no placeholder is substituted, so the reference stays resolvable via get-mail-attachment. `--output-path` writes the HTML to a file.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-mailbox-settings",
@@ -2404,7 +2409,8 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings",
       "options": [],
       "example": "ask-marcel-office get-mailbox-settings",
-      "responseShape": "single Microsoft Graph `mailboxSettings` resource"
+      "responseShape": "single Microsoft Graph `mailboxSettings` resource",
+      "effect": "read"
     },
     {
       "name": "get-my-calendar",
@@ -2428,7 +2434,8 @@
         }
       ],
       "example": "ask-marcel-office get-my-calendar --select 'id,name'",
-      "responseShape": "single Microsoft Graph `calendar` resource"
+      "responseShape": "single Microsoft Graph `calendar` resource",
+      "effect": "read"
     },
     {
       "name": "get-my-manager",
@@ -2452,7 +2459,8 @@
         }
       ],
       "example": "ask-marcel-office get-my-manager --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description)."
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description).",
+      "effect": "read"
     },
     {
       "name": "get-my-profile-photo",
@@ -2464,7 +2472,8 @@
       "options": [],
       "example": "ask-marcel-office get-my-profile-photo",
       "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "get-onenote-page-as-markdown",
