@@ -35,4 +35,12 @@ describe('accessToken brand factory', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('wrong_audience');
   });
+
+  it('refuses a fresh Graph JWT that is not sent as three base64url segments: padding, a line break from a wrapped paste, a fourth segment', () => {
+    const good = makeJwt({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://graph.microsoft.com' });
+    const [header, payload] = good.split('.');
+    for (const raw of [`${header}=.${payload}.sig`, `${good}\nPART2`, `${good}.extra`]) {
+      expect(accessToken(raw)).toEqual({ ok: false, error: { type: 'malformed_jwt' } });
+    }
+  });
 });

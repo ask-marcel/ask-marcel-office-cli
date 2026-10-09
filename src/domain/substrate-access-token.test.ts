@@ -25,6 +25,14 @@ describe('a Teams chat token checked for the service it signs for', () => {
     expect(substrateAccessToken(jwt({ exp: Math.floor(Date.now() / 1000) + 60, aud: IC3 }), 'ic3')).toEqual(err({ type: 'expired' }));
     expect(substrateAccessToken('opaque', 'ic3')).toEqual(err({ type: 'malformed_jwt' }));
   });
+
+  it('refuses a chat token that is not sent as three base64url segments, as not a JWT', () => {
+    const good = jwt({ exp: inAnHour(), aud: CHATSVCAGG });
+    const [header, payload] = good.split('.');
+    for (const raw of [`${header}=.${payload}.sig`, `${good}\nPART2`, `${good}.extra`]) {
+      expect(substrateAccessToken(raw, 'chatsvcagg')).toEqual(err({ type: 'malformed_jwt' }));
+    }
+  });
 });
 
 describe('a value shaped as a JWT is sent in a header', () => {

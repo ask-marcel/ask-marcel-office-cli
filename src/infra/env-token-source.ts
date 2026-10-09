@@ -1,5 +1,5 @@
 import type { AccessToken, AccessTokenError } from '../domain/access-token.ts';
-import { accessToken, isJwtShaped, SUBSTRATE_AUDIENCE, substrateAccessToken } from '../domain/access-token.ts';
+import { accessToken, SUBSTRATE_AUDIENCE, substrateAccessToken } from '../domain/access-token.ts';
 import { envVar } from '../domain/env-var.ts';
 import type { Result } from '../domain/result.ts';
 import { err } from '../domain/result.ts';
@@ -44,10 +44,9 @@ const invalid = (message: string): Result<never, TokenError> => err({ type: 'aut
 
 const UNSET_OR_FIX = 'Put a fresh token in it, or unset it so the token helper is asked.';
 
-const decoded = (tier: EnvTier, raw: string): Result<AccessToken, AccessTokenError> => {
-  if (!isJwtShaped(raw)) return err({ type: 'malformed_jwt' });
-  return tier === 'basic' || tier === 'elevated' ? accessToken(raw) : substrateAccessToken(raw, tier);
-};
+// Both checks refuse a value that is not three base64url segments (malformed_jwt).
+const decoded = (tier: EnvTier, raw: string): Result<AccessToken, AccessTokenError> =>
+  tier === 'basic' || tier === 'elevated' ? accessToken(raw) : substrateAccessToken(raw, tier);
 
 const checked = (tier: EnvTier, raw: string): Result<AccessToken, TokenError> => {
   const token = decoded(tier, raw);

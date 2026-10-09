@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-10 done (2026-10-04) and the two step 10 follow-up fixes done (2026-10-05: the elevated lock wait at a terminal, and a token endpoint 200 that is not a token); steps 11-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-10 done (2026-10-04) and the two step 10 follow-up fixes done (2026-10-05: the elevated lock wait at a terminal, and a token endpoint 200 that is not a token); the two step 10 follow-up 2 changes done (2026-10-09: the token helper locator looks up the runtime and entry and does not read them, and every AccessToken is JWT-shaped); steps 11-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 

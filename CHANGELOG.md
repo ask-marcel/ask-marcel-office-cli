@@ -84,6 +84,11 @@ the same package name. The passive update notice stays.
   have `exists(path)`, the new `FileExistence` type. It tells if a file is at
   the path and does not read the file. `createBunFileSystem` and
   `createNodeFileSystem` have it.
+- `accessToken` gives `malformed_jwt` for a value that is not three base64url
+  segments, for example base64 with `=` padding or a token with a line break.
+  Before, only the environment token variables had this check. Every
+  `AccessToken` now has the shape that an HTTP header can carry. The error
+  messages do not change.
 
 ## 2.8.0
 
