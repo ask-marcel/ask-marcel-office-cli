@@ -1,15 +1,19 @@
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 
 const isMissingError = (e: unknown): boolean => e instanceof Error && (e as { code?: string }).code === 'ENOENT';
 
-export const createBunFileSystem = (): FileSystem & AtomicFileWrites => ({
+export const createBunFileSystem = (): FileSystem & AtomicFileWrites & FileExistence => ({
   // Bun has neither a rename nor an exclusive create; both live on node:fs, so
   // these two delegate to the Node adapter, lazily (the same Rule-20 boundary
   // exception as chmod and the recursive delete below).
   writeTextAtomic: async (path, content, mode) => (await import('./filesystem-node.ts')).writeTextAtomic(path, content, mode),
   createExclusive: async (path, content, mode) => (await import('./filesystem-node.ts')).createExclusive(path, content, mode),
+  // Bun.file().exists() says true for a named pipe and throws on a NUL byte, so
+  // the existence check delegates to the Node adapter's stat, lazily: both
+  // adapters then give one answer for one path.
+  exists: async (path) => (await import('./filesystem-node.ts')).exists(path),
   readJson: async <T>(path: string) => {
     const file = Bun.file(path);
     if (!(await file.exists())) return err({ type: 'not_found' });

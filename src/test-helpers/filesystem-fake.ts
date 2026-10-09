@@ -1,8 +1,9 @@
 import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 
 export type FileSystemFake = FileSystem &
-  AtomicFileWrites & {
+  AtomicFileWrites &
+  FileExistence & {
     readonly seed: (path: string, content: string) => void;
     readonly seedBytes: (path: string, bytes: Uint8Array) => void;
     readonly snapshot: (path: string) => string | undefined;
@@ -33,6 +34,8 @@ export const createFileSystemFake = (): FileSystemFake => {
       if (text !== undefined) return ok(new TextEncoder().encode(text));
       return err({ type: 'not_found' });
     },
+    // The fake holds files only, so anything stored is a file.
+    exists: async (path) => ok(store.has(path) || bytesStore.has(path)),
     writeText: async (path, content) => {
       store.set(path, content);
       bytesStore.delete(path);

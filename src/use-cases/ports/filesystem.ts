@@ -27,6 +27,17 @@ export type FileSystem = {
 };
 
 /**
+ * Whether a file is at a path, from its folder entry alone: the file is never
+ * opened, so the token helper locator checks a recorded runtime (about 100 MB
+ * for node) at the cost of one lookup. A folder is not a file. Kept apart from
+ * FileSystem because only the locator needs it.
+ */
+export type FileExistence = {
+  /** ok(false) when nothing is there or what is there is not a file (a folder, a named pipe); io_failed when the lookup fails (a link loop). */
+  readonly exists: (path: string) => Promise<Result<boolean, FileSystemError>>;
+};
+
+/**
  * Writes that other processes race on: the token cache, replaced whole so a
  * reader never sees half a file, and its lock, created only when absent. Kept
  * apart from FileSystem because only the auth code needs them.

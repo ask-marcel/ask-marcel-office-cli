@@ -28,7 +28,7 @@ export type { WinstonLoggerConfig } from './infra/logger.ts';
 export { createBunProcessRunner } from './infra/process-runner-bun.ts';
 export { createNodeProcessRunner } from './infra/process-runner-node.ts';
 
-export type { AtomicFileWrites, FileSystem, FileSystemError } from './use-cases/ports/filesystem.ts';
+export type { AtomicFileWrites, FileExistence, FileSystem, FileSystemError } from './use-cases/ports/filesystem.ts';
 export type { Logger, LogMeta } from './use-cases/ports/logger.ts';
 export type { ProcessRunner, ProcessRunnerError, ProcessRunOptions, ProcessRunResult } from './use-cases/ports/process-runner.ts';
 

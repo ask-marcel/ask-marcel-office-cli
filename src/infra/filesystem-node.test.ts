@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describeAtomicFileWritesContract } from '../test-helpers/atomic-file-writes-contract.ts';
+import { describeFileExistsContract } from '../test-helpers/file-exists-contract.ts';
 import { createNodeFileSystem } from './filesystem-node.ts';
 
 let tmp: string;
@@ -202,3 +203,16 @@ describe('Node filesystem adapter — chmod', () => {
 });
 
 describeAtomicFileWritesContract('Node filesystem adapter', createNodeFileSystem);
+
+describeFileExistsContract('Node filesystem adapter', createNodeFileSystem);
+
+describe('Node filesystem adapter — exists', () => {
+  it('returns io_failed when the path cannot be looked up, rather than call a runtime gone', async () => {
+    // Two links that point at each other: the lookup fails with ELOOP.
+    symlinkSync(join(tmp, 'b'), join(tmp, 'a'));
+    symlinkSync(join(tmp, 'a'), join(tmp, 'b'));
+    const result = await createNodeFileSystem().exists(join(tmp, 'a'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.type).toBe('io_failed');
+  });
+});

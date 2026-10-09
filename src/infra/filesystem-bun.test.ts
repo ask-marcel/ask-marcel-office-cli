@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describeAtomicFileWritesContract } from '../test-helpers/atomic-file-writes-contract.ts';
+import { describeFileExistsContract } from '../test-helpers/file-exists-contract.ts';
 import { createBunFileSystem } from './filesystem-bun.ts';
 
 let tmp: string;
@@ -200,3 +201,5 @@ describe('Bun filesystem adapter — chmod', () => {
 });
 
 describeAtomicFileWritesContract('Bun filesystem adapter', createBunFileSystem);
+
+describeFileExistsContract('Bun filesystem adapter', createBunFileSystem);

@@ -13,11 +13,11 @@
  * either runtime directly.
  */
 
-import { chmod, mkdir, open, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { formatError } from '../domain/utilities/format-error.ts';
 import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AtomicFileWrites, FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 import { renameWithRetry } from './rename-with-retry.ts';
 
 const isNodeError = (e: unknown): e is NodeJS.ErrnoException => e instanceof Error && 'code' in e;
@@ -67,9 +67,21 @@ export const createExclusive: AtomicFileWrites['createExclusive'] = async (path,
   }
 };
 
-export const createNodeFileSystem = (): FileSystem & AtomicFileWrites => ({
+// A stat, never a read. ENOTDIR (a file where a folder of the path should be)
+// means nothing is there. Exported for the Bun adapter, which delegates to it.
+export const exists: FileExistence['exists'] = async (path) => {
+  try {
+    return ok((await stat(path)).isFile());
+  } catch (e) {
+    if (isNodeError(e) && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) return ok(false);
+    return err({ type: 'io_failed', message: formatError(e) });
+  }
+};
+
+export const createNodeFileSystem = (): FileSystem & AtomicFileWrites & FileExistence => ({
   writeTextAtomic,
   createExclusive,
+  exists,
   readJson: async <T>(path: string) => {
     let raw: string;
     try {
