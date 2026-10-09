@@ -49,6 +49,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
   responseShape:
     'single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied), with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

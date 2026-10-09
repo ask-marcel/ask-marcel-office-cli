@@ -34,6 +34,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office get-team-channel-message --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
   responseShape:
     'single Microsoft Graph `chatMessage` resource: `id`, `replyToId`, `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`',
+  effect: 'read',
+  scopesRequired: ['ChannelMessage.Read.All'],
 };
 
 export { execute, meta, schema };

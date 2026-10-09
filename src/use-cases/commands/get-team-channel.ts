@@ -28,6 +28,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-team-channel --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --select 'id,displayName'",
   responseShape: 'single Microsoft Graph `channel` resource',
+  effect: 'read',
+  scopesRequired: ['Channel.ReadBasic.All'],
 };
 
 export { execute, meta, schema };

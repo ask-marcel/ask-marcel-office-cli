@@ -34,6 +34,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...' --select 'id,subject,start,end'",
   responseShape: 'single Microsoft Graph `event` resource',
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

@@ -34,6 +34,7 @@ const meta: CommandMeta = {
   responseShape:
     'single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc., plus `webUrl`, and `event`, `files` and `reactions` when present. **Microsoft-internal schema — fields may change without notice.**',
   stability: 'experimental',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

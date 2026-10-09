@@ -22,6 +22,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-site-analytics --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'single Microsoft Graph `itemAnalytics` resource',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-team --team-id 'abc-1234-...' --select displayName,description,visibility",
   responseShape: 'single Microsoft Graph `team` resource (or projection of the requested `--select` fields)',
+  effect: 'read',
+  scopesRequired: ['Team.ReadBasic.All'],
 };
 
 export { execute, meta, schema };
