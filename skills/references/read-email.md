@@ -24,7 +24,7 @@ One call usually returns the whole thread, because every reply quotes what came 
 ask-marcel-office list-mail-attachments --message-id '<id>'
 # ≤5 MB, text-heavy (docx/xlsx/csv):
 ask-marcel-office convert-mail-attachment-to-markdown --message-id '<id>' --attachment-id '<attId>'
-# ≤5 MB, layout matters (pptx/pdf):
+# ≤5 MB, layout matters (pptx/pdf). It uploads a temporary copy to your OneDrive and tries to delete it after:
 ask-marcel-office convert-mail-attachment-to-pdf --message-id '<id>' --attachment-id '<attId>' --output-path att.pdf
 # >5 MB, or you want the raw file:
 ask-marcel-office get-mail-attachment --message-id '<id>' --attachment-id '<attId>' --output-path att.<real ext>

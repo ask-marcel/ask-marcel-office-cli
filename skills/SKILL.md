@@ -16,7 +16,7 @@ description: >
 
 # Answer a question, or draft a reply, from Microsoft 365
 
-Thin orchestrator over `ask-marcel-office` (200+ typed Microsoft Graph subcommands — read-only except four unsent-draft writers). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
+Thin orchestrator over `ask-marcel-office` (200+ typed Microsoft Graph subcommands — read-only except four unsent-draft writers and three PDF converters that use a temporary OneDrive file). The CLI handles auth, pagination, and file conversion. Your job: pick the right commands, read what they return, follow the leads, and assemble a sourced answer — or, on request, an unsent draft.
 
 ## Ground rules
 
