@@ -100,6 +100,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/x-diff", size, text, added, removed, versionId }` — `text` is the unified diff; `note` says when nothing was saved after the instant, when the two render the same, when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.',
   needsElevatedToken: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

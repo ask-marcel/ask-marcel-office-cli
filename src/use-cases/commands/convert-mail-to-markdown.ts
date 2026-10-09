@@ -376,6 +376,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped, carrying the share of the body\u2019s readable text that went with it (`quoted reply chain stripped (removed 62% of the body text) \u2014 pass --keep-quoted true to include it`). A share near 100% on a message that should have had a real reply above the quote is the signature of a mis-detected boundary: refetch with `--keep-quoted true` to confirm.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 // Shared with get-mail-signature, which fetches the same inline images by the

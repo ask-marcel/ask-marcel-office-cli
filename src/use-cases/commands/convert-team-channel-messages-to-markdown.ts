@@ -124,6 +124,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size, text, note }`: a `# Transcript of <channel>` heading, then every post as `### date time · author` with its body and quoted replies. The `note` counts the posts and pages read, the system events omitted, and says when the walk was cut at `--max-pages`.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['ChannelMessage.Read.All'],
 };
 
 export { execute, meta, schema };

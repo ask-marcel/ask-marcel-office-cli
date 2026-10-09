@@ -85,6 +85,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: the post heading, its body, then the replies as quoted blocks. The optional `note` reports a failed or truncated replies read.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['ChannelMessage.Read.All'],
 };
 
 export { execute, meta, schema };
