@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-onenote-section-pages --onenote-section-id '1-abc...'",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read'],
 };
 
 export { execute, meta, schema };

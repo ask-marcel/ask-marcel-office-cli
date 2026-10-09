@@ -16,6 +16,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-onenote-notebooks',
   responseShape: 'collection of Microsoft Graph `notebook` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read'],
 };
 
 export { execute, meta, schema };

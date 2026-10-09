@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:39:19.046Z",
+  "generatedAt": "2026-10-09T18:40:13.719Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -6039,7 +6039,8 @@
       ],
       "example": "ask-marcel-office list-onenote-notebook-sections --notebook-id '1-12abc...'",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-onenote-notebooks",
@@ -6088,7 +6089,8 @@
       ],
       "example": "ask-marcel-office list-onenote-notebooks",
       "responseShape": "collection of Microsoft Graph `notebook` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-onenote-section-pages",
@@ -6143,7 +6145,8 @@
       ],
       "example": "ask-marcel-office list-onenote-section-pages --onenote-section-id '1-abc...'",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-outlook-categories",
@@ -6154,7 +6157,8 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories",
       "options": [],
       "example": "ask-marcel-office list-outlook-categories",
-      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`"
+      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-plan-buckets",
@@ -6179,7 +6183,8 @@
       ],
       "example": "ask-marcel-office list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
       "responseShape": "collection of Microsoft Graph `plannerBucket` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-plan-tasks",
@@ -6198,7 +6203,8 @@
       ],
       "example": "ask-marcel-office list-plan-tasks --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-planner-plans",
@@ -6217,7 +6223,8 @@
       ],
       "example": "ask-marcel-office list-planner-plans",
       "responseShape": "collection of Microsoft Graph `plannerPlan` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-planner-tasks",
@@ -6266,7 +6273,8 @@
       ],
       "example": "ask-marcel-office list-planner-tasks",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-recent-files",
@@ -6322,7 +6330,8 @@
       ],
       "example": "ask-marcel-office list-recent-files",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-recently-used-insights",

@@ -18,6 +18,8 @@ const meta: CommandMeta = {
   options: [],
   example: 'ask-marcel-office list-outlook-categories',
   responseShape: 'collection of Microsoft Graph `outlookCategory` resources under `value[]`',
+  effect: 'read',
+  scopesRequired: ['MailboxSettings.Read'],
 };
 
 export { execute, meta, schema };
