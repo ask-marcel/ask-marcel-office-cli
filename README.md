@@ -28,7 +28,7 @@ ask-marcel-office login          # your normal Microsoft sign-in, in a browser, 
 ask-marcel-office list-mail-messages --top 5
 ```
 
-That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And nothing for a runaway agent to break: the command surface is read-only by design.
+That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And little for a runaway agent to break: the command surface is read-mostly by design. A write leaves an unsent draft, or a temporary OneDrive file that the command tries to delete.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ask-marcel/ask-marcel-office-cli/main/docs/demo.gif" alt="ask-marcel-office converting an Outlook .msg file into clean markdown in one command, offline" width="880">
@@ -51,7 +51,7 @@ And against the tools you already know:
 |---|---|---|---|
 | Sign-in | An Entra app registration, always: every auth flow needs a client id | An Entra app registration; its `setup` command creates one, and the permissions it requests can need admin consent | Your own account, in a browser, once. No app registration |
 | Built for | Backend services | Admins and scripts | Tool-calling LLMs: markdown out, lean fields, a repair hint on every error |
-| Can it break things | Whatever your app's permissions allow | Yes: it creates, changes, and deletes across the tenant | No: read-only by design; the four writes only leave unsent drafts |
+| Can it break things | Whatever your app's permissions allow | Yes: it creates, changes, and deletes across the tenant | No: read-mostly by design; a write leaves an unsent draft, or a temporary OneDrive file that the command tries to delete |
 
 ## The three walls it removes
 
@@ -61,7 +61,7 @@ Microsoft Graph normally means registering an Azure app, chasing tenant-admin co
 
 ### 🛡️ Safe to hand to an autonomous agent
 
-The 211 commands break down as 202 GET, 5 read-only POST (four searches and a free/busy lookup), and 4 mail-draft operations. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
+The 211 commands break down as 199 GET reads, 5 read-only POST (four searches and a free/busy lookup), and 7 writes: 4 mail-draft operations and 3 PDF conversions that upload an attachment to a temporary file in your OneDrive, convert it, and try to delete that file. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder, or a temporary file in the `.ask-marcel-temp` OneDrive folder when a conversion stops before its cleanup. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
 
 ### 🧠 Responses budgeted for a context window
 
@@ -205,8 +205,8 @@ You get **six gateway tools**, not one per command — a schema per command woul
 |:--|:--|
 | `list-commands` | The terse manifest. Start here; `category` narrows it. |
 | `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 207 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
-| `run-write-command` | The 4 mail-draft **write** commands. Separate tool so the read tool's promise stays honest. |
+| `run-command` | The 204 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
+| `run-write-command` | The 7 **write** commands: 4 mail-draft operations and 3 PDF conversions (a temporary OneDrive upload). Separate tool so the read tool's promise stays honest. |
 | `login` | Sign in / refresh. Opens a browser on this machine. |
 | `status` | Shows the four cached tokens: available or not, time left, scopes. Reads only the cache and never opens a browser. |
 

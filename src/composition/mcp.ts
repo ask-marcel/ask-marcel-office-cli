@@ -23,6 +23,7 @@ import { z } from 'zod';
 import type { AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
+import { describeWrites, WRITE_EFFECTS, writeGroups } from '../use-cases/commands/command-effect.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
@@ -71,13 +72,16 @@ const errText = (message: string, code?: string, source?: Parameters<typeof rend
 // used to name the split as a pair of literals, and those literals were stale
 // within two releases: exactly the failure the derivation below exists to
 // prevent. Read the counts off the registry, never off a sentence.
+// The same holds for what a write does: each command's `effect` decides its tool,
+// and the wording and annotations come from the effect table in command-effect.ts.
 const readCommandNames = Object.entries(cmdRegistry)
-  .filter(([, c]) => c.meta.mutates !== true)
+  .filter(([, c]) => c.meta.effect === 'read')
   .map(([n]) => n);
 const writeCommandNames = Object.entries(cmdRegistry)
-  .filter(([, c]) => c.meta.mutates === true)
+  .filter(([, c]) => c.meta.effect !== 'read')
   .map(([n]) => n)
   .toSorted((a, b) => a.localeCompare(b));
+const writesAreDestructive = writeGroups(cmdRegistry).some((group) => WRITE_EFFECTS[group.effect].destructive);
 
 // Derived from the single curated order in docs-render, never hardcoded, so a new category can never
 // drift out of sync with what the category filter actually accepts (docs-render.test pins completeness).
@@ -133,7 +137,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
 
   // The read/write split exists so the read commands keep an honest
   // `readOnlyHint: true` (which lets a client auto-approve them) instead of
-  // losing it to the handful of draft commands sharing one tool.
+  // losing it to the handful of write commands sharing one tool.
   const runToolInput = {
     command: z.string().describe('Command name from list-commands.'),
     params: z.record(z.string(), z.string()).optional().describe('Command options WITHOUT the `--` prefix, e.g. {"top":"10","folderId":"inbox"}. See get-command-docs.'),
@@ -153,7 +157,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
   ): Promise<CallToolResult> => {
     const resolved = resolveCommand(cmdRegistry, commandName);
     if (!resolved.ok) return errText(unknownCommandMessage(resolved.error.name, resolved.error.available, MCP_REMEDY), 'cli_unknown_command');
-    const isMutating = resolved.value.command.meta.mutates === true;
+    const isMutating = resolved.value.command.meta.effect !== 'read';
     // Gate BEFORE executing: a write routed through run-command would silently
     // mutate under a `readOnlyHint: true` tool the client may have auto-approved.
     if (isMutating && !wantMutating)
@@ -172,7 +176,7 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     'run-command',
     {
       title: 'Run a read command',
-      description: `Run any of the ${readCommandNames.length} READ commands (mail, files, calendar, chats, search, document conversion). Cannot write: the ${writeCommandNames.length} draft commands are rejected here and live on run-write-command. Call get-command-docs first to learn the params.`,
+      description: `Run any of the ${readCommandNames.length} READ commands (mail, files, calendar, chats, search, document conversion). Cannot write: the ${writeCommandNames.length} write commands are rejected here and live on run-write-command. Call get-command-docs first to learn the params.`,
       inputSchema: runToolInput,
       annotations: { readOnlyHint: true },
     },
@@ -183,11 +187,13 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     'run-write-command',
     {
       title: 'Run a write command',
-      description: `Run one of the ${writeCommandNames.length} commands that WRITE to Microsoft 365: ${writeCommandNames.join(', ')}. Each only creates or updates an UNSENT mail draft — this CLI cannot send mail, and has no other write surface. Read commands are rejected here; use run-command.`,
+      description: `Run one of the ${writeCommandNames.length} commands that WRITE to Microsoft 365. ${describeWrites(cmdRegistry)}. This CLI has no other write surface. Read commands are rejected here; use run-command.`,
       inputSchema: runToolInput,
-      // Not read-only, but not destructive either: every write here produces an
-      // unsent draft. Nothing is overwritten or transmitted.
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      // Not read-only. Destructive only when one of the write classes is (none
+      // today: a draft is unsent, and a temporary upload is a copy of the user's
+      // own attachment that the command tries to delete; nothing is overwritten
+      // or transmitted).
+      annotations: { readOnlyHint: false, destructiveHint: writesAreDestructive },
     },
     async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, true)
   );

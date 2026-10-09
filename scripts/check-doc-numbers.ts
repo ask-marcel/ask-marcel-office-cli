@@ -46,39 +46,50 @@ const manifest = buildManifest(commands, 'ask-marcel-office-cli', '0.0.0');
 const graphCommands = manifest.commands.filter((entry) => entry.category !== 'lifecycle');
 
 const total = entries.length;
-const write = entries.filter(([, command]) => command.meta.mutates === true).length;
+const write = entries.filter(([, command]) => command.meta.effect !== 'read').length;
 const read = total - write;
-const get = graphCommands.filter((entry) => entry.graphMethod === 'GET').length;
-const post = graphCommands.filter((entry) => entry.graphMethod === 'POST').length;
+const draft = entries.filter(([, command]) => command.meta.effect === 'draft').length;
+const transientUpload = entries.filter(([, command]) => command.meta.effect === 'transient-upload').length;
 const categories = new Set(graphCommands.map((entry) => entry.category)).size;
 
 // The manifest carries the lifecycle stubs the registry does not; the COMMANDS.md
 // gap sentence explains that difference and must track both sides of it.
 const manifestTotal = manifest.commands.length;
 
-// The draft commands are the writes, and three of the four are POST. The README
-// counts POST twice over: once as the read-only POSTs (the searches and the
-// free/busy lookup) and once as the mail-draft operations, so the read-only
-// figure is the POSTs that are not drafts.
-const draftPosts = graphCommands.filter((entry) => entry.graphMethod === 'POST' && commands[entry.name]?.meta.mutates === true).length;
-const readOnlyPost = post - draftPosts;
+// The README splits the surface by effect first and verb second: the reads are
+// GET or a read-only POST (the searches and the free/busy lookup), and the writes
+// are counted apart whatever their verb (three drafts are POST, and the PDF
+// conversions are declared GET although they upload a temporary file).
+const readEntries = graphCommands.filter((entry) => entry.effect === 'read');
+const readGet = readEntries.filter((entry) => entry.graphMethod === 'GET').length;
+const readOnlyPost = readEntries.filter((entry) => entry.graphMethod === 'POST').length;
 
 const CLAIMS: ReadonlyArray<Claim> = [
   { file: 'README.md', label: 'command total in the nav and deep-docs links', pattern: /All (\d+) commands/g, expected: [total] },
   {
     file: 'README.md',
     label: 'safety breakdown by HTTP verb',
-    pattern: /The (\d+) commands break down as (\d+) GET, (\d+) read-only POST[^.]*, and (\d+) mail-draft operations/,
-    expected: [total, get, readOnlyPost, write],
+    pattern: /The (\d+) commands break down as (\d+) GET reads, (\d+) read-only POST[^.]*, and (\d+) writes: (\d+) mail-draft operations and (\d+) PDF conversions/,
+    expected: [total, readGet, readOnlyPost, write, draft, transientUpload],
   },
   { file: 'README.md', label: 'run-command payload in the MCP tool table', pattern: /The (\d+) \*\*read\*\* commands/, expected: [read] },
-  { file: 'README.md', label: 'run-write-command payload in the MCP tool table', pattern: /The (\d+) mail-draft \*\*write\*\* commands/, expected: [write] },
+  {
+    file: 'README.md',
+    label: 'run-write-command payload in the MCP tool table',
+    pattern: /The (\d+) \*\*write\*\* commands: (\d+) mail-draft operations and (\d+) PDF conversions/,
+    expected: [write, draft, transientUpload],
+  },
   { file: 'docs/COMMANDS.md', label: 'header count and category count', pattern: /All (\d+) commands across (\d+) categories/, expected: [total, categories] },
   { file: 'docs/COMMANDS.md', label: 'help-json manifest total', pattern: /manifest total \((\d+)\)/, expected: [manifestTotal] },
   { file: 'docs/COMMANDS.md', label: 'the sentence explaining the lifecycle gap', pattern: /a (\d+)-vs-(\d+) gap/, expected: [total, manifestTotal] },
   { file: 'docs/USAGE.md', label: 'run-command payload in the gateway listing', pattern: /the (\d+) READ commands/, expected: [read] },
-  { file: 'docs/USAGE.md', label: 'run-write-command payload in the gateway listing', pattern: /the (\d+) mail-draft WRITE commands/, expected: [write] },
-  { file: 'docs/USAGE.md', label: 'draft-command count in the MCP notes', pattern: /carries the (\d+) draft commands/, expected: [write] },
+  { file: 'docs/USAGE.md', label: 'run-write-command payload in the gateway listing', pattern: /the (\d+) WRITE commands \((\d+) drafts, (\d+) PDF\)/, expected: [write, draft, transientUpload] },
+  {
+    file: 'docs/USAGE.md',
+    label: 'write-command counts in the MCP notes',
+    pattern: /carries the (\d+) write commands\s+\((\d+) mail-draft operations and (\d+) PDF conversions\)/,
+    expected: [write, draft, transientUpload],
+  },
 ];
 
 /** Line number of a match, so a failure is clickable rather than a hunt. */
@@ -110,7 +121,7 @@ const runSelftest = (): number => {
     console.error('check-doc-numbers: selftest cannot run, the claim table is empty');
     return 1;
   }
-  const wrong = `The ${total + 1} commands break down as ${get} GET, ${readOnlyPost} read-only POST (three searches and a free/busy lookup), and ${write} mail-draft operations.`;
+  const wrong = `The ${total + 1} commands break down as ${readGet} GET reads, ${readOnlyPost} read-only POST (three searches and a free/busy lookup), and ${write} writes: ${draft} mail-draft operations and ${transientUpload} PDF conversions.`;
   const rejected = checkClaim(wrong, claim);
   const missing = checkClaim('a document that never mentions the counts at all', claim);
 
@@ -138,11 +149,11 @@ const run = async (): Promise<number> => {
   if (failures.length > 0) {
     console.error('check-doc-numbers: the docs disagree with the registry.\n');
     for (const failure of failures) console.error(`  ${failure}`);
-    console.error(`\nRegistry now holds: ${total} commands (${read} read, ${write} write), ${get} GET, ${readOnlyPost} read-only POST, ${categories} categories, ${manifestTotal} in the help-json manifest.`);
+    console.error(`\nRegistry now holds: ${total} commands (${read} read, ${write} write: ${draft} draft, ${transientUpload} transient-upload), ${readGet} GET reads, ${readOnlyPost} read-only POST, ${categories} categories, ${manifestTotal} in the help-json manifest.`);
     return 1;
   }
 
-  console.log(`check-doc-numbers: ${CLAIMS.length} claims match the registry (${total} commands, ${read} read, ${write} write, ${get} GET, ${categories} categories).`);
+  console.log(`check-doc-numbers: ${CLAIMS.length} claims match the registry (${total} commands, ${read} read, ${write} write, ${readGet} GET reads, ${categories} categories).`);
   return 0;
 };
 

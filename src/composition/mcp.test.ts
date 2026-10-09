@@ -37,9 +37,9 @@ const textOf = (result: unknown): string => {
 };
 const isError = (result: unknown): boolean => (result as { isError?: boolean }).isError === true;
 
-const readCommandCount = Object.values(commands).filter((c) => c.meta.mutates !== true).length;
+const readCommandCount = Object.values(commands).filter((c) => c.meta.effect === 'read').length;
 const writeCommandNames = Object.entries(commands)
-  .filter(([, c]) => c.meta.mutates === true)
+  .filter(([, c]) => c.meta.effect !== 'read')
   .map(([n]) => n);
 
 describe('the MCP gateway an agent connects to', () => {
@@ -57,7 +57,7 @@ describe('the MCP gateway an agent connects to', () => {
     expect(annotationOf('get-command-docs')['readOnlyHint']).toBe(true);
     expect(annotationOf('run-command')['readOnlyHint']).toBe(true);
     expect(annotationOf('run-write-command')['readOnlyHint']).toBe(false);
-    // The drafts are unsent and overwrite nothing.
+    // A draft is unsent and a temporary upload is a copy the command tries to delete: neither overwrites anything.
     expect(annotationOf('run-write-command')['destructiveHint']).toBe(false);
   });
 
@@ -260,6 +260,44 @@ describe('the read/write boundary the readOnlyHint promises', () => {
     });
     expect(isError(result)).toBe(false);
     expect(textOf(result)).toContain('draft-1');
+  });
+
+  it('refuses a PDF conversion on run-command before any Graph call, because it uploads a temporary file to OneDrive', async () => {
+    let graphWasCalled = false;
+    const graph: GraphClient = fakeGraphClient({
+      get: async () => {
+        graphWasCalled = true;
+        return ok({});
+      },
+    });
+    const client = await connect({ graph });
+    const result = await client.callTool({ name: 'run-command', arguments: { command: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1', attachmentId: 'a1' } } });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('run-write-command');
+    expect(graphWasCalled).toBe(false);
+  });
+
+  it('runs a PDF conversion through run-write-command', async () => {
+    const graph: GraphClient = fakeGraphClient({
+      get: async () => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: btoa('%PDF-1.7') }),
+    });
+    const client = await connect({ graph });
+    const result = await client.callTool({ name: 'run-write-command', arguments: { command: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1', attachmentId: 'a1' } } });
+    expect(isError(result)).toBe(false);
+    expect(textOf(result)).toContain('application/pdf');
+  });
+
+  it('tells the agent what each write leaves behind: an unsent draft, or a temporary OneDrive file that the command deletes', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    const description = tools.find((t) => t.name === 'run-write-command')?.description ?? '';
+    expect(description).toContain('create-forward-draft, create-mail-draft, create-reply-draft, update-mail-draft: create or update an UNSENT mail draft');
+    expect(description).toContain(
+      'convert-calendar-event-attachment-to-pdf, convert-group-post-attachment-to-pdf, convert-mail-attachment-to-pdf: upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)'
+    );
+    // One sentence per write class, so the agent can tell which promise belongs to which command.
+    expect(description).toContain('(this CLI cannot send mail). convert-calendar-event-attachment-to-pdf, ');
+    expect(tools.find((t) => t.name === 'run-command')?.description).toContain(`the ${writeCommandNames.length} write commands are rejected here`);
   });
 
   it('advertises the write set derived from the registry, so a newly-flagged write command is covered without touching this file', async () => {

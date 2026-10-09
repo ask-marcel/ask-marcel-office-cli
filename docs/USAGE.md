@@ -195,8 +195,8 @@ bloat this CLI exists to avoid). Discovery is three hops:
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 207 READ commands
-run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
+run-command { command, params?, outputPath?, outputDir? }        → the 204 READ commands
+run-write-command { command, params?, outputPath?, outputDir? }  → the 7 WRITE commands (4 drafts, 3 PDF)
 login { force?: boolean }                      → sign in / refresh
 status                                         → the four cached tokens (reads only the cache)
 ```
@@ -211,8 +211,11 @@ run-command { "command": "list-mail-messages", "params": { "top": "10" } }
 Notes:
 
 - `run-command` is annotated `readOnlyHint: true` so clients can auto-approve it. A write routed
-  through it is refused before it executes. `run-write-command` carries the 4 draft commands and is
-  marked non-destructive: each produces an UNSENT draft, and this CLI cannot send mail.
+  through it is refused before it executes. `run-write-command` carries the 7 write commands
+  (4 mail-draft operations and 3 PDF conversions) and is marked non-destructive: a draft is
+  UNSENT, and this CLI cannot send mail; a PDF conversion uploads the attachment to a temporary
+  file in your OneDrive and tries to delete it after the conversion (a failed cleanup can leave it
+  in the `.ask-marcel-temp` folder).
 - **Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`, or the equivalent).
   Measured live: a browser sign-in takes **37–64 s with no MFA prompt at all** (it varies with how
   warm the persistent browser profile is), and the MCP default request timeout is **60 s** — so

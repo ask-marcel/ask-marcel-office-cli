@@ -91,12 +91,12 @@ describe('buildCli command surface', () => {
   it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET').length;
+    const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
     const mutating = Object.entries(commands)
-      .filter(([, c]) => c.meta.mutates === true)
+      .filter(([, c]) => c.meta.effect !== 'read')
       .map(([n]) => n);
     const searchPosts = Object.entries(commands)
-      .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.mutates !== true)
+      .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
       .map(([n]) => n);
     const description = cli.description();
     expect(description).toContain(`${getCount} GET endpoints`);
@@ -108,6 +108,19 @@ describe('buildCli command surface', () => {
     // the old bug: every POST was labelled "searches, not mutations", which
     // mislabelled create-mail-draft. That phrasing must be gone.
     expect(description).not.toContain('searches, not mutations');
+  });
+
+  it('top-level description says what each write leaves behind, so the PDF conversions are not hidden behind a drafts-only promise', () => {
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
+    const description = cli.description();
+    const writeCount = Object.values(commands).filter((c) => c.meta.effect !== 'read').length;
+    expect(description).toContain(`the ONLY writes are ${writeCount} commands.`);
+    expect(description).toContain(
+      'convert-calendar-event-attachment-to-pdf, convert-group-post-attachment-to-pdf, convert-mail-attachment-to-pdf: upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)'
+    );
+    // The cleanup is best effort, so the help must not promise that no file stays.
+    expect(description).not.toContain('keeps no file');
+    expect(description).not.toContain('write files');
   });
 
   it('renders the slim summary in text format with the two-pointer hint', async () => {

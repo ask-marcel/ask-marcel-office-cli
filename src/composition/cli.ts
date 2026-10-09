@@ -16,6 +16,7 @@ import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import * as status from '../use-cases/commands/status.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
+import { describeWrites } from '../use-cases/commands/command-effect.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
 import { resolveDateZone } from './date-zone.ts';
@@ -157,23 +158,22 @@ const buildCli = (deps: BuildCliDeps): Command => {
   // top-level description can never drift from the manifest again. The
   // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
   // POST) when search-all-accessible-sites was added without updating it.
-  const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET').length;
-  // 2026-06-15 (F-03), extended 2026-07-04: the only write commands are the three mail-draft ones
-  // (create=POST, update=PATCH); everything else is a read or a search. Derive
-  // BOTH lists from the manifest's `mutates` flag so the read-only narrative can
-  // never drift from the registry. The previous code took every POST command and
-  // labelled it "— searches, not mutations", which silently mislabelled
-  // create-mail-draft as a search the moment it shipped (and omitted the PATCH
-  // update-mail-draft entirely).
-  const mutatingCommandNames = Object.entries(cmdRegistry)
-    .filter(([, c]) => c.meta.mutates === true)
-    .map(([n]) => n)
-    .toSorted((a, b) => a.localeCompare(b));
+  // GET reads only: the PDF conversions are declared GET, but they are writes.
+  const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
+  // 2026-06-15 (F-03), extended 2026-07-04 and at package-split step 11: everything
+  // whose `effect` is not `read` is a write (the mail drafts, and the PDF
+  // conversions that upload a temporary file); everything else is a read or a
+  // search. Derive BOTH lists, and the wording of each write, from the effect so
+  // the read-only narrative can never drift from the registry. The previous code
+  // took every POST command and labelled it "— searches, not mutations", which
+  // silently mislabelled create-mail-draft as a search the moment it shipped (and
+  // omitted the PATCH update-mail-draft entirely).
+  const writeCount = Object.values(cmdRegistry).filter((c) => c.meta.effect !== 'read').length;
   const searchPostNames = Object.entries(cmdRegistry)
-    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.mutates !== true)
+    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
-  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are the ${mutatingCommandNames.length} mail-draft commands (${mutatingCommandNames.join(', ')}), which can only create or update an UNSENT draft; the CLI cannot send mail, create or modify calendar items, or write files (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
+  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(cmdRegistry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
 
   program
     .name('ask-marcel-office')
