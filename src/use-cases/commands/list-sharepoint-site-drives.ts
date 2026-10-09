@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All', 'Files.Read'],
 };
 
 export { execute, meta, schema };

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:41:10.287Z",
+  "generatedAt": "2026-10-09T18:42:08.743Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -6986,7 +6986,8 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-folders --user-id 'shared-mailbox@contoso.com'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-mailbox-messages",
@@ -7041,7 +7042,8 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-with-me",
@@ -7052,7 +7054,8 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-sharedwithme",
       "options": [],
       "example": "ask-marcel-office list-shared-with-me",
-      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)"
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)",
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-list-columns",
@@ -7088,7 +7091,8 @@
         }
       ],
       "example": "ask-marcel-office list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-list-item-versions",
@@ -7149,7 +7153,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-list-item-versions --site-id 'contoso.sharepoint.com,...' --list-id 'list-guid' --list-item-id '12'",
       "responseShape": "collection of Microsoft Graph `listItemVersion` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-drives",
@@ -7198,7 +7203,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-list-items",
@@ -7256,7 +7262,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-list-items --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks'",
       "responseShape": "collection of Microsoft Graph `listItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-lists",
@@ -7305,7 +7312,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `list` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-members",
@@ -7323,7 +7331,8 @@
         }
       ],
       "example": "ask-marcel-office list-sharepoint-site-members --site-id 'contoso.sharepoint.com,11111111-2222-3333-4444-555555555555,66666666-7777-8888-9999-000000000000'",
-      "responseShape": "`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`)."
+      "responseShape": "`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`).",
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-onenote-notebook-sections",

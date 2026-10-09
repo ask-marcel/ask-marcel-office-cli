@@ -21,6 +21,8 @@ const meta: CommandMeta = {
   options: [],
   example: 'ask-marcel-office list-shared-with-me',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

@@ -26,6 +26,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read.Shared'],
 };
 
 export { execute, meta, schema };

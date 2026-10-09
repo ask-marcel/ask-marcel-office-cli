@@ -30,6 +30,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
   responseShape: 'collection of Microsoft Graph `columnDefinition` resources under `value[]`',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };
