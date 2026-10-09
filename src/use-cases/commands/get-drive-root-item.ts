@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office get-drive-root-item --drive-id 'b!1234'",
   responseShape: 'single Microsoft Graph `driveItem` resource (the root folder)',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

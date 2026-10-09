@@ -22,6 +22,8 @@ const meta: CommandMeta = {
   options: [...selectExpandOptions],
   example: 'ask-marcel-office get-current-user',
   responseShape: 'single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)',
+  effect: 'read',
+  scopesRequired: ['User.Read'],
 };
 
 export { execute, meta, schema };

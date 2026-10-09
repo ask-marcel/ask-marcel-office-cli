@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:28:10.630Z",
+  "generatedAt": "2026-10-09T18:29:07.023Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1649,7 +1649,8 @@
         }
       ],
       "example": "ask-marcel-office get-current-user",
-      "responseShape": "single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)"
+      "responseShape": "single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)",
+      "effect": "read"
     },
     {
       "name": "get-drive-delta",
@@ -1692,7 +1693,8 @@
       ],
       "example": "ask-marcel-office get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
       "responseShape": "collection of changed Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "get-drive-item",
@@ -1734,7 +1736,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
-      "responseShape": "single Microsoft Graph `driveItem` resource"
+      "responseShape": "single Microsoft Graph `driveItem` resource",
+      "effect": "read"
     },
     {
       "name": "get-drive-item-analytics",
@@ -1758,7 +1761,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-analytics --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "single Microsoft Graph `itemAnalytics` resource"
+      "responseShape": "single Microsoft Graph `itemAnalytics` resource",
+      "effect": "read"
     },
     {
       "name": "get-drive-item-created-by-user",
@@ -1794,7 +1798,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,jobTitle,mail'",
-      "responseShape": "single Microsoft Graph `user` resource"
+      "responseShape": "single Microsoft Graph `user` resource",
+      "effect": "read"
     },
     {
       "name": "get-drive-item-last-modified-by-user",
@@ -1830,7 +1835,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource"
+      "responseShape": "single Microsoft Graph `user` resource",
+      "effect": "read"
     },
     {
       "name": "get-drive-item-list-item",
@@ -1872,7 +1878,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "single Microsoft Graph `listItem` resource"
+      "responseShape": "single Microsoft Graph `listItem` resource",
+      "effect": "read"
     },
     {
       "name": "get-drive-root-delta",
@@ -1903,7 +1910,8 @@
       ],
       "example": "ask-marcel-office get-drive-root-delta",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "get-drive-root-item",
@@ -1933,7 +1941,8 @@
         }
       ],
       "example": "ask-marcel-office get-drive-root-item --drive-id 'b!1234'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (the root folder)"
+      "responseShape": "single Microsoft Graph `driveItem` resource (the root folder)",
+      "effect": "read"
     },
     {
       "name": "get-drive-special-folder",
