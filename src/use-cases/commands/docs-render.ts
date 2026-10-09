@@ -1,3 +1,4 @@
+import { WRITE_EFFECTS } from './command-effect.ts';
 import type { CommandCategory, CommandMeta, PaginationStrategy } from './command-types.ts';
 
 export type CommandManifestEntry = {
@@ -118,6 +119,7 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
     `- **Graph endpoint:** \`${entry.graphMethod} ${entry.graphPathTemplate}\``,
     `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
   ];
+  if (entry.effect !== undefined && entry.effect !== 'read') lines.push(`- **Writes to Microsoft 365** (\`${entry.effect}\`): ${WRITE_EFFECTS[entry.effect].action}.`);
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {

@@ -151,6 +151,20 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('ask-marcel-office status');
   });
 
+  it('says what a write command leaves in Microsoft 365, worded from its effect, so an agent reads it before invoking', () => {
+    expect(renderCommandMarkdown({ ...calendarEvent, effect: 'draft' })).toContain(
+      '- **Writes to Microsoft 365** (`draft`): create or update an UNSENT mail draft (this CLI cannot send mail).'
+    );
+    expect(renderCommandMarkdown({ ...calendarEvent, effect: 'transient-upload' })).toContain(
+      '- **Writes to Microsoft 365** (`transient-upload`): upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there).'
+    );
+  });
+
+  it('renders no write line for a read command, nor for an entry with no effect (a lifecycle command)', () => {
+    expect(renderCommandMarkdown({ ...calendarEvent, effect: 'read' })).not.toContain('Writes to Microsoft 365');
+    expect(renderCommandMarkdown(calendarEvent)).not.toContain('Writes to Microsoft 365');
+  });
+
   it('renders an elevated-token warning when needsElevatedToken is true', () => {
     const elevated: CommandManifestEntry = { ...calendarEvent, needsElevatedToken: true };
     const md = renderCommandMarkdown(elevated);
