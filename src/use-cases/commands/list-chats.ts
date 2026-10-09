@@ -36,6 +36,8 @@ const meta: CommandMeta = {
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).',
   pagination: true,
   needsElevatedToken: true,
+  effect: 'read',
+  scopesRequired: ['Chat.ReadBasic'],
 };
 
 export { execute, meta, schema };

@@ -45,6 +45,8 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]` (unordered). This command ships no default `$select`, so an unflagged call returns the full `message` resource. `internetMessageHeaders` IS honored here (verified live 2026-08-29): naming it in `--select` returns the raw RFC 5322 headers for every message in the thread in ONE call, so a per-message `get-mail-message --select internetMessageHeaders` follow-up is unnecessary. Use `get-mail-message-mime` when the complete raw source, not just the headers, is needed.',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { execute, meta, schema };

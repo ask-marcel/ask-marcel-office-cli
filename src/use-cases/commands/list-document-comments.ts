@@ -60,6 +60,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-document-comments --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ name, format, count, comments: [{ author, date?, anchor?, text, mentions }] }`. `format` is `docx`, `xlsx` or `pptx`. `anchor` is the commented text (docx), the cell as `Sheet!A1` with non-plain sheet names quoted (xlsx), or `slide N` (pptx); it is absent when the file does not record it. `date` is absent on Excel notes, which keep none. `mentions` lists the names written after an `@` that the file knows (its people and its commenters). A file of any other type returns a 415.',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

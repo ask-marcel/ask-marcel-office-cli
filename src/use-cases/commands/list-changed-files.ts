@@ -64,6 +64,7 @@ const meta: CommandMeta = {
     "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '({query}) AND LastModifiedTime>=<the UTC day before {since}>' }, from: <page*200>, size: 200 }] } — re-issued per page until `moreResultsAvailable` is false or the 10-page ceiling is hit",
   responseShape:
     '`{ since, count, value: [<Microsoft Graph driveItem resource: { id, name, webUrl, lastModifiedDateTime, lastModifiedBy, parentReference: { driveId }, … }>], note, truncated?: true }`, newest first, only files modified at or after `since`. `note` states the index limits. `truncated: true` means the sweep stopped at 2000 files or on a failed later page — narrow with `--query` or a later `--since`.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

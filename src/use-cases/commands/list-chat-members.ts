@@ -67,6 +67,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-chat-members --chat-id '19:abc...@thread.v2'",
   responseShape: 'collection of Microsoft Graph `conversationMember` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['ChatMember.Read'],
 };
 
 export { execute, meta, schema };

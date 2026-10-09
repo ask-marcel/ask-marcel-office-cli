@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-calendar-groups',
   responseShape: 'collection of Microsoft Graph `calendarGroup` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };
