@@ -134,6 +134,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
   responseShape: '`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

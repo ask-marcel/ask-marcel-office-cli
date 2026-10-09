@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:44:56.567Z",
+  "generatedAt": "2026-10-09T18:45:50.274Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -8649,7 +8649,8 @@
       ],
       "example": "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "Polymorphic by attachment content-type. A zip → `{ count, files: [{ path, contentType, size, text } | { path, note }], truncated? }` (the convert-mail-attachment-zip-to-markdown shape). Everything else → `{ contentType: \"text/markdown\" | \"text/plain\", size, text, pageCount? }` (the convert-mail-attachment-to-markdown shape; `pageCount` present for PDF sources). Unsupported types (image / scanned PDF / legacy .ppt) return an api_error (415/400) naming the right next command.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "resolve-calendar-link",
@@ -8667,7 +8668,8 @@
         }
       ],
       "example": "ask-marcel-office resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
-      "responseShape": "`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`."
+      "responseShape": "`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`.",
+      "effect": "read"
     },
     {
       "name": "resolve-drive-share-link",
@@ -8685,7 +8687,8 @@
         }
       ],
       "example": "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
-      "responseShape": "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder)."
+      "responseShape": "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder).",
+      "effect": "read"
     },
     {
       "name": "resolve-mail-link",
@@ -8703,7 +8706,8 @@
         }
       ],
       "example": "ask-marcel-office resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
-      "responseShape": "`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`."
+      "responseShape": "`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`.",
+      "effect": "read"
     },
     {
       "name": "resolve-teams-link",
@@ -8721,7 +8725,8 @@
         }
       ],
       "example": "ask-marcel-office resolve-teams-link --url 'https://teams.microsoft.com/l/message/19%3A...%40unq.gbl.spaces/1700000000000?tenantId=...&groupId=...&ctx=chat'",
-      "responseShape": "`{ chatId: string, messageId: string, tenantId?: string, groupId?: string, parentMessageId?: string, context?: string }`. `chatId` and `messageId` are URL-decoded and ready to pass to other commands. Optional fields are included only when the source URL carried them."
+      "responseShape": "`{ chatId: string, messageId: string, tenantId?: string, groupId?: string, parentMessageId?: string, context?: string }`. `chatId` and `messageId` are URL-decoded and ready to pass to other commands. Optional fields are included only when the source URL carried them.",
+      "effect": "read"
     },
     {
       "name": "search-all-accessible-sites",
@@ -8746,7 +8751,8 @@
       ],
       "example": "ask-marcel-office search-all-accessible-sites --output json",
       "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, size?, estimatedFileCount?, … }>], count, fileEstimate?, archivedExcluded?, nonNavigableExcluded?, notFoundExcluded?, archiveProbeErrors?, truncated?: true, archiveProbeTruncated?: true }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each site, omitted past the 200-site count cap or when the per-site query fails. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `size` (when present) is the site's DEFAULT document library's total bytes used (`drive.quota.used`, recursive) — folded onto the same per-site probe for free, omitted for sites past the probe ceiling or without a default drive; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe; `nonNavigableExcluded` counts sites dropped by URL shape (add-in app domains, `/contentstorage/` SharePoint Embedded containers, `/_layouts/` system pages); `notFoundExcluded` counts sites whose probe returned 404. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
+      "effect": "read"
     },
     {
       "name": "search-all-files",
@@ -8765,7 +8771,8 @@
       ],
       "example": "ask-marcel-office search-all-files --query 'q1 budget filetype:xlsx'",
       "responseShape": "`{ value: [<Microsoft Graph driveItem resource: { id, name, webUrl, parentReference: { driveId }, size, … }>], count, truncated?: true }`. `value[]` is deduped by `hitId` across pages; `count` is the number of distinct files returned. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit",
+      "effect": "read"
     },
     {
       "name": "search-mail-messages",
@@ -8820,7 +8827,8 @@
       ],
       "example": "ask-marcel-office search-mail-messages --query 'from:alice subject:Q3'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "search-my-documents",
@@ -8869,7 +8877,8 @@
       ],
       "example": "ask-marcel-office search-my-documents --query 'q1 budget'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "search-onedrive-files",

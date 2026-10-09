@@ -108,6 +108,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
   responseShape: '`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

@@ -115,6 +115,7 @@ const meta: CommandMeta = {
   example: "ask-marcel-office resolve-teams-link --url 'https://teams.microsoft.com/l/message/19%3A...%40unq.gbl.spaces/1700000000000?tenantId=...&groupId=...&ctx=chat'",
   responseShape:
     '`{ chatId: string, messageId: string, tenantId?: string, groupId?: string, parentMessageId?: string, context?: string }`. `chatId` and `messageId` are URL-decoded and ready to pass to other commands. Optional fields are included only when the source URL carried them.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

@@ -56,6 +56,7 @@ const meta: CommandMeta = {
     "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit",
   responseShape:
     '`{ value: [<Microsoft Graph driveItem resource: { id, name, webUrl, parentReference: { driveId }, size, … }>], count, truncated?: true }`. `value[]` is deduped by `hitId` across pages; `count` is the number of distinct files returned. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

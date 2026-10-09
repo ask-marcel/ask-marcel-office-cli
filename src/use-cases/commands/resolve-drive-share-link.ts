@@ -185,6 +185,9 @@ const meta: CommandMeta = {
   example: "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
   responseShape:
     "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder).",
+  effect: 'read',
+  // A shared link may point outside the user's own drive, hence the .All variant.
+  scopesRequired: ['Files.Read.All'],
 };
 
 export { execute, meta, schema };
