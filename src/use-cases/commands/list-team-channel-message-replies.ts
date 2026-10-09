@@ -34,6 +34,8 @@ const meta: CommandMeta = {
     'collection of Microsoft Graph `chatMessage` resources under `value[]`, each with `replyToId` set to the root post: `id`, `messageType`, `createdDateTime`, `deletedDateTime`, `from { user { id, displayName } }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
+  effect: 'read',
+  scopesRequired: ['ChannelMessage.Read.All'],
 };
 
 export { execute, meta, schema };

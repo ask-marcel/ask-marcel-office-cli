@@ -29,6 +29,8 @@ const meta: CommandMeta = {
     'collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
+  effect: 'read',
+  scopesRequired: ['ChannelMember.Read.All'],
 };
 
 export { execute, meta, schema };

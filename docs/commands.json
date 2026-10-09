@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:42:08.743Z",
+  "generatedAt": "2026-10-09T18:43:06.415Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -7393,7 +7393,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-onenote-notebooks",
@@ -7448,7 +7449,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-notebooks --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `notebook` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-onenote-section-pages",
@@ -7509,7 +7511,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-section-pages --site-id 'contoso.sharepoint.com,...' --onenote-section-id 's1'",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sharepoint-site-pages",
@@ -7558,7 +7561,8 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `sitePage` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-site-columns",
@@ -7588,7 +7592,8 @@
         }
       ],
       "example": "ask-marcel-office list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-site-content-types",
@@ -7637,7 +7642,8 @@
       ],
       "example": "ask-marcel-office list-site-content-types --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `contentType` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-specific-calendar-events",
@@ -7692,7 +7698,8 @@
       ],
       "example": "ask-marcel-office list-specific-calendar-events --calendar-id 'primary'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-specific-calendar-view",
@@ -7796,7 +7803,8 @@
       ],
       "example": "ask-marcel-office list-team-channel-members --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
       "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-team-channel-message-replies",
@@ -7839,7 +7847,8 @@
       ],
       "example": "ask-marcel-office list-team-channel-message-replies --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
       "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`, each with `replyToId` set to the root post: `id`, `messageType`, `createdDateTime`, `deletedDateTime`, `from { user { id, displayName } }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-team-channel-messages",

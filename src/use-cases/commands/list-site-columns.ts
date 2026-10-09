@@ -24,6 +24,8 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
   responseShape: 'collection of Microsoft Graph `columnDefinition` resources under `value[]`',
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

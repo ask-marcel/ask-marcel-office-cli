@@ -33,6 +33,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Notes.Read.All', 'Sites.Read.All'],
 };
 
 export { execute, meta, schema };
