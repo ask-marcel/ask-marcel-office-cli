@@ -39,6 +39,8 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — that discriminator is what the attachment-converting commands branch on.',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

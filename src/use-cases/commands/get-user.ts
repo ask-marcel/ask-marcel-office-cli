@@ -128,6 +128,8 @@ const meta: CommandMeta = {
   responseShape:
     'For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path resolves on the basic token; on a tenant that restricts basic directory reads it falls back to the elevated M365 token, which fail-fasts with `secondary_token_unavailable` when that token is cold (preflight with `ask-marcel-office status`, re-capture with `ask-marcel-office login`).',
   needsElevatedToken: true,
+  effect: 'read',
+  scopesRequired: ['User.Read.All'],
 };
 
 export { execute, meta, schema };

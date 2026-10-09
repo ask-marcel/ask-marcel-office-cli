@@ -77,6 +77,8 @@ const meta: CommandMeta = {
     "ask-marcel-office list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };

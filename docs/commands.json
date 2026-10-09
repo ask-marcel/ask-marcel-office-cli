@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:33:47.900Z",
+  "generatedAt": "2026-10-09T18:34:43.448Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -3272,6 +3272,7 @@
       ],
       "example": "ask-marcel-office get-user --user-id 'alice@contoso.com' --select 'id,displayName,mail,jobTitle,department'",
       "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path resolves on the basic token; on a tenant that restricts basic directory reads it falls back to the elevated M365 token, which fail-fasts with `secondary_token_unavailable` when that token is cold (preflight with `ask-marcel-office status`, re-capture with `ask-marcel-office login`).",
+      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -3302,7 +3303,8 @@
         }
       ],
       "example": "ask-marcel-office get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`)."
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`).",
+      "effect": "read"
     },
     {
       "name": "list-accessible-drives",
@@ -3332,7 +3334,8 @@
         }
       ],
       "example": "ask-marcel-office list-accessible-drives --output json",
-      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId?, size?, estimatedFileCount? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each drive, omitted past the 200-drive count cap or when the per-drive query fails. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `size` (when present) is the drive's total bytes used (`quota.used`, recursive) — surfaced free from the drive resource, omitted for the rare drive without a quota facet; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign \"can't reach this one\" results (404/403/423/400) are dropped, not listed."
+      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId?, size?, estimatedFileCount? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each drive, omitted past the 200-drive count cap or when the per-drive query fails. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `size` (when present) is the drive's total bytes used (`quota.used`, recursive) — surfaced free from the drive resource, omitted for the rare drive without a quota facet; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign \"can't reach this one\" results (404/403/423/400) are dropped, not listed.",
+      "effect": "read"
     },
     {
       "name": "list-all-onenote-sections",
@@ -3381,7 +3384,8 @@
       ],
       "example": "ask-marcel-office list-all-onenote-sections",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-event-attachments",
@@ -3436,7 +3440,8 @@
       ],
       "example": "ask-marcel-office list-calendar-event-attachments --event-id 'AAMkAGI2...'",
       "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — that discriminator is what the attachment-converting commands branch on.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-event-instances",
@@ -3516,7 +3521,8 @@
       ],
       "example": "ask-marcel-office list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-events",
@@ -3565,7 +3571,8 @@
       ],
       "example": "ask-marcel-office list-calendar-events",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-events-delta",
@@ -3584,7 +3591,8 @@
       ],
       "example": "ask-marcel-office list-calendar-events-delta --top 50",
       "responseShape": "collection of changed Microsoft Graph `event` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-group-calendars",
@@ -3639,7 +3647,8 @@
       ],
       "example": "ask-marcel-office list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
       "responseShape": "collection of Microsoft Graph `calendar` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-calendar-groups",

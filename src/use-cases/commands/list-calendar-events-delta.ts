@@ -46,6 +46,8 @@ const meta: CommandMeta = {
     'collection of changed Microsoft Graph `event` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,
   paginationStrategy: 'preferMaxPageSize',
+  effect: 'read',
+  scopesRequired: ['Calendars.Read'],
 };
 
 export { execute, meta, schema };
