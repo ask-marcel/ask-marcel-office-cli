@@ -20,6 +20,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-recently-used-insights',
   responseShape: 'collection of Microsoft Graph `usedInsight` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-shared-calendar-events --user-id 'colleague@contoso.com'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Calendars.Read.Shared'],
 };
 
 export { execute, meta, schema };

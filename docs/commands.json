@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:40:13.719Z",
+  "generatedAt": "2026-10-09T18:41:10.287Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -6393,7 +6393,8 @@
       ],
       "example": "ask-marcel-office list-recently-used-insights",
       "responseShape": "collection of Microsoft Graph `usedInsight` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-relevant-people",
@@ -6442,7 +6443,8 @@
       ],
       "example": "ask-marcel-office list-relevant-people",
       "responseShape": "collection of Microsoft Graph `person` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-room-lists",
@@ -6491,7 +6493,8 @@
       ],
       "example": "ask-marcel-office list-room-lists",
       "responseShape": "collection of Microsoft Graph `roomList` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-rooms",
@@ -6540,7 +6543,8 @@
       ],
       "example": "ask-marcel-office list-rooms",
       "responseShape": "collection of Microsoft Graph `room` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-sensitivity-labels",
@@ -6589,7 +6593,8 @@
       ],
       "example": "ask-marcel-office list-sensitivity-labels",
       "responseShape": "collection of Microsoft Graph `sensitivityLabel` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-calendar-events",
@@ -6644,7 +6649,8 @@
       ],
       "example": "ask-marcel-office list-shared-calendar-events --user-id 'colleague@contoso.com'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-calendar-view",
@@ -6774,7 +6780,8 @@
       ],
       "example": "ask-marcel-office list-shared-insights",
       "responseShape": "collection of Microsoft Graph `sharedInsight` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-mailbox-child-folders",
@@ -6848,7 +6855,8 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-child-folders --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-mailbox-folder-messages",
@@ -6909,7 +6917,8 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-shared-mailbox-folders",

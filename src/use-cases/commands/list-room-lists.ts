@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-room-lists',
   responseShape: 'collection of Microsoft Graph `roomList` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Place.Read.All'],
 };
 
 export { execute, meta, schema };

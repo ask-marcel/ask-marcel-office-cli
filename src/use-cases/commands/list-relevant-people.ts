@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-relevant-people',
   responseShape: 'collection of Microsoft Graph `person` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['People.Read'],
 };
 
 export { execute, meta, schema };

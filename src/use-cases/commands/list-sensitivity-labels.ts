@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-sensitivity-labels',
   responseShape: 'collection of Microsoft Graph `sensitivityLabel` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['InformationProtectionPolicy.Read'],
 };
 
 export { execute, meta, schema };
