@@ -76,6 +76,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted.',
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

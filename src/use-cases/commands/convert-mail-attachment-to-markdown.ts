@@ -197,6 +197,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { convertAttachmentToMarkdown, convertFetchedAttachment, execute, MAIL_HINTS, meta, schema };

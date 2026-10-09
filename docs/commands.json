@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-04T08:52:11.355Z",
+  "generatedAt": "2026-10-09T18:20:27.789Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -58,7 +58,8 @@
       ],
       "example": "ask-marcel-office convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "convert-calendar-event-attachment-to-pdf",
@@ -83,7 +84,8 @@
       ],
       "example": "ask-marcel-office convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "transient-upload"
     },
     {
       "name": "convert-drive-item-zip-to-markdown",
@@ -145,7 +147,8 @@
         }
       ],
       "example": "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
+      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted.",
+      "effect": "read"
     },
     {
       "name": "convert-group-post-attachment-to-markdown",
@@ -214,7 +217,8 @@
       ],
       "example": "ask-marcel-office convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file and reference attachments run through the conversion dispatch; an embedded item is rendered locally). Plain-text sources return the raw-bytes envelope, and a PDF source carries `pageCount`. Unsupported types return an api_error with status 415 naming `get-group-post-attachment` as the way to the bytes.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "convert-group-post-attachment-to-pdf",
@@ -251,7 +255,8 @@
       ],
       "example": "ask-marcel-office convert-group-post-attachment-to-pdf --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "transient-upload"
     },
     {
       "name": "convert-group-post-to-markdown",
@@ -308,7 +313,8 @@
       ],
       "example": "ask-marcel-office convert-group-post-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: headers, the turndown-rendered body and, when present, an attachments list. The optional `note` carries the attachments-list failure hint and/or the quoted-chain notice with the share of the body text it removed.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "convert-local-file-to-markdown",
@@ -391,7 +397,8 @@
       ],
       "example": "ask-marcel-office convert-local-file-to-markdown --path ./report.docx",
       "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -454,7 +461,8 @@
       ],
       "example": "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "convert-mail-attachment-to-pdf",
@@ -479,7 +487,8 @@
       ],
       "example": "ask-marcel-office convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "transient-upload"
     },
     {
       "name": "convert-mail-attachment-zip-to-markdown",

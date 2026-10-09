@@ -138,6 +138,7 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown" | "text/plain", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.',
   producesBytes: true,
+  effect: 'read',
 };
 
 export { execute, executeLocal, meta, schema };
