@@ -30,6 +30,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-todo-linked-resources --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
   responseShape: 'collection of Microsoft Graph `linkedResource` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

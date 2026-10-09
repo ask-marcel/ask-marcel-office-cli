@@ -92,6 +92,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office my-quick-context',
   responseShape:
     '`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user\'s role string from Azure AD (e.g. "Engineering Manager"). `tenantTimeZone` is the Outlook timezone string (e.g. "Romance Standard Time", "Pacific Standard Time"); `tenantLocale` is the IETF tag (e.g. "en-US"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command\'s fan-out to keep the envelope LLM-tractable.',
+  effect: 'read',
+  scopesRequired: ['User.Read', 'Files.Read', 'Mail.Read', 'Tasks.Read', 'Calendars.Read', 'Notes.Read', 'Team.ReadBasic.All'],
 };
 
 export { execute, meta, schema };

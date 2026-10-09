@@ -20,6 +20,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-trending-insights',
   responseShape: 'collection of Microsoft Graph `trending` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Sites.Read.All'],
 };
 
 export { execute, meta, schema };

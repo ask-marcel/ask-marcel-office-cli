@@ -70,6 +70,7 @@ const meta: CommandMeta = {
     "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given",
   responseShape:
     'merged Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …], partialErrors?: [{ entityType, error }] }`. value[] holds one container per entityType that succeeded; partialErrors[] (only present when at least one sub-request failed) lists which entityTypes returned errors.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

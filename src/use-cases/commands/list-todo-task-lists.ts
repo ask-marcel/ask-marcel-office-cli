@@ -23,6 +23,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-todo-task-lists',
   responseShape: 'collection of Microsoft Graph `todoTaskList` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

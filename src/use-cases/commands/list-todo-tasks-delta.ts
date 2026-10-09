@@ -28,6 +28,8 @@ const meta: CommandMeta = {
     'collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,
   paginationStrategy: 'deltaLink',
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

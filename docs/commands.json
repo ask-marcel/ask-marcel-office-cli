@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:44:02.865Z",
+  "generatedAt": "2026-10-09T18:44:56.567Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -8274,7 +8274,8 @@
       ],
       "example": "ask-marcel-office list-todo-linked-resources --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
       "responseShape": "collection of Microsoft Graph `linkedResource` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-todo-task-lists",
@@ -8311,7 +8312,8 @@
       ],
       "example": "ask-marcel-office list-todo-task-lists",
       "responseShape": "collection of Microsoft Graph `todoTaskList` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-todo-tasks",
@@ -8372,7 +8374,8 @@
       ],
       "example": "ask-marcel-office list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-todo-tasks-delta",
@@ -8391,7 +8394,8 @@
       ],
       "example": "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-trending-insights",
@@ -8453,7 +8457,8 @@
       ],
       "example": "ask-marcel-office list-trending-insights",
       "responseShape": "collection of Microsoft Graph `trending` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-user-direct-reports",
@@ -8508,7 +8513,8 @@
       ],
       "example": "ask-marcel-office list-user-direct-reports --user-id 'alice@contoso.com'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "microsoft-search-query",
@@ -8533,7 +8539,8 @@
       ],
       "example": "ask-marcel-office microsoft-search-query --query 'q3 budget'",
       "responseShape": "merged Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …], partialErrors?: [{ entityType, error }] }`. value[] holds one container per entityType that succeeded; partialErrors[] (only present when at least one sub-request failed) lists which entityTypes returned errors.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given",
+      "effect": "read"
     },
     {
       "name": "my-quick-context",
@@ -8544,7 +8551,8 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
       "options": [],
       "example": "ask-marcel-office my-quick-context",
-      "responseShape": "`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user's role string from Azure AD (e.g. \"Engineering Manager\"). `tenantTimeZone` is the Outlook timezone string (e.g. \"Romance Standard Time\", \"Pacific Standard Time\"); `tenantLocale` is the IETF tag (e.g. \"en-US\"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command's fan-out to keep the envelope LLM-tractable."
+      "responseShape": "`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user's role string from Azure AD (e.g. \"Engineering Manager\"). `tenantTimeZone` is the Outlook timezone string (e.g. \"Romance Standard Time\", \"Pacific Standard Time\"); `tenantLocale` is the IETF tag (e.g. \"en-US\"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command's fan-out to keep the envelope LLM-tractable.",
+      "effect": "read"
     },
     {
       "name": "next-page",
@@ -8577,7 +8585,8 @@
         }
       ],
       "example": "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
-      "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level."
+      "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level.",
+      "effect": "read"
     },
     {
       "name": "read-mail-attachment",

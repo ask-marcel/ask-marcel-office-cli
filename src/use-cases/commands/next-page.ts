@@ -95,6 +95,7 @@ const meta: CommandMeta = {
   ],
   example: "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
   responseShape: 'same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: "..." }` with the cursor at envelope level.',
+  effect: 'read',
 };
 
 export { execute, meta, schema };

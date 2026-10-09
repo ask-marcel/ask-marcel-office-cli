@@ -26,6 +26,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-user-direct-reports --user-id 'alice@contoso.com'",
   responseShape: 'collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['User.Read.All'],
 };
 
 export { execute, meta, schema };
