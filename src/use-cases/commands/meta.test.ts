@@ -21,6 +21,31 @@ const isOptionalSchemaField = (schema: Command['schema'], key: string): boolean 
 
 type PopulatedEntry = readonly [string, Command & { meta: CommandMeta }];
 
+// Commands that declare no Graph scope (moved here with the scope map, which
+// each command's `meta.scopesRequired` replaced at package-split step 11). They
+// call no single fixed Graph endpoint, or call no Graph endpoint at all.
+const COMMANDS_WITHOUT_SCOPES: ReadonlySet<string> = new Set([
+  'next-page', // inherits from cursor target
+  'microsoft-search-query', // varies by entity types
+  'convert-local-file-to-markdown', // reads the local filesystem — no Graph call
+  'extract-local-file-images', // reads the local filesystem — no Graph call
+  // chatsvcagg / ic3 commands — not Graph; auth gates server-side on the
+  // captured Teams client identity, not on delegated Graph scopes.
+  'list-teams-chats-with-messages',
+  'list-teams-chat-messages',
+  'list-teams-chat-history',
+  'get-teams-chat-message',
+  'extract-teams-chat-message-images',
+  // resolve-mail-link / resolve-calendar-link / resolve-teams-link are pure URL
+  // parsers — no Graph call. (resolve-drive-share-link is NOT here: it fetches
+  // /shares/{token}/driveItem, so it carries a real Files.Read.All scope.)
+  'resolve-teams-link',
+  'resolve-mail-link',
+  'resolve-calendar-link',
+  // find-chats-with-user iterates the chatsvcagg substrate (paginated /chats endpoint).
+  'find-chats-with-user',
+]);
+
 const populated: ReadonlyArray<PopulatedEntry> = Object.entries(commands).map(([name, cmd]) => [name, cmd as Command & { meta: CommandMeta }] as PopulatedEntry);
 
 describe('command meta — invariants on every registered command', () => {
@@ -74,6 +99,37 @@ describe('command meta — invariants on every registered command', () => {
       .map(([name]) => name)
       .toSorted((a, b) => a.localeCompare(b));
     expect(mutating).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+  });
+
+  it('classifies EXACTLY the four mail-draft commands as `draft` writes and the three PDF converters as `transient-upload` writes; every other command is a `read` — the MCP routing and the --help narrative derive from this (F-03). Any new write command must be added here deliberately.', () => {
+    const byEffect = (effect: string): ReadonlyArray<string> =>
+      Object.entries(commands)
+        .filter(([, cmd]) => cmd.meta.effect === effect)
+        .map(([name]) => name)
+        .toSorted((a, b) => a.localeCompare(b));
+    expect(byEffect('draft')).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
+    expect(byEffect('transient-upload')).toEqual(['convert-calendar-event-attachment-to-pdf', 'convert-group-post-attachment-to-pdf', 'convert-mail-attachment-to-pdf']);
+    expect(byEffect('read')).toHaveLength(Object.keys(commands).length - 7);
+  });
+
+  it('declares its Graph scopes inline on every command except the ones that call no fixed Graph endpoint, so `help-json` can predict a 403 before the call', () => {
+    const missing = Object.entries(commands)
+      .filter(([name, cmd]) => !COMMANDS_WITHOUT_SCOPES.has(name) && (cmd.meta.scopesRequired ?? []).length === 0)
+      .map(([name]) => name);
+    expect(missing).toEqual([]);
+  });
+
+  it('declares no scope on a command that calls no fixed Graph endpoint, so its docs do not claim one', () => {
+    const declared = [...COMMANDS_WITHOUT_SCOPES].filter((name) => commands[name]?.meta.scopesRequired !== undefined);
+    expect(declared).toEqual([]);
+  });
+
+  it('writes every scope in the PascalCase.Verb form Microsoft documents (e.g. `Files.Read`, `Chat.ReadBasic`)', () => {
+    const scopePattern = /^[A-Z][A-Za-z]+(\.[A-Z][A-Za-z]+)*$/;
+    const malformed = Object.entries(commands).flatMap(([name, cmd]) =>
+      (cmd.meta.scopesRequired ?? []).filter((scope) => !scopePattern.test(scope)).map((scope) => `${name}: ${scope}`)
+    );
+    expect(malformed).toEqual([]);
   });
 
   for (const [name, cmd] of populated) {
