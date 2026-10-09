@@ -80,6 +80,10 @@ the same package name. The passive update notice stays.
 - `ProcessRunner.runInherit` is removed. `run(cmd, args, options)` replaces it.
   It has a deadline and a limit on stdout size, and it returns the captured
   stdout. A process that a signal stops is a failure.
+- A file system that you give to `buildDeps` (`BuildDepsConfig.fs`) must also
+  have `exists(path)`, the new `FileExistence` type. It tells if a file is at
+  the path and does not read the file. `createBunFileSystem` and
+  `createNodeFileSystem` have it.
 
 ## 2.8.0
 

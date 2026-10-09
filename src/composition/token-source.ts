@@ -3,7 +3,7 @@ import { createHelperTokenSource } from '../infra/helper-token-source.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { locateTokenHelper } from '../infra/token-helper-locator.ts';
 import { runTokenHelper } from '../infra/token-helper-run.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import { tokenHelperLocatorPath } from './token-helper.ts';
@@ -11,7 +11,7 @@ import { tokenHelperLocatorPath } from './token-helper.ts';
 export type EnvThenHelperOptions = {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly home: string;
-  readonly fs: Pick<FileSystem, 'readJson' | 'readBytes'>;
+  readonly fs: Pick<FileSystem, 'readJson' | 'readBytes'> & FileExistence;
   readonly runner: ProcessRunner;
   readonly interactive: boolean;
   // This process's platform and runtime unless a test names others.

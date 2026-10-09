@@ -1,7 +1,7 @@
 import { posix, win32 } from 'node:path';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 
 /*
  * Where the token helper is, in the order the package split fixes
@@ -13,7 +13,7 @@ import type { FileSystem } from '../use-cases/ports/filesystem.ts';
  *    `execPath entry` runs whatever PATH holds and whether or not the entry
  *    keeps its shebang, which also covers npx and GUI-launched MCP clients. A
  *    file whose entry or runtime is gone (an evicted npx cache, an upgraded
- *    node) is passed over. The entry is checked first: it is the small file.
+ *    node) is passed over. Both are only looked up, never read.
  * 3. The auth bin on PATH. Off Windows the system searches PATH when the child
  *    starts. On Windows a global npm bin is a `.cmd` shim, which only a shell
  *    runs, so the PATHEXT search is done here and a shim is read for the script
@@ -29,7 +29,7 @@ export type TokenHelperLocateError = { readonly type: 'not_found' } | { readonly
 export type TokenHelperLocatorDeps = {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly locatorPath: string;
-  readonly fs: Pick<FileSystem, 'readJson' | 'readBytes'>;
+  readonly fs: Pick<FileSystem, 'readJson' | 'readBytes'> & FileExistence;
   readonly platform: string;
   // The runtime that runs the script behind a Windows shim: this process's own.
   readonly execPath: string;
@@ -44,7 +44,10 @@ const SHIM_SCRIPT = /"%(?:~dp0|dp0%)\\([^"]+)"\s+%\*/;
 
 type Located = Result<TokenHelperCommand, TokenHelperLocateError> | undefined;
 
-const exists = async (deps: TokenHelperLocatorDeps, path: string): Promise<boolean> => (await deps.fs.readBytes(path)).ok;
+const exists = async (deps: TokenHelperLocatorDeps, path: string): Promise<boolean> => {
+  const found = await deps.fs.exists(path);
+  return found.ok && found.value;
+};
 
 const fromLocatorFile = async (deps: TokenHelperLocatorDeps, paths: typeof posix): Promise<Located> => {
   const held = await deps.fs.readJson<unknown>(deps.locatorPath);
@@ -55,11 +58,12 @@ const fromLocatorFile = async (deps: TokenHelperLocatorDeps, paths: typeof posix
 };
 
 // A `.cmd` or `.bat` file runs only through a shell, so only an npm shim, read
-// for its script, is taken; `.exe` and `.com` run as they are.
+// for its script, is taken; `.exe` and `.com` run as they are, so they are
+// only looked up.
 const runnable = async (deps: TokenHelperLocatorDeps, path: string): Promise<TokenHelperCommand | undefined> => {
+  if (/\.(?:exe|com)$/i.test(path)) return (await exists(deps, path)) ? { command: path, args: TOKEN_ARGS } : undefined;
   const bytes = await deps.fs.readBytes(path);
   if (!bytes.ok) return undefined;
-  if (/\.(?:exe|com)$/i.test(path)) return { command: path, args: TOKEN_ARGS };
   const script = SHIM_SCRIPT.exec(new TextDecoder().decode(bytes.value))?.[1];
   return script === undefined ? undefined : { command: deps.execPath, args: [win32.join(win32.dirname(path), script), ...TOKEN_ARGS] };
 };

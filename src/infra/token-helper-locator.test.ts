@@ -34,6 +34,15 @@ const withFiles = (files: Record<string, string>): FileSystemFake => {
   return fs;
 };
 
+// The same files, with every path the locator reads appended to `read`.
+const recordingReads = (files: FileSystemFake, read: string[]): FileSystemFake => ({
+  ...files,
+  readBytes: async (path) => {
+    read.push(path);
+    return files.readBytes(path);
+  },
+});
+
 describe('finding the token helper', () => {
   it('runs ASKMARCEL_TOKEN_COMMAND first, as the program itself with nothing before --tier, ahead of a locator file', async () => {
     const fs = withFiles({ [LOCATOR]: JSON.stringify({ execPath: NODE, entry: ENTRY, version: '2.8.0' }), [ENTRY]: '' });
@@ -70,6 +79,20 @@ describe('finding the token helper', () => {
     expect(await locate(fs)).toEqual(ok(ON_PATH));
   });
 
+  it('passes over a locator file whose runtime cannot be looked up, as if it were gone, and looks on PATH', async () => {
+    const files = withFiles({ [LOCATOR]: JSON.stringify({ execPath: NODE, entry: ENTRY, version: '2.8.0' }), [ENTRY]: '', [NODE]: '' });
+    const fs: FileSystemFake = { ...files, exists: async (path) => (path === NODE ? err({ type: 'io_failed', message: 'ELOOP' }) : files.exists(path)) };
+    expect(await locate(fs)).toEqual(ok(ON_PATH));
+  });
+
+  it('only looks for the recorded runtime and entry, never reads them: a 100 MB node binary is not loaded to find the helper', async () => {
+    const files = withFiles({ [LOCATOR]: JSON.stringify({ execPath: NODE, entry: ENTRY, version: '2.8.0' }), [ENTRY]: '', [NODE]: '' });
+    const read: string[] = [];
+    const fs = recordingReads(files, read);
+    expect(await locate(fs)).toEqual(ok({ command: NODE, args: [ENTRY] }));
+    expect(read).toEqual([]);
+  });
+
   it('passes over a locator file that does not hold a location', async () => {
     for (const held of [
       'null',
@@ -81,6 +104,20 @@ describe('finding the token helper', () => {
       '{',
     ]) {
       const fs = withFiles({ [LOCATOR]: held, [ENTRY]: '', 'dist/token.js': '' });
+      expect(await locate(fs)).toEqual(ok(ON_PATH));
+    }
+  });
+
+  it('passes over a locator file that names a runtime or entry that is not an absolute path, even when one is found from here', async () => {
+    // Every path below is there, so only the shape check can send the locator to PATH:
+    // a relative entry would run whatever the current folder holds.
+    for (const held of [
+      { execPath: 'node', entry: ENTRY },
+      { execPath: NODE, entry: 'dist/token.js' },
+      { execPath: 42, entry: ENTRY },
+      { execPath: NODE, entry: 42 },
+    ]) {
+      const fs = withFiles({ [LOCATOR]: JSON.stringify(held), [ENTRY]: '', [NODE]: '', node: '', 'dist/token.js': '' });
       expect(await locate(fs)).toEqual(ok(ON_PATH));
     }
   });
@@ -105,6 +142,24 @@ describe('finding the token helper', () => {
     const fs = withFiles({ 'C:\\first\\ask-marcel-office-auth.exe': 'MZ', 'C:\\first\\ask-marcel-office-auth.cmd': NPM_SHIM, 'C:\\second\\ask-marcel-office-auth.exe': 'MZ' });
     const found = await locate(fs, { platform: 'win32', env: { PATH: 'C:\\first;C:\\second', PATHEXT: '.COM;.EXE;.BAT;.CMD' } });
     expect(found).toEqual(ok({ command: 'C:\\first\\ask-marcel-office-auth.exe', args: ['token'] }));
+  });
+
+  it('only looks for a .exe on the Windows PATH, never reads it, as it runs as it is', async () => {
+    const files = withFiles({ 'C:\\npm\\ask-marcel-office-auth.exe': 'MZ' });
+    const read: string[] = [];
+    const fs = recordingReads(files, read);
+    const found = await locate(fs, { platform: 'win32', env: { PATH: 'C:\\npm', PATHEXT: '.EXE' } });
+    expect(found).toEqual(ok({ command: 'C:\\npm\\ask-marcel-office-auth.exe', args: ['token'] }));
+    expect(read).toEqual([]);
+  });
+
+  it('only looks for a .com on the Windows PATH, never reads it, as it runs as it is', async () => {
+    const files = withFiles({ 'C:\\npm\\ask-marcel-office-auth.com': 'MZ' });
+    const read: string[] = [];
+    const fs = recordingReads(files, read);
+    const found = await locate(fs, { platform: 'win32', env: { PATH: 'C:\\npm', PATHEXT: '.COM' } });
+    expect(found).toEqual(ok({ command: 'C:\\npm\\ask-marcel-office-auth.com', args: ['token'] }));
+    expect(read).toEqual([]);
   });
 
   it('honours a PATHEXT that leaves .exe out', async () => {
