@@ -5,6 +5,7 @@ import { err, ok } from '../domain/result.ts';
 import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { installFetchMock, type FetchMockCall } from '../test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { jwtSegment } from '../test-helpers/jwt.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import type { AuthLadder, AuthManager, FetchFn } from './auth.ts';
 import { createAuthManager, createAuthManagerFromApi, createFreshCachedTokenProbe, stderrProgress } from './auth-browser.ts';
@@ -172,30 +173,30 @@ const fakeBrowserAuth = (config?: {
 
 const futureToken = (): BrowserTokenResult => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', tid: 'tenant-1' }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com', tid: 'tenant-1' });
   return { accessToken: accessTokenUnsafe(`${header}.${payload}.sig`), refreshToken: 'new-refresh' };
 };
 
 const futureElevated = (): AccessToken => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1' }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1' });
   return accessTokenUnsafe(`${header}.${payload}.sig`);
 };
 
 // A JWT carrying a `scp` claim, for the per-tier scope-decoding tests.
 const jwtWithScopes = (scopes: ReadonlyArray<string>): string => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: future, scp: scopes.join(' ') }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: future, scp: scopes.join(' ') });
   return `${header}.${payload}.sig`;
 };
 
 // A fresh Graph token of one account (object id `robin`, tenant `tenant-1`).
 const robin = (): AccessToken => {
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://graph.microsoft.com', oid: 'robin', tid: 'tenant-1' }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: Math.floor(Date.now() / 1000) + 3600, aud: 'https://graph.microsoft.com', oid: 'robin', tid: 'tenant-1' });
   return accessTokenUnsafe(`${header}.${payload}.sig`);
 };
 
@@ -329,8 +330,8 @@ describe('auth manager recovery ladder', () => {
 
   it('returns cached token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
 
@@ -353,8 +354,8 @@ describe('auth manager recovery ladder', () => {
         },
         respond: () => {
           const future = Math.floor(Date.now() / 1000) + 3600;
-          const header = btoa(JSON.stringify({ alg: 'RS256' }));
-          const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+          const header = jwtSegment({ alg: 'RS256' });
+          const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
           return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600, refresh_token: 'new-refresh' }));
         },
       },
@@ -383,8 +384,8 @@ describe('auth manager recovery ladder', () => {
         },
         respond: () => {
           const future = Math.floor(Date.now() / 1000) + 3600;
-          const header = btoa(JSON.stringify({ alg: 'RS256' }));
-          const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+          const header = jwtSegment({ alg: 'RS256' });
+          const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
           return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600, refresh_token: 'new-refresh' }));
         },
       },
@@ -549,8 +550,8 @@ describe('auth manager recovery ladder', () => {
 
   it('skips browser when cached token has wrong audience', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'management.core.windows.net' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'management.core.windows.net' });
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: '' }));
 
@@ -664,8 +665,8 @@ describe('auth manager recovery ladder', () => {
 
   it('getLastElevatedOutcome returns null when getAccessToken hit the cache (no browser step ran)', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
     const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -962,7 +963,7 @@ describe('auth manager cached tier scopes (decoded from each token scp claim)', 
 // does not refresh a token and it does not open a browser: the browser fake here
 // throws if the manager starts it.
 describe('auth manager token report (getTokenInfo)', () => {
-  const tokenWith = (claims: Record<string, unknown>): string => `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify(claims))}.sig`;
+  const tokenWith = (claims: Record<string, unknown>): string => `${jwtSegment({ alg: 'RS256' })}.${jwtSegment(claims)}.sig`;
   const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
   const managerWith = (cache: Record<string, unknown> | undefined, fetchFn: FetchFn = refusingTokenEndpoint): AuthLadder => {
     const fs = createFileSystemFake();
@@ -1085,8 +1086,8 @@ describe('auth manager token report (getTokenInfo)', () => {
 describe('auth manager forced re-capture (login --force)', () => {
   it('ignores a valid cached token and re-acquires via the browser when forced', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh' }));
     const browserToken = futureToken();
@@ -1171,8 +1172,8 @@ describe('auth manager forced re-capture (login --force)', () => {
 describe('auth manager elevated token', () => {
   it('returns the cached elevated token when fresh and valid', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1' });
     const elevatedToken = `${header}.${payload}.sig`;
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: 'teams-tok', expires_on: future, refresh_token: 'r', elevated_access_token: elevatedToken, elevated_expires_on: future }));
@@ -1353,8 +1354,8 @@ describe('auth manager elevated token', () => {
         match: (url) => url.includes('/token'),
         respond: () => {
           const future = Math.floor(Date.now() / 1000) + 3600;
-          const header = btoa(JSON.stringify({ alg: 'RS256' }));
-          const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+          const header = jwtSegment({ alg: 'RS256' });
+          const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
           // No refresh_token in the OAuth response — auth manager must fall back to the cached one.
           return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600 }));
         },
@@ -1408,7 +1409,7 @@ describe('auth manager elevated token', () => {
 
   it('persists access_token expires_on as 0 when the Teams JWT has no exp claim (covers `exp ?? 0` fallback)', async () => {
     const fs = createFileSystemFake();
-    const noExpAccessJwt = `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify({ aud: 'https://graph.microsoft.com' }))}.sig`;
+    const noExpAccessJwt = `${jwtSegment({ alg: 'RS256' })}.${jwtSegment({ aud: 'https://graph.microsoft.com' })}.sig`;
     const browserResult: BrowserTokenResult = { accessToken: accessTokenUnsafe(noExpAccessJwt), refreshToken: 'rt' };
     const auth = createAuthManagerFromApi(fakeBrowserAuth({ acquireResult: browserResult }), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
     await auth.getAccessToken();
@@ -1448,7 +1449,7 @@ describe('auth manager elevated token', () => {
 
   it('persists elevated_expires_on as 0 when the elevated JWT has no exp claim', async () => {
     const fs = createFileSystemFake();
-    const noExpJwt = `${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify({ aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9' }))}.sig`;
+    const noExpJwt = `${jwtSegment({ alg: 'RS256' })}.${jwtSegment({ aud: 'https://graph.microsoft.com', appid: 'c0ab8ce9' })}.sig`;
     const auth = createAuthManagerFromApi(
       fakeBrowserAuth({ acquireResult: futureToken(), elevatedResult: accessTokenUnsafe(noExpJwt) }),
       CACHE_PATH,
@@ -1603,8 +1604,8 @@ describe('auth manager concurrent-call serialization', () => {
 // can move chatsvcagg out without touching the elevated tests.
 const futureChatsvcagg = (): AccessToken => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://chatsvcagg.teams.microsoft.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: future, aud: 'https://chatsvcagg.teams.microsoft.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' });
   return accessTokenUnsafe(`${header}.${payload}.sig`);
 };
 
@@ -1801,8 +1802,8 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 
   it('getLastChatsvcaggOutcome returns null before any browser step has run', async () => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     const fs = createFileSystemFake();
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'r' }));
     const auth = createAuthManagerFromApi(fakeBrowserAuth(), CACHE_PATH, BROWSER_PROFILE_DIR, createLoggerFake(), fs);
@@ -1853,8 +1854,8 @@ describe('auth manager — chatsvcagg-tier (Teams substrate)', () => {
 // chatsvcagg-tier set one-for-one.
 const futureIc3 = (): AccessToken => {
   const future = Math.floor(Date.now() / 1000) + 3600;
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify({ exp: future, aud: 'https://ic3.teams.office.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' }));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment({ exp: future, aud: 'https://ic3.teams.office.com', appid: '5e3ce6c0-2b1f-4285-8d4b-75ee78787346' });
   return accessTokenUnsafe(`${header}.${payload}.sig`);
 };
 
@@ -2294,8 +2295,8 @@ describe('createFreshCachedTokenProbe', () => {
     fs.seed(CACHE_PATH, JSON.stringify({ refresh_token: 'rt' }));
     expect(await probe()).toBeNull(); // no access_token field
     const past = Math.floor(Date.now() / 1000) - 100;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: past, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: past, aud: 'https://graph.microsoft.com' });
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: past, refresh_token: 'rt' }));
     expect(await probe()).toBeNull(); // expired
   });
@@ -2360,8 +2361,8 @@ describe('guest access tokens for a partner tenant', () => {
 
   const guestTokenResponse = (refreshToken = 'rotated-refresh'): Response => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', tid: CONTOSO }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com', tid: CONTOSO });
     return new Response(JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_in: 3600, refresh_token: refreshToken }));
   };
 
@@ -2370,8 +2371,8 @@ describe('guest access tokens for a partner tenant', () => {
 
   const seedCache = (fs: ReturnType<typeof createFileSystemFake>, extra: Record<string, unknown> = {}): void => {
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     fs.seed(CACHE_PATH, JSON.stringify({ access_token: `${header}.${payload}.sig`, expires_on: future, refresh_token: 'old-refresh', ...extra }));
   };
 
@@ -2412,8 +2413,8 @@ describe('guest access tokens for a partner tenant', () => {
     const mock = tokenEndpointMock();
     afterEach(() => mock.restore());
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com' });
     const fs = createFileSystemFake();
     seedCache(fs, { guest_tokens: { [CONTOSO]: { access_token: `${header}.${payload}.sig`, expires_on: future } } });
 
@@ -2647,8 +2648,8 @@ describe('createAuthManager', () => {
 describe('token cache writes', () => {
   const future = Math.floor(Date.now() / 1000) + 3600;
   const accountToken = (oid: string): AccessToken => {
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com', oid, tid: 'tenant-1' }));
+    const header = jwtSegment({ alg: 'RS256' });
+    const payload = jwtSegment({ exp: future, aud: 'https://graph.microsoft.com', oid, tid: 'tenant-1' });
     return accessTokenUnsafe(`${header}.${payload}.sig`);
   };
   const createIssuingTokenEndpoint = (token: string, refresh: string): (() => Promise<Response>) => {

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import { createAuthManager } from '../infra/auth-browser.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { unsignedJwt } from '../test-helpers/jwt.ts';
 import { buildDeps } from './build-deps.ts';
 
 describe('buildDeps composition root', () => {
@@ -144,9 +145,7 @@ describe('buildDeps composition root', () => {
     const dir = mkdtempSync(join(tmpdir(), 'atelier-build-deps-'));
     const tmpCache = join(dir, 'cache.json');
     const future = Math.floor(Date.now() / 1000) + 3600;
-    const header = btoa(JSON.stringify({ alg: 'RS256' }));
-    const payload = btoa(JSON.stringify({ exp: future, aud: 'https://graph.microsoft.com' }));
-    const seededToken = `${header}.${payload}.sig`;
+    const seededToken = unsignedJwt({ exp: future, aud: 'https://graph.microsoft.com' });
     await Bun.write(tmpCache, JSON.stringify({ access_token: seededToken, expires_on: future, refresh_token: '' }));
     try {
       const deps = buildDeps({ cachePath: tmpCache, logLevel: 'error' });

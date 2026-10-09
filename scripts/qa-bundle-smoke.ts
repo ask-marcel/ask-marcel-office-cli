@@ -193,7 +193,9 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
  * CLI's heavy modules, which is what keeps it near bare runtime startup.
  */
 const TOKEN_EXP = Math.floor(Date.now() / 1000) + 3600;
-const TOKEN_FIXTURE = `${btoa(JSON.stringify({ alg: 'none' }))}.${btoa(JSON.stringify({ exp: TOKEN_EXP, aud: 'https://graph.microsoft.com' }))}.sig`;
+// base64url, as a token is sent: the AccessToken brand refuses padded base64.
+const jwtSegment = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url');
+const TOKEN_FIXTURE = `${jwtSegment({ alg: 'none' })}.${jwtSegment({ exp: TOKEN_EXP, aud: 'https://graph.microsoft.com' })}.sig`;
 const tokenHome = (withToken: boolean): string => {
   const home = mkdtempSync(join(DIR, 'home-'));
   mkdirSync(join(home, '.ask-marcel'), { recursive: true });

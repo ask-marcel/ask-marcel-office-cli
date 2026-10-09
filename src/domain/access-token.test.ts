@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { jwtSegment } from '../test-helpers/jwt.ts';
 import { accessToken, accessTokenUnsafe } from './access-token.ts';
 
 const makeJwt = (claims: Record<string, unknown>): string => {
-  const header = btoa(JSON.stringify({ alg: 'RS256' }));
-  const payload = btoa(JSON.stringify(claims));
+  const header = jwtSegment({ alg: 'RS256' });
+  const payload = jwtSegment(claims);
   return `${header}.${payload}.sig`;
 };
 

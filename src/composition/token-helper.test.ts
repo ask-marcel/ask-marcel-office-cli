@@ -8,6 +8,7 @@ import { err } from '../domain/result.ts';
 import { tokenFingerprint } from '../domain/token-fingerprint.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { unsignedJwt } from '../test-helpers/jwt.ts';
 import { createAuthLadder } from '../infra/auth.ts';
 import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import type { BrowserAuth } from '../infra/browser-auth.ts';
@@ -21,7 +22,7 @@ const LOCATION = { execPath: '/usr/local/bin/node', entry: '/opt/ask-marcel/dist
 const ignore = (): void => undefined;
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
 
-const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(`${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify(claims))}.sig`);
+const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(unsignedJwt(claims));
 const graphToken = (name: string): AccessToken => jwt({ exp: inAnHour(), aud: 'https://graph.microsoft.com', name });
 
 const cacheHolding = (entries: Record<string, unknown>): FileSystemFake => {

@@ -6,6 +6,7 @@ import { tenantIdUnsafe } from '../domain/tenant-id.ts';
 import { tokenFingerprint } from '../domain/token-fingerprint.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { unsignedJwt } from '../test-helpers/jwt.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import type { BrowserRungs, FetchFn, TokenCacheAccess } from './auth.ts';
 import { createAuthLadder } from './auth.ts';
@@ -18,7 +19,7 @@ const CACHE_PATH = '/virtual/token-cache.json';
 const PARTNER = tenantIdUnsafe('8f2c1a4e-3b6d-4c9a-9e1f-2a7b5c8d0e3f');
 const inAnHour = (): number => Math.floor(Date.now() / 1000) + 3600;
 
-const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(`${btoa(JSON.stringify({ alg: 'RS256' }))}.${btoa(JSON.stringify(claims))}.sig`);
+const jwt = (claims: Record<string, unknown>): AccessToken => accessTokenUnsafe(unsignedJwt(claims));
 const graphToken = (name: string): AccessToken => jwt({ exp: inAnHour(), aud: 'https://graph.microsoft.com', name });
 const chatToken = (name: string): AccessToken => jwt({ exp: inAnHour(), aud: 'https://chatsvcagg.teams.microsoft.com', name });
 
