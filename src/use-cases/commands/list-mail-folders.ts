@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-mail-folders',
   responseShape: 'collection of Microsoft Graph `mailFolder` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { execute, meta, schema };

@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:38:24.823Z",
+  "generatedAt": "2026-10-09T18:39:19.046Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -5631,7 +5631,8 @@
       ],
       "example": "ask-marcel-office list-mail-folder-messages --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-folder-messages-delta",
@@ -5674,7 +5675,8 @@
       ],
       "example": "ask-marcel-office list-mail-folder-messages-delta --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page (CLI strips the original `@odata.*` keys from `data`). A `deltaLink` on the FIRST page means the folder is fully synced, not that it was truncated.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-folders",
@@ -5736,7 +5738,8 @@
       ],
       "example": "ask-marcel-office list-mail-folders",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-folders-delta",
@@ -5748,7 +5751,8 @@
       "options": [],
       "example": "ask-marcel-office list-mail-folders-delta",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-messages",
@@ -5810,7 +5814,8 @@
       ],
       "example": "ask-marcel-office list-mail-messages",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-mail-rules",
@@ -5828,7 +5833,8 @@
         }
       ],
       "example": "ask-marcel-office list-mail-rules",
-      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`"
+      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`",
+      "effect": "read"
     },
     {
       "name": "list-my-direct-reports",
@@ -5877,7 +5883,8 @@
       ],
       "example": "ask-marcel-office list-my-direct-reports",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-my-memberships",
@@ -5926,7 +5933,8 @@
       ],
       "example": "ask-marcel-office list-my-memberships",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-my-transitive-memberships",
@@ -5975,7 +5983,8 @@
       ],
       "example": "ask-marcel-office list-my-transitive-memberships",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-onenote-notebook-sections",

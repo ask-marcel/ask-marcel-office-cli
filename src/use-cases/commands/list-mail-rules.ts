@@ -26,6 +26,8 @@ const meta: CommandMeta = {
   ],
   example: 'ask-marcel-office list-mail-rules',
   responseShape: 'collection of Microsoft Graph `messageRule` resources under `value[]`',
+  effect: 'read',
+  scopesRequired: ['MailboxSettings.Read'],
 };
 
 export { execute, meta, schema };

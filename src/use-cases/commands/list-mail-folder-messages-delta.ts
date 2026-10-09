@@ -56,6 +56,8 @@ const meta: CommandMeta = {
     'collection of Microsoft Graph `message` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page (CLI strips the original `@odata.*` keys from `data`). A `deltaLink` on the FIRST page means the folder is fully synced, not that it was truncated.',
   pagination: true,
   paginationStrategy: 'preferMaxPageSize',
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { execute, meta, schema };

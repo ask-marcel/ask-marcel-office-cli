@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Mail.Read'],
 };
 
 export { execute, meta, schema };

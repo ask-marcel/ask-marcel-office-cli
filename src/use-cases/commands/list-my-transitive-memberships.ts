@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-my-transitive-memberships',
   responseShape: 'collection of Microsoft Graph `directoryObject` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['User.Read'],
 };
 
 export { execute, meta, schema };
