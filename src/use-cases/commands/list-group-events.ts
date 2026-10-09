@@ -25,6 +25,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-group-events --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Group.Read.All', 'Calendars.Read'],
 };
 
 export { execute, meta, schema };

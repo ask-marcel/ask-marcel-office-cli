@@ -32,6 +32,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-group-conversations --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `conversation` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Group.Read.All'],
 };
 
 export { execute, meta, schema };

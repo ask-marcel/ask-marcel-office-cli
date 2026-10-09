@@ -31,6 +31,8 @@ const meta: CommandMeta = {
   example: "ask-marcel-office list-group-planner-plans --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `plannerPlan` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['Tasks.Read'],
 };
 
 export { execute, meta, schema };

@@ -17,6 +17,8 @@ const meta: CommandMeta = {
   example: 'ask-marcel-office list-focused-inbox-overrides',
   responseShape: 'collection of Microsoft Graph `inferenceClassificationOverride` resources under `value[]`',
   pagination: true,
+  effect: 'read',
+  scopesRequired: ['MailboxSettings.Read'],
 };
 
 export { execute, meta, schema };

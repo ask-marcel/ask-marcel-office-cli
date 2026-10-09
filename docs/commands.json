@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:36:34.274Z",
+  "generatedAt": "2026-10-09T18:37:29.384Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -4670,7 +4670,8 @@
       ],
       "example": "ask-marcel-office list-excel-worksheets --drive-id 'b!1234' --item-id '01XLSX'",
       "responseShape": "collection of Microsoft Graph `worksheet` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-focused-inbox-overrides",
@@ -4719,7 +4720,8 @@
       ],
       "example": "ask-marcel-office list-focused-inbox-overrides",
       "responseShape": "collection of Microsoft Graph `inferenceClassificationOverride` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-folder-files",
@@ -4780,7 +4782,8 @@
       ],
       "example": "ask-marcel-office list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-followed-drive-items",
@@ -4823,7 +4826,8 @@
       ],
       "example": "ask-marcel-office list-followed-drive-items",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-calendar-view",
@@ -4940,7 +4944,8 @@
       ],
       "example": "ask-marcel-office list-group-conversations --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `conversation` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-events",
@@ -4995,7 +5000,8 @@
       ],
       "example": "ask-marcel-office list-group-events --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-members",
@@ -5050,7 +5056,8 @@
       ],
       "example": "ask-marcel-office list-group-members --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-owners",
@@ -5105,7 +5112,8 @@
       ],
       "example": "ask-marcel-office list-group-owners --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-planner-plans",
@@ -5130,7 +5138,8 @@
       ],
       "example": "ask-marcel-office list-group-planner-plans --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `plannerPlan` resources under `value[]`",
-      "pagination": true
+      "pagination": true,
+      "effect": "read"
     },
     {
       "name": "list-group-post-attachments",
