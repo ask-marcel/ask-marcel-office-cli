@@ -100,6 +100,8 @@ const meta: CommandMeta = {
   responseShape:
     '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: "text/plain", size, text }` for plain-text passthrough sources (txt/md/json/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.',
   producesBytes: true,
+  effect: 'read',
+  scopesRequired: ['Files.Read'],
 };
 
 export { execute, meta, schema };

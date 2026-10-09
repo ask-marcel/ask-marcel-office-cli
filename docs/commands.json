@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-09T18:25:15.934Z",
+  "generatedAt": "2026-10-09T18:26:11.443Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -1099,7 +1099,8 @@
       ],
       "example": "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: \"text/plain\", size, text }` for plain-text passthrough sources (txt/md/json/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "download-drive-item-as-pdf",
@@ -1130,7 +1131,8 @@
       ],
       "example": "ask-marcel-office download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "download-drive-item-content",
@@ -1161,7 +1163,8 @@
       ],
       "example": "ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.",
-      "producesBytes": true
+      "producesBytes": true,
+      "effect": "read"
     },
     {
       "name": "download-drive-item-version",
@@ -1232,6 +1235,7 @@
       "example": "ask-marcel-office download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
       "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions.",
       "producesBytes": true,
+      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -1269,7 +1273,8 @@
       ],
       "example": "ask-marcel-office extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true
+      "producesMedia": true,
+      "effect": "read"
     },
     {
       "name": "extract-group-post-attachment-images",
@@ -1306,7 +1311,8 @@
       ],
       "example": "ask-marcel-office extract-group-post-attachment-images --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./post-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true
+      "producesMedia": true,
+      "effect": "read"
     },
     {
       "name": "extract-local-file-images",
@@ -1325,7 +1331,8 @@
       ],
       "example": "ask-marcel-office extract-local-file-images --path /tmp/deck.pdf --output-dir ./deck-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter). A missing file returns api_error 404 with the path.",
-      "producesMedia": true
+      "producesMedia": true,
+      "effect": "read"
     },
     {
       "name": "extract-mail-attachment-images",
@@ -1356,7 +1363,8 @@
       ],
       "example": "ask-marcel-office extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true
+      "producesMedia": true,
+      "effect": "read"
     },
     {
       "name": "extract-sharepoint-links-in-documents",
@@ -1380,7 +1388,8 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
+      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
+      "effect": "read"
     },
     {
       "name": "extract-sharepoint-links-in-group-post",
