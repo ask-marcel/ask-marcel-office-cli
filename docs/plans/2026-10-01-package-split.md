@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-10 done (2026-10-04) and the two step 10 follow-up fixes done (2026-10-05: the elevated lock wait at a terminal, and a token endpoint 200 that is not a token); the two step 10 follow-up 2 changes done (2026-10-09: the token helper locator looks up the runtime and entry and does not read them, and every AccessToken is JWT-shaped); step 11 in progress (2026-10-09): its additive half is done (every command declares its effect and its Graph scopes in its own meta, the mail and calendar PDF converters declare `Files.ReadWrite`, a write command's docs page says what it writes, and the live sweep runs only `read` commands), and its contract half (MCP routing by effect, `--help` and README counts, `mutates` and `graph-scopes.ts` removed) waits for the maintainer's approval of its test edits; steps 12-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-10 done (2026-10-04) and the two step 10 follow-up fixes done (2026-10-05: the elevated lock wait at a terminal, and a token endpoint 200 that is not a token); the two step 10 follow-up 2 changes done (2026-10-09: the token helper locator looks up the runtime and entry and does not read them, and every AccessToken is JWT-shaped); step 11 in progress (2026-10-09): its additive half is done (every command declares its effect and its Graph scopes in its own meta, the mail and calendar PDF converters declare `Files.ReadWrite`, a write command's docs page says what it writes, and the live sweep runs only `read` commands), and its contract half (MCP routing by effect, `--help` and README counts, `mutates` and `graph-scopes.ts` removed) waits for the maintainer's approval of its test edits (proposed in the working tree); steps 12-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -291,6 +291,22 @@ whose effect is exactly `read` and fails when the field is missing (today it alr
 converters, which write). The central `graph-scopes.ts` table is dissolved into each command's
 `meta.scopesRequired` (docs already prefer the inline value); the PDF converters declare
 `Files.ReadWrite`.
+
+As built in step 11 (`src/use-cases/commands/command-effect.ts`, `CommandMeta.effect`):
+
+- `effect` is required on every command, so a new command chooses its class instead of inheriting
+  `read`. `help-json` and `commands.json` give it on every registry command (`read` included); the
+  lifecycle entries have none.
+- `command-effect.ts` words each write class once (`action`, and `destructive` for the MCP
+  annotation). The run-write-command description, the top-level `--help` text and the per-command
+  docs line ("Writes to Microsoft 365") read it. `destructiveHint` is true only when a write class
+  in the registry is destructive (none today).
+- `check-doc-numbers.ts` counts by effect: the README breakdown is GET reads, read-only POST, and
+  writes split into drafts and PDF conversions.
+- The transient-upload wording says the command tries to delete the temporary file: the converters'
+  cleanup is best effort, so a failed cleanup can leave it in `.ask-marcel-temp`.
+- Commands that call no fixed Graph endpoint (the chat substrate, local files, link parsers,
+  `next-page`, `microsoft-search-query`) declare no scope; `meta.test.ts` pins that set.
 
 ## Cross-package names
 

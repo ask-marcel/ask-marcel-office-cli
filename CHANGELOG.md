@@ -45,6 +45,42 @@ not set, from the helper. This is how the read and write packages will get
 tokens. Without the variable, nothing changes: the token cache is read in
 process. New error codes: `env_token_invalid` and `token_helper_unavailable`.
 
+### Changed: the three PDF conversions are write commands
+
+This is an intended change. `convert-mail-attachment-to-pdf`,
+`convert-calendar-event-attachment-to-pdf` and
+`convert-group-post-attachment-to-pdf` upload the attachment to a temporary
+file in your OneDrive, convert it, and try to delete that file. A failed
+cleanup can leave the file in the `.ask-marcel-temp` folder. Thus they are now
+write commands:
+
+- The MCP server runs them through `run-write-command`. `run-command`, which
+  is marked read-only, refuses them before it makes a Graph call.
+- Each one declares `Files.ReadWrite` in `scopesRequired`.
+- `scripts/qa-live-sweep.ts` does not run them.
+
+The CLI commands do not change.
+
+### Breaking: `effect` replaces `mutates` in the command meta
+
+Each command has an `effect`: `read`, `draft` (the four mail-draft commands)
+or `transient-upload` (the three PDF conversions). `help-json` and
+`commands.json` give `effect` for each command, `read` included, and do not
+give `mutates`. In the library, `meta.effect` replaces `meta.mutates`.
+
+Code that tests `mutates === true` (in the meta, in `help-json` or in
+`commands.json`) now finds no write at all, and treats the drafts and the PDF
+conversions as reads. To find the writes, test `effect !== 'read'`.
+
+The MCP
+tool descriptions, the MCP annotations, the top-level `--help` text and the
+docs page of a write command get their text from the effect.
+`scripts/qa-live-sweep.ts` runs only the commands whose effect is `read`, and
+it stops when a command has no effect.
+
+Each command now declares its Graph scopes in its own `meta.scopesRequired`.
+The scopes in `help-json` do not change, except for the PDF conversions.
+
 ### Changed: text errors give the error code
 
 A text error now has a `code:` line under the `error:` line when the error has

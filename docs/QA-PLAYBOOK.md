@@ -106,7 +106,7 @@ For **every command**, exercise each row of this table (live against the tenant 
 | OData flags where declared (`--select/--filter/--top/--orderby/--expand`) | honored or documented-as-ignored (mailboxSettings class); `--top` >1000 rejected client-side |
 | Pagination (every `pagination: true` command) | `nextLink` hoisted to envelope top level; `next-page --url` round-trips |
 
-**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check). _As of 2026-06-15 (F-01 fix) `docs/commands.json` AND `help-json` both carry `producesBytes`/`producesMedia`/`mutates` (and, since package-split step 11, `effect`), so derive the leak-scan worklist straight from the manifest: `jq '[.commands[]|select(.producesBytes or .producesMedia)|.name]' docs/commands.json`._:
+**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check). _As of 2026-06-15 (F-01 fix) `docs/commands.json` AND `help-json` both carry `producesBytes`/`producesMedia` (and, since package-split step 11, `effect` in place of `mutates`), so derive the leak-scan worklist straight from the manifest: `jq '[.commands[]|select(.producesBytes or .producesMedia)|.name]' docs/commands.json`._:
 
 | Flag | Check | Pass criteria |
 |---|---|---|
