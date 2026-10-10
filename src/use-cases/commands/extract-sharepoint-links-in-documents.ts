@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { extractExternalRels } from './ooxml-metadata.ts';
@@ -35,7 +36,7 @@ type DocumentLinkSummary = {
   readonly skippedCount: number;
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<DocumentLinkSummary, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<DocumentLinkSummary, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
@@ -72,7 +73,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok({ driveId, itemId, links, truncated, skippedCount });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Find every `*.sharepoint.com` URL embedded in a Word / Excel / PowerPoint or OpenDocument file on OneDrive or SharePoint and resolve each one to its driveItem (driveId, itemId, name, webUrl) so the agent can feed those into `download-drive-item-as-pdf` / `-as-markdown` etc. The document sibling of `extract-sharepoint-links-in-mail`. For OOXML (.docx/.xlsx/.pptx) it reads external hyperlinks from the package’s relationship parts (`_rels/*.rels`, `TargetMode="External"`); for OpenDocument (.odt/.ods/.odp) it reads the inline `xlink:href` links in content.xml / styles.xml — either way it catches links wherever they live (body text, headers/footers, cell formulas, slide shapes). Read-only — no conversion happens here. Capped at 25 unique URLs per call (returns `truncated: true` and `skippedCount` when there are more); duplicates are deduplicated; per-link errors are captured inside each entry instead of failing the whole call. Non-zip inputs (pdf/images) return an api_error.',
   category: 'drive',

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickPreviousVersion, refuseVersionRender, resolveVersion } from './download-drive-item-version.ts';
 import { diffEnvelope, readDriveFile, renderSide } from './drive-item-diff.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -31,7 +32,7 @@ const liveNote = (id: string, before: string | undefined): string =>
     ? `Version ${id} is the only one saved: there is no earlier version to compare with the live file.`
     : `Nothing was saved after ${before}: version ${id} is the live file.`;
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId, before, maxCells, sheet } = parsed.data;
@@ -56,7 +57,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok({ ...diff, versionId: id });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'What changed in a OneDrive or SharePoint file: the version saved before `--before`, the one named by `--version-id`, or by default the version saved just before the live one (what the last save changed), and the live file are both converted to markdown the way `download-drive-item-as-markdown` converts them, and the answer is a unified diff of the two (`--- a/<name> (version N)`, `+++ b/<name> (current)`, three lines of context) with the count of added and removed lines and the `versionId` compared. Nothing saved after the instant answers an empty diff with a note, without a download. `--include-metadata true` renders comments, tracked changes and properties on both sides, so a file whose body did not move but whose comments did still shows the change. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Loop, Fluid and Whiteboard pages are refused: Graph renders any old version of them as the current page. Needs the second token `login` captures for version history. For two different files, `diff-drive-items`.',
   category: 'drive',

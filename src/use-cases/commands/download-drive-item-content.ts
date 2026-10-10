@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { base64ToBytes, inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { decodeUtf8Text } from './text-passthrough.ts';
@@ -11,7 +12,7 @@ import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
@@ -51,7 +52,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok(text !== undefined ? { contentType: 'text/plain', size: blob.value.size, text } : blob.value);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Download the binary content of a file stored in OneDrive / SharePoint, with the bytes inlined. The CLI follows the Graph 302 → SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. The bytes are CONTENT-SNIFFED, not judged by extension: if they decode as valid UTF-8 they come back as `{contentType: "text/plain", size, text}` (avoids ~33% base64 bloat, works for any text file regardless of name); otherwise as `{contentType, size, base64}`. A binary file that happens to be named `.txt` is returned faithfully as base64 — never silently corrupted into `�` by a forced text decode.',
   category: 'drive',

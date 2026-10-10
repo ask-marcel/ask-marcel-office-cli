@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { officeToMarkdown, rendersThroughGraph } from './office-to-markdown.ts';
@@ -32,7 +33,7 @@ type SavedVersion = { readonly id: string; readonly lastModifiedDateTime: string
 type PickedVersion = { readonly id: string; readonly current: boolean };
 
 /** The file's versions, newest first; an entry without an id or a save time is dropped. */
-const listVersions = async (graph: GraphClient, driveId: string, itemId: string): Promise<Result<ReadonlyArray<SavedVersion>, GraphError>> => {
+const listVersions = async (graph: ReadGraph, driveId: string, itemId: string): Promise<Result<ReadonlyArray<SavedVersion>, GraphError>> => {
   const listed = await graph.get(`/drives/${driveId}/items/${itemId}/versions?$select=id,lastModifiedDateTime`);
   if (!listed.ok) return listed;
   return ok(
@@ -46,7 +47,7 @@ const listVersions = async (graph: GraphClient, driveId: string, itemId: string)
 // caller comparing "what changed in the window" no longer lists the versions
 // and chooses by hand. `current` says that version is still the live file:
 // nothing was saved after the instant.
-const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: string, before: string): Promise<Result<PickedVersion, GraphError>> => {
+const pickVersionBefore = async (graph: ReadGraph, driveId: string, itemId: string, before: string): Promise<Result<PickedVersion, GraphError>> => {
   const versions = await listVersions(graph, driveId, itemId);
   if (!versions.ok) return versions;
   const newest = versions.value.find((v) => v.lastModifiedDateTime < before);
@@ -62,7 +63,7 @@ const pickVersionBefore = async (graph: GraphClient, driveId: string, itemId: st
 
 // With neither flag, the version diff answers what the last save changed: the
 // version saved just before the live one. A file saved once has only the live one.
-const pickPreviousVersion = async (graph: GraphClient, driveId: string, itemId: string): Promise<Result<PickedVersion, GraphError>> => {
+const pickPreviousVersion = async (graph: ReadGraph, driveId: string, itemId: string): Promise<Result<PickedVersion, GraphError>> => {
   const versions = await listVersions(graph, driveId, itemId);
   if (!versions.ok) return versions;
   const [live, previous] = versions.value;
@@ -74,7 +75,7 @@ const pickPreviousVersion = async (graph: GraphClient, driveId: string, itemId: 
 // An explicit `--version-id` wins and skips the listing (its `current` is unknown,
 // so false: Graph itself refuses the live version on this endpoint).
 const resolveVersion = async (
-  graph: GraphClient,
+  graph: ReadGraph,
   driveId: string,
   itemId: string,
   versionId: string | undefined,
@@ -94,9 +95,9 @@ const resolveVersion = async (
 const contentPathOf = (driveId: string, itemId: string, picked: PickedVersion): string =>
   picked.current ? `/drives/${driveId}/items/${itemId}/content` : `/drives/${driveId}/items/${itemId}/versions/${picked.id}/content`;
 
-const fetchOriginal = async (graph: GraphClient, contentPath: string): Promise<Result<unknown, GraphError>> => inlineBinary(graph, contentPath, { elevated: true });
+const fetchOriginal = async (graph: ReadGraph, contentPath: string): Promise<Result<unknown, GraphError>> => inlineBinary(graph, contentPath, { elevated: true });
 
-const fetchPdf = async (graph: GraphClient, driveId: string, itemId: string, contentPath: string, versionId: string): Promise<Result<unknown, GraphError>> => {
+const fetchPdf = async (graph: ReadGraph, driveId: string, itemId: string, contentPath: string, versionId: string): Promise<Result<unknown, GraphError>> => {
   // Pre-fetch the driveItem for its filename. Plain-text / pdf sources
   // short-circuit to raw bytes (Graph's `?format=pdf` does not list `pdf`
   // in its supported input set — the CDN responds 406 InputFormatNotSupported
@@ -139,7 +140,7 @@ type FetchRequest = {
   readonly maxCells?: number;
 };
 
-const fetchMarkdown = async (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+const fetchMarkdown = async (graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
   const { driveId, itemId, contentPath, includeMetadata, maxCells } = r;
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
@@ -148,7 +149,7 @@ const fetchMarkdown = async (graph: GraphClient, r: FetchRequest): Promise<Resul
   return officeToMarkdown(graph, contentPath, name, { elevated: true, includeMetadata, maxCells });
 };
 
-const fetchByFormat = (graph: GraphClient, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
+const fetchByFormat = (graph: ReadGraph, r: FetchRequest): Promise<Result<unknown, GraphError>> => {
   if (r.format === 'original') return fetchOriginal(graph, r.contentPath);
   if (r.format === 'pdf') return fetchPdf(graph, r.driveId, r.itemId, r.contentPath, r.versionId);
   return fetchMarkdown(graph, r);
@@ -160,7 +161,7 @@ const withNote = (value: Record<string, unknown>, note: string): Record<string, 
   return { ...value, note: typeof existing === 'string' ? `${existing} ${note}` : note };
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId, before } = parsed.data;
@@ -178,7 +179,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok(picked.current ? withNote({ ...chosen, current: true }, `Nothing was saved after ${before}: this is the live file.`) : chosen);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Download a *non-current* historical version of a OneDrive / SharePoint file. `--format original` (default) returns the raw bytes — Graph refuses to serve the current version through this endpoint with "You cannot get the content of the current version"; for the current version use `download-drive-item-content`. `--format pdf` runs Graph `?format=pdf` for Office docs; plain-text and `pdf` sources short-circuit to raw bytes with `passthrough: true` + a note (Graph rejects `pdf → pdf` with InputFormatNotSupported). `--format markdown` runs the local conversion pipeline (mammoth for docx, sheetjs for xlsx, csv → table, odt/ods/odp via content.xml, plain-text passthrough). All three formats use an M365ChatClient-elevated Graph token (captured at login from m365.cloud.microsoft) — the Teams web client token returns 403 logicalPermissionAccessDenied on historical-version stream content. The CLI follows the SharePoint streamContent redirect internally so the LLM never has to fetch an external URL. Caveat for `--format pdf`: Graph does not convert a historical version — `?format=pdf` on one answers the raw bytes of that version, flagged `passthrough: true` — so save it with the source extension, not `.pdf` (the global output-path flag refuses the mismatch). A Loop, Fluid or Whiteboard version is refused in markdown, because Graph renders any version of those as the current page; `--format original` returns the bytes of that version. A headless or scheduled run must call `login` first: the elevated token lives about 80 minutes and cannot refresh silently.',
   category: 'drive',

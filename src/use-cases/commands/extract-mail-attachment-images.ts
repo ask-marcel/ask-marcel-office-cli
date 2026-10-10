@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { base64ToBytes, fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import type { PageRange } from '../../domain/page-range.ts';
@@ -39,7 +40,7 @@ const fromFileAttachment = (
 ): Promise<Result<unknown, GraphError>> => extractImagesFromBytes(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', hints.fetchHint, pages);
 
 const fromReferenceAttachment = async (
-  graph: GraphClient,
+  graph: ReadGraph,
   attachment: { sourceUrl?: string },
   hints: ImageExtractionHints,
   pages: PageRange | undefined
@@ -71,7 +72,7 @@ const fromReferenceAttachment = async (
 // A forwarded mail: its files come out of its MIME source through the .eml
 // parser, and every image they hold comes back named after its file (a scanned
 // contract inside a forwarded mail, 2026-09-23, was otherwise unreachable).
-const fromItemAttachment = async (graph: GraphClient, attachmentPath: string, pages: PageRange | undefined): Promise<Result<unknown, GraphError>> => {
+const fromItemAttachment = async (graph: ReadGraph, attachmentPath: string, pages: PageRange | undefined): Promise<Result<unknown, GraphError>> => {
   const embedded = await readEmbeddedItem(graph, attachmentPath);
   if (!embedded.ok) return embedded;
   if (embedded.value.kind === 'other')
@@ -88,7 +89,7 @@ const fromItemAttachment = async (graph: GraphClient, attachmentPath: string, pa
  * here, and one post of a group thread. The path and the hints are the only
  * things that differ; `pages` narrows a PDF when the caller offers `--pages`.
  */
-const extractAttachmentImages = async (graph: GraphClient, attachmentPath: string, hints: ImageExtractionHints, pages?: PageRange): Promise<Result<unknown, GraphError>> => {
+const extractAttachmentImages = async (graph: ReadGraph, attachmentPath: string, hints: ImageExtractionHints, pages?: PageRange): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
@@ -107,14 +108,14 @@ const extractAttachmentImages = async (graph: GraphClient, attachmentPath: strin
   }
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
   return extractAttachmentImages(graph, `/me/messages/${messageId}/attachments/${attachmentId}`, MAIL_HINTS, parsed.data.pages);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Extract the embedded images from an Outlook mail attachment that is a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. An embedded mail (a forwarded message) is opened: its image files come back as they are and its pdf / Office files through the extractor, each path prefixed with its file name, and `--pages` narrows every PDF among them; an embedded event or contact, and unsupported formats, return a 415.',
   category: 'mail',

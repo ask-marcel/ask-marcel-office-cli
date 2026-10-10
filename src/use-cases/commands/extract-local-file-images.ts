@@ -2,9 +2,10 @@ import { basename } from 'node:path';
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { extractImagesFromBytes } from './image-extraction.ts';
 
@@ -38,14 +39,14 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   return extractImagesFromBytes(bytes.value, basename(path), FETCH_HINT);
 };
 
-const execute = async (_graph: GraphClient, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
+const execute = async (_graph: ReadGraph, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
   err({
     type: 'api_error',
     status: 400,
     message: 'extract-local-file-images reads the local filesystem, not Graph — call executeLocal(fs, params) with a FileSystem (the CLI wires this automatically).',
   });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Extract the embedded images from a file ON DISK — the local sibling of `extract-drive-item-images`, and like `convert-local-file-to-markdown` it never calls Microsoft Graph (works offline, no login). Same per-extension dispatch: docx / xlsx / pptx (and their macro-enabled / template variants) have their OOXML media parts read directly (png/jpg/gif/bmp/tiff/webp/svg — full-resolution originals, including images on hidden slides); a pdf is walked page by page via unpdf with each painted image re-encoded as PNG. Two flows only this command completes: a Graph-rendered PDF saved locally (legacy `.ppt` → `download-drive-item-as-pdf` with the global output-path flag → this command pulls the slide images for OCR), and Office files unpacked from a local archive. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. Any other extension returns a 415 naming the local ways out.',
   category: 'meta',

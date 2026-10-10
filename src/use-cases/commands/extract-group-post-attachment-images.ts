@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { extractAttachmentImages } from './extract-mail-attachment-images.ts';
 import type { ImageExtractionHints } from './extract-mail-attachment-images.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -21,14 +22,14 @@ const schema = z.object({
   attachmentId: z.string().min(1),
 });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { groupId, threadId, postId, attachmentId } = parsed.data;
   return extractAttachmentImages(graph, `/groups/${groupId}/threads/${threadId}/posts/${postId}/attachments/${attachmentId}`, POST_HINTS);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Extract the embedded images from an attachment on one post of a unified (Microsoft 365) group thread, the `extract-mail-attachment-images` sibling for a group inbox and sharing its pipeline. Handles a pdf or a docx / xlsx / pptx (and their macro-enabled / template variants). OOXML reads the media parts directly (png/jpg/gif/bmp/tiff/webp/svg), including full-resolution / un-cropped originals and images on hidden slides; pdf walks every page via unpdf and re-encodes each painted image as PNG (page-oriented — not layer-hidden/unpainted/uncropped originals). fileAttachment decodes the inline bytes; referenceAttachment resolves via /shares/{token}/driveItem and fetches the content. Pair with the global output-dir flag to write every image to a folder; otherwise the bytes ride back base64-encoded. svg rides back as its XML source (which carries the diagram text labels); legacy vector (emf/wmf) and audio/video are skipped. An embedded mail (a forwarded message) is opened: its image files come back as they are and its pdf / Office files through the extractor, each path prefixed with its file name; an embedded event or contact, and unsupported formats, return a 415. This is how a diagram inside a document posted to a group survives into a searchable form.',
   category: 'mail',
