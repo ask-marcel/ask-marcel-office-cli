@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
-import { base64ToBytes, inlineBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { WriteCommandMeta } from './command-types.ts';
+import { base64ToBytes, inlineBasicBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
@@ -36,7 +37,7 @@ const extensionOf = (name: string): string => {
   return name.slice(dot + 1).toLowerCase();
 };
 
-const convertFileAttachment = async (graph: GraphClient, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
+const convertFileAttachment = async (graph: WriteGraph, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
   const name = attachment.name ?? 'unnamed';
   const contentBytes = attachment.contentBytes ?? '';
   const bytes = base64ToBytes(contentBytes);
@@ -75,7 +76,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
     return err({ type: 'api_error', status: 500, message: 'upload returned no driveItem id' });
   }
 
-  const converted = tagPdfPassthrough(await inlineBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
+  const converted = tagPdfPassthrough(await inlineBasicBinary(graph, `/me/drive/items/${itemId}/content?format=pdf`), name);
   // Best-effort cleanup; ignore the err if it fails.
   await graph.delete(`/me/drive/items/${itemId}`);
   // A 406 from the transform means Graph accepted the upload but refused to
@@ -102,7 +103,7 @@ const convertFileAttachment = async (graph: GraphClient, attachment: { name?: st
   return converted;
 };
 
-const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
+const cleanupTempFolderIfEmpty = async (graph: WriteGraph): Promise<void> => {
   // pre-rename versions used an un-dotted `ask-marcel-temp` folder and
   // never removed it — QA run-1 found one orphaned (empty) at a real tenant's
   // OneDrive root. Sweep BOTH names, best-effort, only when empty.
@@ -115,7 +116,7 @@ const cleanupTempFolderIfEmpty = async (graph: GraphClient): Promise<void> => {
   }
 };
 
-const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
+const convertReferenceAttachment = async (graph: WriteGraph, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
     return err({
@@ -142,18 +143,18 @@ const convertReferenceAttachment = async (graph: GraphClient, attachment: { sour
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard
     // blocks writing it into a `.pdf` — same protection as the fileAttachment path.
-    return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`), name);
+    return tagPdfPassthrough(await inlineBasicBinary(graph, `/drives/${driveId}/items/${itemId}/content`), name);
   }
   const refExt = extensionOf(name);
   if (IMAGE_EXTENSIONS.has(refExt)) return err({ type: 'api_error', status: 415, message: imageHint(refExt) });
-  return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
+  return tagPdfPassthrough(await inlineBasicBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`), name);
 };
 
 // Fetch an attachment by its full Graph path and convert it to PDF, branching
 // on the polymorphic `@odata.type`. Path-agnostic so both the mail
 // (`/me/messages/{id}/attachments/{id}`) and calendar-event
 // (`/me/events/{id}/attachments/{id}`) commands share one implementation.
-const convertAttachmentToPdf = async (graph: GraphClient, attachmentPath: string): Promise<Result<unknown, GraphError>> => {
+const convertAttachmentToPdf = async (graph: WriteGraph, attachmentPath: string): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   const a = fetched.value as Record<string, unknown>;
@@ -180,14 +181,14 @@ const convertAttachmentToPdf = async (graph: GraphClient, attachmentPath: string
   }
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: WriteGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
   return convertAttachmentToPdf(graph, `/me/messages/${messageId}/attachments/${attachmentId}`);
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Convert an Outlook mail attachment to PDF on the fly. Polymorphic on the attachment’s `@odata.type`: fileAttachment uploads the bytes to a temp folder under /me/drive (large files use Graph’s chunked upload session — no 4 MB ceiling), runs ?format=pdf, then deletes the temp item; referenceAttachment resolves via /shares/{token}/driveItem and runs ?format=pdf in place; plain-text source extensions and `pdf` sources short-circuit to a raw-bytes envelope on either path (Graph’s `?format=pdf` does not accept `pdf` as an input format — pdf attachments are returned as-is). itemAttachment (embedded mail/event/contact) is unsupported here — Graph rejects those source types — use convert-mail-attachment-to-markdown instead. Worst-case wall-clock for huge attachments is ~22 minutes (1 metadata GET + up-to-20 chunk PUTs + 1 convert GET + 1 cleanup DELETE, each capped at 60s).',
   category: 'mail',

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
 import {
   bodyCarriesQuote,
   boundaryMarkerRefusal,
@@ -66,7 +67,7 @@ const reviseBodyAboveQuote = (draft: DraftBody, messageId: string, comment: stri
   return ok({ contentType: draft.contentType, content: revised.html });
 };
 
-const readDraft = async (graph: GraphClient, messageId: string): Promise<Result<z.infer<typeof draftSchema>, GraphError>> => {
+const readDraft = async (graph: WriteGraph, messageId: string): Promise<Result<z.infer<typeof draftSchema>, GraphError>> => {
   const fetched = await graph.get(`/me/messages/${messageId}?$select=body,isDraft`);
   if (!fetched.ok) return fetched;
   const parsed = draftSchema.safeParse(fetched.value);
@@ -88,14 +89,14 @@ const readDraft = async (graph: GraphClient, messageId: string): Promise<Result<
  * Reads the draft to decide whether a whole-body replace would drop a quote.
  * The read doubles as the is-this-a-draft check the comment path already made.
  */
-const guardQuotedHistory = async (graph: GraphClient, messageId: string): Promise<Result<undefined, GraphError>> => {
+const guardQuotedHistory = async (graph: WriteGraph, messageId: string): Promise<Result<undefined, GraphError>> => {
   const draft = await readDraft(graph, messageId);
   if (!draft.ok) return draft;
   if (!bodyCarriesQuote(draft.value.body.contentType, draft.value.body.content)) return ok(undefined);
   return err(quotedHistoryRefusal(messageId));
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, subject, bodyContent, comment, replaceQuotedHistory, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance } = parsed.data;
@@ -156,7 +157,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return slimDraftResult(await graph.patch(`/me/messages/${messageId}`, body));
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Update an existing mail draft. PATCH /me/messages/{id} — modifies a draft created by create-mail-draft (or any existing draft in the Drafts folder). Only the fields you pass are updated; omitted fields are left unchanged. At least one field must be provided. On a THREADED draft (one made by create-reply-draft / create-forward-draft), revise your text with --comment, which rewrites only what sits above the quoted history and leaves the quote byte-identical; --body-content replaces the whole body and would drop the thread, so it is REFUSED on a draft that still carries a quote unless you pass --replace-quoted-history true. Passing an EMPTY string to a recipient flag clears that list, which is how you drop recipients a reply-all or forward inherited; omitting the flag leaves the list alone. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the full body, which you just wrote; read it back with get-mail-message if you need the whole draft before sending.',
   category: 'mail',

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { WriteCommandMeta } from './command-types.ts';
 import { convertAttachmentToPdf } from './convert-mail-attachment-to-pdf.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -11,14 +12,14 @@ const schema = z.object({
   attachmentId: z.string().min(1),
 });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: WriteGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { eventId, attachmentId } = parsed.data;
   return convertAttachmentToPdf(graph, `/me/events/${eventId}/attachments/${attachmentId}`);
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Convert an attachment on an Outlook calendar event to PDF on the fly (shares the mail-attachment pipeline). fileAttachment uploads the bytes to a temp folder under /me/drive, runs Graph `?format=pdf`, then deletes the temp item; referenceAttachment resolves via /shares/{token}/driveItem and converts in place; plain-text and `pdf` sources short-circuit to a raw-bytes envelope (Graph’s `?format=pdf` does not accept `pdf` as an input). image attachments are rejected (Graph rejects image inputs); itemAttachment (embedded mail/event/contact) is unsupported — use convert-calendar-event-attachment-to-markdown. Best for the deck attached to a meeting, where PDF preserves slide layout for a vision-capable LLM.',
   category: 'calendar',

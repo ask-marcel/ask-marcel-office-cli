@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -26,7 +27,7 @@ type DraftBody = z.infer<typeof draftBodySchema>['body'];
 // Mirrors create-reply-draft's reader: the body normally rides back on the
 // create response, so the common case costs no extra call. Duplicated rather
 // than shared while there are only two of them (Rule of Three).
-const readDraftBody = async (graph: GraphClient, created: unknown, draftId: string): Promise<Result<DraftBody, GraphError>> => {
+const readDraftBody = async (graph: WriteGraph, created: unknown, draftId: string): Promise<Result<DraftBody, GraphError>> => {
   const inline = draftBodySchema.safeParse(created);
   if (inline.success) return ok(inline.data.body);
   const fetched = await graph.get(`/me/messages/${draftId}?$select=body`);
@@ -43,7 +44,7 @@ const readDraftBody = async (graph: GraphClient, created: unknown, draftId: stri
   return ok(parsed.data.body);
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success)
     return err({
@@ -120,7 +121,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Create an UNSENT forward draft of an existing message. POST /me/messages/{id}/createForward mints the draft (FW: subject, quoted original) with your comment placed above the quote and the recipients set, in one call. Redirects a thread to the right owner without leaving the CLI. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
   category: 'mail',

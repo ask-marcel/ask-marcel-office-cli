@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -24,7 +25,7 @@ type DraftBody = z.infer<typeof draftBodySchema>['body'];
 // Graph returns the freshly minted draft's body on the create response, so the
 // common case costs no extra call. It is not contractually guaranteed, so fall
 // back to reading it back rather than guessing at the scaffolding.
-const readDraftBody = async (graph: GraphClient, created: unknown, draftId: string): Promise<Result<DraftBody, GraphError>> => {
+const readDraftBody = async (graph: WriteGraph, created: unknown, draftId: string): Promise<Result<DraftBody, GraphError>> => {
   const inline = draftBodySchema.safeParse(created);
   if (inline.success) return ok(inline.data.body);
   const fetched = await graph.get(`/me/messages/${draftId}?$select=body`);
@@ -41,7 +42,7 @@ const readDraftBody = async (graph: GraphClient, created: unknown, draftId: stri
   return ok(parsed.data.body);
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { replyToMessageId, comment, subject, replyAll, bodyContentType } = parsed.data;
@@ -111,7 +112,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Create an UNSENT reply draft threaded on an existing message. POST /me/messages/{id}/createReplyAll mints the draft (inherited recipients, RE: subject, quoted history) with your reply text placed above the quote, in one call. Reply-all by default - dropping recipients is a deliberate act, so pass --reply-all false to reply to the sender only, which switches the action to createReply. The draft is saved in Drafts and can be reviewed, edited, and sent from any Outlook client; the CLI still cannot send.',
   category: 'mail',

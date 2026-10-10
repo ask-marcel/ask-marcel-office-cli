@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
 import { slimDraftResult } from './draft-response.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
@@ -16,7 +16,7 @@ const schema = z.object({
   mailFolderId: z.string().optional(),
 });
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { subject, bodyContent, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance, mailFolderId } = parsed.data;
@@ -38,7 +38,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return slimDraftResult(await graph.post(path, body));
 };
 
-const meta: CommandMeta = {
+const meta: WriteCommandMeta = {
   summary:
     'Create a new mail draft. POST /me/messages (or /me/mailFolders/{id}/messages when --mail-folder-id is set). The draft is saved in the Drafts folder (or the specified folder) and can be sent later via the Outlook client or Graph sendMail. Recipients are comma-separated email addresses. Returns a slim confirmation (id, subject, recipients, importance, bodyPreview, …) - NOT the body you just wrote; read the full draft back with get-mail-message if you need it. Use the returned id with update-mail-draft to modify before sending.',
   category: 'mail',
