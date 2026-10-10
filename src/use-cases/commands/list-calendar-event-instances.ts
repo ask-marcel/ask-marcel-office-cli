@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import { buildListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -31,7 +31,7 @@ const EXPAND_SERIES_NEEDLE = 'ExpandSeries can only be performed against a serie
 // `ErrorInvalidRequest: ... ExpandSeries can only be performed against a
 // series.`. Rewrite to a clear hint pointing the LLM at the seriesMaster
 // filter that finds a recurring event.
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const result = await inner.execute(graph, params);
   if (result.ok) return result;
   if (result.error.type === 'api_error' && result.error.message.includes(EXPAND_SERIES_NEEDLE)) {
@@ -47,7 +47,7 @@ const execute: Command['execute'] = async (graph, params) => {
 };
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the individual occurrences of a recurring calendar event over a date range. Both ISO date-time params are required by Graph. `--calendar-id` is optional and defaults to `primary` (the signed-in user’s default calendar) — most callers know the event-id but not which calendar it lives in. Pass an explicit `--calendar-id` only when targeting a non-default calendar.',
   category: 'calendar',

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildListCommand(() => '/me/onenote/sections', baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List every OneNote section the signed-in user can see, across all notebooks.',
   category: 'notes',
   graphMethod: 'GET',

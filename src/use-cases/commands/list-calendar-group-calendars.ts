@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ calendarGroupId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/me/calendarGroups/${p.calendarGroupId}/calendars`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the calendars inside one calendar group.',
   category: 'calendar',
   graphMethod: 'GET',

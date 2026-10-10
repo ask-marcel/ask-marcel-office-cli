@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { withDefaultSelect } from './build-command.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataStringLiteral, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
@@ -55,7 +56,7 @@ const is404 = (error: GraphError): boolean => error.type === 'api_error' && erro
 // requested field: `department` rides in the default $select, so keying the fallback on a field
 // would send every lookup to the elevated token, whose interactive-only re-capture is the very
 // prompt the basic path exists to avoid.
-const getProfile = async (graph: GraphClient, path: string): ReturnType<GraphClient['get']> => {
+const getProfile = async (graph: ReadGraph, path: string): ReturnType<ReadGraph['get']> => {
   const basic = await graph.get(path);
   if (basic.ok) return basic;
   if (basic.error.type === 'api_error' && basic.error.status === 403) return graph.getElevated(path);
@@ -66,7 +67,7 @@ const getProfile = async (graph: GraphClient, path: string): ReturnType<GraphCli
 // encodeURIComponent is load-bearing: a guest UPN is `alice_x.com#EXT#@tenant...` and a raw `#` is
 // the URL fragment delimiter — fetch would drop everything from it and hit the wrong user. Encoding
 // (`#`→`%23`, `@`→`%40`) preserves the whole id; GUIDs pass through unchanged.
-const resolveByIdentifier = async (graph: GraphClient, userId: string, query: Parameters<typeof appendOData>[1]): ReturnType<Command['execute']> => {
+const resolveByIdentifier = async (graph: ReadGraph, userId: string, query: Parameters<typeof appendOData>[1]): ReturnType<ReadCommand['execute']> => {
   const direct = await getProfile(graph, appendOData(`/users/${encodeURIComponent(userId)}`, query));
   if (direct.ok || !userId.includes('@') || !is404(direct.error)) return direct;
   // The `@` input 404'd — it may be a `mail` that differs from the UPN. A guest carries
@@ -80,7 +81,7 @@ const resolveByIdentifier = async (graph: GraphClient, userId: string, query: Pa
   return Array.isArray(matches) && matches.length > 0 ? ok(matches[0]) : direct;
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { userId } = parsed.data;
@@ -107,7 +108,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ query: userId, matches: (Array.isArray(value) ? value : []).map(toCandidate) });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the basic token — no elevated login needed. On a tenant that restricts basic directory reads the id path falls back to the elevated M365 token; re-capture that with `ask-marcel-office login` (preflight tiers with `ask-marcel-office status`, no Graph call). An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Only THIS tenant's directory is queried: a person's home-tenant object id (e.g. a cross-tenant Teams `8:orgid:<home-id>` participant, whose id lives in their own tenant) and any email that is not their `mail`/UPN here are unresolvable by design — reach an external person via their LOCAL guest projection (by name, or by their real `mail`), never by their home id. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query. Re-query by the candidate's `id` when it is a directory GUID; an EXTERNAL contact's candidate carries a base64-ish People-API id instead, which nothing can resolve — re-query those by the candidate's `mail` (the CLI rejects an opaque contact id with that remedy rather than returning empty matches). Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search. Without `--select`, the profile ships a default projection of id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone.",
   category: 'user',

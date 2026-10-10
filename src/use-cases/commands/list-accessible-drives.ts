@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { searchIndexTotal } from './search-index-total.ts';
@@ -46,7 +47,7 @@ const schema = z.object({
 const stripPrefix = (nextLink: string): string => (nextLink.startsWith(`${GRAPH_PREFIX}/`) ? nextLink.slice(GRAPH_PREFIX.length) : nextLink);
 
 // Follow @odata.nextLink (bounded) and concatenate every `value[]` page.
-const listAll = async (graph: GraphClient, firstPath: string): Promise<Result<ReadonlyArray<unknown>, GraphError>> => {
+const listAll = async (graph: ReadGraph, firstPath: string): Promise<Result<ReadonlyArray<unknown>, GraphError>> => {
   const items: Array<unknown> = [];
   let path: string | undefined = firstPath;
   for (let page = 0; page < MAX_PAGES && path !== undefined; page += 1) {
@@ -135,7 +136,7 @@ const tagKnown = (drives: Map<string, Accumulator>, ids: ReadonlyArray<string>, 
 
 // Resolve `/drives/{id}` for ids not yet known, capped at `maxGroups`. Returns true if the cap was hit.
 const enrichUnknownDrives = async (
-  graph: GraphClient,
+  graph: ReadGraph,
   ids: ReadonlyArray<string>,
   source: Source,
   drives: Map<string, Accumulator>,
@@ -157,7 +158,7 @@ const enrichUnknownDrives = async (
 // Collect drive ids behind every private/shared channel of the given teams: list channels,
 // then resolve each non-standard channel's files folder to its backing drive id.
 const collectChannelDriveIds = async (
-  graph: GraphClient,
+  graph: ReadGraph,
   teamIds: ReadonlyArray<string>,
   maxGroups: number,
   partialErrors: PartialErrors
@@ -207,7 +208,7 @@ const itemDriveId = (item: unknown): string | undefined => {
   return match === null ? undefined : match[1];
 };
 
-const collectActivityDriveIds = async (graph: GraphClient, partialErrors: PartialErrors): Promise<ReadonlyArray<string>> => {
+const collectActivityDriveIds = async (graph: ReadGraph, partialErrors: PartialErrors): Promise<ReadonlyArray<string>> => {
   const results = await Promise.all(ACTIVITY_PATHS.map((p) => listAll(graph, p)));
   const ids = new Set<string>();
   ACTIVITY_PATHS.forEach((p, i) => {
@@ -237,7 +238,7 @@ const driveValues = (body: unknown): ReadonlyArray<unknown> => {
   return Array.isArray(value) ? value : [];
 };
 
-const addSiteLibraries = async (graph: GraphClient, drives: Map<string, Accumulator>, maxGroups: number, partialErrors: PartialErrors): Promise<boolean> => {
+const addSiteLibraries = async (graph: ReadGraph, drives: Map<string, Accumulator>, maxGroups: number, partialErrors: PartialErrors): Promise<boolean> => {
   const sites = new Set<string>();
   for (const acc of drives.values()) {
     const addr = siteAddress(acc.webUrl);
@@ -260,7 +261,7 @@ const addSiteLibraries = async (graph: GraphClient, drives: Map<string, Accumula
   return sites.size > maxGroups;
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const maxGroups = Number(parsed.data.maxGroups ?? String(DEFAULT_MAX_GROUPS));
@@ -362,7 +363,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Enumerate every drive (document library) the signed-in user can reach — personal OneDrive(s), Teams libraries, SharePoint M365-group sites, drives behind files shared with the user, private/shared Teams channel sites, drives behind recently-used / followed / trending items (activity signals), AND every NON-default document library of each discovered SharePoint site — by unioning `/me/drives`, `/me/joinedTeams`, `/me/memberOf` (Unified groups → `/groups/{id}/drive`), `/me/drive/sharedWithMe`, per-team `/teams/{id}/channels` → `/channels/{ch}/filesFolder` (private/shared channels only — their files live in their own site, not the team default drive), `/me/drive/recent` + `/me/drive/following` + `/me/insights/{trending,used,shared}`, and a path-addressed `/sites/{host}:/sites/{name}:/drives` per discovered site (catches secondary libraries like "Teams Wiki Data" the default-drive vectors miss). Unlike `search-sharepoint-sites-by-name` (which relies on the tenant search index and misses direct-link-only sites + OneDrives), these vectors surface drives the search index never returns; the index in turn returns sites you can open but are not a member of, so the *union of both commands* is the practical maximum on a delegated token. Each drive is tagged with the `sources[]` that found it (a drive can have several). Per-resource "can\'t reach this one" failures are dropped silently (404 no drive, 403 access-denied / non-member private channel, 423 admin-locked site, 400 stale/unresolvable id); only actionable failures (auth, throttling, 5xx, network) appear in `partialErrors[]`, so it stays signal-only. Fans out one `/groups/{id}/drive` + one `/teams/{id}/channels` call per joined team + member group, a `filesFolder` call per private/shared channel, five fixed activity calls, and one `/sites/{id}/drives` call per discovered site (all capped by `--max-groups`, default 100; raise carefully — large memberships can hit 429 throttling). `/me/followedSites` is not used — it 403s on this token. Loop workspaces are not in this union: their container drives cannot be listed on a delegated token (the containers endpoint answers 403), so find a workspace through `search-all-files` with the query `filetype:loop` and take `parentReference.driveId` from a hit.',
   category: 'drive',

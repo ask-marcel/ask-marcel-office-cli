@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { topOnlyOptions, topOnlyShape } from './odata-query.ts';
 
 const schema = z.object({}).extend(topOnlyShape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // Graph's calendar delta endpoint REJECTS `$top` as a query parameter
@@ -33,7 +33,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return result;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Get the incremental change set (added / modified / deleted events) for the signed-in user's default calendar. Use the `@odata.deltaLink` from a previous response to resume. The CLI translates `--top` into the `Prefer: odata.maxpagesize=N` header internally; `$top` as a URL query is rejected by Graph (`ErrorInvalidUrlQuery`). Other OData passthroughs (`$select`, `$filter`, `$orderby`, `$skip`) are silently ignored by Graph on this delta endpoint, so the CLI does NOT expose them — slice / sort / project client-side. Most tenants accept the call without `--top` and return a sane page (~200 events); pass `--top` only when you want a smaller bound. If Graph returns an empty `UnknownError:` (rare), the CLI rewrites it to a hint pointing at the `--top` workaround.",
   category: 'calendar',

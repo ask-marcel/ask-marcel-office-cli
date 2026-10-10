@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
@@ -11,7 +11,7 @@ const schema = z.object({ eventId: z.string().min(1) }).extend(odataQuerySchema.
 // Graph regardless (and Graph rejects asking for it in `$select`).
 const DEFAULT_SELECT = 'id,name,contentType,size,isInline';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const dataWithSelect = parsed.data.select === undefined ? { ...parsed.data, select: DEFAULT_SELECT } : parsed.data;
@@ -19,7 +19,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return graph.get(path);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the attachments (file, item, reference) on a single Outlook calendar event. Ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM doesn't accidentally pull multi-MB `contentBytes` for every attachment. The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To read one, call `convert-calendar-event-attachment-to-markdown` (or `convert-calendar-event-attachment-to-pdf` for slide / layout fidelity).",
   category: 'calendar',
