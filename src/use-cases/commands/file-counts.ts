@@ -1,4 +1,4 @@
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { searchIndexTotal } from './search-index-total.ts';
 
 /**
@@ -12,10 +12,10 @@ import { searchIndexTotal } from './search-index-total.ts';
 const FILE_COUNT_CHUNK = 10;
 const FILE_COUNT_MAX = 200;
 
-const countForUrl = async (graph: GraphClient, webUrl: string): Promise<number | undefined> =>
+const countForUrl = async (graph: ReadGraph, webUrl: string): Promise<number | undefined> =>
   webUrl === '' ? undefined : searchIndexTotal(graph, 'driveItem', `path:"${webUrl.replaceAll('"', '')}"`);
 
-const countsForUrls = async (graph: GraphClient, urls: ReadonlyArray<string>, max: number, chunk: number): Promise<ReadonlyArray<number | undefined>> => {
+const countsForUrls = async (graph: ReadGraph, urls: ReadonlyArray<string>, max: number, chunk: number): Promise<ReadonlyArray<number | undefined>> => {
   const out: Array<number | undefined> = [];
   for (let start = 0; start < urls.length; start += chunk) {
     const slice = urls.slice(start, start + chunk);
@@ -31,7 +31,7 @@ type FileCountOptions = { readonly max?: number; readonly chunk?: number };
 // entry whose webUrl yields a count; entries past the cap or without a webUrl
 // are returned unchanged.
 const addEstimatedFileCounts = async (
-  graph: GraphClient,
+  graph: ReadGraph,
   entries: ReadonlyArray<unknown>,
   webUrlOf: (entry: unknown) => string | undefined,
   options?: FileCountOptions

@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 
 /**
@@ -12,7 +13,7 @@ import { fetchRawBytes } from './fetch-raw-bytes.ts';
  */
 type EmbeddedItem = { readonly kind: 'mail'; readonly source: Uint8Array } | { readonly kind: 'other'; readonly attachment: Record<string, unknown> };
 
-const readEmbeddedItem = async (graph: GraphClient, attachmentPath: string): Promise<Result<EmbeddedItem, GraphError>> => {
+const readEmbeddedItem = async (graph: ReadGraph, attachmentPath: string): Promise<Result<EmbeddedItem, GraphError>> => {
   const expanded = await graph.get(`${attachmentPath}?$expand=microsoft.graph.itemattachment/item`);
   if (!expanded.ok) return expanded;
   const attachment = expanded.value as Record<string, unknown> & { readonly item?: Record<string, unknown> };

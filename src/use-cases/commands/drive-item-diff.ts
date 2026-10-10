@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { err, map, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { lineDiff, MAX_EDITS } from '../../infra/line-diff-adapter.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
@@ -29,7 +30,7 @@ type DiffEnvelope = {
   readonly note?: string;
 };
 
-const readDriveFile = async (graph: GraphClient, driveId: string, itemId: string): Promise<Result<DriveFile, GraphError>> => {
+const readDriveFile = async (graph: ReadGraph, driveId: string, itemId: string): Promise<Result<DriveFile, GraphError>> => {
   const meta = await graph.get(`/drives/${driveId}/items/${itemId}`);
   if (!meta.ok) return meta;
   const item = meta.value as { readonly name?: string; readonly folder?: unknown };
@@ -37,7 +38,7 @@ const readDriveFile = async (graph: GraphClient, driveId: string, itemId: string
 };
 
 /** One side as markdown; a folder is refused, and a file with no text form (an image) fails in the conversion. */
-const renderSide = async (graph: GraphClient, file: DriveFile, contentPath: string, opts: RenderOptions): Promise<Result<Render, GraphError>> => {
+const renderSide = async (graph: ReadGraph, file: DriveFile, contentPath: string, opts: RenderOptions): Promise<Result<Render, GraphError>> => {
   if (file.folder) return err({ type: 'validation_error', message: `${file.name} is a folder, not a file: pick a file inside it with list-folder-files.` });
   // Every markdown answer carries `text`: converted markdown or a plain-text passthrough.
   return map(await officeToMarkdown(graph, contentPath, file.name, opts), (envelope) => {

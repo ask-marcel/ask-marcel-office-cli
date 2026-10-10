@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { FetchOptions } from './fetch-raw-bytes.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
@@ -67,7 +68,7 @@ const withLoopNote = (result: Result<unknown, GraphError>, modifiedAt: string | 
   return result;
 };
 
-const officeToMarkdown = async (graph: GraphClient, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
+const officeToMarkdown = async (graph: ReadGraph, contentPath: string, filename: string, opts: OfficeToMarkdownOptions = {}): Promise<Result<unknown, GraphError>> => {
   const ext = extensionOf(filename);
   if (opts.sheet !== undefined && HTML_FORMAT_INPUTS.has(ext)) return refuseSheet(`this file is a .${ext}`);
   if (HTML_FORMAT_INPUTS.has(ext)) return withLoopNote(await convertToMarkdown(graph, `${contentPath}?format=html`), opts.modifiedAt);

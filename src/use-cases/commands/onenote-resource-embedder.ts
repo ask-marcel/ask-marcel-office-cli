@@ -1,4 +1,4 @@
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * OneNote page HTML references images as absolute Graph resource URLs:
@@ -43,7 +43,7 @@ const annotateOnenoteObjects = (html: string): string =>
     return `<p>[OneNote attachment: ${name}${suffix}]</p>`;
   });
 
-const embedOnenoteResources = async (graph: GraphClient, html: string): Promise<string> => {
+const embedOnenoteResources = async (graph: ReadGraph, html: string): Promise<string> => {
   // Rewrite <object> file attachments first so their resource URLs aren't then
   // treated as candidate <img> sources.
   const annotated = annotateOnenoteObjects(html);

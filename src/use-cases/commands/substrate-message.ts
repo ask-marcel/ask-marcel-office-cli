@@ -1,7 +1,8 @@
 import { parseJson } from '../../domain/json.ts';
 import type { Result } from '../../domain/result.ts';
 import { ok, unwrapOr } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { CommandOptionMeta } from './command-types.ts';
 
 /**
@@ -147,7 +148,7 @@ const SUBSTRATE_FILTER_OPTIONS: ReadonlyArray<CommandOptionMeta> = [
 ];
 
 /** Resolves the two flags into a filter; `--mentions-me` costs one `/me` read for the caller's directory id. */
-const substrateFilterFor = async (graph: GraphClient, params: SubstrateFilterParams): Promise<Result<SubstrateFilter, GraphError>> => {
+const substrateFilterFor = async (graph: ReadGraph, params: SubstrateFilterParams): Promise<Result<SubstrateFilter, GraphError>> => {
   const skipSystem = params.skipSystem === 'true';
   if (params.mentionsMe !== 'true') return ok({ skipSystem });
   const me = await graph.get('/me?$select=id');

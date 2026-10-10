@@ -1,5 +1,6 @@
 import { bytesToBase64 } from '../../domain/utilities/base64.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * Shared helpers for the SharePoint-link-extraction commands
@@ -104,7 +105,7 @@ const failedLink = (url: string, error: GraphError): ResolvedLink => {
   return { url, error: error.message, ...where, ...(error.status === 403 ? { hint: accessHint(location) } : {}) };
 };
 
-const resolveOne = async (graph: GraphClient, url: string): Promise<ResolvedLink> => {
+const resolveOne = async (graph: ReadGraph, url: string): Promise<ResolvedLink> => {
   const token = buildShareToken(url);
   const result = await graph.get(`/shares/${token}/driveItem`);
   if (!result.ok) return failedLink(url, result.error);
@@ -118,7 +119,7 @@ const resolveOne = async (graph: GraphClient, url: string): Promise<ResolvedLink
   };
 };
 
-const resolveSharepointUrls = async (graph: GraphClient, urls: ReadonlyArray<string>): Promise<ResolvedLinks> => {
+const resolveSharepointUrls = async (graph: ReadGraph, urls: ReadonlyArray<string>): Promise<ResolvedLinks> => {
   const truncated = urls.length > MAX_LINKS;
   const skippedCount = truncated ? urls.length - MAX_LINKS : 0;
   const kept = truncated ? urls.slice(0, MAX_LINKS) : urls;
