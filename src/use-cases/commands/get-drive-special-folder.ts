@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ folderName: z.enum(['documents', 'photos', 'cameraroll', 'approot', 'music', 'attachments']) });
 const { execute, schema } = buildSelectableCommand((p) => `/me/drive/special/${p.folderName}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Resolve a OneDrive well-known folder via `--folder-name` (one of `documents`, `photos`, `cameraroll`, `approot`, `music`, `attachments`) without having to navigate from the root. Returns the folder's driveItem (id, name, parentReference, etc.) ready to feed into `list-folder-files` or `download-drive-item-content`.",
   category: 'drive',

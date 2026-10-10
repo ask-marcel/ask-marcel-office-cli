@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/root`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Get the root folder (driveItem) of a OneDrive / SharePoint drive. Use `--select` to slim the response (e.g. `--select id,name,folder`).',
   category: 'drive',
   graphMethod: 'GET',

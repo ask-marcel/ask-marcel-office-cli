@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
@@ -8,7 +8,7 @@ const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1),
 const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables/${p.tableId}`, schema);
 const execute = wrapExcelExecute(inner.execute);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Get the metadata (style, header row, total row) of a single named Excel table.',
   category: 'excel',
   graphMethod: 'GET',

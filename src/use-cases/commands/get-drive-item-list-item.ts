@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
@@ -8,7 +8,7 @@ import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/listItem`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Return the SharePoint listItem projection of a OneDrive / SharePoint file — exposes the file's library-defined column values (custom metadata: status, due-date, classification, taxonomy tags, etc.) which are NOT present on the plain `driveItem`. Combine with `list-sharepoint-list-columns` to interpret the column schema.",
   category: 'sharepoint',

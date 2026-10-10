@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
 // Live probe 2026-07-23: `--filter name eq '<no match>'` and `--orderby name
@@ -11,7 +11,7 @@ import { pickODataOptions } from './odata-query.ts';
 const baseSchema = z.object({});
 const { execute, schema } = buildPickODataListCommand(() => '/me/drive/root/delta()', baseSchema, ['top', 'select', 'expand']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Track incremental changes (added / modified / deleted items) anywhere under the signed-in user's OneDrive root. **Takes zero required arguments** — acts implicitly on the signed-in user's primary OneDrive; use `get-drive-delta` to target a specific drive by ID. The first call returns a snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since. Cross-folder companion to `get-drive-delta` (which scopes to one specific folder).",
   category: 'drive',

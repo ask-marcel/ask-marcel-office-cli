@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/analytics`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return view / activity analytics for a OneDrive / SharePoint file — `allTime` totals (views, viewers) and `lastSevenDays` rollup. Useful for ranking files by attention or detecting stale content. **Known empty case**: returns `{ allTime: null, lastSevenDays: null }` on low-traffic items, or when the calling identity (the Teams web client basic token) lacks the analytics scope on the tenant. Do not interpret nulls as "no views" — interpret as "not available for this caller". For active files where you expect data and see nulls, escalate to a token with `Reports.Read.All`.',
   category: 'drive',

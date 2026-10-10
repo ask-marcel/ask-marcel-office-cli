@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
@@ -8,7 +8,7 @@ import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get the metadata (driveItem resource) of a single file or folder in OneDrive / SharePoint. Use `--select` to slim the response — a full driveItem can run >10 KB with all the optional facets.',
   category: 'drive',

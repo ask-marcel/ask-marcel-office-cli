@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/lastModifiedByUser`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return the full `user` resource for whoever last modified a OneDrive / SharePoint file — sibling to `get-drive-item-created-by-user`. Use `--select` to fetch only specific fields.',
   category: 'drive',

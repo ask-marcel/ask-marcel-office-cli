@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
@@ -57,7 +57,7 @@ const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1),
 const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/worksheets/${p.worksheetId}/range(address='${p.address}')`, schema);
 const execute = wrapExcelExecute(inner.execute);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get the cell values, formulas, and formats of a specific Excel range (e.g. `A1:C10`). The CLI caps the in-flight range at 100 000 cells to prevent runaway responses — split absurd ranges (`ZZ999999:AAA1` etc.) into smaller bands.',
   category: 'excel',
