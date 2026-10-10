@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -10,7 +10,7 @@ const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/wo
 const execute = wrapExcelExecute(inner.execute);
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the modern threaded comments anchored to cells in an Excel workbook (the New Comments feature, distinct from legacy notes). Each `workbookComment` has `content`, `contentType`, `task` state, plus replies via the comment's `replies` navigation.",
   category: 'excel',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -15,7 +15,7 @@ const inner = buildPickODataListCommand((p) => `/drives/${p.driveId}/items/${p.i
 const execute = wrapExcelExecute(inner.execute);
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the worksheets (tabs) inside an Excel workbook stored in OneDrive / SharePoint. Returns a clear "not an accessible Excel workbook" error if the item is a folder, non-.xlsx file, or sensitivity-label-blocked. Note: Graph silently ignores `$top`, `$filter`, and `$orderby` on this endpoint, so the CLI does not expose those flags — slice / sort client-side.',
   category: 'excel',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { odataQueryOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -10,7 +10,7 @@ const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/wo
 const execute = wrapExcelExecute(inner.execute);
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the workbook's defined names (named ranges, named formulas, named constants). Each `workbookNamedItem` has `name`, `value` (the formula or address), `comment`, and `scope` (workbook or worksheet). Useful for understanding workbook structure before reading ranges.",
   category: 'excel',

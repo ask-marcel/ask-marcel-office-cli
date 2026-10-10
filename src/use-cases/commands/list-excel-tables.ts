@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -14,7 +14,7 @@ const inner = buildPickODataListCommand((p) => `/drives/${p.driveId}/items/${p.i
 const execute = wrapExcelExecute(inner.execute);
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the named tables across every worksheet in an Excel workbook. Note: Graph silently ignores `$filter` and `$orderby` on this endpoint, so the CLI does not expose those flags — slice / sort client-side.',
   category: 'excel',
