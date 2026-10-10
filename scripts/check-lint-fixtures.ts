@@ -39,6 +39,10 @@ const NEEDLESS_ASSERTION = 'const n = 1;\nexport const f = (): number => n as nu
 const STRING_REJECTION = "export const f = (): Promise<never> => Promise.reject('nope');\n";
 const BROWSER_IMPORT = "import { createBrowserAuth } from './browser-auth.ts';\nexport const f = (): unknown => createBrowserAuth;\n";
 const WINSTON_IMPORT = "import winston from 'winston';\nexport const f = (): unknown => winston;\n";
+const WRITE_GRAPH_IMPORT = "import { createWriteGraph } from '../../infra/write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
+const WRITE_GRAPH_TYPE_IMPORT = "import type { WriteGraph } from '../../infra/write-graph.ts';\nexport type F = WriteGraph;\n";
+const FULL_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
+const SIBLING_WRITE_GRAPH_IMPORT = "import { createWriteGraph } from './write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
@@ -47,6 +51,11 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'control: the browser half of auth loads it', path: 'src/infra/auth-browser.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the token helper never loads winston', path: 'src/composition/token-helper.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: the logger adapter wraps winston', path: 'src/infra/logger.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
+  { name: 'a read command never imports the write graph', path: 'src/use-cases/commands/list-drives.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'a read command never takes the write graph type', path: 'src/use-cases/commands/get-schedule.ts', source: WRITE_GRAPH_TYPE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'a read helper never builds the full client', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: FULL_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the read graph never imports the write graph', path: 'src/infra/read-graph.ts', source: SIBLING_WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'control: a write command takes the write graph', path: 'src/use-cases/commands/create-mail-draft.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'strict lint rejects a needless assertion', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true },
   { name: 'strict lint rejects a string rejection', path: 'src/domain/result.ts', source: STRING_REJECTION, rule: '@typescript-eslint/prefer-promise-reject-errors', fires: true, strict: true },
   { name: 'control: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false },

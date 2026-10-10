@@ -202,6 +202,43 @@ export default [
     },
   },
   {
+    // Read-only code never holds the write graph (package split, D9): the read
+    // commands, their helpers and the read graph's own modules import neither
+    // write-graph.ts (its type included, so no read command can be typed against
+    // it) nor a value from graph-client.ts, which builds the full client. Type
+    // imports from graph-client.ts (`GraphError`) are erased at build time.
+    // The write commands, their write-only helpers, and the registry and
+    // command framework that hold both kinds are the exceptions. A new write
+    // command joins the list (meta.test.ts pins the write set).
+    // scripts/check-read-bundle.ts checks the same boundary on the built code.
+    files: ['src/use-cases/commands/**/*.ts', 'src/infra/read-graph.ts', 'src/infra/graph-request.ts', 'src/infra/graph-substrate.ts'],
+    ignores: [
+      '**/*.test.ts',
+      'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
+      'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
+      'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
+      'src/use-cases/commands/{index,command-graph,command-types}.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)write-graph(\\.[cm]?[jt]s)?$',
+              message: 'Read-only code never holds the write graph: type a read command against ReadGraph (read-graph.ts), which POSTs only to the two query endpoints.',
+            },
+            {
+              regex: '(^|/)graph-client(\\.[cm]?[jt]s)?$',
+              allowTypeImports: true,
+              message: 'graph-client.ts builds the full client, write graph included: read code takes the read graph (read-graph.ts) instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];
