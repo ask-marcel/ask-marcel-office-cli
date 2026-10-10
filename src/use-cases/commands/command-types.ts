@@ -1,9 +1,15 @@
 import type { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { WriteGraph } from '../../infra/write-graph.ts';
+import type { FileSystem } from '../ports/filesystem.ts';
 
 type CommandSchema = z.ZodType;
-type CommandExecute = (graph: GraphClient, params: Record<string, string>) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
+/** A command's run on the graph `G` it is given. */
+type GraphExecute<G> = (graph: G, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
+/** A command's run on the single package's full client, which holds both graphs. */
+type CommandExecute = GraphExecute<GraphClient>;
 
 // `'auth'` and `'contacts'` were declared
 // but no command ever used them — removed so the type system enforces "no
@@ -183,20 +189,50 @@ type CommandMeta = {
   readonly stability?: 'experimental';
 };
 
+/**
+ * Present on the rare command whose input is the LOCAL filesystem instead of
+ * Graph (`convert-local-file-to-markdown`). The CLI routes execution here, passing its
+ * composition-selected FileSystem; `execute` stays as the registry-typed
+ * fallback that redirects library consumers to this variant.
+ */
+type LocalExecute = (fs: FileSystem, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
+
+/** The meta of a command that changes nothing in the tenant. */
+type ReadCommandMeta = CommandMeta & { readonly effect: 'read' };
+/** The meta of a command that writes; `command-effect.ts` words each class. */
+type WriteCommandMeta = CommandMeta & { readonly effect: Exclude<CommandEffect, 'read'> };
+
+/**
+ * A command that changes nothing: it runs on the read graph, which has no
+ * member that writes (package split, D9). Its effect is `read`, so the registry
+ * can tell it from a write by its meta.
+ */
+type ReadCommand = {
+  readonly schema: CommandSchema;
+  readonly execute: GraphExecute<ReadGraph>;
+  readonly meta: ReadCommandMeta;
+  readonly executeLocal?: LocalExecute;
+};
+
+/** A command that writes: it runs on the write graph, basic tier only. */
+type WriteCommand = {
+  readonly schema: CommandSchema;
+  readonly execute: GraphExecute<WriteGraph>;
+  readonly meta: WriteCommandMeta;
+};
+
+/** What the registry holds: each command typed against the narrower graph it runs on. */
+type RegisteredCommand = ReadCommand | WriteCommand;
+
+/**
+ * Any command, read or write, run on the full client. The docs, the manifest
+ * and the CLI and MCP shells take this type; every registered command is one.
+ */
 type Command = {
   readonly schema: CommandSchema;
   readonly execute: CommandExecute;
   readonly meta: CommandMeta;
-  /**
-   * Present on the rare command whose input is the LOCAL filesystem instead of
-   * Graph (`convert-local-file-to-markdown`). The CLI routes execution here, passing its
-   * composition-selected FileSystem; `execute` stays as the registry-typed
-   * fallback that redirects library consumers to this variant.
-   */
-  readonly executeLocal?: (
-    fs: import('../ports/filesystem.ts').FileSystem,
-    params: Record<string, string>
-  ) => Promise<Result<unknown, import('../../infra/graph-client.ts').GraphError>>;
+  readonly executeLocal?: LocalExecute;
 };
 
 export type {
@@ -210,5 +246,11 @@ export type {
   CommandOptionMeta,
   CommandPositionalArgumentMeta,
   CommandSchema,
+  GraphExecute,
   PaginationStrategy,
+  ReadCommand,
+  ReadCommandMeta,
+  RegisteredCommand,
+  WriteCommand,
+  WriteCommandMeta,
 };
