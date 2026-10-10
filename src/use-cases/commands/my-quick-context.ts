@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({}).strict();
@@ -19,7 +19,7 @@ const valueOrUndefined = <T>(r: Result<unknown, GraphError>): T | undefined => (
 // each sub-call's result is optional and the response carries the IDs it
 // managed to fetch. Only `/me` is load-bearing — if that fails the whole
 // session is broken and we surface the error.
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
 
@@ -80,7 +80,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "One-shot discovery for the IDs every other command needs, plus the user's job title and tenant timezone / locale / working-hours. Issues 9 Graph calls in parallel and returns what each succeeded for. Partial-result mode: only `/me` is load-bearing — if any other sub-call fails (missing license, scope, or tenant policy) the corresponding field is `undefined` but the rest are still returned. Replaces the audit's 5-call discovery chain — feed the IDs straight into `list-mail-folder-messages`, `list-folder-files`, `list-planner-tasks`, `list-onenote-notebook-sections`, etc. For Microsoft To Do lists call `list-todo-task-lists` on demand (intentionally dropped from this command's fan-out — the array of {id, displayName, wellknownListName} entries crowded the envelope with IDs an LLM rarely needs on first contact). `tenantTimeZone` lets an LLM stop treating every datetime as UTC on first contact.",
   category: 'meta',

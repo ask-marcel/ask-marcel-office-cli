@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 import { DUE_BEFORE_OPTION, dueBeforeField, withDueBefore } from './todo-due-before.ts';
@@ -9,7 +9,7 @@ import { withTaskLinks } from './todo-web-url.ts';
 
 const schema = z.object({ todoTaskListId: z.string().min(1), dueBefore: dueBeforeField }).extend(odataQuerySchema.shape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks`, { ...parsed.data, filter: withDueBefore(parsed.data.filter, parsed.data.dueBefore) });
@@ -21,7 +21,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return rewritten ? err(rewritten) : result;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List every task in a single Microsoft To Do task list, regardless of completion status. Use `list-incomplete-todo-tasks` if you only want the open ones. Known Graph quirk: certain `--select` combinations (notably any combo that includes `title`) trip `RequestBroker--ParseUri` on this endpoint; the CLI rewrites that opaque error to a hint pointing at the workaround.',
   category: 'tasks',

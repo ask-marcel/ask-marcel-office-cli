@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 // Deep-link parser for Microsoft Outlook calendar item URLs. Outlook
@@ -72,7 +72,7 @@ const parse = (raw: string): ParseOutcome => {
   return { kind: 'unknown' };
 };
 
-const execute: Command['execute'] = async (_graph, params) => {
+const execute: ReadCommand['execute'] = async (_graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const outcome = parse(parsed.data.url);
@@ -90,7 +90,7 @@ const execute: Command['execute'] = async (_graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Parse a Microsoft Outlook calendar item link (the URL emitted by the "Copy link" / share action on a calendar event) into its `eventId`. Pure transformation — no Graph call. Pipe the result into `get-calendar-event` to fetch the event body. For Outlook mail message links use `resolve-mail-link` instead — this command rejects them with a pointer.',
   category: 'calendar',

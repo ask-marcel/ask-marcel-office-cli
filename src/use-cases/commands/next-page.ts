@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, map } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { topOnlyShape } from './odata-query.ts';
 import { brandTenantId, tenantIdShape } from './tenant-option.ts';
@@ -35,7 +35,7 @@ const TODO_TASKS = /^\/me\/todo\/lists\/[^/?]+\/tasks(?:\/delta)?(?:\?|$)/;
 
 const TOP_REFUSED = '--top applies to a cursor read on the basic token (mail, files, To Do and the like); a chat or partner-tenant cursor keeps the page size it was given.';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = parsed.data.url.slice(PREFIX.length);
@@ -57,7 +57,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return TODO_TASKS.test(path) ? map(page, withTaskLinks) : page;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url \'<url>\'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`. `--top` keeps a page size on the continuation (Graph drops it after page one otherwise), and a To Do task page gets the `webUrl` of each task, as the To Do listings give page one.',
   category: 'meta',

@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { map } from '../../domain/result.ts';
 import { buildCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { withTaskLinks } from './todo-web-url.ts';
 
 const schema = z.object({ todoTaskListId: z.string().min(1) });
 const delta = buildCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/delta()`, schema);
-const execute: Command['execute'] = async (graph, params) => map(await delta.execute(graph, params), withTaskLinks);
+const execute: ReadCommand['execute'] = async (graph, params) => map(await delta.execute(graph, params), withTaskLinks);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Track incremental task changes (added / updated / completed / deleted) within a single Microsoft To Do list. The first call returns the current snapshot plus `@odata.deltaLink`; subsequent calls with that link return only what has changed since. Note: Graph rejects standard OData query parameters on this delta endpoint (the page-cap flag throws `Skip token is not provided`), so the OData passthrough is intentionally NOT exposed here. Use `next-page` with the returned `@odata.nextLink` to walk pages.',
   category: 'tasks',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
 // Microsoft Graph rejects $select and $orderby on the task-list endpoint
@@ -12,7 +12,7 @@ const TODO_LISTS_ODATA_KEYS = ['top', 'skip', 'filter', 'expand'] as const;
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildPickODataListCommand(() => '/me/todo/lists', baseSchema, TODO_LISTS_ODATA_KEYS);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the signed-in user's Microsoft To Do task lists (e.g. `Tasks`, `Flagged Emails`, custom lists). Note: Graph rejects `$select` and `$orderby` on this endpoint with `RequestBroker--ParseUri`, so the CLI does not expose those flags — slice / sort client-side.",
   category: 'tasks',

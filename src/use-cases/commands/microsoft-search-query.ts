@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const ALL_ENTITY_TYPES = ['driveItem', 'listItem', 'site', 'message', 'event', 'person'] as const;
@@ -14,7 +14,7 @@ const schema = z.object({ query: z.string().min(1), top: z.string().regex(TOP_PA
 type SearchHitsContainer = { readonly searchTerms?: ReadonlyArray<string>; readonly hitsContainers?: ReadonlyArray<unknown> };
 type SearchResponse = { readonly value?: ReadonlyArray<SearchHitsContainer> };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const queryString = parsed.data.query;
@@ -42,7 +42,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ value: merged, ...(partialErrors.length > 0 ? { partialErrors } : {}) });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Run a federated KQL search across the signed-in user's mail, files, list items, sites, calendar events, and people. Microsoft Graph v1.0 rejects multi-entity search bodies on most tenants (`Multiple entity search is not supported in v1.0`), so this command issues SIX parallel POSTs — one per entityType — and merges the per-entity `searchHits` containers into a single `value[]`. Each container is identifiable by the resource type inside `hits[].resource`. If a sub-request fails (e.g. tenant lacks the scope for one entity), the others still return; failures show up in `partialErrors[]`. Each sub-request asks for 25 hits, or `--top` of them (1 to 25); Graph takes the page size as the body's `size`, since it rejects $top in /search/query bodies. `chatMessage` is excluded since `Chat.Read*` is unavailable. To find Microsoft Loop pages (`.loop`) for markdown conversion, query `filetype:loop`: each `driveItem` hit carries `resource.id` plus `resource.parentReference.driveId`, the exact pair `download-drive-item-as-markdown` needs to render the page via Graph `?format=html`. (`filetype:fluid` returns nothing on this corpus; Loop pages index as `.loop`.)",
   category: 'meta',
