@@ -77,6 +77,7 @@
     "typecheck": "bun --bun x tsc --noEmit",
     "coverage": "bun run scripts/check-coverage.ts",
     "check:docs": "bun run scripts/check-doc-numbers.ts",
+    "check:read-bundle": "bun run scripts/check-read-bundle.ts",
     "mutate": "stryker run",
     "mutate:changed": "bash scripts/mutate-changed.sh",
     "mutate:staged": "bash scripts/mutate-staged.sh",

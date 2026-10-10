@@ -77,6 +77,8 @@ jobs:
         run: bun run lint:strict
       - name: lint fixtures (every path-scoped rule still fires on its files, and only there)
         run: bun run scripts/check-lint-fixtures.ts
+      - name: read bundle (the read graph and the read commands, built alone, hold no write method; a control with the write graph shows them)
+        run: bun run check:read-bundle
       - name: typecheck
         run: bun run typecheck
       - name: tests
