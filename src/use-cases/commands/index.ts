@@ -1,4 +1,5 @@
-import type { Command } from './command-types.ts';
+import { withOwnGraph } from './command-graph.ts';
+import type { Command, RegisteredCommand } from './command-types.ts';
 import { withUnknownParamRejection } from './reject-unknown-params.ts';
 import * as diffDriveItemVersions from './diff-drive-item-versions.ts';
 import * as diffDriveItems from './diff-drive-items.ts';
@@ -212,7 +213,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const modules: Record<string, Command> = {
+const modules: Record<string, RegisteredCommand> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
@@ -428,11 +429,15 @@ const modules: Record<string, Command> = {
 
 /*
  * Every command is wrapped so an undeclared parameter is refused before it runs
- * (2026-07-24). The wrap lives HERE rather than in composition because a
- * library consumer reaches `commands[x].execute(...)` directly, never passing
- * through the CLI or the MCP gateway — wrapping at assembly is the only point
- * all three surfaces share.
+ * (2026-07-24), and so it runs on the graph its effect allows (package split,
+ * D9). The wraps live HERE rather than in composition because a library
+ * consumer reaches `commands[x].execute(...)` directly, never passing through
+ * the CLI or the MCP gateway — wrapping at assembly is the only point all
+ * three surfaces share.
  */
-const commands: Record<string, Command> = Object.fromEntries(Object.entries(modules).map(([name, command]) => [name, withUnknownParamRejection(command)]));
+const registerCommands = (registered: Readonly<Record<string, RegisteredCommand>>): Record<string, Command> =>
+  Object.fromEntries(Object.entries(registered).map(([name, command]) => [name, withUnknownParamRejection(withOwnGraph(command))]));
 
-export { commands };
+const commands = registerCommands(modules);
+
+export { commands, registerCommands };
