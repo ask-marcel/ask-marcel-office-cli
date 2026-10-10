@@ -8,7 +8,7 @@ import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
 import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import type { FetchFn, GraphError } from './graph-request.ts';
-import { apiErrorFrom, isAllowedFetchUrlHost, toBase64, wrapNetworkError } from './graph-request.ts';
+import { apiErrorFrom, asAuthFailure, createGraphRequestCore, isAllowedFetchUrlHost, toBase64, wrapNetworkError } from './graph-request.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
 
 type GraphClient = {
@@ -174,14 +174,6 @@ const asSubstrateError = (e: GraphError, substrate: 'chatsvcagg' | 'ic3'): Graph
 // Every bearer comes from the token source, which knows the tiers; this client
 // only signs requests with them.
 const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fetch): GraphClient => {
-  // Carry the auth layer's machine-readable code (e.g. the secondary-token
-  // fail-fast) through to the envelope's `errorCode` so an agent can branch on
-  // it without substring-matching the message.
-  const asAuthFailure = (error: TokenError): GraphError => {
-    const message = error.type === 'auth_cancelled' ? 'Auth cancelled' : error.message;
-    const code = error.type === 'auth_failed' ? error.code : undefined;
-    return { type: 'auth_failed', message, ...(code ? { code } : {}) };
-  };
   const bearer = async (token: Promise<Result<AccessToken, TokenError>>): Promise<Result<{ Authorization: string }, GraphError>> => {
     const tokenResult = await token;
     if (!tokenResult.ok) return err(asAuthFailure(tokenResult.error));
@@ -191,58 +183,9 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
   const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.graphToken('elevated'));
   const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.guestToken(tenantId));
 
-  const request = async (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-    const headers = await authHeaders();
-    if (!headers.ok) return headers;
-
-    const url = `https://graph.microsoft.com/v1.0${path}`;
-    try {
-      const res = await fetchFn(url, {
-        method,
-        headers: { ...headers.value, 'content-type': 'application/json', ...(extraHeaders ?? {}) },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
-      return ok(await res.json());
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, method, path, 'json'));
-    }
-  };
-
-  const getElevated = async (path: string): Promise<Result<unknown, GraphError>> => {
-    const headers = await elevatedAuthHeaders();
-    if (!headers.ok) return headers;
-    const url = `https://graph.microsoft.com/v1.0${path}`;
-    try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: { ...headers.value, 'content-type': 'application/json' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
-      return ok(await res.json());
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (elevated)`, 'json'));
-    }
-  };
-
-  const getGuest = async (path: string, tenantId: TenantId): Promise<Result<unknown, GraphError>> => {
-    const headers = await guestAuthHeaders(tenantId);
-    if (!headers.ok) return headers;
-    const url = `https://graph.microsoft.com/v1.0${path}`;
-    try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: { ...headers.value, 'content-type': 'application/json' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
-      return ok(await res.json());
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (guest ${tenantId})`, 'json'));
-    }
-  };
+  const core = createGraphRequestCore(tokens, fetchFn);
+  const request = (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> =>
+    core.json('basic', method, path, { body, extraHeaders });
 
   // Teams chat substrate. Same Teams web client identity as `get`, but the
   // bearer is issued for `chatsvcagg.teams.microsoft.com` (audience claim only
@@ -555,8 +498,8 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
 
   return {
     get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
-    getElevated,
-    getGuest,
+    getElevated: (path) => core.json('elevated', 'GET', path),
+    getGuest: (path, tenant) => core.json({ guest: tenant }, 'GET', path),
     discoverTenantId,
     teamsChat,
     teamsChatIc3,

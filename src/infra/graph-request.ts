@@ -1,5 +1,10 @@
+import type { AccessToken } from '../domain/access-token.ts';
+import type { Result } from '../domain/result.ts';
+import { err, ok } from '../domain/result.ts';
+import type { TenantId } from '../domain/tenant-id.ts';
+import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import type { HttpMethod, TimeoutTier } from './network-error.ts';
-import { networkErrorMessage, timeoutLabelFor } from './network-error.ts';
+import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor } from './network-error.ts';
 
 /*
  * The private request core the read graph (read-graph.ts) and the write graph
@@ -16,6 +21,36 @@ type GraphError =
   | { type: 'validation_error'; message: string; code?: string };
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
+
+// Who signs a Graph request: the Teams web client token, the elevated one, or
+// a partner tenant's guest token.
+type GraphTier = 'basic' | 'elevated' | { readonly guest: TenantId };
+
+// A request `send` signs. Each attempt gets its own deadline, so a replay has
+// the full budget.
+type SignedRequest = {
+  readonly method: HttpMethod;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: BodyInit;
+  readonly redirect?: RequestRedirect;
+  readonly timeoutMs: number;
+};
+
+type JsonRequest = {
+  readonly body?: unknown;
+  readonly extraHeaders?: Readonly<Record<string, string>>;
+  // How a success is read; JSON by default.
+  readonly readBody?: (res: Response) => Promise<unknown>;
+};
+
+type GraphRequestCore = {
+  // One request signed for the tier.
+  readonly send: (tier: GraphTier, url: string, request: SignedRequest) => Promise<Result<Response, GraphError>>;
+  // A JSON request to Graph v1.0: the body read from a success, or the error.
+  readonly json: (tier: GraphTier, method: HttpMethod, path: string, request?: JsonRequest) => Promise<Result<unknown, GraphError>>;
+};
+
+const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
 
 const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
   /\.sharepoint\.com$/i,
@@ -159,5 +194,64 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}), ...retry };
 };
 
-export { apiErrorFrom, isAllowedFetchUrlHost, toBase64, wrapNetworkError };
-export type { FetchFn, GraphError };
+// Carry the auth layer's machine-readable code (e.g. the secondary-token
+// fail-fast) through to the envelope's `errorCode` so an agent can branch on
+// it without substring-matching the message.
+const asAuthFailure = (error: TokenError): GraphError => {
+  const message = error.type === 'auth_cancelled' ? 'Auth cancelled' : error.message;
+  const code = error.type === 'auth_failed' ? error.code : undefined;
+  return { type: 'auth_failed', message, ...(code ? { code } : {}) };
+};
+
+// The network-error label names the tier a JSON request was signed for.
+const tierLabel = (tier: GraphTier): string => {
+  if (tier === 'basic') return '';
+  return tier === 'elevated' ? ' (elevated)' : ` (guest ${tier.guest})`;
+};
+
+// Every bearer comes from the token source, which knows the tiers; the core
+// only signs requests with them.
+const createGraphRequestCore = (tokens: TokenSource, fetchFn: FetchFn): GraphRequestCore => {
+  const tokenFor = (tier: GraphTier, rejected?: AccessToken): Promise<Result<AccessToken, TokenError>> => {
+    if (tier === 'basic') return tokens.graphToken('basic', { rejected });
+    if (tier === 'elevated') return tokens.graphToken('elevated');
+    return tokens.guestToken(tier.guest, { rejected });
+  };
+
+  const sendWith = (token: AccessToken, url: string, request: SignedRequest): Promise<Response> =>
+    fetchFn(url, {
+      method: request.method,
+      headers: { Authorization: `Bearer ${token}`, ...request.headers },
+      signal: AbortSignal.timeout(request.timeoutMs),
+      body: request.body,
+      redirect: request.redirect,
+    });
+
+  const send = async (tier: GraphTier, url: string, request: SignedRequest): Promise<Result<Response, GraphError>> => {
+    const token = await tokenFor(tier);
+    if (!token.ok) return err(asAuthFailure(token.error));
+    return ok(await sendWith(token.value, url, request));
+  };
+
+  const json = async (tier: GraphTier, method: HttpMethod, path: string, request: JsonRequest = {}): Promise<Result<unknown, GraphError>> => {
+    const url = `${GRAPH_ROOT}${path}`;
+    try {
+      const sent = await send(tier, url, {
+        method,
+        headers: { 'content-type': 'application/json', ...request.extraHeaders },
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
+      });
+      if (!sent.ok) return sent;
+      if (!sent.value.ok) return err(await apiErrorFrom(sent.value, url));
+      return ok(await (request.readBody ?? ((res: Response): Promise<unknown> => res.json()))(sent.value));
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, method, `${path}${tierLabel(tier)}`, 'json'));
+    }
+  };
+
+  return { send, json };
+};
+
+export { apiErrorFrom, asAuthFailure, createGraphRequestCore, isAllowedFetchUrlHost, toBase64, wrapNetworkError };
+export type { FetchFn, GraphError, GraphRequestCore, GraphTier };
