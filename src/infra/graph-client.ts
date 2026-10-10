@@ -2,15 +2,12 @@ import type { AccessToken } from '../domain/access-token.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { AuthManager } from '../infra/auth.ts';
-import type { TenantId } from '../domain/tenant-id.ts';
-import { tenantId } from '../domain/tenant-id.ts';
-import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
 import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import type { FetchFn, GraphError } from './graph-request.ts';
 import { apiErrorFrom, asAuthFailure, createGraphRequestCore, isAllowedFetchUrlHost, wrapNetworkError } from './graph-request.ts';
-import { createSubstrateReader } from './graph-substrate.ts';
 import type { ReadGraph } from './read-graph.ts';
+import { createReadGraph } from './read-graph.ts';
 import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
 
 // The client: every read of the read graph, and the writes the write
@@ -49,51 +46,6 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
   const core = createGraphRequestCore(tokens, fetchFn);
   const request = (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> =>
     core.json('basic', method, path, { body, extraHeaders });
-
-  /**
-   * Ask Entra which tenant owns a SharePoint host, using its public OIDC
-   * discovery document. No credentials: the question is "who owns this host?",
-   * and the answer is public.
-   *
-   * A host outside the `*.sharepoint.com` convention, or a domain Entra does not
-   * know, is not an error to retry — it means no partner tenant applies, and the
-   * caller should stay on its home token. Both surface as a clear message rather
-   * than a crash, because the host->onmicrosoft mapping is a convention and a
-   * tenant with a vanity arrangement may not follow it.
-   */
-  const discoverTenantId = async (spoHost: string): Promise<Result<TenantId, GraphError>> => {
-    const domain = spoHostToTenantDomain(spoHost);
-    if (domain === null) {
-      return err({
-        type: 'api_error',
-        status: 400,
-        message: `${spoHost} is not a tenant SharePoint host, so no partner tenant can be resolved from it`,
-        code: 'not_a_sharepoint_host',
-      });
-    }
-    const url = `https://login.microsoftonline.com/${domain}/v2.0/.well-known/openid-configuration`;
-    try {
-      const res = await fetchFn(url, { method: 'GET', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-      if (!res.ok) {
-        return err({
-          type: 'api_error',
-          status: res.status,
-          message: `could not resolve a tenant for ${spoHost} (tried ${domain}) — the host may belong to a tenant whose sign-in domain differs from its SharePoint name`,
-          code: 'tenant_discovery_failed',
-        });
-      }
-      const issuer = (await res.json())['issuer'];
-      // The tenant id is the first path segment of the issuer
-      // (`https://login.microsoftonline.com/{tid}/v2.0`). Brand it: it becomes an
-      // authority segment on a POST that carries the refresh token.
-      const segment = typeof issuer === 'string' ? (new URL(issuer).pathname.split('/')[1] ?? '') : '';
-      const branded = tenantId(segment);
-      if (!branded.ok) return err({ type: 'api_error', status: 502, message: `tenant discovery for ${spoHost} returned an unusable issuer`, code: 'tenant_discovery_failed' });
-      return ok(branded.value);
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `tenant discovery for ${spoHost}`, 'json'));
-    }
-  };
 
   const simplePut = async (path: string, body: Uint8Array, contentType?: string): Promise<Result<unknown, GraphError>> => {
     const headers = await authHeaders();
@@ -199,17 +151,9 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
   };
 
   return {
-    get: (path, extraHeaders) => request('GET', path, undefined, extraHeaders),
-    getElevated: (path) => core.json('elevated', 'GET', path),
-    getGuest: (path, tenant) => core.json({ guest: tenant }, 'GET', path),
-    discoverTenantId,
-    ...createSubstrateReader(tokens, fetchFn),
+    ...createReadGraph(tokens, fetchFn),
     post: (path, body) => request('POST', path, body),
     patch: (path, body) => request('PATCH', path, body),
-    getBinary: (path) => core.getBinary('basic', path),
-    getBinaryElevated: (path) => core.getBinary('elevated', path),
-    getBinaryGuest: (path, tenant) => core.getBinary({ guest: tenant }, path),
-    fetchUrl: core.fetchUrl,
     put,
     delete: deleteResource,
   };
