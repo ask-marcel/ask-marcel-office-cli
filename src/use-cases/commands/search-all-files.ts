@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { searchDriveItems } from './drive-item-search.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -25,7 +25,7 @@ const MAX_PAGES = 25; // runaway guard: 25 × 200 = 5000 files, then `truncated:
 
 const schema = z.object({ query: z.string().min(1) });
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const sweep = await searchDriveItems(graph, parsed.data.query, MAX_PAGES);
@@ -34,7 +34,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ value, count: value.length, ...(truncated ? { truncated: true } : {}) });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Search EVERY file the signed-in user can access — their personal OneDrive, files shared with them, and every SharePoint and Teams (channel) document library they can open — for a free-text query. Unlike `search-my-documents` (personal OneDrive only) or `search-onedrive-files` (one drive by id), this reaches across all accessible drives via the security-trimmed Microsoft Search index; unlike `microsoft-search-query` it returns FILES ONLY (`entityTypes: ["driveItem"]`), not mail/calendar/people/sites. It deep-pages `POST /search/query` with `from`/`size` (200 per page) following the index\'s `moreResultsAvailable` flag until exhausted, or the ceiling of 25×200 = 5000 files is reached (`truncated: true` — narrow with `--query` to see the rest). Hits are deduped by `hitId`. Each returned `driveItem` carries `id` + `parentReference.driveId`, the pair `download-drive-item-content` / `download-drive-item-as-markdown` need to open it.',
   category: 'drive',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
 
@@ -56,7 +56,7 @@ const parse = (raw: string): Resolved | null => {
   };
 };
 
-const execute: Command['execute'] = async (_graph, params) => {
+const execute: ReadCommand['execute'] = async (_graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // v1.4.0 re-audit Nit 1 (drive-share + sharepoint + outlook gaps): a
@@ -96,7 +96,7 @@ const execute: Command['execute'] = async (_graph, params) => {
   return ok(resolved);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Parse a Microsoft Teams `Copy link` URL (the share link emitted by the message context menu in Teams) into its `chatId` + `messageId` components. Pure transformation — no Graph call. Pipe the result into `get-teams-chat-message` to fetch the message body, or into `list-teams-chat-history` to read the chat that contains it.',
   category: 'chats',

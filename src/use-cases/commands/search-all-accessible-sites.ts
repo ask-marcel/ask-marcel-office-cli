@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -40,7 +40,7 @@ const siteWebUrl = (resource: unknown): string | undefined => {
   return typeof url === 'string' ? url : undefined;
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const queryString = parsed.data.query ?? '*';
@@ -91,7 +91,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Enumerate EVERY SharePoint site the signed-in user can access via the Microsoft Search index — far more than `search-sharepoint-sites-by-name`, which calls `GET /sites?search=` and returns a single capped page with no continuation. This command deep-pages the Search API (`POST /search/query` with `entityTypes: ["site"]`) using `from`/`size`, following the index\'s own `moreResultsAvailable` flag until exhausted (or the page ceiling of 60×25 = 1500 is reached, signalled by `truncated: true`), and dedupes site resources by id. The index is security-trimmed, so it returns sites you can open even when you are not a member (the gap `list-accessible-drives` cannot fill). Conversely it does NOT return OneDrives, private channel sites, or direct-link-only sites — so the *union of this command and `list-accessible-drives` is the practical maximum reachable on a delegated token* (a truly exhaustive list of every site in the tenant needs admin-only app permissions: `GET /sites/getAllSites`). Sites you cannot open are EXCLUDED so the list is not polluted with 404s: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining site is probed (`GET /sites/{id}?$select=…,siteCollection`) and `archivedExcluded` drops archived / `423 resourceLocked` sites (e.g. an auto-archived OneDrive of a departed user) while `notFoundExcluded` drops probes that 404. Active personal OneDrives are kept. All three counters are omitted when 0. Optional `--query` narrows the index (default `*` = all accessible sites) and keeps the per-site probe cheap.',
   category: 'sharepoint',

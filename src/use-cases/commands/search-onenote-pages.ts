@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
 
@@ -17,14 +17,14 @@ const noFilterOptions = odataQueryOptions.filter((o) => o.name !== 'filter');
 // conventional name is the only one.
 const schema = z.object({ query: z.string().min(1) }).extend(noFilterShape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/onenote/pages?$filter=contains(title,'${odataStringLiteral(parsed.data.query)}')`, parsed.data);
   return graph.get(path);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Find OneNote pages whose title contains a substring (case-sensitive — page content is NOT searched). Microsoft removed full-text OneNote `?search=` from v1.0 Graph; only $filter against `title` remains, which is what this command runs. Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the title-contains predicate, and Graph rejects two `$filter` query params.',
   category: 'notes',

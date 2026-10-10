@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import { buildListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
 import { odataQueryOptions } from './odata-query.ts';
 import { kqlSearchClause } from './search-escape.ts';
@@ -16,7 +16,7 @@ const inner = buildListCommand((p) => `/me/messages?${kqlSearchClause(p.query)}`
 // Reject the conflict client-side so the LLM gets a precise pointer to the
 // alternative command instead of paying a 500ms round-trip for an opaque
 // Graph code.
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   if (typeof params['filter'] === 'string' && params['filter'].length > 0) {
     // short `error` headline, with the
     // actionable remedy carried by the matching `hint` rule in
@@ -33,7 +33,7 @@ const execute: Command['execute'] = async (graph, params) => {
 };
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Search the signed-in user's entire Outlook mailbox using KQL or free text. Results are ranked by Graph relevance. The CLI ships a slim default `--select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments,isRead,importance,bodyPreview,conversationId,webLink` (same as `list-mail-messages`; `conversationId` is included so you can group hits into a thread or feed one to `list-conversation-messages`) so a 3-result page stays ~3 KB instead of ~30 KB. Pass `--select id,subject,body` to widen, or override entirely. Note: Graph does not allow `$search` and `$filter` together — the CLI rejects `--filter` client-side with a pointer to `list-mail-messages` (which supports OData filtering). For sorting, server-side `$orderby` is also not allowed with `$search`; use the relevance ranking Graph returns. **Exact-phrase search works**: `--query '\"budget allocation\"'` and embedded field phrases like `--query 'subject:\"Contoso A2 & B7 timeline\"'` are supported — the CLI escapes your double quotes into KQL phrase quotes, wraps the whole expression in the `\"…\"` Graph requires, and percent-encodes the value so `&`, `#`, and `+` are wire-safe. Pass raw KQL otherwise, e.g. `--query 'subject:invoice from:alice'`.",
   category: 'mail',

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions, odataStringLiteral } from './odata-query.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), query: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/search(q='${odataStringLiteral(p.query)}')`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Search a single OneDrive / SharePoint drive for files and folders matching a free-text query.',
   category: 'drive',
   graphMethod: 'GET',

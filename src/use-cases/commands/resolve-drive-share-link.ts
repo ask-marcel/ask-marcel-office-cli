@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
 import { buildShareToken } from './sharepoint-link-extractor.ts';
@@ -98,7 +98,7 @@ const toResolvedItem = (raw: unknown, shareToken: string): Record<string, unknow
  */
 const isForeignTenantAudienceError = (error: GraphError): boolean => error.type === 'api_error' && error.status === 401 && error.code === 'invalidAudienceUri';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   // v1.4.0 re-audit Nit 1 (outlook + teams gaps): an Outlook web URL or
@@ -166,7 +166,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ ...toResolvedItem(guestItem.value, resolved.shareToken), tenantId: tenant.value });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Resolve a OneDrive / SharePoint sharing URL (a "Copy link" address someone sent you) to the file it points at, returning `driveId` + `itemId` ready to feed `get-drive-item`, `download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, and the rest of the `*-drive-item` family. It encodes the URL to the Graph `/shares/{token}` share token (`u!<base64url>` per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get)) and fetches `/shares/{token}/driveItem` in ONE call (basic token, `Files.Read.All`) — a raw sharing URL carries no ids, so this is the entry point into the drive-item family from a shared link. Accepts any `*.sharepoint.com` URL (tenant + `*-my.sharepoint.com` personal OneDrive) and Microsoft\'s short-link host `1drv.ms`. **Cross-tenant links work too**: when the URL belongs to a tenant you are only a GUEST in, your home token cannot read its SharePoint (Graph answers `invalidAudienceUri` — it cannot mint a SharePoint token for a foreign tenant), so this command identifies the owning tenant from the URL host and retries with a guest token automatically, then returns that tenant as `tenantId` — see `responseShape` for how to pass it on to the follow-up calls. The answer names the file as `driveId` and `itemId` (not `parentReference.driveId` and `id` as a `driveItem` does); to list a shared folder, pass them to `list-folder-files` as its drive id and item id.',
   category: 'drive',

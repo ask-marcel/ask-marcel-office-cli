@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ok } from '../../domain/result.ts';
 import { buildListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -20,7 +20,7 @@ const sitesOf = (body: unknown): ReadonlyArray<unknown> => {
 // ones (e.g. a departed user's auto-archived OneDrive, which 423s), non-navigable
 // URL shapes (add-in app domains, `/contentstorage/` containers, `/_layouts/`
 // pages), and probes that 404. The cap (~25 matches) never trips the probe ceiling.
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const r = await built.execute(graph, params);
   if (!r.ok) return r;
   const filtered = await filterOutArchivedSites(graph, sitesOf(r.value));
@@ -33,7 +33,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Search the tenant for SharePoint sites whose display name or description matches a free-text query (returns up to 25).',
   category: 'sharepoint',
   graphMethod: 'GET',

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions, odataStringLiteral } from './odata-query.ts';
 
 const baseSchema = z.object({ query: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/me/drive/search(q='${odataStringLiteral(p.query)}')`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Search the signed-in user’s default OneDrive for documents matching a free-text query (filename, content, metadata).',
   category: 'drive',
   graphMethod: 'GET',

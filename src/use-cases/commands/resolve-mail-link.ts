@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
 
@@ -91,7 +91,7 @@ const parse = (raw: string): ParseOutcome => {
   return { kind: 'unknown' };
 };
 
-const execute: Command['execute'] = async (_graph, params) => {
+const execute: ReadCommand['execute'] = async (_graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const outcome = parse(parsed.data.url);
@@ -116,7 +116,7 @@ const execute: Command['execute'] = async (_graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Parse a Microsoft Outlook web mail link (the URL emitted by the "Copy link" / address-bar share of an email) into its `messageId`. Pure transformation — no Graph call. Pipe the result into `get-mail-message` to fetch the body, or `convert-mail-to-markdown` to render it. For Outlook calendar links use `resolve-calendar-link` instead — this command rejects them with a pointer.',
   category: 'mail',
