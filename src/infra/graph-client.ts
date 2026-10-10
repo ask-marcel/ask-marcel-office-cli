@@ -7,13 +7,9 @@ import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
 import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
-import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor, type HttpMethod, type TimeoutTier } from './network-error.ts';
-
-type GraphError =
-  | { type: 'api_error'; status: number; message: string; code?: string; retryAfterSeconds?: number }
-  | { type: 'auth_failed'; message: string; code?: string }
-  | { type: 'network_error'; message: string; code?: string }
-  | { type: 'validation_error'; message: string; code?: string };
+import type { FetchFn, GraphError } from './graph-request.ts';
+import { isAllowedFetchUrlHost, toBase64, wrapNetworkError } from './graph-request.ts';
+import { REQUEST_TIMEOUT_MS, timeoutMsFor } from './network-error.ts';
 
 type GraphClient = {
   /**
@@ -128,20 +124,6 @@ type GraphClient = {
   delete: (path: string) => Promise<Result<unknown, GraphError>>;
 };
 
-const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
-  /\.sharepoint\.com$/i,
-  /\.onedrive\.com$/i,
-  /\.live\.com$/i,
-  /\.officeapps\.live\.com$/i,
-  /\.1drv\.com$/i,
-  /^graph\.microsoft\.com$/i,
-  /\.svc\.ms$/i,
-];
-
-const isAllowedFetchUrlHost = (host: string): boolean => ALLOWED_FETCH_URL_HOSTS.some((re) => re.test(host));
-
-type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
-
 // Two-tier timeout constants live in src/infra/network-error.ts (shared
 // with the TeamsClient adapter). The chunk constants are GraphClient-
 // specific so they stay here.
@@ -155,21 +137,6 @@ const isText = (contentType: string | null): boolean => {
   const lower = contentType.toLowerCase();
   return lower.startsWith('text/') || lower.includes('+xml') || lower.includes('application/xml') || lower.includes('application/javascript');
 };
-
-const toBase64 = (bytes: Uint8Array): string => {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-};
-
-// Collapses the per-catch boilerplate that previously repeated across 8 sites:
-// each catch had to manually format the label and pick the right timeout-tier
-// constant. Putting both pieces here makes the binary-vs-json choice explicit
-// at every call site without leaking the timeout-label strings outwards.
-const wrapNetworkError = (e: unknown, method: HttpMethod, label: string, tier: TimeoutTier): GraphError => ({
-  type: 'network_error',
-  message: networkErrorMessage(e, `${method} ${label}`, timeoutLabelFor(tier)),
-});
 
 type GraphErrorBody = {
   readonly error?: {

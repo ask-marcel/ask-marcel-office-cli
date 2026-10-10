@@ -35,6 +35,7 @@ import '../src/infra/browser-auth.ts';
 import '../src/infra/filesystem-bun.ts';
 import '../src/infra/filesystem-node.ts';
 import '../src/infra/graph-client.ts';
+import '../src/infra/graph-request.ts';
 import '../src/infra/network-error.ts';
 import '../src/infra/child-process-watch.ts';
 import '../src/infra/process-runner-bun.ts';
