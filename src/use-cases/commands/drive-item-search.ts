@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * Deep-page `POST /search/query` over files (`entityTypes: ['driveItem']`), 200
@@ -29,7 +30,7 @@ const dedupKey = (hit: Hit): string | undefined => {
   return typeof id === 'string' ? id : undefined;
 };
 
-const searchDriveItems = async (graph: GraphClient, queryString: string, maxPages: number): Promise<Result<DriveItemSweep, GraphError>> => {
+const searchDriveItems = async (graph: ReadGraph, queryString: string, maxPages: number): Promise<Result<DriveItemSweep, GraphError>> => {
   const seen = new Set<string>();
   const value: Array<unknown> = [];
   let truncated = false;

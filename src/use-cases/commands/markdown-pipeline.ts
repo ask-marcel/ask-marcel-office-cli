@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
 
@@ -42,7 +43,7 @@ const augmentSandboxError = (e: GraphError): GraphError => {
   };
 };
 
-const extractHtml = async (graph: GraphClient, binaryResult: Record<string, unknown>): Promise<Result<string, GraphError>> => {
+const extractHtml = async (graph: ReadGraph, binaryResult: Record<string, unknown>): Promise<Result<string, GraphError>> => {
   if (typeof binaryResult.text === 'string') {
     return ok(binaryResult.text);
   }
@@ -65,7 +66,7 @@ type ConvertOptions = {
   readonly htmlTransform?: (html: string) => Promise<string>;
 };
 
-const convertToMarkdown = async (graph: GraphClient, contentPath: string, options: ConvertOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
+const convertToMarkdown = async (graph: ReadGraph, contentPath: string, options: ConvertOptions = {}): Promise<Result<MarkdownEnvelope, GraphError>> => {
   const binary = await graph.getBinary(contentPath);
   if (!binary.ok) return err(augmentSandboxError(binary.error));
   const html = await extractHtml(graph, binary.value as Record<string, unknown>);

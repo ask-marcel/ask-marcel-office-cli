@@ -1,4 +1,4 @@
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * The Microsoft Search index's security-trimmed match count for one entity type
@@ -10,7 +10,7 @@ import type { GraphClient } from '../../infra/graph-client.ts';
 
 type SearchTotalResponse = { readonly value?: ReadonlyArray<{ readonly hitsContainers?: ReadonlyArray<{ readonly total?: unknown }> }> };
 
-const searchIndexTotal = async (graph: GraphClient, entityType: string, queryString = '*'): Promise<number | undefined> => {
+const searchIndexTotal = async (graph: ReadGraph, entityType: string, queryString = '*'): Promise<number | undefined> => {
   const r = await graph.post('/search/query', { requests: [{ entityTypes: [entityType], query: { queryString }, size: 1 }] });
   if (!r.ok) return undefined;
   const total = (r.value as SearchTotalResponse).value?.[0]?.hitsContainers?.[0]?.total;

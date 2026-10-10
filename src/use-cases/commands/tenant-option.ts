@@ -3,7 +3,8 @@ import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
 import { tenantId } from '../../domain/tenant-id.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { CommandOptionMeta } from './command-types.ts';
 
 /**
@@ -41,7 +42,7 @@ const TENANT_ID_OPTION: CommandOptionMeta = {
  * here instead of growing guest twins (which would take 10 builders to 14+, and
  * would still not express "it depends on the argument").
  */
-const routeGet = async (graph: GraphClient, path: string, rawTenantId: string | undefined): Promise<Result<unknown, GraphError>> => {
+const routeGet = async (graph: ReadGraph, path: string, rawTenantId: string | undefined): Promise<Result<unknown, GraphError>> => {
   if (rawTenantId === undefined) return graph.get(path);
   const branded = brandTenantId(rawTenantId);
   if (!branded.ok) return branded;

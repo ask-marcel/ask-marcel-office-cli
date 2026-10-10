@@ -69,7 +69,7 @@ const ORDERED_KEYS = ['top', 'skip', 'select', 'filter', 'orderby', 'expand'] as
  * Two steps, in this order:
  * 1. double any `'` — OData's string-literal escape, so the value cannot
  *    terminate the literal early;
- * 2. percent-encode — graph-client concatenates command paths verbatim, so an
+ * 2. percent-encode — graph-request concatenates command paths verbatim, so an
  *    un-encoded value corrupts the query string. `&`/`#` truncate it outright,
  *    and a raw `+` is decoded back to a SPACE server-side, which silently
  *    matches nothing (base64 conversationIds and plus-addressed emails both

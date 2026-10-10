@@ -2,7 +2,8 @@ import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * Helpers that consolidate the "Graph hands you a 302, follow the CDN
@@ -71,12 +72,12 @@ const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, Grap
 // `inlineBinary` come through here. `tenantId` is checked FIRST: a partner-tenant
 // file is unreadable on every home token, elevated included, so a caller that
 // passed both would otherwise get a guaranteed 401 instead of its file.
-const callBinary = (graph: GraphClient, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> => {
+const callBinary = (graph: ReadGraph, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> => {
   if (opts.tenantId !== undefined) return graph.getBinaryGuest(contentPath, opts.tenantId);
   return opts.elevated ? graph.getBinaryElevated(contentPath) : graph.getBinary(contentPath);
 };
 
-export const fetchRawBytes = async (graph: GraphClient, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
+export const fetchRawBytes = async (graph: ReadGraph, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
   const initial = await callBinary(graph, contentPath, opts);
   if (!initial.ok) return initial;
   const value = initial.value as Record<string, unknown>;
@@ -106,8 +107,8 @@ const toInlineBinary = (blob: Record<string, unknown>): Result<InlineBinary, Gra
   return err({ type: 'api_error', status: 500, message: 'unexpected envelope: response had no @microsoft.graph.downloadUrl, no base64 bytes, and no text body' });
 };
 
-export const inlineBinary = async (graph: GraphClient, contentPath: string, opts: FetchOptions = {}): Promise<Result<InlineBinary, GraphError>> => {
-  const initial = await callBinary(graph, contentPath, opts);
+// Follows a redirect the first answer may hold, then inlines the bytes.
+const inlineAnswer = async (graph: Pick<ReadGraph, 'fetchUrl'>, initial: Result<unknown, GraphError>): Promise<Result<InlineBinary, GraphError>> => {
   if (!initial.ok) return initial;
   const value = initial.value as Record<string, unknown>;
 
@@ -119,6 +120,16 @@ export const inlineBinary = async (graph: GraphClient, contentPath: string, opts
   }
   return toInlineBinary(value);
 };
+
+export const inlineBinary = async (graph: ReadGraph, contentPath: string, opts: FetchOptions = {}): Promise<Result<InlineBinary, GraphError>> =>
+  inlineAnswer(graph, await callBinary(graph, contentPath, opts));
+
+/**
+ * `inlineBinary` on the basic token, typed against the two members it uses, so
+ * the write graph (basic tier only) satisfies it as the read graph does.
+ */
+export const inlineBasicBinary = async (graph: Pick<ReadGraph, 'getBinary' | 'fetchUrl'>, contentPath: string): Promise<Result<InlineBinary, GraphError>> =>
+  inlineAnswer(graph, await graph.getBinary(contentPath));
 
 /**
  * Detect Graph's silent-raw-bytes fallback on `?format=pdf` requests.

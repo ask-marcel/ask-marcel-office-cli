@@ -1,6 +1,7 @@
 import { errorIndicatesArchived, isArchivedSite } from '../../domain/utilities/archive-status.ts';
 import { isNonNavigableSiteUrl } from '../../domain/utilities/site-url-classifier.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * Drop sites the signed-in user cannot actually open from a list of Microsoft
@@ -65,7 +66,7 @@ const driveSize = (body: unknown): number | undefined => {
   return typeof used === 'number' ? used : undefined;
 };
 
-const probe = async (graph: GraphClient, resource: unknown): Promise<ProbeOutcome> => {
+const probe = async (graph: ReadGraph, resource: unknown): Promise<ProbeOutcome> => {
   const url = siteWebUrl(resource);
   if (url !== undefined && isNonNavigableSiteUrl(url)) return { verdict: 'nonNavigable' };
   const id = siteId(resource);
@@ -77,7 +78,7 @@ const probe = async (graph: GraphClient, resource: unknown): Promise<ProbeOutcom
   return { verdict: 'error' };
 };
 
-const verdictsFor = async (graph: GraphClient, sites: ReadonlyArray<unknown>, probeMax: number, chunkSize: number): Promise<ReadonlyArray<ProbeOutcome>> => {
+const verdictsFor = async (graph: ReadGraph, sites: ReadonlyArray<unknown>, probeMax: number, chunkSize: number): Promise<ReadonlyArray<ProbeOutcome>> => {
   const out: Array<ProbeOutcome> = [];
   for (let start = 0; start < sites.length; start += chunkSize) {
     const chunk = sites.slice(start, start + chunkSize);
@@ -94,7 +95,7 @@ const countVerdict = (outcomes: ReadonlyArray<ProbeOutcome>, target: Verdict): n
 const withSize = (resource: unknown, size: number | undefined): unknown =>
   size !== undefined && resource !== null && typeof resource === 'object' ? { ...resource, size } : resource;
 
-const filterOutArchivedSites = async (graph: GraphClient, sites: ReadonlyArray<unknown>, options?: FilterOptions): Promise<FilterResult> => {
+const filterOutArchivedSites = async (graph: ReadGraph, sites: ReadonlyArray<unknown>, options?: FilterOptions): Promise<FilterResult> => {
   const probeMax = options?.probeMax ?? ARCHIVE_PROBE_MAX;
   const chunkSize = options?.chunkSize ?? PROBE_CHUNK;
   const outcomes = await verdictsFor(graph, sites, probeMax, chunkSize);

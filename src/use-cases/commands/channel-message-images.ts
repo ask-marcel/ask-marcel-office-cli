@@ -1,4 +1,4 @@
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { nonEmpty, type ChannelMessage } from './channel-message-html.ts';
 
 /**
@@ -34,7 +34,7 @@ const hostedImageSources = (messages: ReadonlyArray<ChannelMessage>): ReadonlyAr
 };
 
 /** Fetches each hosted image through Graph; only `image/*` bodies at or under 2 MB become data URIs. */
-const fetchHostedImages = async (graph: GraphClient, sources: ReadonlyArray<string>): Promise<ReadonlyMap<string, string>> => {
+const fetchHostedImages = async (graph: ReadGraph, sources: ReadonlyArray<string>): Promise<ReadonlyMap<string, string>> => {
   const images = new Map<string, string>();
   for (const src of sources) {
     if (!GRAPH_ORIGIN.test(src)) continue;

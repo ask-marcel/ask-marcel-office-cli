@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, replaceUnresolvedCidImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -153,7 +154,7 @@ type EmbedFetchResult = { readonly meta: InlineImageCandidate; readonly inline?:
 
 // `resourcePath` is the message or post the image hangs off (`/me/messages/{id}`,
 // `/groups/{g}/threads/{t}/posts/{p}`); its attachments live one segment below.
-const fetchInlineImageBytes = async (graph: GraphClient, resourcePath: string, meta: InlineImageCandidate): Promise<EmbedFetchResult> => {
+const fetchInlineImageBytes = async (graph: ReadGraph, resourcePath: string, meta: InlineImageCandidate): Promise<EmbedFetchResult> => {
   if ((meta.size ?? 0) > INLINE_IMAGE_SIZE_LIMIT_BYTES) return { meta, oversize: true };
   if (!nonEmpty(meta.id)) return { meta, oversize: false };
   const fetched = await graph.get(`${resourcePath}/attachments/${meta.id}`);
@@ -235,7 +236,7 @@ type MarkdownRenderOptions = {
 // (`/me/messages/{id}`, `/groups/{g}/threads/{t}/posts/{p}`) and its attachments
 // always live one segment below it, so the only things that differ between the
 // two are the header line-up and the fetch hint, which arrive as options.
-const renderMessageAsMarkdown = async (graph: GraphClient, resourcePath: string, options: MarkdownRenderOptions): Promise<Result<unknown, GraphError>> => {
+const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, options: MarkdownRenderOptions): Promise<Result<unknown, GraphError>> => {
   const { inlineImages: embedInlineImagesEnabled, keepQuoted } = options;
 
   const fetched = await graph.get(resourcePath);
@@ -325,7 +326,7 @@ const renderMessageAsMarkdown = async (graph: GraphClient, resourcePath: string,
 
 const MAIL_ATTACHMENT_HINT = '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._';
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return renderMessageAsMarkdown(graph, `/me/messages/${parsed.data.messageId}`, {
@@ -342,7 +343,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Render a single Outlook email as markdown — headers (`**Subject:**`, `**From:**`, `**To:**`, `**Cc:**` only when present, `**Date:**`), followed by the body run through turndown. By default NO image bytes are fetched: every inline `cid:` image renders as a readable `[inline image: <name>]` placeholder and the images surface in the file-attachments list, so the output stays close to the text size (an email whose 6 KB body carried 30 KB of signature-image base64 now ships at ~6 KB). Pass `--inline-images true` to embed inline images (`isInline:true` + `image/*` content-type, size ≤ 2 MB) as base64 `data:` URIs for self-contained output (non-image inline attachments are never embedded; oversize inline images keep a placeholder note; a cid whose per-image fetch fails degrades to the placeholder too). File attachments are always listed below the body by name + size + id; their bytes are NOT fetched here — call `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the id when you actually need them. Staged-fetch design: one call for the body, one for the attachments-metadata list (when `hasAttachments` is true or the body references a `cid:` image, since Graph reports false for inline-only mail), and with `--inline-images true` one per small inline image — replaces the old `?$expand=attachments` which timed out / truncated on messages with multi-MB attachments.',
   category: 'mail',

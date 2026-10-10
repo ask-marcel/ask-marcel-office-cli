@@ -1,6 +1,6 @@
 /**
- * Wire-safe builder for Graph `$search=` KQL clauses. graph-client
- * concatenates command paths verbatim (`https://graph.microsoft.com/v1.0${path}`)
+ * Wire-safe builder for Graph `$search=` KQL clauses. The request core
+ * (graph-request.ts) concatenates command paths verbatim (`https://graph.microsoft.com/v1.0${path}`)
  * with no percent-encoding pass, so a raw `&`, `#`, `%`, or `+` inside a user
  * query corrupts the query string on the wire: a live ` & ` truncated the KQL
  * mid-phrase (`$search="subject:"Contoso A2` reached Graph). Values are
