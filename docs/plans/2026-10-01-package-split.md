@@ -215,6 +215,7 @@ single-flight), `token-helper-run.ts` (one spawn), `token-helper-answer.ts`,
 - Not built in step 10: the basic and guest 401 replay (the two **new** rows of the table below).
   `TokenSource.graphToken` and `guestToken` take no `rejected` option yet, so only the chat tiers
   replay. Step 12 owns it. The phase 1 exit smoke does not force a 401, so it does not cover it.
+  Built in step 12; see "As built in step 12" under Read guarantee.
 
 ### Per-tier policy (unchanged from today unless marked)
 
@@ -307,6 +308,42 @@ As built in step 11 (`src/use-cases/commands/command-effect.ts`, `CommandMeta.ef
   cleanup is best effort, so a failed cleanup can leave it in `.ask-marcel-temp`.
 - Commands that call no fixed Graph endpoint (the chat substrate, local files, link parsers,
   `next-page`, `microsoft-search-query`) declare no scope; `meta.test.ts` pins that set.
+
+As built in step 12 (`src/infra/graph-request.ts`, `read-graph.ts`, `graph-substrate.ts`,
+`write-graph.ts`, `src/use-cases/commands/command-graph.ts`):
+
+- `graph-request.ts` is the private request core: error shaping, signing, the 401 replay, the JSON,
+  bytes and CDN GETs. It holds no write method. `read-graph.ts` (with the chat substrate in
+  `graph-substrate.ts`) and `write-graph.ts` are built on it. `graph-client.ts` stays only as the
+  single package's full client, `GraphClient = ReadGraph & WriteGraph`, for the composition root and
+  the library.
+- `WriteGraph` is `get`, `getBinary`, `fetchUrl` (what the write commands read) plus `post`,
+  `patch`, `put`, `delete`. A write whose body is empty is `ok(undefined)`.
+- Commands: `ReadCommand` (`execute(graph: ReadGraph)`, `meta.effect: 'read'`) and `WriteCommand`
+  (`execute(graph: WriteGraph)`, a write effect). Every command file names its narrower meta type, so
+  a module whose effect and graph disagree does not compile into the registry. `Command` stays the
+  general type (any command, run on the full client) for the docs, the manifest, the shells and the
+  library.
+- In the single package the composition passes the full client, so the registry hands each command
+  its own view (`readGraphOf`, `writeGraphOf`, pure functions in `command-graph.ts`; the POST check
+  they share with the read graph is `read-only-post.ts`), at assembly beside the unknown-parameter wrap: a
+  read command never holds a write member at run time, and its POST is checked again there.
+- Enforced by `command-graph.test.ts` (the registry gives each kind only its graph, and no
+  registered read command reaches a write member when run on placeholders), the ESLint rule with
+  its fixtures in `scripts/check-lint-fixtures.ts`, and `scripts/check-read-bundle.ts`: it bundles
+  `createReadGraph` and every read command module on their own (the single bundle holds both, so
+  `dist` cannot answer) and fails on a `"PUT"`, `"PATCH"`, `"DELETE"` string or
+  `createUploadSession`; a control bundle with `createWriteGraph` must show all four. CI runs it.
+- The 401 replay: the basic and guest tiers replay once on `InvalidAuthenticationToken` or
+  `TokenExpired` (read from a copy of the answer), never on another code, never on elevated. When the
+  source has no newer token than the refused one, the first 401 stands and the request is not sent
+  twice. The in-process source replays through the ladder's `issueToken` (the same `--reject` path
+  as the helper, no browser); a manager without an issuer is asked by its own getter again, and the
+  request is sent again (once) only if the getter gives a different token. A token from
+  `ASKMARCEL_TOKEN_BASIC` is not replayed: `env_token_invalid`.
+- `fetch-raw-bytes.ts` gained `inlineBasicBinary`, typed against `Pick<ReadGraph, 'getBinary' |
+  'fetchUrl'>`, which the write graph satisfies; the PDF converters use it.
+- The graph fake is split: `fakeReadGraph`, `fakeWriteGraph`; `fakeGraphClient` composes them.
 
 ## Cross-package names
 

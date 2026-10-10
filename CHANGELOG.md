@@ -87,6 +87,33 @@ A text error now has a `code:` line under the `error:` line when the error has
 a code. The JSON envelope gives the same value as `errorCode`. An MCP client
 reads text, so it can now see codes such as `not_authenticated`.
 
+### Changed: a refused basic or guest token is replaced one time
+
+When Graph refuses the basic token or a guest token with a 401 and the code
+`InvalidAuthenticationToken` or `TokenExpired`, the CLI sends the request one
+more time with a newer token. By default the newer token comes from the token
+cache or from the refresh token. With `ASKMARCEL_TOKEN_COMMAND`, the helper
+runs with `--reject`. No browser opens. A 401 with a different code (for
+example `invalidAudienceUri` on a file in a partner tenant) is not replayed, and
+the elevated token is never replayed. A token in `ASKMARCEL_TOKEN_BASIC` is not
+replaced: the 401 gives `env_token_invalid`.
+
+### Fixed: a write that Graph accepts with an empty body
+
+A POST or a PATCH that Graph answers with 202 or 204 and no body is now a
+success with no value. Before, the empty body gave a `network_error`, and a
+caller could send the write again.
+
+### Changed: each command gets only its own graph
+
+A read command runs on the read graph: the GET calls of each tier, and a POST
+that goes only to `/search/query` and `/me/calendar/getSchedule`. A write
+command runs on the write graph: the basic token only, with `post`, `patch`,
+`put` and `delete`. In the library, `GraphClient` has the same members as
+before, and `commands[name].execute(graph)` gives the command only the members
+of its own graph. A POST from a read command to another path fails with
+`write_refused` and is not sent.
+
 ### Fixed: a token endpoint answer that is not a token
 
 When the token endpoint answered 200 with a body that is not JSON, or JSON that

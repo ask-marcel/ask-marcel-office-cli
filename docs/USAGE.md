@@ -278,8 +278,9 @@ bearer the way `@ask-marcel/office-read` and `-write` will:
    `ASKMARCEL_TOKEN_CHATSVCAGG` or `ASKMARCEL_TOKEN_IC3`, with `ASKMARCEL_TEAMS_REGION` beside a
    chat token. The token is checked each time it is used: three base64url segments and nothing
    else, then its expiry and audience. A token that fails gives `env_token_invalid`, which names the
-   variable and never its value. The helper is then not asked, and a chat token the service refuses
-   with a 401 is not replayed. Guest tokens have no variable.
+   variable and never its value. The helper is then not asked, and a token from a variable that
+   the service refuses with a 401 is not replayed: the call fails with `env_token_invalid`. Guest
+   tokens have no variable.
 2. The helper, run as `<helper> --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`, never
    through a shell. stdin goes to it only from a terminal, where it may wait up to 13 minutes (a held
    lock plus a browser sign-in); otherwise it has 90 seconds. One run serves every concurrent call
@@ -287,6 +288,12 @@ bearer the way `@ask-marcel/office-read` and `-write` will:
    5 minutes to its expiry. A failure gives the helper's exit code, the length of its stdout and its
    `errorCode`, never what it printed; a helper that cannot be started gives
    `token_helper_unavailable`.
+
+On both paths, a Graph request that Graph refuses with a 401 and the code `InvalidAuthenticationToken`
+or `TokenExpired` is sent one more time with a newer basic or guest token: from the token cache or the
+refresh token by default, from the helper with `--reject` here. It never opens a browser. A 401 with
+another code (such as `invalidAudienceUri`) is an answer and is not replayed, and neither is a request
+signed with the elevated token, which has no refresh token.
 
 The read and write packages will also find a helper with no variable: through
 `~/.ask-marcel/token-helper.json`, then `ask-marcel-office-auth` on PATH (on Windows, an npm `.cmd`
@@ -389,6 +396,7 @@ bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
 bun run mutate:changed  # mutation testing on changed domain/use-case files (>90% kill threshold)
+bun run check:read-bundle  # the read graph and the read commands, built alone, hold no write method
 ```
 
 ### Pre-commit hook (fast gates; the rest run in CI)
