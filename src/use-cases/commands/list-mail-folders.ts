@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { INCLUDE_HIDDEN_FOLDERS_OPTION } from './include-hidden-folders.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -14,7 +14,7 @@ const { execute, schema } = buildListCommand((p) => (p.includeHiddenFolders === 
   defaultTop: '100',
 });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the top-level mail folders in the signed-in user’s Outlook mailbox (Inbox, Sent Items, etc.). The CLI asks for 100 folders a page (Graph’s own default is ten, which once hid an eleventh folder); a larger mailbox continues through the `next:` footer, and `--top` sets the page. Child folders come from `list-mail-child-folders`, and `list-mail-folders-delta` lists every folder at every depth in one walk.',
   category: 'mail',

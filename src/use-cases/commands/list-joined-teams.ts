@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({}).strict();
 const { execute } = buildCommand(() => '/me/joinedTeams', schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the Microsoft Teams the signed-in user is a member of. Note: this endpoint does NOT accept the standard OData query parameters — Graph rejects `$top`/`$select`/`$filter`/etc. on `/me/joinedTeams` with `Query option 'X' is not allowed`. The CLI omits the OData passthrough on this command for that reason; pass post-processing through `jq` instead if you need to slice the response.",
   category: 'teams',

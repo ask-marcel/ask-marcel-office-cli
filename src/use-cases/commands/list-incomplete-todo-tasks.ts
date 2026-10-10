@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 import { DUE_BEFORE_OPTION, dueBeforeClause, dueBeforeField } from './todo-due-before.ts';
@@ -16,7 +16,7 @@ import { withTaskLinks } from './todo-web-url.ts';
 // pointer at the sibling command that supports it.
 const schema = z.object({ todoTaskListId: z.string().min(1), dueBefore: dueBeforeField }).extend(odataQuerySchema.shape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   if (parsed.data.filter !== undefined) {
@@ -36,7 +36,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return rewritten ? err(rewritten) : result;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List every incomplete Microsoft To Do task in a given list (status not equal to `completed`). Accepts the OData passthrough flags top/skip/select/orderby/expand. The filter passthrough is intentionally omitted — the path already pins a `$filter` for the completion-status predicate, and Graph rejects two `$filter` query params. If you supply `--filter` anyway, the CLI returns a clear pointer to `list-todo-tasks` (which lets you AND your predicate with the completion filter yourself).',
   category: 'tasks',

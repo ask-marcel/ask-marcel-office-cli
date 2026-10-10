@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { EXCLUDE_MEETING_RESPONSES_OPTION, withMeetingResponseFilter } from './mail-response-filter.ts';
 import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
@@ -9,7 +9,7 @@ const inner = buildListCommand((p) => `/me/mailFolders/${p.mailFolderId}/message
 const schema = z.object({ ...baseSchema.shape, ...odataQuerySchema.shape, excludeMeetingResponses: z.enum(['true', 'false']).optional() });
 const execute = withMeetingResponseFilter(schema, inner.execute);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the messages inside a specific Outlook mail folder (Inbox, custom folder, etc.).',
   category: 'mail',
   graphMethod: 'GET',

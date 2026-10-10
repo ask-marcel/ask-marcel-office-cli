@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
 
@@ -13,7 +13,7 @@ const schema = z.object({ messageId: z.string().min(1) }).extend(odataQuerySchem
 // User-supplied `--select` overrides.
 const DEFAULT_SELECT = 'id,name,contentType,size,isInline';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const dataWithSelect = parsed.data.select === undefined ? { ...parsed.data, select: DEFAULT_SELECT } : parsed.data;
@@ -21,7 +21,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return graph.get(path);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the attachments (file, item, reference) on a single Outlook message. The CLI ships an opinionated default `--select=id,name,contentType,size,isInline` so an LLM that doesn't slim the response itself doesn't accidentally pull multi-MB `contentBytes` for every attachment (a single 1.5 MB image attachment would otherwise blow the context window). The `@odata.type` discriminator is always returned by Graph regardless of `$select` (and Graph rejects asking for it explicitly). To fetch the actual bytes, call `get-mail-attachment` for the one you need (or override `--select` if you really want the raw inline payload). An empty list on a reply is normal: Outlook leaves the original's files off a reply, so list the thread with `list-conversation-messages` (`hasAttachments` in its `--select`) to find the message that carries them.",
   category: 'mail',

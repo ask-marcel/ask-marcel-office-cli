@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { INCLUDE_HIDDEN_FOLDERS_OPTION } from './include-hidden-folders.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -13,7 +13,7 @@ const { execute, schema } = buildListCommand(
   { defaultTop: '100' } // Graph's default page is ten folders, as on list-mail-folders.
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the subfolders of a single Outlook mail folder (e.g. subfolders of Inbox). The CLI asks for 100 a page, where Graph would answer 10, unless `--top` says otherwise.',
   category: 'mail',

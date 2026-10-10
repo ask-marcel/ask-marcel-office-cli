@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, pickODataOptions, pickODataShape } from './odata-query.ts';
 
@@ -18,7 +18,7 @@ import { appendOData, pickODataOptions, pickODataShape } from './odata-query.ts'
 // refused by the registry-level unknown-parameter guard.
 const schema = z.object({ mailFolderId: z.string().min(1) }).extend(pickODataShape(['top', 'select', 'filter', 'expand']));
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { mailFolderId, top, ...odata } = parsed.data;
@@ -35,7 +35,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return graph.get(appendOData(`/me/mailFolders/${mailFolderId}/messages/delta()`, odata), headers);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Track incremental changes (added / updated / deleted messages) within a single mail folder using Microsoft Graph delta tokens. The first call returns the current snapshot plus a `@odata.deltaLink`; subsequent calls with that link return only what has changed since. `--top` is translated into the `Prefer: odata.maxpagesize=N` header: as a `$top` query parameter Graph reads a satisfied count as "sync complete" and hands back a deltaLink after N items, silently abandoning the rest of the folder. `$skip` and `$orderby` are NOT exposed — Graph ignores the former on this endpoint and rejects the latter unless it merely restates the default `receivedDateTime desc`.',
   category: 'mail',
