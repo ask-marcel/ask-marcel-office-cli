@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import type { Command } from './command-types.ts';
+import type { ReadCommand } from './command-types.ts';
 import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
 
 const graph = fakeGraphClient();
 
-const spy = (): { calls: number; execute: Command['execute'] } => {
-  const box = { calls: 0, execute: (async () => ok({})) as Command['execute'] };
+const spy = (): { calls: number; execute: ReadCommand['execute'] } => {
+  const box = { calls: 0, execute: (async () => ok({})) as ReadCommand['execute'] };
   box.execute = async () => {
     box.calls += 1;
     return ok({ value: [] });

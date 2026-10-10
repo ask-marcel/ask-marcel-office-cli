@@ -1,5 +1,5 @@
 import { err } from '../../domain/result.ts';
-import type { Command, CommandOptionMeta } from './command-types.ts';
+import type { ReadCommand, CommandOptionMeta } from './command-types.ts';
 
 /**
  * Graph caps a page of channel messages (and of a message's replies) at 50:
@@ -19,7 +19,7 @@ const CHANNEL_MESSAGES_TOP_OPTION: CommandOptionMeta = {
 
 /** Wraps an execute so a `--top` above the cap is refused before Graph is called. */
 const withChannelMessagesTopCap =
-  (inner: Command['execute']): Command['execute'] =>
+  (inner: ReadCommand['execute']): ReadCommand['execute'] =>
   async (graph, params) => {
     if (Number(params['top']) > CHANNEL_MESSAGES_TOP_CAP) {
       return err({
