@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectOnlyOptions } from './odata-query.ts';
 
 // A group's plans are the group's: belonging to the group is what grants them,
@@ -12,7 +12,7 @@ import { selectOnlyOptions } from './odata-query.ts';
 const baseSchema = z.object({ groupId: z.string().min(1) });
 const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupId}/planner/plans`, baseSchema, ['select']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the Microsoft Planner plans a Microsoft 365 group owns. A group's plans are granted by membership and need not appear in `list-planner-plans`, which lists the plans shared with the signed-in user: to find every plan a user can read, list their groups with `list-my-memberships`, keep the ones whose `groupTypes` holds `Unified` (security groups, distribution lists and roles own no plans), and ask each here. Only `--select` is advertised; slice and sort client-side.",
   category: 'tasks',

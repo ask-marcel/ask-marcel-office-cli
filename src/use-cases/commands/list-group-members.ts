@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/members`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: "List members of an Azure AD / Microsoft 365 group. Returns users, groups, and other directoryObjects depending on the group's membership.",
   category: 'user',
   graphMethod: 'GET',

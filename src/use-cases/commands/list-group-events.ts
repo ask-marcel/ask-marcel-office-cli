@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/groups/${p.groupId}/events`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List events from a unified (Microsoft 365) group's calendar. Only Microsoft 365 groups have a calendar — security and distribution groups return an empty `value[]` or 404.",
   category: 'calendar',

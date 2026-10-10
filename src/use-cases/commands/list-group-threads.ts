@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
 // Graph refuses `$filter` on this collection. Probed live 2026-09-06 on a group
@@ -16,7 +16,7 @@ const HONOURED = ['top', 'skip', 'select', 'orderby', 'expand'] as const;
 const baseSchema = z.object({ groupId: z.string().min(1) });
 const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupId}/threads`, baseSchema, HONOURED);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List threads in a unified (Microsoft 365) group inbox. Threads are flatter than conversations — one per topic, useful when conversation-level grouping isn't needed. Only Microsoft 365 groups have a mailbox — security and distribution groups return `MailboxNotEnabledForRESTAPI`. Each thread carries only a truncated `preview` of its latest post: read the full posts with `list-group-thread-posts`, or pass `--expand posts` here to inline them.",
   category: 'mail',

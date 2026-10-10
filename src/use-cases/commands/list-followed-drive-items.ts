@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildNoSkipListCommand(() => '/me/drive/following', baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List driveItems the signed-in user has explicitly followed (the OneDrive star). A small, hand-curated set of frequently-revisited files, distinct from the algorithmic `list-recent-files` and `list-recently-used-insights`.',
   category: 'drive',

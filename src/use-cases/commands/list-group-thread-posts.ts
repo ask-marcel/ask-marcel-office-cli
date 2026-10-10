@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1), threadId: z.string().min(1) });
@@ -10,7 +10,7 @@ const baseSchema = z.object({ groupId: z.string().min(1), threadId: z.string().m
 // thread, so the other passthroughs would promise a slice that never happens.
 const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupId}/threads/${p.threadId}/posts`, baseSchema, ['select', 'expand']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List every post in one thread of a unified (Microsoft 365) group inbox: the full `post` resources with the HTML `body.content`, `from`, `sender`, `receivedDateTime` and `hasAttachments`, where `list-group-threads` stops at a truncated `preview`. Graph returns the whole thread in one call with no page cursor, and it silently ignores `$top`, `$skip` and `$orderby` while rejecting `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed; sort on `receivedDateTime` client-side if order matters. `sender` is the person who wrote the post and `from` is normally the group's own address. Render one post as markdown with `convert-group-post-to-markdown`. Access is membership-gated, not scope-gated: a group the signed-in user does not belong to answers `ErrorAccessDenied` even though `list-groups` lists it.",
   category: 'mail',

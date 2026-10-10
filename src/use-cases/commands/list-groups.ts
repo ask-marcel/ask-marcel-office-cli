@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildNoSkipListCommand(() => '/groups', baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List Microsoft 365 groups, security groups, and distribution groups in the tenant directory. Use `--top` and `next-page` to paginate over very large directories.',
   category: 'user',
   graphMethod: 'GET',

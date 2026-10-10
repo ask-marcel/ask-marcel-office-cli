@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1), threadId: z.string().min(1), postId: z.string().min(1) });
@@ -19,7 +19,7 @@ const { execute, schema } = buildPickODataListCommand((p) => `/groups/${p.groupI
   defaultSelect: DEFAULT_SELECT,
 });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the attachments (file, item, reference) on one post of a unified (Microsoft 365) group thread. Ships the slim default `--select=id,name,contentType,size,isInline` the mail and calendar siblings use, so a caller sees what is attached without pulling any bytes — the staged alternative to `get-group-post --expand attachments`, which inlines EVERY attachment at once and times out on a post carrying a multi-MB file. Graph returns the whole collection in one response and silently ignores `$top`, `$skip`, `$orderby` and `$filter` (probed live 2026-09-03), so only `--select` and `--expand` are exposed. A post whose only attachments are inline images reports `hasAttachments: false`, so call this whenever the body shows `cid:` references. Read one with `convert-group-post-attachment-to-markdown`, or fetch its bytes with `get-group-post-attachment`.',
   category: 'mail',
