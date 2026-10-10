@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
@@ -12,7 +12,7 @@ import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const { execute, schema } = buildPickODataListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/delta()`, baseSchema, ['top', 'select', 'expand']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Get the incremental change set (added / modified / deleted items) under a OneDrive / SharePoint folder. Use the `@odata.deltaLink` from a previous response to resume.',
   category: 'drive',
   graphMethod: 'GET',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildElevatedSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 // round-6 moved this off elevation on the hypothesis
@@ -19,7 +19,7 @@ const DEFAULT_SELECT = 'id,topic,chatType,createdDateTime,lastUpdatedDateTime';
 const baseSchema = z.object({ chatId: z.string().min(1) });
 const { execute, schema } = buildElevatedSelectableCommand((p) => `/chats/${p.chatId}`, baseSchema, { defaultSelect: DEFAULT_SELECT });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return metadata for a single Microsoft Teams chat (1:1, group, or meeting). The CLI ships a slim default `--select=id,topic,chatType,createdDateTime,lastUpdatedDateTime`; pass `--select id,topic,webUrl,onlineMeetingInfo` (or any other comma-separated field list) to widen. Pass `--expand members` to inline membership. Returns metadata only — not the messages (which need `Chat.Read*`). Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`).',
   category: 'chats',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -10,7 +10,7 @@ const baseSchema = z.object({
 });
 const { execute, schema } = buildListCommand((p) => `/me/calendarView?startDateTime=${p.startDateTime}&endDateTime=${p.endDateTime}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the signed-in user's default-calendar events with recurrence expanded into individual occurrences in a date range. Both date-time params accept strict ISO 8601 (`2026-04-01T00:00:00Z`) AND the CLI's relative shapes (`7d`, `today`, `monday`, `start-of-month`, …) so a question like \"what's on my calendar this week\" no longer requires the LLM to compute timestamps by hand. With no `--select` every occurrence carries `attendees` (each with `status.response`) and `body`; a narrow `--select` drops them unless it names them (`bodyPreview` is the light form of `body`).",
   category: 'calendar',

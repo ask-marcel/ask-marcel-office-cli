@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({ chatId: z.string().min(1), messageId: z.string().min(1) });
@@ -25,7 +26,7 @@ const EXTENSIONS: Readonly<Record<string, string>> = { 'image/png': 'png', 'imag
 
 type Blob = { readonly contentType: string; readonly size: number; readonly base64: string };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId, messageId } = parsed.data;
@@ -46,7 +47,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok({ count: media.length, media });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Fetch the images pasted into one Teams chat message (screenshots, charts), which `list-teams-chat-messages` shows only as an empty `<img>`: the message is read through the IC3 substrate and each pasted image downloaded from Teams' media service with the same token, emoji and stickers left out. Answers them as a media list, ready to save as files for a vision model. Take the ids from `list-teams-chat-messages` or `list-teams-chat-history`. **Best-effort, may break on Microsoft client updates** — the substrate and the media service are not in the public Microsoft Graph API.",
   category: 'chats',

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
 import type { Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 // Cross-chat member search — collapses the "all my conversations with
@@ -175,7 +176,7 @@ const collectChat = (chat: Chat, queryFolded: string, acc: ScanAcc): void => {
   }
 };
 
-const scanChatPages = async (graph: GraphClient, queryFolded: string, pageSize: string, maxPages: number): Promise<Result<ScanState, GraphError>> => {
+const scanChatPages = async (graph: ReadGraph, queryFolded: string, pageSize: string, maxPages: number): Promise<Result<ScanState, GraphError>> => {
   const acc: ScanAcc = { seen: new Set<string>(), matched: [], bareUnmatched: [] };
   let continuationToken: string | undefined;
   let pagesFetched = 0;
@@ -210,7 +211,7 @@ const sumBareCounts = (bare: ReadonlyArray<BareChat>): number => bare.reduce((n,
 // refresh on the command path, so depending on it would make this fail whenever
 // it is stale. If the scope is ever absent the call 403s, `null` is returned, and
 // the chat is surfaced via `unresolvedMemberCount` / `hint` — graceful, not silent.
-const hydrateMatches = async (graph: GraphClient, chatId: string, queryFolded: string): Promise<ReadonlyArray<Member> | null> => {
+const hydrateMatches = async (graph: ReadGraph, chatId: string, queryFolded: string): Promise<ReadonlyArray<Member> | null> => {
   const res = await graph.get(`/chats/${chatId}/members`);
   if (!res.ok) return null;
   const value = (res.value as GraphMembersResponse).value ?? [];
@@ -235,7 +236,7 @@ type HydrationOutcome = { readonly chatsHydrated: number; readonly unresolvedMem
 // Resolve every bare direct chat in parallel and fold any name matches into
 // `matched`. A chat Graph cannot resolve (error) and every bare member left in
 // a non-direct chat stay counted in `unresolvedMemberCount` — never silent.
-const hydrateBareDirect = async (graph: GraphClient, queryFolded: string, bareUnmatched: ReadonlyArray<BareChat>, matched: Array<MatchedChat>): Promise<HydrationOutcome> => {
+const hydrateBareDirect = async (graph: ReadGraph, queryFolded: string, bareUnmatched: ReadonlyArray<BareChat>, matched: Array<MatchedChat>): Promise<HydrationOutcome> => {
   const direct = bareUnmatched.filter((b) => isDirectChat(b.chatId));
   let unresolvedMemberCount = sumBareCounts(bareUnmatched.filter((b) => !isDirectChat(b.chatId)));
   const results = await Promise.all(direct.map(async (b) => ({ bare: b, hits: await hydrateMatches(graph, b.chatId, queryFolded) })));
@@ -252,7 +253,7 @@ const hydrateBareDirect = async (graph: GraphClient, queryFolded: string, bareUn
 const HINT =
   'No chat member matched by name, but at least one chat has a cross-tenant member the Teams roster left unresolved — an externally-homed counterpart often appears only as a bare object-id. Direct 1:1 chats were deep-probed; members in group/meeting chats were not. Retry searching by their object-id (pass it as `--name <object-id>`), or, if you have the chat URL, read it directly with `get-chat` / `list-teams-chat-messages --chat-id 19:<their-oid>_<your-oid>@unq.gbl.spaces`.';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const queryFolded = fold(parsed.data.name);
@@ -282,7 +283,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Find every Microsoft Teams chat that includes a member matching `--name` (substring search across display-name, email, given-name, surname, MRI, and object-id). Both sides are Unicode-folded (NFD + combining-mark strip) and lowercased before comparison, so `--name Alex` matches `Alex Kim` AND `alex.kim@example.com` AND `ALEX` — important because a dual-identity user often carries the accented display-name on one identity and the un-accented email on the other. Walks the paginated chat-list substrate up to `--max-pages` and returns matching chats with their `matchedMembers[]`. Collapses the canonical "all conversations with person X" workflow into a single call AND surfaces dual-identity people (e.g. someone with both an org MRI and a guest-tenant MRI). Cross-tenant resolution: the summary roster returns externally-homed counterparts as a bare object-id (no name/email), which a name search cannot match; for every bare DIRECT (1:1) chat the command hydrates the roster via the per-chat members endpoint and re-matches — so an external counterpart who is bare in your 1:1 is still found, even when they were already resolved in some meeting (the dual-identity case). Bare members in group/meeting chats are not deep-probed; when nothing matches and such members exist it returns a `hint` plus `unresolvedMemberCount` rather than a confident empty result. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API.',
   category: 'chats',

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { extractSharepointUrls, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import type { ResolvedLink } from './sharepoint-link-extractor.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -17,7 +18,7 @@ type LinkExtractionSummary = {
 
 const schema = z.object({ messageId: z.string().min(1) });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<LinkExtractionSummary, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<LinkExtractionSummary, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId } = parsed.data;
@@ -40,7 +41,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Find every `*.sharepoint.com` URL in the body of a single Outlook email and resolve each one to its driveItem (driveId, itemId, name, webUrl) so the agent can feed those into `download-drive-item-as-pdf` / `-as-markdown` etc. Read-only — no conversion happens here. Capped at 25 unique URLs per call to bound fan-out (returns `truncated: true` and `skippedCount` when the body has more); duplicate URLs are deduplicated. Per-link errors are captured inside each entry instead of failing the whole call.',
   category: 'mail',

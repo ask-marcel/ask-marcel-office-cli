@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/filesFolder`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Return the SharePoint folder that backs a Teams channel's Files tab. Returned `driveItem` includes `parentReference.driveId` and `id` so you can pivot into `list-folder-files`, `download-drive-item-content`, etc., and treat the channel like any other OneDrive folder. Requires that the signed-in user is a member of the channel — restricted channels return `AccessDenied`.",
   category: 'teams',

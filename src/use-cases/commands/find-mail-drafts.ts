@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { matchExistingDrafts } from './draft-dedup.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -36,7 +36,7 @@ const parseRecipients = (raw: string | undefined): ReadonlyArray<string> | undef
     .filter((address) => address.length > 0);
 };
 
-const execute: Command['execute'] = async (graph, params): Promise<Result<unknown, GraphError>> => {
+const execute: ReadCommand['execute'] = async (graph, params): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { subject, toRecipients } = parsed.data;
@@ -63,7 +63,7 @@ const execute: Command['execute'] = async (graph, params): Promise<Result<unknow
   return ok({ matches, conversationIds, scanned: scanned.length, scanLimit: SCAN_LIMIT });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Find existing drafts on a mail thread WITHOUT trusting a conversationId $filter. Reply and forward drafts do not always inherit the inbound message conversationId (a thread can split across several), and Graph $filter on the Drafts folder is not read-your-writes consistent, so filtering Drafts by conversationId misses drafts. This command instead scans the 50 most recently modified drafts and matches them client-side on a normalized subject (stripping RE:/FW: and localized reply/forward prefixes) plus, optionally, a shared recipient. Use it before create-reply-draft to avoid creating a duplicate: if a match comes back, revise it with update-mail-draft instead of making a new one. Read-only.',
   category: 'mail',

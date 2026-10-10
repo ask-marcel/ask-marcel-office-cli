@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ eventId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/me/events/${p.eventId}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Fetch a single calendar event by ID from the signed-in user’s default calendar. Pass `--select` to project only the fields you need (the full event body can be large with HTML body and attendee lists). Replies are recorded on the organiser's copy: on your copy of someone else's meeting, `attendees[].status.response` reads `none` for people who did answer, and the organiser's own entry reads `none` too; your answer is `responseStatus`.",
   category: 'calendar',
