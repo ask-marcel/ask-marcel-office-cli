@@ -38,6 +38,7 @@ import '../src/infra/graph-client.ts';
 import '../src/infra/graph-request.ts';
 import '../src/infra/graph-substrate.ts';
 import '../src/infra/read-graph.ts';
+import '../src/infra/write-graph.ts';
 import '../src/infra/network-error.ts';
 import '../src/infra/child-process-watch.ts';
 import '../src/infra/process-runner-bun.ts';

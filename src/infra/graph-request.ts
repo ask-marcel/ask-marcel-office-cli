@@ -325,5 +325,5 @@ const createGraphRequestCore = (tokens: TokenSource, fetchFn: FetchFn): GraphReq
   return { send, json, getBinary, fetchUrl };
 };
 
-export { apiErrorFrom, asAuthFailure, createGraphRequestCore, isAllowedFetchUrlHost, toBase64, wrapNetworkError };
+export { apiErrorFrom, asAuthFailure, createGraphRequestCore, GRAPH_ROOT, isAllowedFetchUrlHost, toBase64, wrapNetworkError };
 export type { FetchFn, GraphError, GraphRequestCore, GraphTier };
