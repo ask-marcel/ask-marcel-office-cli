@@ -156,7 +156,7 @@ describe('findErrorHint — Graph error translation', () => {
     expect(result?.hint).toContain('list-todo-task-lists');
   });
 
-  it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-client.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — follow-up', () => {
+  it('maps the URL-contextualised `ErrorInvalidIdMalformed_mailFolders` (tagged by graph-request.ts when the failing path was `/mailFolders/...`) to a folder-specific hint that mentions the well-known names (inbox, sentitems, …) — follow-up', () => {
     const result = findErrorHint('ErrorInvalidIdMalformed: Id is malformed.', 'ErrorInvalidIdMalformed_mailFolders');
     expect(result?.source).toBe('graph');
     expect(result?.hint).toContain('inbox');

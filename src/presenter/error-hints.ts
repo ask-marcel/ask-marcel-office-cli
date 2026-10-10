@@ -155,7 +155,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
   },
   // ─── Graph: ID malformed / item not found ────────────────────────────────
   // when the failing URL was against
-  // `/mailFolders/`, the infra layer (`contextualizeCode` in graph-client.ts)
+  // `/mailFolders/`, the infra layer (`contextualizeCode` in graph-request.ts)
   // tags the code with `_mailFolders` so the hint can specifically recommend
   // well-known folder names. This rule must run BEFORE the generic
   // `InvalidIdMalformed` rule (rule order is "first match wins").
