@@ -130,14 +130,6 @@ type GraphClient = {
 const SIMPLE_PUT_THRESHOLD = 4 * 1024 * 1024; // 4 MiB
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MiB — Graph requires multiples of 320 KiB; 5 MiB is 16 × 320 KiB
 
-const isJson = (contentType: string | null): boolean => contentType !== null && contentType.toLowerCase().includes('application/json');
-
-const isText = (contentType: string | null): boolean => {
-  if (contentType === null) return false;
-  const lower = contentType.toLowerCase();
-  return lower.startsWith('text/') || lower.includes('+xml') || lower.includes('application/xml') || lower.includes('application/javascript');
-};
-
 // The Teams media service hosts that may receive the IC3 bearer; a chat image
 // URL is read out of message content, so nothing else is trusted with it.
 const TEAMS_MEDIA_HOST = /^[a-z0-9-]+\.(?:asm\.skype\.com|asyncgw\.teams\.microsoft\.com)$/i;
@@ -180,8 +172,6 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
     return ok({ Authorization: `Bearer ${tokenResult.value}` });
   };
   const authHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.graphToken('basic'));
-  const elevatedAuthHeaders = (): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.graphToken('elevated'));
-  const guestAuthHeaders = (tenantId: TenantId): Promise<Result<{ Authorization: string }, GraphError>> => bearer(tokens.guestToken(tenantId));
 
   const core = createGraphRequestCore(tokens, fetchFn);
   const request = (method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<Result<unknown, GraphError>> =>
@@ -260,58 +250,6 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
     }
   };
 
-  const getBinaryWith = async (path: string, signedHeaders: { Authorization: string }): Promise<Result<unknown, GraphError>> => {
-    const url = `https://graph.microsoft.com/v1.0${path}`;
-    try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: signedHeaders,
-        redirect: 'manual',
-        // The byte budget, not the JSON one: `/content` answers a quick 302, but
-        // an attachment's `$value` streams the whole file from Graph itself.
-        signal: AbortSignal.timeout(timeoutMsFor('binary')),
-      });
-      if (res.status >= 300 && res.status < 400) {
-        const location = res.headers.get('location');
-        if (location !== null) return ok({ '@microsoft.graph.downloadUrl': location });
-      }
-      if (!res.ok) return err(await apiErrorFrom(res, url));
-      const contentType = res.headers.get('content-type');
-      if (isJson(contentType)) return ok(await res.json());
-      if (isText(contentType)) {
-        const text = await res.text();
-        // `size` is documented as the byte count of the source. JS strings are
-        // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
-        // with multi-byte chars (any non-ASCII) reported a `size` smaller than
-        // the actual byte count an `--output-path` write produced.
-        // Use the encoded byte length so envelope `size` matches the disk size.
-        return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
-      }
-      const buffer = await res.arrayBuffer();
-      return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${path} (binary)`, 'binary'));
-    }
-  };
-
-  const getBinary = async (path: string): Promise<Result<unknown, GraphError>> => {
-    const headers = await authHeaders();
-    if (!headers.ok) return headers;
-    return getBinaryWith(path, headers.value);
-  };
-
-  const getBinaryElevated = async (path: string): Promise<Result<unknown, GraphError>> => {
-    const headers = await elevatedAuthHeaders();
-    if (!headers.ok) return headers;
-    return getBinaryWith(path, headers.value);
-  };
-
-  const getBinaryGuest = async (path: string, tenantId: TenantId): Promise<Result<unknown, GraphError>> => {
-    const headers = await guestAuthHeaders(tenantId);
-    if (!headers.ok) return headers;
-    return getBinaryWith(path, headers.value);
-  };
-
   /**
    * Ask Entra which tenant owns a SharePoint host, using its public OIDC
    * discovery document. No credentials: the question is "who owns this host?",
@@ -354,42 +292,6 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
       return ok(branded.value);
     } catch (e: unknown) {
       return err(wrapNetworkError(e, 'GET', `tenant discovery for ${spoHost}`, 'json'));
-    }
-  };
-
-  const fetchUrl = async (url: string): Promise<Result<unknown, GraphError>> => {
-    let host: string;
-    try {
-      host = new URL(url).host;
-    } catch {
-      return err({ type: 'network_error', message: `fetchUrl rejected: invalid URL ${url}` });
-    }
-    if (!isAllowedFetchUrlHost(host)) {
-      return err({ type: 'network_error', message: `fetchUrl rejected: host ${host} not in Microsoft allow-list` });
-    }
-
-    try {
-      const res = await fetchFn(url, {
-        method: 'GET',
-        headers: { accept: 'text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8' },
-        signal: AbortSignal.timeout(timeoutMsFor('binary')),
-      });
-      if (!res.ok) return err(await apiErrorFrom(res, url));
-      const contentType = res.headers.get('content-type');
-      if (isJson(contentType)) return ok(await res.json());
-      if (isText(contentType)) {
-        const text = await res.text();
-        // `size` is documented as the byte count of the source. JS strings are
-        // UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a file
-        // with multi-byte chars (any non-ASCII) reported a `size` smaller than
-        // the actual byte count an `--output-path` write produced.
-        // Use the encoded byte length so envelope `size` matches the disk size.
-        return ok({ contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text });
-      }
-      const buffer = await res.arrayBuffer();
-      return ok({ contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) });
-    } catch (e: unknown) {
-      return err(wrapNetworkError(e, 'GET', `${url} (CDN follow)`, 'binary'));
     }
   };
 
@@ -506,10 +408,10 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
     teamsChatMedia,
     post: (path, body) => request('POST', path, body),
     patch: (path, body) => request('PATCH', path, body),
-    getBinary,
-    getBinaryElevated,
-    getBinaryGuest,
-    fetchUrl,
+    getBinary: (path) => core.getBinary('basic', path),
+    getBinaryElevated: (path) => core.getBinary('elevated', path),
+    getBinaryGuest: (path, tenant) => core.getBinary({ guest: tenant }, path),
+    fetchUrl: core.fetchUrl,
     put,
     delete: deleteResource,
   };

@@ -4,7 +4,7 @@ import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
 import type { HttpMethod, TimeoutTier } from './network-error.ts';
-import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor } from './network-error.ts';
+import { REQUEST_TIMEOUT_MS, networkErrorMessage, timeoutLabelFor, timeoutMsFor } from './network-error.ts';
 
 /*
  * The private request core the read graph (read-graph.ts) and the write graph
@@ -48,6 +48,10 @@ type GraphRequestCore = {
   readonly send: (tier: GraphTier, url: string, request: SignedRequest) => Promise<Result<Response, GraphError>>;
   // A JSON request to Graph v1.0: the body read from a success, or the error.
   readonly json: (tier: GraphTier, method: HttpMethod, path: string, request?: JsonRequest) => Promise<Result<unknown, GraphError>>;
+  // A content GET: the redirect target, or the bytes inlined.
+  readonly getBinary: (tier: GraphTier, path: string) => Promise<Result<unknown, GraphError>>;
+  // An unsigned GET of a Microsoft CDN URL.
+  readonly fetchUrl: (url: string) => Promise<Result<unknown, GraphError>>;
 };
 
 const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
@@ -63,6 +67,14 @@ const ALLOWED_FETCH_URL_HOSTS: ReadonlyArray<RegExp> = [
 ];
 
 const isAllowedFetchUrlHost = (host: string): boolean => ALLOWED_FETCH_URL_HOSTS.some((re) => re.test(host));
+
+const isJson = (contentType: string | null): boolean => contentType !== null && contentType.toLowerCase().includes('application/json');
+
+const isText = (contentType: string | null): boolean => {
+  if (contentType === null) return false;
+  const lower = contentType.toLowerCase();
+  return lower.startsWith('text/') || lower.includes('+xml') || lower.includes('application/xml') || lower.includes('application/javascript');
+};
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
@@ -250,7 +262,67 @@ const createGraphRequestCore = (tokens: TokenSource, fetchFn: FetchFn): GraphReq
     }
   };
 
-  return { send, json };
+  // The bytes of a Graph answer: JSON as it is, text with its UTF-8 size, and
+  // anything else base64. `size` is documented as the byte count of the source.
+  // JS strings are UTF-16 — `.length` counts code units, NOT UTF-8 bytes — so a
+  // file with multi-byte chars (any non-ASCII) reported a `size` smaller than
+  // the actual byte count an `--output-path` write produced. Use the encoded
+  // byte length so envelope `size` matches the disk size.
+  const inlined = async (res: Response): Promise<unknown> => {
+    const contentType = res.headers.get('content-type');
+    if (isJson(contentType)) return res.json();
+    if (isText(contentType)) {
+      const text = await res.text();
+      return { contentType: contentType ?? 'text/plain', size: new TextEncoder().encode(text).byteLength, text };
+    }
+    const buffer = await res.arrayBuffer();
+    return { contentType: contentType ?? 'application/octet-stream', size: buffer.byteLength, base64: toBase64(new Uint8Array(buffer)) };
+  };
+
+  const getBinary = async (tier: GraphTier, path: string): Promise<Result<unknown, GraphError>> => {
+    const url = `${GRAPH_ROOT}${path}`;
+    try {
+      // The byte budget, not the JSON one: `/content` answers a quick 302, but
+      // an attachment's `$value` streams the whole file from Graph itself.
+      const sent = await send(tier, url, { method: 'GET', redirect: 'manual', timeoutMs: timeoutMsFor('binary') });
+      if (!sent.ok) return sent;
+      const res = sent.value;
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (location !== null) return ok({ '@microsoft.graph.downloadUrl': location });
+      }
+      if (!res.ok) return err(await apiErrorFrom(res, url));
+      return ok(await inlined(res));
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${path} (binary)`, 'binary'));
+    }
+  };
+
+  const fetchUrl = async (url: string): Promise<Result<unknown, GraphError>> => {
+    let host: string;
+    try {
+      host = new URL(url).host;
+    } catch {
+      return err({ type: 'network_error', message: `fetchUrl rejected: invalid URL ${url}` });
+    }
+    if (!isAllowedFetchUrlHost(host)) {
+      return err({ type: 'network_error', message: `fetchUrl rejected: host ${host} not in Microsoft allow-list` });
+    }
+
+    try {
+      const res = await fetchFn(url, {
+        method: 'GET',
+        headers: { accept: 'text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8' },
+        signal: AbortSignal.timeout(timeoutMsFor('binary')),
+      });
+      if (!res.ok) return err(await apiErrorFrom(res, url));
+      return ok(await inlined(res));
+    } catch (e: unknown) {
+      return err(wrapNetworkError(e, 'GET', `${url} (CDN follow)`, 'binary'));
+    }
+  };
+
+  return { send, json, getBinary, fetchUrl };
 };
 
 export { apiErrorFrom, asAuthFailure, createGraphRequestCore, isAllowedFetchUrlHost, toBase64, wrapNetworkError };
