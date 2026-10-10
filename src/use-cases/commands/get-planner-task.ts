@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ plannerTaskId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/planner/tasks/${p.plannerTaskId}`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Get the metadata of a single Microsoft Planner task (title, assignees, dates, completion).',
   category: 'tasks',
   graphMethod: 'GET',

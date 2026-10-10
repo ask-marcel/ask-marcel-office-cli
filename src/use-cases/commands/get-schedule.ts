@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 
@@ -18,7 +18,7 @@ const schema = z.object({
 // output), so stripping the suffix loses nothing.
 const toGraphDateTime = (iso: string): string => (iso.endsWith('Z') ? iso.slice(0, -1) : iso);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const addresses = parsed.data.schedules
@@ -40,7 +40,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return graph.post('/me/calendar/getSchedule', body);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Get the free/busy availability of one or more people (or meeting rooms) over a time window — the Outlook \"scheduling assistant\" data. Pass a comma-separated list of email addresses; each result carries `availabilityView` (one character per interval: 0 free, 1 tentative, 2 busy, 3 out-of-office, 4 working-elsewhere), the underlying `scheduleItems[]` (busy blocks with start/end and, where the target's calendar permits, subject/location), and the person's `workingHours`. Read-only despite being a POST (the body is a query, nothing is created). Bounds are interpreted as UTC; per-address failures (unknown mailbox, external tenant) surface inside that entry's `error` field rather than failing the whole call.",
   category: 'calendar',

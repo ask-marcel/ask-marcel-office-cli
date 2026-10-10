@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -11,7 +11,7 @@ const { execute, schema } = buildListCommand(
   baseSchema
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: "Return a date-windowed calendar view from another user's primary calendar (shared / delegated access). Recurrences expanded into individual occurrences.",
   category: 'calendar',
   graphMethod: 'GET',

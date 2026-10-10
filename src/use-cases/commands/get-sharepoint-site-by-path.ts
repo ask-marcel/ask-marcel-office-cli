@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({
   hostname: z.string().min(1),
@@ -11,7 +11,7 @@ const schema = z.object({
 });
 const { execute } = buildCommand((p) => `/sites/${p.hostname}:${p.path}`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Resolve a SharePoint site by its hostname + server-relative path. Use this when you have a SharePoint URL (e.g. `https://contoso.sharepoint.com/sites/Marketing`) but no site ID.',
   category: 'sharepoint',
