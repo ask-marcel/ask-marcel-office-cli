@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ plannerPlanId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/planner/plans/${p.plannerPlanId}/details`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Get the details of a Microsoft Planner plan: the names of its labels (`categoryDescriptions`, what `category1` to `category25` in a task's `appliedCategories` stand for) and who the plan is shared with.",
   category: 'tasks',

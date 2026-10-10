@@ -1,19 +1,20 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({ onenotePageId: z.string().min(1) });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return graph.getBinary(`/me/onenote/pages/${parsed.data.onenotePageId}/content`);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get the raw HTML body of a single OneNote page. Returned as a `text/html` payload so the HTML body is available verbatim (text mode prints the body raw; JSON mode wraps it in the standard `{contentType, size, text}` envelope). For markdown output use `get-onenote-page-as-markdown`.',
   category: 'notes',

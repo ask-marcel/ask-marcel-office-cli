@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 
 const schema = z.object({}).extend(selectExpandSchema.shape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData('/me/manager', parsed.data);
@@ -23,7 +23,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return result;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Return the signed-in user's manager (a single `user` resource). When no manager is set in the directory, Graph returns 404 `Request_ResourceNotFound`; this command maps that one specific 404 to `{ ok: true, data: { manager: null, note: '...' } }` so an LLM can distinguish 'no manager' from a permission failure without parsing prose. Use `--select` to slim the response (e.g. `--select id,displayName,mail`).",
   category: 'user',

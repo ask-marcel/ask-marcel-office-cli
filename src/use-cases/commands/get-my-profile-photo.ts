@@ -1,20 +1,21 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { inlineBinary } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 const schema = z.object({}).strict();
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return inlineBinary(graph, '/me/photo/$value');
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Download the signed-in user's profile photo (largest available size), inlined. The CLI follows the Graph 302 → CDN redirect internally so the LLM never has to fetch an external URL.",
   category: 'user',

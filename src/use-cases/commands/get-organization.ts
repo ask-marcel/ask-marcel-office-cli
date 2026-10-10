@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({});
 const { execute, schema } = buildSelectableCommand(() => '/organization', baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Return the tenant's organization metadata — display name, country, verified domains, business phones, technical / security notification contacts, assigned Microsoft 365 SKUs / licensing. Graph wraps the single organization resource under `value[]` (— even though only one tenant exists, the endpoint returns a collection). The full resource is ~57 KB; use `--select` to slim it (e.g. `--select id,displayName,verifiedDomains`).",
   category: 'user',
