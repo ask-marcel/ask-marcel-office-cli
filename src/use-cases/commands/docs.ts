@@ -4,7 +4,6 @@ import type { CommandCategory, Command, CommandMeta } from './command-types.ts';
 import type { CommandManifest, CommandManifestEntry } from './docs-render.ts';
 import { CATEGORY_LABELS, renderCommandMarkdown } from './docs-render.ts';
 import { firstSentence } from './first-sentence.ts';
-import { lookupScopes } from './graph-scopes.ts';
 
 export type DocsError = { type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
 
@@ -40,10 +39,9 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
   // the manifest field always populated on paginated commands so LLM
   // consumers don't need to read prose to learn the cursor mechanism.
   const paginationStrategy = cmd.meta.paginationStrategy ?? (cmd.meta.pagination ? 'nextLink' : undefined);
-  // scopesRequired now comes from a central map by
-  // default (`graph-scopes.ts`). Per-command inline overrides win so that
-  // future commands with non-standard scope needs can declare them locally.
-  const scopesRequired = cmd.meta.scopesRequired ?? lookupScopes(name);
+  // Each command declares its own scopes (the central graph-scopes.ts map was
+  // dissolved into the command files at package-split step 11).
+  const scopesRequired = cmd.meta.scopesRequired;
   return {
     name,
     summary: cmd.meta.summary,

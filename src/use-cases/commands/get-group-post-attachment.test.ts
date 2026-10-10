@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { lookupScopes } from './graph-scopes.ts';
 import { commands } from './index.ts';
 
 const command = commands['get-group-post-attachment'];
@@ -102,6 +101,6 @@ describe('fetching one attachment of a group post', () => {
   it('is a mail command that produces bytes, on the group scope the token already carries', () => {
     expect(command.meta.category).toBe('mail');
     expect(command.meta.producesBytes).toBe(true);
-    expect(lookupScopes('get-group-post-attachment')).toEqual(['Group.Read.All']);
+    expect(command.meta.scopesRequired).toEqual(['Group.Read.All']);
   });
 });

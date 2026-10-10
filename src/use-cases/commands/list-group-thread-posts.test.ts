@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { lookupScopes } from './graph-scopes.ts';
 import { commands } from './index.ts';
 
 // Reached through the registry so the unknown-parameter wrap is under test too.
@@ -68,7 +67,7 @@ describe('reading the posts of a group thread', () => {
 
   it('is a mail command on the group scope the token already carries, with no page cursor to follow', () => {
     expect(command.meta.category).toBe('mail');
-    expect(lookupScopes('list-group-thread-posts')).toEqual(['Group.Read.All']);
+    expect(command.meta.scopesRequired).toEqual(['Group.Read.All']);
     expect(command.meta.pagination).toBeUndefined();
   });
 });

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { lookupScopes } from './graph-scopes.ts';
 import { commands } from './index.ts';
 
 const command = commands['convert-group-post-to-markdown'];
@@ -205,7 +204,7 @@ describe('a group post that cannot be rendered', () => {
   it('is a mail command that produces bytes, on the group scope the token already carries', () => {
     expect(command.meta.category).toBe('mail');
     expect(command.meta.producesBytes).toBe(true);
-    expect(lookupScopes('convert-group-post-to-markdown')).toEqual(['Group.Read.All']);
+    expect(command.meta.scopesRequired).toEqual(['Group.Read.All']);
   });
 });
 

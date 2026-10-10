@@ -100,9 +100,19 @@ type CommandMeta = {
    * Graph permission scopes the endpoint requires. The basic Teams web-client
    * token grants ~30 scopes (run `ask-marcel-office status` to see). Commands
    * with unmet scopes return `403 Forbidden: Missing scope` at the wire. Use
-   * this for pre-flight checks rather than failing on-the-wire. Optional —
-   * populated only on commands where the audit confirmed a scope-failure
-   * path; absent means "should work with the basic Teams token".
+   * this for pre-flight checks rather than failing on-the-wire.
+   *
+   * Source: the Microsoft Graph permissions reference
+   * (https://learn.microsoft.com/en-us/graph/permissions-reference) and the
+   * command's `graphDocsUrl` page. List the LEAST-PRIVILEGED delegated scope
+   * Microsoft documents, unless the token does not carry it: group posts list
+   * `Group.Read.All`, the documented higher alternative the basic token holds,
+   * because no token carries `Group-Conversation.Read.All`. A command that
+   * writes declares the write scope (the PDF converters' `Files.ReadWrite`).
+   * Every command declares it here (the central graph-scopes.ts map was
+   * dissolved into the commands at package-split step 11), except the ones that
+   * call no fixed Graph endpoint: the chat substrate, local files, link parsers,
+   * `next-page` and `microsoft-search-query`. meta.test.ts pins that set.
    */
   readonly scopesRequired?: ReadonlyArray<string>;
   /**

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '../../domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { lookupScopes } from './graph-scopes.ts';
 import { commands } from './index.ts';
 
 const command = commands['list-group-post-attachments'];
@@ -74,6 +73,6 @@ describe('listing the attachments of a group post', () => {
 
   it('is a mail command on the group scope the token already carries', () => {
     expect(command.meta.category).toBe('mail');
-    expect(lookupScopes('list-group-post-attachments')).toEqual(['Group.Read.All']);
+    expect(command.meta.scopesRequired).toEqual(['Group.Read.All']);
   });
 });
