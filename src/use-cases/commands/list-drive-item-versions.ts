@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
@@ -8,7 +8,7 @@ import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/versions`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the historical versions of a OneDrive / SharePoint file (each save creates a new version). Note: each version\'s `id` is a stringified float like `"79.0"` (NOT an integer like `79`) — pass it literally to the `download-drive-item-version` command (it accepts an `original | pdf | markdown` format selector); numeric coercion silently fails because Graph rejects `79` against a path templated for stringified floats.',
   category: 'drive',

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
 // Token: BASIC. `/chats/{id}/members` needs `ChatMember.Read`. Round-8 testing
@@ -28,7 +28,7 @@ const inner = buildPickODataListCommand((p) => `/chats/${p.chatId}/members`, bas
 // chat-id — empty, malformed, or well-formed-but-unknown. Same rewrite
 // shape as round-6's `get-team-channel` fix, but with a chat-id-format hint
 // since chat IDs are particularly fiddly (`19:<thread>@thread.v2`).
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const result = await inner.execute(graph, params);
   if (result.ok) return result;
   if (result.error.type === 'api_error' && /^1:\s*NotFound/i.test(result.error.message)) {
@@ -44,7 +44,7 @@ const execute: Command['execute'] = async (graph, params) => {
 };
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the members of a single Microsoft Teams chat. Graph rejects `$top` / `$orderby` / `$expand` on this endpoint, so the CLI advertises only the subset Graph honours (`--skip`, `--select`, `--filter`).',
   category: 'chats',

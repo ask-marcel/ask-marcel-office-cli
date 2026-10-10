@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { commentsFromBytes } from './document-comments.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -11,7 +12,7 @@ import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
@@ -40,7 +41,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok({ name, ...comments.value });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the comments in a Word, Excel or PowerPoint file on OneDrive / SharePoint as one flat list: who wrote each and when, where it sits (the commented text in a document, the cell as `Sheet!A1` in a workbook, the slide in a deck), what it says, and the people it @-mentions. Covers Word comments and replies, Excel notes and threaded comments, and PowerPoint legacy and modern comments, macro-enabled and template variants included. The legacy copy Excel keeps of each threaded comment is dropped, so every comment appears once. For the comments together with the rest of the side-channel metadata, `download-drive-item-as-markdown` has an include-metadata switch.',
   category: 'drive',

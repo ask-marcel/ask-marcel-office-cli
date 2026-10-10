@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { searchDriveItems } from './drive-item-search.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
@@ -25,7 +25,7 @@ const kqlDateBefore = (since: string): string => new Date(Date.parse(since) - DA
 
 const modifiedAt = (item: unknown): number => Date.parse(String((item as { readonly lastModifiedDateTime?: unknown } | null)?.lastModifiedDateTime));
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { since, query } = parsed.data;
@@ -37,7 +37,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ since, count: value.length, value, note: COVERAGE_NOTE, ...(sweep.value.truncated ? { truncated: true } : {}) });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List every file changed since a date across everything the signed-in user can open — their OneDrive, files shared with them, every SharePoint and Teams library — newest first, in one sweep of the Microsoft Search index (no per-drive walk, nothing stored between runs). Each hit is a driveItem with `lastModifiedDateTime`, `lastModifiedBy`, `webUrl` and the `id` + `parentReference.driveId` pair the download commands take. The index lags behind the newest saves and skips libraries excluded from search, which the answer says in its `note`. Narrow with `--query` (KQL, e.g. `filetype:docx`).',
   category: 'drive',

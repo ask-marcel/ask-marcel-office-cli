@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildElevatedPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 
 // round-6 hypothesized that `/me/chats` would succeed
@@ -24,7 +24,7 @@ const baseSchema = z.object({}).strict();
 const CHATS_ODATA_KEYS = ['top', 'skip', 'select', 'filter'] as const;
 const { execute, schema } = buildElevatedPickODataListCommand(() => '/me/chats', baseSchema, CHATS_ODATA_KEYS, { defaultSelect: DEFAULT_SELECT });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the signed-in user's Microsoft Teams chats (1:1, group, and meeting chats). The CLI ships a slim default `--select=id,topic,chatType,createdDateTime,lastUpdatedDateTime`; pass `--select id,topic,webUrl,...` to widen. Returns chat metadata only — reading chat *messages* needs `Chat.Read*` which neither token grants. Requires the M365ChatClient elevated token captured at login (the basic Teams web client token lacks `Chat.ReadBasic`). Graph rejects `$orderby` and hangs on `$expand` for this endpoint, so the CLI advertises only the subset Graph honours (`--top`, `--skip`, `--select`, `--filter`).",
   category: 'chats',

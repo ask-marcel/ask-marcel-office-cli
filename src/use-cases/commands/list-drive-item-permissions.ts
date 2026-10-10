@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
@@ -8,7 +8,7 @@ import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/permissions`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the sharing permissions on a OneDrive / SharePoint file or folder.',
   category: 'drive',
   graphMethod: 'GET',
