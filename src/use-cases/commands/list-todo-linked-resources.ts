@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ todoTaskListId: z.string().min(1), todoTaskId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/me/todo/lists/${p.todoTaskListId}/tasks/${p.todoTaskId}/linkedResources`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the linked resources (URLs, emails, files) attached to a Microsoft To Do task.',
   category: 'tasks',
   graphMethod: 'GET',

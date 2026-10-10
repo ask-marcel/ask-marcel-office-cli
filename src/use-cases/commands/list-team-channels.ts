@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildFilterSelectListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { filterSelectOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1) });
 const { execute, schema } = buildFilterSelectListCommand((p) => `/teams/${p.teamId}/channels`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the channels (standard, private, shared) inside a single Microsoft Team. Microsoft documents this endpoint as supporting only `$filter` and `$select` — Graph returns `BadRequest` on `$top`, `$skip`, `$orderby`, `$expand`, so the CLI exposes only the two flags that actually work.',
   category: 'teams',

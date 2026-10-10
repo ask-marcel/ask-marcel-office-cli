@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 // Microsoft Teams chat substrate, paginated chat-list endpoint
@@ -27,7 +27,7 @@ const schema = z.object({
 
 const QUERY_BASE = 'enableMembershipSummary=true&supportsAdditionalSystemGeneratedFolders=true&supportsSliceItems=true&enableEngageCommunities=false';
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const pageSize = parsed.data.pageSize ?? '100';
@@ -36,7 +36,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return graph.teamsChat(`/api/v3/teams/users/me/chats?${qs.toString()}&${QUERY_BASE}`);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the signed-in user's Microsoft Teams chats with the last message body inlined per chat. Uses the chatsvcagg-audience bearer captured at login. Paginated via `continuationToken` (default page size 100; pass the response's `continuationToken` back as `--continuation-token` while `hasMoreData: true`). **Best-effort, may break on Microsoft client updates**: the chat substrate is not part of the public Microsoft Graph API; Microsoft can change route shapes without notice. Caller Graph scopes do NOT matter here; the substrate server gates access on the appid + identity, not on Graph scopes. Members come back as display names only; for their `email` and `userId`, read `list-chat-members` for that chat on the basic token.",
   category: 'chats',

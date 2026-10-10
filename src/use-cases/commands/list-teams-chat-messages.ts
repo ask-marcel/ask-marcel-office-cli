@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople, type SubstrateMessage } from './substrate-message.ts';
 
@@ -26,7 +26,7 @@ const schema = z.object({
 
 type Envelope = { readonly messages?: ReadonlyArray<SubstrateMessage> } & Record<string, unknown>;
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId } = parsed.data;
@@ -41,7 +41,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok({ ...body, messages: kept, ...(kept.length === messages.length ? {} : { omitted: messages.length - kept.length }) });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the most recent messages in a single Microsoft Teams chat via the chat substrate. Companion to `list-teams-chats-with-messages` when the inlined `lastMessage` isn't deep enough. Uses the chatsvcagg-audience bearer captured at login. **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. **No pagination**: the route caps at the 200 most recent messages per chat and the CLI cannot reach older history (Teams web itself uses WebSockets for scrollback, and the official `Chat.Read` Graph scope that would enable paginated reads is outside the appid's scope ceiling). Each message carries `webUrl`, `event` for a system entry, and, when it has any, `files` (name, type, `url` and `shareUrl`, either of which `resolve-drive-share-link` turns into drive ids) and `reactions` (type, who, when, oldest first).",
   category: 'chats',

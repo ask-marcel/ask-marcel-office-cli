@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ teamId: z.string().min(1) });
 // `$expand=teamsAppDefinition` is hard-pinned because the bare endpoint
@@ -11,7 +11,7 @@ const schema = z.object({ teamId: z.string().min(1) });
 // allowed`) so they remain unexposed.
 const { execute } = buildCommand((p) => `/teams/${p.teamId}/installedApps?$expand=teamsAppDefinition`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the Teams apps installed in a team. The CLI hard-pins `$expand=teamsAppDefinition` so every entry includes `displayName`, `version`, and `distributionMethod` (the bare endpoint returns only opaque IDs). Useful for surfacing which integrations are wired into a given team. Graph rejects user-supplied OData query parameters on this endpoint (`Query option 'Top' is not allowed`) — so the standard OData flags are intentionally NOT exposed here. The response itself is still server-paginated via `@odata.nextLink` when the team has many installed apps; chain with `next-page` to walk subsequent pages.",
   category: 'teams',

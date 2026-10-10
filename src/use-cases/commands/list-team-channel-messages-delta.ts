@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
 import { CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -13,10 +13,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 const sinceFilter = (since: string | undefined): string => (since === undefined ? '' : `?$filter=lastModifiedDateTime%20gt%20${since}`);
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages/delta${sinceFilter(p.since)}`, baseSchema, ['top', 'expand']);
 
-const execute: Command['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
+const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Track what changed in a single channel of a Microsoft Team: the first call returns the root posts (created, edited or replied to, since a fresh reply updates its root) plus `@odata.nextLink` while paging and `@odata.deltaLink` on the final page; feed either to `next-page`, and keep the deltaLink to ask later for only what changed since. Without `--since` the first sync walks the whole channel history; `--since` (an ISO instant or a relative date such as `7d`) bounds it on `lastModifiedDateTime`, the one filter Graph accepts here. Root posts only: pass `--expand replies` to inline each post's replies. `--top` pages up to 50 at a time. Reads through Graph on the basic token; an unknown channel id is named in the error.",
   category: 'teams',

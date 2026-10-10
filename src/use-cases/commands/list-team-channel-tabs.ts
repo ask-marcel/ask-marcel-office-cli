@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildFilterSelectListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { filterSelectOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -14,10 +14,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // has few tabs, so there is no paging to advertise.
 const inner = buildFilterSelectListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/tabs?$expand=teamsApp`, baseSchema);
 
-const execute: Command['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
+const execute: ReadCommand['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the tabs pinned to a single channel of a Microsoft Team, each with its `teamsApp` expanded (the CLI hard-pins `$expand=teamsApp`) so a tab reads as "Planner", "Website" or "SharePoint" and not only as its `displayName`. `webUrl` opens the tab in Teams; `configuration` carries the app\'s own settings (a Planner `planId`, a website `websiteUrl`, a Files folder `contentUrl`). `--filter` narrows server-side (`displayName eq \'Files\'`) and `--select` trims the projection; Graph rejects `$top` here and a channel has few tabs, so there is no paging. An unknown channel id is named in the error instead of the Skype backend failure Graph answers.',
   category: 'teams',

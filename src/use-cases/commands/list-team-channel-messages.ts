@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
 import { CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -11,10 +11,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // `$skip` is undocumented, so paging is the `@odata.nextLink` Graph returns.
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages`, baseSchema, ['top', 'select', 'expand']);
 
-const execute: Command['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
+const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the messages posted in a single channel of a Microsoft Team, newest first, through Microsoft Graph on the basic token (no chat-substrate warm-up, unlike the Teams chat commands): the `chatMessage` resources with the HTML `body.content`, `from.user` (`displayName`, `id`), `createdDateTime`, `messageType` (`message` for a post, `systemEventMessage` for a membership or channel event), `attachments[]` as references (a shared file carries `contentUrl` and `name`), `mentions[]` and `reactions[]`. Each entry is a ROOT post: replies are not inlined unless `--expand replies` is passed, or fetched with `list-team-channel-message-replies`. A deleted message stays in the list with `deletedDateTime` set and an empty body. `--top` pages up to 50 at a time; older history continues through the `next:` footer with `next-page`. Find the ids with `list-joined-teams` then `list-team-channels`; an unknown or malformed channel id is named in the error instead of the bare `UnknownError` Graph answers.',
   category: 'teams',

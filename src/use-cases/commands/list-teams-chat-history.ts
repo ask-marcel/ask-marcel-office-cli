@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople } from './substrate-message.ts';
@@ -103,7 +103,7 @@ const toRelativePath = (absoluteUrl: string): string => {
   return m[1];
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId } = parsed.data;
@@ -159,7 +159,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Deep read of a Microsoft Teams chat's message history via the IC3 substrate (`teams.microsoft.com/api/chatsvc/<region>/v1/...`). Unlike `list-teams-chat-messages` (which caps at the 200 most recent messages with no working pagination cursor), this command follows the server-provided `_metadata.syncState` URL backward through history, fetching up to `--page-size` * `--max-pages` messages per invocation (default 200 * 20 = 4000). Uses the IC3-audience bearer captured at login (same Teams web client identity as the basic Teams token). The CLI ships a slim default projection — each message is reduced to `id, sequenceId, composetime, originalarrivaltime, messagetype, from, imdisplayname, content` (plus `webUrl`, and `event`, `files` and `reactions` when present) and `content` is truncated to 4096 chars (with `truncated: true` and `originalContentChars` set on the affected entries). Pass `--full true` to opt out of projection and truncation; pass `--max-content-chars N` to override the truncation cap. **Best-effort, may break on Microsoft client updates** — the IC3 substrate is not in the public Microsoft Graph API. To page beyond `--max-pages`, take the response's `nextSyncState` and pass it back as `--sync-state` on the next call.",
   category: 'chats',
