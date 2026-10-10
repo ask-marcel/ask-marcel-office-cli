@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectOnlyOptions } from './odata-query.ts';
 
 // Graph's `/me/planner/plans` honors `$select` server-side; every other
@@ -11,7 +11,7 @@ import { selectOnlyOptions } from './odata-query.ts';
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildPickODataListCommand(() => '/me/planner/plans', baseSchema, ['select']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the Microsoft Planner plans shared with the signed-in user. A Microsoft 365 group's plans need not appear here even when the user belongs to the group: list those with `list-group-planner-plans`. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.",
   category: 'tasks',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
@@ -14,7 +14,7 @@ const baseSchema = z.object({}).strict();
 // `build-command.ts` `withDefaultTop`.
 const { execute, schema } = buildListCommand(() => '/me/people', baseSchema, { defaultTop: '10' });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `scoredEmailAddresses`, `jobTitle`, `companyName`, etc.",
   category: 'user',
