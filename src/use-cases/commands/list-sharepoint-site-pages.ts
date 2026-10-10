@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/sites/${p.siteId}/pages`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List modern SharePoint pages on a site (news posts, dashboards, landing pages). Each `sitePage` has `title`, `description`, `webUrl`, `publishingState`, `lastPublishedDateTime`. Returned items are the read-only listing — fetch the page body via the SharePoint REST API or by opening the `webUrl`.',
   category: 'sharepoint',

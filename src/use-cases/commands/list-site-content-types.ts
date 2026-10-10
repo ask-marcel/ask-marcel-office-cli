@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/sites/${p.siteId}/contentTypes`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the content type definitions of a SharePoint site — typed schemas (Document, Page, Item, custom-defined) describing which columns + behaviors apply to items of each type. Useful for understanding a site's information architecture.",
   category: 'sharepoint',

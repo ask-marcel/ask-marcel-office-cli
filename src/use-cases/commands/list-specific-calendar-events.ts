@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ calendarId: z.string().min(1) });
@@ -12,7 +12,7 @@ const isWellKnownDefault = (id: string): boolean => {
 
 const { execute, schema } = buildListCommand((p) => (isWellKnownDefault(p.calendarId) ? '/me/calendar/events' : `/me/calendars/${p.calendarId}/events`), baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the events in a specific calendar (does not expand recurrences). `--calendar-id primary` (or `default`) routes to the signed-in user’s default calendar (`/me/calendar/events`); any other value goes to `/me/calendars/{id}/events` and must be a real calendar ID.',
   category: 'calendar',

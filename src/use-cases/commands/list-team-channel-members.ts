@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildFilterSelectListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { filterSelectOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -9,10 +9,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // and `$filter` work, `$skip` is a 400 and `$top` mis-pages.
 const inner = buildFilterSelectListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/members`, baseSchema);
 
-const execute: Command['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
+const execute: ReadCommand['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the members of a single channel inside a Microsoft Team: the same `conversationMember` entries as `list-team-members` (`displayName`, `email`, `userId`, `roles`), scoped to the channel. On a standard channel this is the whole team; on a private or shared channel it is the channel roster, which `list-team-members` cannot see. `--filter` narrows server-side (owners only with `roles/any(r:r eq 'owner')` on `microsoft.graph.aadUserConversationMember`); only `--filter` and `--select` reach Graph, a large roster continues through the `next:` footer with `next-page`. An unknown channel id is named in the error instead of the bare `1: NotFound` Graph answers.",
   category: 'teams',

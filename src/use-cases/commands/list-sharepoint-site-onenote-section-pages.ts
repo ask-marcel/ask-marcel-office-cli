@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
 
@@ -9,7 +9,7 @@ const inner = buildListCommand((p) => `/sites/${p.siteId}/onenote/sections/${p.o
 const execute = wrapOnenote5kLimit(inner.execute);
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List pages inside one section of a SharePoint-site OneNote notebook.',
   category: 'notes',
   graphMethod: 'GET',

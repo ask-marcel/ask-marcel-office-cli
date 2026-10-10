@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
 import { CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -12,10 +12,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // list is not proof the post exists.
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages/${p.messageId}/replies`, baseSchema, ['top', 'select']);
 
-const execute: Command['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
+const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the replies to one root post in a channel of a Microsoft Team, newest first, through Microsoft Graph on the basic token: the same `chatMessage` shape as `list-team-channel-messages`, each with `replyToId` set to the root post. This is the thread under a post; `list-team-channel-messages` can inline the same replies on every root post of a page instead, through its `expand` option. `--top` pages up to 50 at a time, older replies continue through the `next:` footer with `next-page`. Graph answers an unknown message id with an EMPTY list rather than an error, so an empty result does not prove the post exists: `get-team-channel-message` does.',
   category: 'teams',
