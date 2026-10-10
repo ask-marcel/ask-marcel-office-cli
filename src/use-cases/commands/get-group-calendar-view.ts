@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -10,7 +10,7 @@ const { execute, schema } = buildListCommand(
   baseSchema
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Return a date-windowed calendar view from a unified (Microsoft 365) group's calendar. Recurring events are expanded into individual occurrences across the window. Only Microsoft 365 groups have a calendar — security and distribution groups return `MailboxNotEnabledForRESTAPI`.",
   category: 'calendar',

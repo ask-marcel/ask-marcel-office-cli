@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 
 const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1) }).extend(selectExpandSchema.shape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/messages/${parsed.data.messageId}/attachments/${parsed.data.attachmentId}`, parsed.data);
@@ -27,7 +27,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok(v);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get a single attachment on an Outlook message (metadata, plus the base64 `contentBytes` for file attachments). For fileAttachments, the response also carries a `base64` mirror of `contentBytes` so the global output-path flag can land the bytes on disk in one call — and when an output-path is set the CLI strips BOTH `contentBytes` and `base64` from stdout, leaving a compact metadata envelope with `savedTo` (the file is on disk; no multi-MB base64 in the terminal). When you only want metadata, use `--select id,name,contentType,size` to skip the `contentBytes` payload.',
   category: 'mail',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { mapWacError } from './excel-error.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -42,7 +42,7 @@ type WorkbookRange = {
   readonly formulas?: ReadonlyArray<ReadonlyArray<unknown>>;
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId, worksheetId } = parsed.data;
@@ -80,7 +80,7 @@ const execute: Command['execute'] = async (graph, params) => {
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return the worksheet\'s used range — the bounding box of every non-empty cell — as a single Excel range. The CLI ships a slim default that strips the redundant `text` / `numberFormat` / `formulas` 2D arrays Graph returns (mostly `"General"` repeated cell-by-cell), keeping `address` / `rowCount` / `columnCount` / `values`. Pass `--full true` to return the raw four-array Graph shape. `--max-cells` (default 50 000) caps the size of the projected `values[]`; oversize ranges drop `values` and surface a hint pointing at `get-excel-range` for band-by-band reads. Avoids fetching the entire 1M × 16K-cell sheet when only a small data island is populated.',
   category: 'excel',

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, fetchInlineImageBytes, formatBytes, isInlineImage } from './convert-mail-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { embedInlineImages } from './inline-image-embedder.ts';
@@ -32,7 +33,7 @@ type InlineResult = { readonly html: string; readonly count: number; readonly no
  * `[inline image: logo]` would destroy the reference the caller could still
  * resolve. Anything not embedded keeps its cid: and is named in the note.
  */
-const inlineSignatureImages = async (graph: GraphClient, messageId: string, block: string): Promise<InlineResult> => {
+const inlineSignatureImages = async (graph: ReadGraph, messageId: string, block: string): Promise<InlineResult> => {
   const listed = await graph.get(`/me/messages/${messageId}/attachments?${ATTACHMENT_METADATA_SELECT}`);
   if (!listed.ok) return { html: block, count: 0, note: 'inline images could not be listed, so any cid: references are unresolved' };
   const parsed = attachmentsListSchema.safeParse(listed.value);
@@ -75,7 +76,7 @@ const buildEnvelope = (messageId: string, block: string, sentDateTime: string | 
   ...(inlined.note === undefined ? {} : { note: inlined.note }),
 });
 
-const readCandidates = async (graph: GraphClient, messageId: string | undefined): Promise<Result<ReadonlyArray<string>, GraphError>> => {
+const readCandidates = async (graph: ReadGraph, messageId: string | undefined): Promise<Result<ReadonlyArray<string>, GraphError>> => {
   if (messageId !== undefined) return ok([messageId]);
   const listed = await graph.get(SENT_SCAN_PATH);
   if (!listed.ok) return listed;
@@ -90,7 +91,7 @@ const readCandidates = async (graph: GraphClient, messageId: string | undefined)
   return ok(ids);
 };
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId } = parsed.data;
@@ -114,7 +115,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return err(noSignatureFound(messageId, candidates.value.length));
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Read your own email signature as HTML, lifted from a message you already sent. Graph-created drafts carry NO signature (create-mail-draft, create-reply-draft, and create-forward-draft all produce unsigned bodies), so this is where you get one: take the `text` this returns, append it to your reply text, and hand the result to `update-mail-draft` in comment mode (HTML body-content-type) to place it above the quoted history. Scans your last 10 sent messages newest-first and returns the first `<div id="Signature">` block it finds, stopping there, with any logo the block references embedded as a base64 data: URI so the HTML renders on its own. Read-only. NOTE: the marker is written by Outlook on the web and new Outlook; mail composed in Outlook desktop does not carry it, so pin a webmail-sent message with --message-id if the scan finds nothing.',
   category: 'mail',

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ mailFolderId: z.string().min(1).default('inbox'), messageRuleId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/me/mailFolders/${p.mailFolderId}/messageRules/${p.messageRuleId}`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return a single Outlook message rule by ID, including its conditions and actions. Sibling to `list-mail-rules`. `--mail-folder-id` defaults to `inbox` (the only folder where rules actually live in Graph); the flag is preserved for callers that want to pass a resolved Inbox ID explicitly.',
   category: 'mail',

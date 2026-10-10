@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1), threadId: z.string().min(1), postId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/groups/${p.groupId}/threads/${p.threadId}/posts/${p.postId}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get a single post of a unified (Microsoft 365) group thread by ID, the sibling of `get-mail-message` for a group inbox: the full `post` resource including the HTML `body`. `--select` trims the projection. `--expand attachments` returns every attachment inline with its base64 `contentBytes`, which is convenient for a small post and the wrong shape for one carrying a multi-MB file: list them with `list-group-post-attachments` and fetch one with `get-group-post-attachment` instead. Post IDs come from `list-group-thread-posts`; use `convert-group-post-to-markdown` for a readable rendering.',
   category: 'mail',
