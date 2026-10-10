@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/teams/${p.teamId}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get the metadata of a single Microsoft Team (display name, settings, member-settings, owner group). Pass `--select displayName,description,visibility` to slim the response.',
   category: 'teams',

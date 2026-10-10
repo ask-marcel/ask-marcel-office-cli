@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { pickODataOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -10,10 +10,10 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // `list-team-channel-message-replies`.
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages/${p.messageId}`, baseSchema, ['select']);
 
-const execute: Command['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
+const execute: ReadCommand['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get a single message posted in a channel of a Microsoft Team by its id, through Microsoft Graph on the basic token: the full `chatMessage` with the HTML `body.content`, `from.user`, `createdDateTime`, `attachments[]`, `mentions[]` and `reactions[]`. `--select` trims the projection (`id,from,body`). Its replies are a separate read, `list-team-channel-message-replies`; a reply itself is fetched by its own id the same way, with `replyToId` naming the root post. An unknown message id is named in the error: Graph answers it with `403 Forbidden: UnknownError`, which is not a scope failure.',
   category: 'teams',

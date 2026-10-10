@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ calendarId: z.string().min(1), eventId: z.string().min(1) });
@@ -15,7 +15,7 @@ const { execute, schema } = buildSelectableCommand(
   baseSchema
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Fetch a single calendar event by ID from a specific calendar. `--calendar-id primary` (or `default`) targets the signed-in user's default calendar. Use `--select` to slim large event payloads (a typical event with body+attendees runs >50 KB).",
   category: 'calendar',

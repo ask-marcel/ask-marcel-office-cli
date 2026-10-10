@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { enrichSubstrateMessage, type SubstrateMessage } from './substrate-message.ts';
 
@@ -9,7 +9,7 @@ const schema = z.object({
   messageId: z.string().min(1),
 });
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { chatId, messageId } = parsed.data;
@@ -18,7 +18,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return ok(enrichSubstrateMessage(chatId, fetched.value as SubstrateMessage));
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return a single Microsoft Teams chat message by its id via the chat substrate. Uses the chatsvcagg-audience bearer captured at login (same identity as the basic Teams token, different audience). **Best-effort, may break on Microsoft client updates** — the chat substrate is not in the public Microsoft Graph API. Source the chat-id + message-id via `list-teams-chats-with-messages` or `list-teams-chat-messages`.',
   category: 'chats',

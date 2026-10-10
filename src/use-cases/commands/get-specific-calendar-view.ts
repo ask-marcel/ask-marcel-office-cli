@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -23,7 +23,7 @@ const { execute, schema } = buildListCommand(
   baseSchema
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the events in a specific calendar with recurrence expanded into individual occurrences in a date range. Both ISO date-time params are required by Graph. `--calendar-id primary` (or `default`) routes to the signed-in user’s default calendar.',
   category: 'calendar',

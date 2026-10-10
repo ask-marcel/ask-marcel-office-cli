@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/sites/${p.siteId}`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'Get the metadata of a single SharePoint site by its site ID.',
   category: 'sharepoint',
   graphMethod: 'GET',

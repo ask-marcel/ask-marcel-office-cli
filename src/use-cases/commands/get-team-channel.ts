@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -11,10 +11,10 @@ const inner = buildSelectableCommand((p) => `/teams/${p.teamId}/channels/${p.cha
 // `1:` prefix is the Teams thread-id segment, unhelpfully echoed). The
 // sibling `get-team` returns a clear `BadRequest: teamId needs to be a
 // valid GUID.` The rewrite is shared with every channel-scoped command.
-const execute: Command['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
+const execute: ReadCommand['execute'] = async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params));
 const { schema } = inner;
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get the metadata of a single channel inside a Microsoft Team. Use `--select` to slim the response (e.g. `--select id,displayName,webUrl`) — sibling to `get-team` and `get-team-primary-channel` which both expose the same flag.',
   category: 'teams',

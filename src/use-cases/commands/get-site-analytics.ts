@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ siteId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/sites/${p.siteId}/analytics`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return view / activity analytics for a SharePoint site — `allTime` totals (visits, viewers) and `lastSevenDays` rollup. Site-level parallel to `get-drive-item-analytics`. Useful for ranking sites by attention or detecting stale workspaces. **Known empty case**: returns `{ allTime: null, lastSevenDays: null }` even on active sites when the calling identity (the Teams web client basic token) lacks the analytics scope. Do not interpret nulls as "no activity" — interpret as "not available for this caller".',
   category: 'sharepoint',

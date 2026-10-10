@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
@@ -14,7 +14,7 @@ import { withTaskLinks } from './todo-web-url.ts';
 // RequestBroker--ParseUri quirk — rewrite it via the shared helper.
 const schema = z.object({ todoTaskListId: z.string().min(1), todoTaskId: z.string().min(1) }).extend(selectExpandSchema.shape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/me/todo/lists/${parsed.data.todoTaskListId}/tasks/${parsed.data.todoTaskId}`, parsed.data);
@@ -24,7 +24,7 @@ const execute: Command['execute'] = async (graph, params) => {
   return rewritten ? err(rewritten) : result;
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Get a single Microsoft To Do task by its ID and its parent list ID. Use `--select` to slim the response (e.g. `--select id,status`) or `--expand checklistItems` / `--expand linkedResources` to inline child collections. Known Graph quirk: any `--select` combo that includes `title` trips `RequestBroker--ParseUri` on this endpoint; the CLI rewrites that opaque error to a hint.',
   category: 'tasks',
