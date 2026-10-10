@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { INCLUDE_HIDDEN_FOLDERS_OPTION } from './include-hidden-folders.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
@@ -12,7 +12,7 @@ const { execute, schema } = buildListCommand(
   baseSchema
 );
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the subfolders of one mail folder in a shared or delegated mailbox. The `/me` sibling is `list-mail-child-folders`. Walk it from the folder IDs `list-shared-mailbox-folders` returns to reach nested custom folders. Requires the delegated `Mail.Read.Shared` scope, which neither token this CLI can mint carries (verified live on two tenants, 2026-08-30), so any mailbox other than the signed-in user's own is expected to answer `ErrorAccessDenied` whatever delegation Exchange holds. Your own UPN works; a Microsoft 365 group's mailbox is the shared-mail path that does (`list-group-conversations`, `list-group-thread-posts`).",
   category: 'mail',

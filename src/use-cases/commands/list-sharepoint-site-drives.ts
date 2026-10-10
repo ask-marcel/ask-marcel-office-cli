@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildNoSkipListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { noSkipOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/sites/${p.siteId}/drives`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the document libraries (drives) attached to a SharePoint site.',
   category: 'sharepoint',
   graphMethod: 'GET',

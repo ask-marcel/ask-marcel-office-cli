@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildSelectableCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectExpandOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1), listId: z.string().min(1) });
 const { execute, schema } = buildSelectableCommand((p) => `/sites/${p.siteId}/lists/${p.listId}/columns`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the column definitions (schema) of a SharePoint list. Useful before reading list items so you know which fields exist and their types. Note: Graph silently ignores `$top` and `$skip` on this endpoint, so the CLI exposes only `--select` and `--expand`.',
   category: 'sharepoint',

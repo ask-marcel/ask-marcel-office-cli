@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { appendOData, noSkipOptions, noSkipShape } from './odata-query.ts';
 
@@ -10,14 +10,14 @@ import { appendOData, noSkipOptions, noSkipShape } from './odata-query.ts';
 // pagination still works through nextLink → next-page.
 const schema = z.object({ siteId: z.string().min(1) }).extend(noSkipShape);
 
-const execute: Command['execute'] = async (graph, params) => {
+const execute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const path = appendOData(`/sites/${parsed.data.siteId}/lists`, parsed.data);
   return graph.get(path);
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List all SharePoint lists (custom + built-in document libraries) on a site. Note: the skip flag is intentionally omitted — Graph rejects $skip on this endpoint with invalidRequest. Paginate via the top-level `nextLink` → `next-page`. Heads-up: when `top` is small, the FIRST page may legitimately be empty (`value: []`) while still carrying a `nextLink` — Graph filters server-side after slicing. Always check `nextLink` before concluding "no lists".',
   category: 'sharepoint',
