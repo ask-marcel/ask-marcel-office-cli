@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command } from './command-types.ts';
+import type { ReadCommand } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { routeGet } from './tenant-option.ts';
 import {
@@ -53,8 +53,8 @@ const withDefaultTop = <T extends { readonly top?: string }>(data: T, defaultTop
   return { ...data, top: defaultTop };
 };
 
-const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
-  const execute: Command['execute'] = async (graph, params) => {
+const buildCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<ReadCommand, 'schema' | 'execute'> => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = parsed.data as Record<string, string>;
@@ -63,8 +63,8 @@ const buildCommand = (pathFn: (params: Record<string, string>) => string, schema
   return { schema, execute };
 };
 
-const buildElevatedCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<Command, 'schema' | 'execute'> => {
-  const execute: Command['execute'] = async (graph, params) => {
+const buildElevatedCommand = (pathFn: (params: Record<string, string>) => string, schema: z.ZodType): Pick<ReadCommand, 'schema' | 'execute'> => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const path = pathFn(parsed.data as Record<string, string>);
@@ -77,9 +77,9 @@ const buildListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: ListDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(odataQuerySchema.shape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const selected = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
@@ -94,9 +94,9 @@ const buildElevatedListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(odataQuerySchema.shape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & ODataQueryParams, options?.defaultSelect);
@@ -118,9 +118,9 @@ const buildSelectableCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(selectExpandSchema.shape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams, options?.defaultSelect);
@@ -142,9 +142,9 @@ const buildElevatedSelectableCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(selectExpandSchema.shape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & SelectExpandParams, options?.defaultSelect);
@@ -164,9 +164,9 @@ const buildFilterSelectListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(filterSelectSchema.shape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & FilterSelectParams, options?.defaultSelect);
@@ -187,9 +187,9 @@ const buildNoSkipListCommand = <Shape extends z.ZodRawShape>(
   pathFn: (params: z.infer<z.ZodObject<Shape>>) => string,
   schema: z.ZodObject<Shape>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(noSkipShape);
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as z.infer<z.ZodObject<Shape>> & NoSkipParams, options?.defaultSelect);
@@ -212,9 +212,9 @@ const buildPickODataListCommand = <Shape extends z.ZodRawShape, K extends ODataK
   schema: z.ZodObject<Shape>,
   keys: ReadonlyArray<K>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(pickODataShape(keys));
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as { readonly select?: string } & Record<string, unknown>, options?.defaultSelect);
@@ -235,9 +235,9 @@ const buildElevatedPickODataListCommand = <Shape extends z.ZodRawShape, K extend
   schema: z.ZodObject<Shape>,
   keys: ReadonlyArray<K>,
   options?: SelectDefaults
-): Pick<Command, 'schema' | 'execute'> => {
+): Pick<ReadCommand, 'schema' | 'execute'> => {
   const merged = schema.extend(pickODataShape(keys));
-  const execute: Command['execute'] = async (graph, params) => {
+  const execute: ReadCommand['execute'] = async (graph, params) => {
     const parsed = merged.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const data = withDefaultSelect(parsed.data as { readonly select?: string } & Record<string, unknown>, options?.defaultSelect);

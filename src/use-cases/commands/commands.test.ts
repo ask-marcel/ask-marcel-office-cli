@@ -22,6 +22,7 @@ import {
 } from '../../test-helpers/office-fixtures.ts';
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import type { CommandExecute } from './command-types.ts';
 import { renderSingleCommand } from './docs.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -202,7 +203,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const cmdMap: Record<string, { execute: typeof listDrives.execute }> = {
+const cmdMap: Record<string, { execute: CommandExecute }> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
@@ -3346,7 +3347,7 @@ describe('commands', () => {
   // --- mutation hardening: unconditional error assertions (the `if (error.type === ...)`
   // guards above let type/object/message mutants survive — LESSONS.md), the full
   // IMAGE_EXTENSIONS set, and safeExtension's temp-filename extension via the PUT path. ---
-  const pdfCmd = (): { execute: typeof listDrives.execute } => {
+  const pdfCmd = (): { execute: CommandExecute } => {
     const c = cmdMap['convert-mail-attachment-to-pdf'];
     if (!c) throw new Error('convert-mail-attachment-to-pdf not registered');
     return c;
