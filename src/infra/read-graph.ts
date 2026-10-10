@@ -202,5 +202,27 @@ const createReadGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fetc
   };
 };
 
-export { createReadGraph, READ_ONLY_POST_PATHS };
+/**
+ * The read graph inside any graph, the single package's full client included:
+ * its read members only, with the POST check in front. The command registry
+ * gives every read command this view, so no read command holds a member that
+ * writes, whichever graph its caller passed. Each member calls the graph's own
+ * member on the graph, so a caller's graph whose methods read `this` still works.
+ */
+const readGraphOf = (graph: ReadGraph): ReadGraph => ({
+  get: (path, extraHeaders) => graph.get(path, extraHeaders),
+  getElevated: (path) => graph.getElevated(path),
+  getGuest: (path, tenant) => graph.getGuest(path, tenant),
+  getBinaryGuest: (path, tenant) => graph.getBinaryGuest(path, tenant),
+  discoverTenantId: (spoHost) => graph.discoverTenantId(spoHost),
+  teamsChat: (path) => graph.teamsChat(path),
+  teamsChatIc3: (path) => graph.teamsChatIc3(path),
+  teamsChatMedia: (url) => graph.teamsChatMedia(url),
+  post: (path, body) => postIfReadOnly((readOnly, query) => graph.post(readOnly, query), path, body),
+  getBinary: (path) => graph.getBinary(path),
+  getBinaryElevated: (path) => graph.getBinaryElevated(path),
+  fetchUrl: (url) => graph.fetchUrl(url),
+});
+
+export { createReadGraph, READ_ONLY_POST_PATHS, readGraphOf };
 export type { ReadGraph, ReadOnlyPostPath };

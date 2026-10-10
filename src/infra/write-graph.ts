@@ -153,5 +153,22 @@ const createWriteGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fet
   };
 };
 
-export { createWriteGraph };
+/**
+ * The write graph inside any graph, the single package's full client included:
+ * its basic-tier members only. The command registry gives every write command
+ * this view, so no write command holds an elevated, guest or chat reader. Each
+ * member calls the graph's own member on the graph, so a caller's graph whose
+ * methods read `this` still works.
+ */
+const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
+  get: (path, extraHeaders) => graph.get(path, extraHeaders),
+  getBinary: (path) => graph.getBinary(path),
+  fetchUrl: (url) => graph.fetchUrl(url),
+  post: (path, body) => graph.post(path, body),
+  patch: (path, body) => graph.patch(path, body),
+  put: (basePath, body, contentType) => graph.put(basePath, body, contentType),
+  delete: (path) => graph.delete(path),
+});
+
+export { createWriteGraph, writeGraphOf };
 export type { WriteGraph };

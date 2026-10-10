@@ -4,7 +4,8 @@ import { ok } from '../domain/result.ts';
 import type { TeamsRegion } from '../domain/teams-region.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn } from './graph-request.ts';
-import { createWriteGraph } from './write-graph.ts';
+import { createReadGraph } from './read-graph.ts';
+import { createWriteGraph, writeGraphOf } from './write-graph.ts';
 
 /*
  * The write graph: basic tier only, the members the write commands use. A
@@ -51,6 +52,56 @@ describe('the write graph', () => {
 
   it('holds only the basic-tier members the write commands use', () => {
     expect(Object.keys(writeGraphAnswering(Response.json({}))).toSorted((a, b) => a.localeCompare(b))).toEqual(WRITE_GRAPH_MEMBERS);
+  });
+});
+
+describe('the write view of a graph that can also read every tier', () => {
+  it('keeps only the write graph members, so a write command never holds an elevated, guest or chat reader', () => {
+    const full = { ...createReadGraph(tokens, answering(Response.json({}))), ...writeGraphAnswering(Response.json({})) };
+    expect(Object.keys(writeGraphOf(full)).toSorted((a, b) => a.localeCompare(b))).toEqual(WRITE_GRAPH_MEMBERS);
+  });
+
+  it("sends each write and read to the graph's own member of that name, on a caller's graph whose members are methods that read `this`", async () => {
+    const graph = {
+      calls: [] as string[],
+      async get(path: string) {
+        this.calls.push(`get ${path}`);
+        return ok({});
+      },
+      async getBinary(path: string) {
+        this.calls.push(`getBinary ${path}`);
+        return ok({});
+      },
+      async fetchUrl(url: string) {
+        this.calls.push(`fetchUrl ${url}`);
+        return ok({});
+      },
+      async post(path: string) {
+        this.calls.push(`post ${path}`);
+        return ok({});
+      },
+      async patch(path: string) {
+        this.calls.push(`patch ${path}`);
+        return ok({});
+      },
+      async put(path: string) {
+        this.calls.push(`put ${path}`);
+        return ok({});
+      },
+      async delete(path: string) {
+        this.calls.push(`delete ${path}`);
+        return ok(undefined);
+      },
+    };
+    const view = writeGraphOf(graph);
+    await view.get('/1');
+    await view.getBinary('/2');
+    await view.fetchUrl('https://3');
+    await view.post('/4', {});
+    await view.patch('/5', {});
+    await view.put('/6', new Uint8Array(1));
+    await view.delete('/7');
+    expect(graph.calls).toEqual(['get /1', 'getBinary /2', 'fetchUrl https://3', 'post /4', 'patch /5', 'put /6', 'delete /7']);
   });
 });
 
