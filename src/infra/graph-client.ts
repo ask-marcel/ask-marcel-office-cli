@@ -1,4 +1,5 @@
 import type { AuthManager } from '../infra/auth.ts';
+import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import type { FetchFn, GraphError } from './graph-request.ts';
@@ -24,7 +25,10 @@ const createTokenSourceGraphClient = (tokens: TokenSource, fetchFn: FetchFn = gl
 });
 
 // The default: the in-process auth ladder, or a library caller's own manager.
-const createGraphClient = (auth: AuthManager, fetchFn: FetchFn = globalThis.fetch): GraphClient => createTokenSourceGraphClient(createAuthManagerTokenSource(auth), fetchFn);
+// A ladder that also issues tokens (the one `createAuthManager` builds) replays
+// a refused basic or guest token through its issuer.
+const createGraphClient = (auth: AuthManager & Partial<Pick<TokenIssuer, 'issueToken'>>, fetchFn: FetchFn = globalThis.fetch): GraphClient =>
+  createTokenSourceGraphClient(createAuthManagerTokenSource(auth), fetchFn);
 
 export { createGraphClient, createTokenSourceGraphClient };
 export type { FetchFn, GraphClient, GraphError };
