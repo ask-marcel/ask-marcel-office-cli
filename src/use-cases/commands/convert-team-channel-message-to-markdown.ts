@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import { type ChannelMessage } from './channel-message-html.ts';
 import { fetchHostedImages, hostedImageSources } from './channel-message-images.ts';
 import { renderThread } from './channel-message-markdown.ts';
 import { markdownEnvelope, relativeGraphPath } from './channel-message-page.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
@@ -26,7 +27,7 @@ type RepliesRead = { readonly replies: ReadonlyArray<ChannelMessage>; readonly n
 // cut with a note rather than walked forever. A failed page leaves the post
 // rendered on its own, said in the note, the way the mail renderer survives a
 // failed attachments list.
-const readReplies = async (graph: GraphClient, messagePath: string): Promise<RepliesRead> => {
+const readReplies = async (graph: ReadGraph, messagePath: string): Promise<RepliesRead> => {
   const replies: ChannelMessage[] = [];
   let path: string | undefined = `${messagePath}/replies?$top=${REPLIES_PAGE}`;
   let pages = 0;
@@ -42,7 +43,7 @@ const readReplies = async (graph: GraphClient, messagePath: string): Promise<Rep
   return { replies, notes: [] };
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { teamId, channelId, messageId } = parsed.data;
@@ -56,7 +57,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok(markdownEnvelope(renderThread(root, replies, images, inline), notes));
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Render one post of a Microsoft Teams channel and the replies under it as a markdown thread, the way `convert-group-post-to-markdown` renders a group post: a `### date time · author` heading (`· high importance` when flagged), the subject in bold when the post has one, the body converted from Teams HTML with @mentions flattened to their text, attachment placeholders resolved to `[name](url)` links, `[meeting: …]`, `[tab: …]` or `[card: …]` summaries, then each reply as a quoted block, oldest first, with `_(edited)_`, `_message deleted_` and `_reactions: 👍 2_` markers, then `_reacted: …_` naming who reacted and when, oldest first (a reactor Graph leaves unnamed is named from the posts in the same read, else `user <id>`). Replies are read fifty at a time up to ten pages. Pasted images live in Graph `hostedContents` and are shown as a placeholder unless `--inline-images true` fetches and embeds them (image/*, 2 MB or less). Reads through Graph on the basic token; an unknown message id is named in the error rather than surfacing the `403 UnknownError` Graph answers.',
   category: 'teams',

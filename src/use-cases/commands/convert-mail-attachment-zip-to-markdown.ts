@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
@@ -27,7 +28,7 @@ const schema = z.object({
   keepQuoted: keepQuotedSchemaField,
 });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
@@ -52,7 +53,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Unzip a `.zip` Outlook mail attachment and convert every contained file in one call — the mail-side mirror of `convert-drive-item-zip-to-markdown`, so reading a zipped vendor deck doesn't need `get-mail-attachment` + manual `unzip` + per-file conversion. Pulls the fileAttachment bytes, unzips them (legacy GBK / CP437 entry names — Chinese vendor archives written by WinRAR / Windows Explorer — are decoded correctly, not mojibaked), and runs each file through the local pipelines: Office files (docx/xlsx/pptx/odt/ods/odp and macro-enabled / template variants) → markdown; plain-text entries decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) extracted; an inner Outlook .msg or raw .eml rendered; PDFs have their text layer extracted; images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file's side-channel metadata block. Capped at 100 entries; beyond that the response is flagged `truncated`. itemAttachment / referenceAttachment are rejected (no inline zip payload).",
   category: 'mail',

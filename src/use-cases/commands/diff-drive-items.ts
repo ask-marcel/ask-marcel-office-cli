@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { diffEnvelope, readDriveFile, renderSide } from './drive-item-diff.ts';
 import type { Render, RenderOptions } from './drive-item-diff.ts';
 import { formatZodError } from './format-zod-error.ts';
@@ -19,7 +20,7 @@ const schema = z.object({
   sheet: z.string().min(1).optional(),
 });
 
-const renderFile = async (graph: GraphClient, driveId: string, itemId: string, opts: RenderOptions): Promise<Result<{ name: string; render: Render }, GraphError>> => {
+const renderFile = async (graph: ReadGraph, driveId: string, itemId: string, opts: RenderOptions): Promise<Result<{ name: string; render: Render }, GraphError>> => {
   const file = await readDriveFile(graph, driveId, itemId);
   if (!file.ok) return file;
   const render = await renderSide(graph, file.value, `/drives/${driveId}/items/${itemId}/content`, opts);
@@ -28,7 +29,7 @@ const renderFile = async (graph: GraphClient, driveId: string, itemId: string, o
 
 const WORDING = { same: 'The two files render to the same markdown.', readWhole: 'read each file with download-drive-item-as-markdown' };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId, otherDriveId, otherItemId, maxCells, sheet } = parsed.data;
@@ -39,7 +40,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return ok(diffEnvelope(`a/${from.value.name}`, from.value.render, `b/${to.value.name}`, to.value.render, WORDING));
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Compare two OneDrive or SharePoint files and answer only what differs: each is converted to markdown the way `download-drive-item-as-markdown` converts it, and the answer is a unified diff of the two renders (`--- a/<first>`, `+++ b/<second>`, hunks with three lines of context) with the count of added and removed lines. Made for a document that is saved as a new file each week (a status deck, a task list): the diff costs the lines that moved instead of two full reads. `--include-metadata true` renders comments and tracked changes too, so a comment added between the two shows up. A workbook sheet over the `--max-cells` cap is never reported as unchanged: the note names it, and `--sheet` compares one sheet alone. Past 1,000 added or removed lines (a changed line counts once each way) the answer is a note instead of a diff. For two versions of the same file, `diff-drive-item-versions`.',
   category: 'drive',

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import {
   embeddedContactToMarkdown,
   embeddedEventToMarkdown,
@@ -50,7 +51,7 @@ const MAIL_HINTS: ConversionHints = {
 const convertFileAttachment = (attachment: { name?: string; contentBytes?: string }, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> =>
   bytesToMarkdown(base64ToBytes(attachment.contentBytes ?? ''), attachment.name ?? 'unnamed', opts, hints);
 
-const convertReferenceAttachment = async (graph: GraphClient, attachment: { sourceUrl?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
+const convertReferenceAttachment = async (graph: ReadGraph, attachment: { sourceUrl?: string }, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
     return err({
@@ -117,7 +118,7 @@ const convertItemAttachment = (attachment: { item?: Record<string, unknown> }): 
 // that carries the mail's own attachments (a 15 MB legal opinion inside a
 // forwarded mail, 2026-09-23); an embedded event or contact renders from the
 // expanded item. An attachment that already carries `item` renders from it.
-const readItemAttachment = async (graph: GraphClient, a: Record<string, unknown>, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
+const readItemAttachment = async (graph: ReadGraph, a: Record<string, unknown>, attachmentPath: string, opts: ConvertOptions): Promise<Result<unknown, GraphError>> => {
   if (a['item'] !== undefined) return convertItemAttachment(a);
   const embedded = await readEmbeddedItem(graph, attachmentPath);
   if (!embedded.ok) return embedded;
@@ -130,7 +131,7 @@ const readItemAttachment = async (graph: GraphClient, a: Record<string, unknown>
 // can peek the type for zip-routing without a second Graph round-trip; the
 // path is what an embedded item is read through.
 const convertFetchedAttachment = (
-  graph: GraphClient,
+  graph: ReadGraph,
   a: Record<string, unknown>,
   opts: ConvertOptions,
   hints: ConversionHints,
@@ -153,13 +154,13 @@ const convertFetchedAttachment = (
   }
 };
 
-const convertAttachmentToMarkdown = async (graph: GraphClient, attachmentPath: string, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
+const convertAttachmentToMarkdown = async (graph: ReadGraph, attachmentPath: string, opts: ConvertOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
   const fetched = await graph.get(attachmentPath);
   if (!fetched.ok) return fetched;
   return convertFetchedAttachment(graph, fetched.value as Record<string, unknown>, opts, hints, attachmentPath);
 };
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { messageId, attachmentId } = parsed.data;
@@ -171,7 +172,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   );
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Convert an Outlook mail attachment to markdown. Polymorphic on the attachment’s `@odata.type`: fileAttachment decodes the inline bytes and runs them through the local conversion pipeline (docx via mammoth, xlsx via sheetjs, csv as markdown table, odt/ods/odp via content.xml, pptx as per-slide text (titles + bullets + speaker notes inline), pdf via text-layer extraction (unpdf → text/plain), legacy .xls via sheetjs and legacy .doc via word-extractor (text only), an Outlook .msg or raw .eml attachment rendered to markdown — headers + body (quoted reply chain stripped unless `--keep-quoted true`; inline `cid:` images shown as placeholders) with its own attachments converted recursively — an HTML file through turndown, plus plain-text passthrough); referenceAttachment resolves via /shares/{token}/driveItem and routes through the same dispatcher; itemAttachment (embedded mail / event / contact) is rendered locally via dedicated renderers. For pptx layout / images, `convert-mail-attachment-to-pdf` + a vision model reads the rendered deck better. A scanned / image-only PDF (no text layer), legacy .ppt, and rtf/etc. point to the PDF sibling. Loop/Fluid/Whiteboard reference-attachments use Graph `?format=html` (the four inputs Microsoft documents).',
   category: 'mail',

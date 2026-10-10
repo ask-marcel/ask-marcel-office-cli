@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatAddress, nonEmpty, renderMessageAsMarkdown, type MailLikeResource } from './convert-mail-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
 
@@ -31,7 +32,7 @@ const renderPostHeaders = (m: MailLikeResource): string => {
 // post is the documented route (post-list-attachments), bytes included.
 const POST_ATTACHMENT_HINT = '_Use `convert-group-post-attachment-to-markdown` or `get-group-post-attachment` with the attachment id to fetch._';
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { groupId, threadId, postId } = parsed.data;
@@ -43,7 +44,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Render one post of a unified (Microsoft 365) group thread as markdown, the way `convert-mail-to-markdown` renders an Outlook message: a `**From:**` line, a `**Date:**` line, then the HTML body through turndown with quoted reply chains stripped. A post arrives from the group's own address with the writer in `sender`, so the author line reads `Robin Chen <robin.chen@contoso.com> on behalf of Support <support@contoso.com>`. There is no subject line: the thread `topic` is the subject and lives on `list-group-threads`. By default no image bytes are fetched; inline `cid:` images render as `[inline image: <name>]` placeholders unless `--inline-images true`. File attachments are listed below the body by name, size and id and their bytes are never fetched here; read one with `convert-group-post-attachment-to-markdown` or fetch it with `get-group-post-attachment`. Same staged-fetch design as the mail command: one call for the post, one for the attachment list when `hasAttachments` is true or the body references a `cid:` image (Graph reports false for a post whose only attachments are inline), and with `--inline-images true` one per small inline image.",
   category: 'mail',

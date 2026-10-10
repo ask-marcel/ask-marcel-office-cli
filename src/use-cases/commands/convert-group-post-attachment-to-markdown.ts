@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { convertAttachmentToMarkdown } from './convert-mail-attachment-to-markdown.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
@@ -35,7 +36,7 @@ const schema = z.object({
   keepQuoted: keepQuotedSchemaField,
 });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { groupId, threadId, postId, attachmentId } = parsed.data;
@@ -47,7 +48,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   );
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Convert an attachment on one post of a unified (Microsoft 365) group thread to markdown, the `convert-mail-attachment-to-markdown` sibling for a group inbox. Polymorphic on the attachment’s `@odata.type` and sharing the mail pipeline: fileAttachment decodes the inline bytes and converts them locally (docx, xlsx, csv, odt/ods/odp, pptx as per-slide text, pdf text layer, legacy .xls/.doc, an Outlook `.msg` rendered recursively with its quoted chain stripped unless `--keep-quoted true`, plain text passed through); referenceAttachment resolves via `/shares/{token}/driveItem`; an embedded mail, event or contact is rendered locally. There is no PDF sibling here, so an image, a scanned PDF, a legacy `.ppt` and any other unsupported format return a 415 pointing at `get-group-post-attachment` for the raw bytes.',
   category: 'mail',

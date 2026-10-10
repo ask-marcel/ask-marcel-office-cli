@@ -2,9 +2,10 @@ import { basename } from 'node:path';
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
@@ -79,14 +80,14 @@ const executeLocal = async (fs: FileSystem, params: Record<string, string>): Pro
   return bytesToMarkdown(bytes.value, name, { includeMetadata, inlineImages, maxCells, keepQuoted, sheet }, LOCAL_HINTS);
 };
 
-const execute = async (_graph: GraphClient, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
+const execute = async (_graph: ReadGraph, _params: Record<string, string>): Promise<Result<unknown, GraphError>> =>
   err({
     type: 'api_error',
     status: 400,
     message: 'convert-local-file-to-markdown reads the local filesystem, not Graph — call executeLocal(fs, params) with a FileSystem (the CLI wires this automatically).',
   });
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Convert a file ON DISK to markdown — the only command that never calls Microsoft Graph (works offline, no login). Runs the same local pipelines as `download-drive-item-as-markdown`: docx (mammoth → turndown), xlsx (sheetjs tables, `--max-cells` OOM cap), pptx (per-slide text), odt/ods/odp, csv, pdf (text layer via unpdf), legacy OLE .xls / .doc, Outlook .msg and raw .eml (headers + body with the quoted reply chain stripped — `--keep-quoted true` restores it — and inline `cid:` images shown as placeholders, attachments converted recursively), html/htm through turndown, plain-text passthrough — and a `.zip` is unpacked with every contained file converted in one call (legacy GBK / CP437 entry names decoded, not mojibaked). What it canNOT do locally: convert TO pdf, and Loop/Fluid/Whiteboard sources — both need a Graph server round-trip (upload to OneDrive and use the drive-item siblings). Pass `--include-metadata true` for the Office side-channel metadata blocks; `--inline-images true` to embed docx images as base64 data URIs.',
   category: 'meta',

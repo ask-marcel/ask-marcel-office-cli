@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { fetchRawBytes } from './fetch-raw-bytes.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
@@ -32,7 +33,7 @@ const schema = z.object({
   ...tenantIdShape,
 });
 
-const execute = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
@@ -46,7 +47,7 @@ const execute = async (graph: GraphClient, params: Record<string, string>): Prom
   return convertZipArchive(bytes.value, { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
 };
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Unzip a `.zip` from a OneDrive / SharePoint item and convert every contained file in one call — so "read the handover archive" doesn\'t need a separate unzip + per-file conversion. Office files (docx/xlsx/pptx/odt/ods/odp and their macro-enabled / template variants) are converted to markdown via the local pipelines; plain-text entries (txt/md/csv/json/yaml/…) are decoded inline; legacy OLE .xls (sheetjs) and .doc (word-extractor, text only) are extracted; an Outlook .msg or raw .eml entry is rendered to markdown (headers + body, with its own attachments converted recursively); PDFs have their text layer extracted (text/plain); images, binaries, nested archives, legacy .ppt, and scanned/image-only PDFs (no text layer) are listed with a note (not unpacked) so one unsupported entry never fails the whole archive. Pass `--include-metadata true` to append each Office file\'s side-channel metadata block. Capped at 100 entries (the archive is buffered in memory); beyond that the response is flagged `truncated`.',
   category: 'drive',
