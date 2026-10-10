@@ -81,8 +81,8 @@ export const createHelperTokenSource = (deps: HelperTokenSourceDeps): TokenSourc
   };
 
   return {
-    graphToken: (tier) => tokenFor({ tier }),
-    guestToken: (tenant) => tokenFor({ tier: 'guest', tenant }),
+    graphToken: (tier, options) => tokenFor({ tier }, options?.rejected),
+    guestToken: (tenant, options) => tokenFor({ tier: 'guest', tenant }, options?.rejected),
     substrateToken: (tier, options) => tokenFor({ tier }, options?.rejected),
     // Checked here, not when the token is read: the Teams media service takes
     // the ic3 token with no region, and only a URL carries one.

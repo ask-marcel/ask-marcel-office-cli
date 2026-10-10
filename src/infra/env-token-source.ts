@@ -54,8 +54,10 @@ const checked = (tier: EnvTier, raw: string): Result<AccessToken, TokenError> =>
   return invalid(`${TOKEN_VARIABLE[tier]} does not hold a usable ${tier} token: ${REASON[token.error.type](tier)}. ${UNSET_OR_FIX}`);
 };
 
-const refused = (tier: 'chatsvcagg' | 'ic3'): Result<never, TokenError> =>
-  invalid(`The Teams chat service refused the token in ${TOKEN_VARIABLE[tier]} (HTTP 401). A token from the environment is never replaced by another one. ${UNSET_OR_FIX}`);
+const SERVICE: Readonly<Record<EnvTier, string>> = { basic: 'Microsoft Graph', elevated: 'Microsoft Graph', chatsvcagg: 'The Teams chat service', ic3: 'The Teams chat service' };
+
+const refused = (tier: EnvTier): Result<never, TokenError> =>
+  invalid(`${SERVICE[tier]} refused the token in ${TOKEN_VARIABLE[tier]} (HTTP 401). A token from the environment is never replaced by another one. ${UNSET_OR_FIX}`);
 
 // A chat token from the environment routes by the region beside it, never by
 // one the helper would give for its own session.
@@ -72,17 +74,19 @@ const variable = (env: Env, tier: EnvTier): string | undefined => {
   return raw.ok ? raw.value : undefined;
 };
 
+// A 401 on a token from the environment is the answer: it is not replayed.
+const fromVariable = (tier: EnvTier, raw: string, rejected: AccessToken | undefined): Result<AccessToken, TokenError> =>
+  rejected === undefined ? checked(tier, raw) : refused(tier);
+
 export const createEnvTokenSource = (env: Env, helper: TokenSource): TokenSource => ({
-  graphToken: async (tier) => {
+  graphToken: async (tier, options) => {
     const raw = variable(env, tier);
-    return raw === undefined ? helper.graphToken(tier) : checked(tier, raw);
+    return raw === undefined ? helper.graphToken(tier, options) : fromVariable(tier, raw, options?.rejected);
   },
-  guestToken: (tenant) => helper.guestToken(tenant),
-  // A 401 on a token from the environment is the answer: it is not replayed.
+  guestToken: (tenant, options) => helper.guestToken(tenant, options),
   substrateToken: async (tier, options) => {
     const raw = variable(env, tier);
-    if (raw === undefined) return helper.substrateToken(tier, options);
-    return options?.rejected === undefined ? checked(tier, raw) : refused(tier);
+    return raw === undefined ? helper.substrateToken(tier, options) : fromVariable(tier, raw, options?.rejected);
   },
   substrateRegion: async (tier) => (variable(env, tier) === undefined ? helper.substrateRegion(tier) : regionFrom(env, tier)),
 });
