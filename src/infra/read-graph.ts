@@ -3,6 +3,8 @@ import { err, ok } from '../domain/result.ts';
 import type { TenantId } from '../domain/tenant-id.ts';
 import { tenantId } from '../domain/tenant-id.ts';
 import { spoHostToTenantDomain } from '../domain/utilities/spo-tenant.ts';
+import type { ReadOnlyPost, ReadOnlyPostPath } from '../use-cases/commands/read-only-post.ts';
+import { postIfReadOnly } from '../use-cases/commands/read-only-post.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError } from './graph-request.ts';
 import { createGraphRequestCore, wrapNetworkError } from './graph-request.ts';
@@ -16,11 +18,6 @@ import { REQUEST_TIMEOUT_MS } from './network-error.ts';
  * session. The POST path is checked by its type and again at run time, so a
  * cast cannot turn a read into a write.
  */
-
-// The two endpoints a read command POSTs to; both only answer a query.
-const READ_ONLY_POST_PATHS = ['/search/query', '/me/calendar/getSchedule'] as const;
-
-type ReadOnlyPostPath = (typeof READ_ONLY_POST_PATHS)[number];
 
 type ReadGraph = {
   /**
@@ -109,7 +106,7 @@ type ReadGraph = {
    * A query sent as a POST: a Microsoft Search query or a free/busy schedule.
    * No other path is accepted, by type or at run time.
    */
-  post: (path: ReadOnlyPostPath, body: unknown) => Promise<Result<unknown, GraphError>>;
+  post: ReadOnlyPost;
   getBinary: (path: string) => Promise<Result<unknown, GraphError>>;
   /**
    * Same shape as `getBinary` but signs the request with an "elevated"
@@ -127,19 +124,6 @@ type ReadGraph = {
    */
   fetchUrl: (url: string) => Promise<Result<unknown, GraphError>>;
 };
-
-const isReadOnlyPost = (path: string): path is ReadOnlyPostPath => READ_ONLY_POST_PATHS.some((readOnly) => readOnly === path);
-
-const writeRefused = (path: string): Result<never, GraphError> =>
-  err({
-    type: 'validation_error',
-    code: 'write_refused',
-    message: `POST ${path} was not sent: this graph only reads, and a read command may POST only to ${READ_ONLY_POST_PATHS.join(' and ')}.`,
-  });
-
-// The run-time half of the POST check: a path outside the two is never sent.
-const postIfReadOnly = async (post: ReadGraph['post'], path: string, body: unknown): Promise<Result<unknown, GraphError>> =>
-  isReadOnlyPost(path) ? post(path, body) : writeRefused(path);
 
 /**
  * Ask Entra which tenant owns a SharePoint host, using its public OIDC
@@ -202,27 +186,5 @@ const createReadGraph = (tokens: TokenSource, fetchFn: FetchFn = globalThis.fetc
   };
 };
 
-/**
- * The read graph inside any graph, the single package's full client included:
- * its read members only, with the POST check in front. The command registry
- * gives every read command this view, so no read command holds a member that
- * writes, whichever graph its caller passed. Each member calls the graph's own
- * member on the graph, so a caller's graph whose methods read `this` still works.
- */
-const readGraphOf = (graph: ReadGraph): ReadGraph => ({
-  get: (path, extraHeaders) => graph.get(path, extraHeaders),
-  getElevated: (path) => graph.getElevated(path),
-  getGuest: (path, tenant) => graph.getGuest(path, tenant),
-  getBinaryGuest: (path, tenant) => graph.getBinaryGuest(path, tenant),
-  discoverTenantId: (spoHost) => graph.discoverTenantId(spoHost),
-  teamsChat: (path) => graph.teamsChat(path),
-  teamsChatIc3: (path) => graph.teamsChatIc3(path),
-  teamsChatMedia: (url) => graph.teamsChatMedia(url),
-  post: (path, body) => postIfReadOnly((readOnly, query) => graph.post(readOnly, query), path, body),
-  getBinary: (path) => graph.getBinary(path),
-  getBinaryElevated: (path) => graph.getBinaryElevated(path),
-  fetchUrl: (url) => graph.fetchUrl(url),
-});
-
-export { createReadGraph, READ_ONLY_POST_PATHS, readGraphOf };
+export { createReadGraph };
 export type { ReadGraph, ReadOnlyPostPath };

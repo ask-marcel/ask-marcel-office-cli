@@ -6,7 +6,8 @@ import type { TeamsRegion } from '../domain/teams-region.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn } from './graph-request.ts';
 import type { ReadGraph, ReadOnlyPostPath } from './read-graph.ts';
-import { createReadGraph, readGraphOf } from './read-graph.ts';
+import { readGraphOf } from '../use-cases/commands/command-graph.ts';
+import { createReadGraph } from './read-graph.ts';
 
 /*
  * The read guarantee (package split, D9): the graph a read command gets can

@@ -5,7 +5,8 @@ import type { TeamsRegion } from '../domain/teams-region.ts';
 import type { TokenSource } from '../use-cases/ports/token-source.ts';
 import type { FetchFn } from './graph-request.ts';
 import { createReadGraph } from './read-graph.ts';
-import { createWriteGraph, writeGraphOf } from './write-graph.ts';
+import { writeGraphOf } from '../use-cases/commands/command-graph.ts';
+import { createWriteGraph } from './write-graph.ts';
 
 /*
  * The write graph: basic tier only, the members the write commands use. A

@@ -11,10 +11,10 @@ import { createWriteGraph } from './write-graph.ts';
 /*
  * The single package's full client: the read graph and the write graph on one
  * object, for the composition root and for a library caller. The command
- * registry hands each command only its own view (`readGraphOf`,
- * `writeGraphOf`), so a read command never holds a write member. The package
- * split drops this type: read builds only the read graph, write only the write
- * graph (docs/plans/2026-10-01-package-split.md, D9).
+ * registry hands each command only its own view (`readGraphOf` and
+ * `writeGraphOf` in command-graph.ts), so a read command never holds a write
+ * member. The package split drops this type: read builds only the read graph,
+ * write only the write graph (docs/plans/2026-10-01-package-split.md, D9).
  */
 type GraphClient = ReadGraph & WriteGraph;
 
