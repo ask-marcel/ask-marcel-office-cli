@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
@@ -24,7 +25,7 @@ const schema = z.object({
 
 const base64ByteLength = (b64: string): number => Math.floor((b64.length * 3) / 4);
 
-const run = async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+const run = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId, worksheetId, chartId } = parsed.data;
@@ -40,7 +41,7 @@ const run = async (graph: GraphClient, params: Record<string, string>): Promise<
 
 const execute = wrapExcelExecute(run);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "Render a chart on an Excel worksheet as a PNG (base64). Calls Graph's chart `Image()` function (natural size, aspect-preserving) so a vision-capable LLM can read the plotted data itself — not just the chart's title / position metadata that `list-excel-worksheet-charts` returns. The chart id or name comes from `list-excel-worksheet-charts`.",
   category: 'excel',

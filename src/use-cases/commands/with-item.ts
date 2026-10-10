@@ -1,8 +1,9 @@
 import type { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandOptionMeta } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadCommand, CommandOptionMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 /**
@@ -45,7 +46,7 @@ const recentItemPath: RowPath = (row) => {
   return nonEmpty(row['id']) && nonEmpty(driveId) ? `/drives/${driveId}/items/${row['id']}` : undefined;
 };
 
-const enrichRow = async (graph: GraphClient, row: unknown, pathOf: RowPath): Promise<unknown> => {
+const enrichRow = async (graph: ReadGraph, row: unknown, pathOf: RowPath): Promise<unknown> => {
   if (row === null || typeof row !== 'object') return row;
   const path = pathOf(row as Row);
   if (path === undefined) return { ...(row as Row), itemError: 'no drive item behind this row' };
@@ -58,7 +59,7 @@ const enrichRow = async (graph: GraphClient, row: unknown, pathOf: RowPath): Pro
 // `file-counts` does, rather than all at once.
 const ITEM_READ_CHUNK = 10;
 
-const enrichRows = async (graph: GraphClient, rows: ReadonlyArray<unknown>, pathOf: RowPath): Promise<ReadonlyArray<unknown>> => {
+const enrichRows = async (graph: ReadGraph, rows: ReadonlyArray<unknown>, pathOf: RowPath): Promise<ReadonlyArray<unknown>> => {
   const out: Array<unknown> = [];
   for (let start = 0; start < rows.length; start += ITEM_READ_CHUNK) {
     out.push(...(await Promise.all(rows.slice(start, start + ITEM_READ_CHUNK).map((row) => enrichRow(graph, row, pathOf)))));
@@ -67,8 +68,8 @@ const enrichRows = async (graph: GraphClient, rows: ReadonlyArray<unknown>, path
 };
 
 /** Wraps a listing's execute: the merged schema validates the flag, the flag never reaches the OData schema, and the rows are enriched on request. */
-const withItemEnrichment = (schema: z.ZodType, inner: Command['execute'], pathOf: RowPath): Command['execute'] => {
-  const enriched: Command['execute'] = async (graph, params): Promise<Result<unknown, GraphError>> => {
+const withItemEnrichment = (schema: z.ZodType, inner: ReadCommand['execute'], pathOf: RowPath): ReadCommand['execute'] => {
+  const enriched: ReadCommand['execute'] = async (graph, params): Promise<Result<unknown, GraphError>> => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { withItem, ...rest } = params;

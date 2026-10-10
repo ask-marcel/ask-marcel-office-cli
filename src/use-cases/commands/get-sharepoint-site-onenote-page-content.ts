@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err } from '../../domain/result.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
 
@@ -12,14 +12,14 @@ const schema = z.object({ siteId: z.string().min(1), onenotePageId: z.string().m
 // and route through `graph.getBinary`, which respects the response's
 // Content-Type and produces `{contentType: "text/html", size, text}` for
 // text bodies.
-const innerExecute: Command['execute'] = async (graph, params) => {
+const innerExecute: ReadCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return graph.getBinary(`/sites/${parsed.data.siteId}/onenote/pages/${parsed.data.onenotePageId}/content`);
 };
 const execute = wrapOnenote5kLimit(innerExecute);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'Return the HTML content of a single OneNote page from a SharePoint site (parallel to `get-onenote-page-content` for `/me`). The response carries the standard `{contentType: text/html, size, text}` shape so the HTML body is available verbatim under either output format.',
   category: 'notes',

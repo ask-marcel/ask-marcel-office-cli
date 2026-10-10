@@ -1,7 +1,8 @@
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { Command } from './command-types.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { ReadCommand } from './command-types.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
  * Audit round-8 H2: when a tenant exceeds the 5000-item OneNote limit per
@@ -14,8 +15,8 @@ import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 const ONENOTE_5K_NEEDLE = '10008';
 
 const wrapOnenote5kLimit =
-  (inner: Command['execute']): Command['execute'] =>
-  async (graph: GraphClient, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+  (inner: ReadCommand['execute']): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const result = await inner(graph, params);
     if (result.ok) return result;
     if (result.error.type === 'api_error' && (result.error.code === ONENOTE_5K_NEEDLE || result.error.message.includes('10008'))) {

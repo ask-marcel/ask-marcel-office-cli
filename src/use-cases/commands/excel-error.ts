@@ -1,6 +1,7 @@
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '../../infra/read-graph.ts';
 
 const WAC_NEEDLE = 'Could not obtain a WAC access token';
 // Graph's `/workbook` endpoint also surfaces a different leaky error when
@@ -24,7 +25,7 @@ const mapWacError = (e: GraphError): GraphError => {
   };
 };
 
-type ExecuteFn = (graph: GraphClient, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
+type ExecuteFn = (graph: ReadGraph, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
 
 const wrapExcelExecute =
   (inner: ExecuteFn): ExecuteFn =>

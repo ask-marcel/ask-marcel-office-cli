@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { Command, CommandOptionMeta } from './command-types.ts';
+import type { ReadCommand, CommandOptionMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 
 /**
@@ -38,8 +38,8 @@ const excludeMeetingResponses = (result: Result<unknown, GraphError>): Result<un
 };
 
 /** Wraps a listing's execute: the merged schema validates the flag, then the flag is kept away from the OData schema behind it. */
-const withMeetingResponseFilter = (schema: z.ZodType, inner: Command['execute']): Command['execute'] => {
-  const filtered: Command['execute'] = async (graph, params) => {
+const withMeetingResponseFilter = (schema: z.ZodType, inner: ReadCommand['execute']): ReadCommand['execute'] => {
+  const filtered: ReadCommand['execute'] = async (graph, params) => {
     const parsed = schema.safeParse(params);
     if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
     const { excludeMeetingResponses: flag, ...rest } = params;
