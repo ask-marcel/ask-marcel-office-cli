@@ -44,7 +44,7 @@ type JsonRequest = {
 };
 
 type GraphRequestCore = {
-  // One request signed for the tier.
+  // One request signed for the tier, with the tier's 401 replay.
   readonly send: (tier: GraphTier, url: string, request: SignedRequest) => Promise<Result<Response, GraphError>>;
   // A JSON request to Graph v1.0: the body read from a success, or the error.
   readonly json: (tier: GraphTier, method: HttpMethod, path: string, request?: JsonRequest) => Promise<Result<unknown, GraphError>>;
@@ -215,6 +215,18 @@ const asAuthFailure = (error: TokenError): GraphError => {
   return { type: 'auth_failed', message, ...(code ? { code } : {}) };
 };
 
+// The two codes Graph gives a token it no longer takes. A 401 with any other
+// code is an answer, not a dead token: `invalidAudienceUri` (a partner-tenant
+// file read on a home token) refuses every token of the tier, however fresh.
+const DEAD_TOKEN_CODES: ReadonlySet<string> = new Set(['InvalidAuthenticationToken', 'TokenExpired']);
+
+// Read from a copy, so the caller can still read the answer itself.
+const refusesTheToken = async (res: Response, url: string): Promise<boolean> => {
+  if (res.status !== 401) return false;
+  const answer = await apiErrorFrom(res.clone(), url);
+  return DEAD_TOKEN_CODES.has(answer.code ?? '');
+};
+
 // The network-error label names the tier a JSON request was signed for.
 const tierLabel = (tier: GraphTier): string => {
   if (tier === 'basic') return '';
@@ -239,10 +251,18 @@ const createGraphRequestCore = (tokens: TokenSource, fetchFn: FetchFn): GraphReq
       redirect: request.redirect,
     });
 
+  // The basic and guest tiers replay a request whose token Graph refused, once,
+  // with a token the source mints past the refused one (package split, per-tier
+  // policy). When the source has no other token, the refusal stands as it is.
+  // Elevated has no refresh token, so it never replays.
   const send = async (tier: GraphTier, url: string, request: SignedRequest): Promise<Result<Response, GraphError>> => {
     const token = await tokenFor(tier);
     if (!token.ok) return err(asAuthFailure(token.error));
-    return ok(await sendWith(token.value, url, request));
+    const response = await sendWith(token.value, url, request);
+    if (tier === 'elevated' || !(await refusesTheToken(response, url))) return ok(response);
+    const fresh = await tokenFor(tier, token.value);
+    if (!fresh.ok) return err(asAuthFailure(fresh.error));
+    return ok(fresh.value === token.value ? response : await sendWith(fresh.value, url, request));
   };
 
   const json = async (tier: GraphTier, method: HttpMethod, path: string, request: JsonRequest = {}): Promise<Result<unknown, GraphError>> => {
