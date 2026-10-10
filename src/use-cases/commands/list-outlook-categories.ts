@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 // Graph's `/me/outlook/masterCategories` silently ignores every standard
 // OData passthrough (verified live — `--top 1` against a 14-category
@@ -8,7 +8,7 @@ import type { CommandMeta } from './command-types.ts';
 const schema = z.object({}).strict();
 const { execute } = buildCommand(() => '/me/outlook/masterCategories', schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     "List the signed-in user's Outlook color categories — the named tags that can be applied to mail, calendar items, and contacts. Each entry has `displayName` and a `color` from Outlook's preset palette. Note: Graph silently ignores every OData passthrough on this endpoint (`$top`, `$skip`, `$select`, `$filter`, `$orderby`, `$expand`), so the CLI does not expose any of those flags — the full collection is always returned. Slice client-side.",
   category: 'mail',

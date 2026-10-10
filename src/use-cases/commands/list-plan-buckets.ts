@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { selectOnlyOptions } from './odata-query.ts';
 
 // Same Graph behavior as `/me/planner/plans`: `$select` works, everything
@@ -8,7 +8,7 @@ import { selectOnlyOptions } from './odata-query.ts';
 const baseSchema = z.object({ plannerPlanId: z.string().min(1) });
 const { execute, schema } = buildPickODataListCommand((p) => `/planner/plans/${p.plannerPlanId}/buckets`, baseSchema, ['select']);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the buckets (columns / lanes) of a Microsoft Planner plan. Note: Graph silently drops `$top`, `$skip`, `$filter`, and `$orderby` on this endpoint, so the CLI advertises only `--select` — slice / sort client-side.',
   category: 'tasks',

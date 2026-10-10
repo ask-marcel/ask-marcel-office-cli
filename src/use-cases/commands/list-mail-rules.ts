@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 // Graph's `/me/mailFolders/inbox/messageRules` silently ignores every
 // standard OData passthrough (verified live — `--top 1` against a
@@ -8,7 +8,7 @@ import type { CommandMeta } from './command-types.ts';
 const schema = z.object({ mailFolderId: z.string().min(1).default('inbox') });
 const { execute } = buildCommand((p) => `/me/mailFolders/${p.mailFolderId}/messageRules`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List the message rules on the Outlook Inbox. Microsoft Graph only supports message rules on the Inbox folder; passing any other folder ID (drafts, sentitems, archive, a custom folder) returns `MailFolderNotSupportedError` from Graph. `--mail-folder-id` defaults to `inbox` because that is the only value Graph accepts; the flag is kept (optional) for callers that want to pass a resolved Inbox ID explicitly. Note: Graph silently ignores every OData passthrough on this endpoint, so the CLI does NOT expose them — the full rule set is always returned.',
   category: 'mail',

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({ onenoteSectionId: z.string().min(1) });
 const { execute, schema } = buildListCommand((p) => `/me/onenote/sections/${p.onenoteSectionId}/pages`, baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the pages inside a single OneNote section.',
   category: 'notes',
   graphMethod: 'GET',

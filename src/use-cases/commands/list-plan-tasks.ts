@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { buildCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 
 const schema = z.object({ plannerPlanId: z.string().min(1) });
 const { execute } = buildCommand((p) => `/planner/plans/${p.plannerPlanId}/tasks`, schema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary:
     'List every task within a Microsoft Planner plan, regardless of completion status (Graph orders by `orderHint`). Use `list-incomplete-planner-tasks` for the across-plans incomplete view. Note: Graph silently ignores standard OData query parameters on `/planner/plans/{id}/tasks` (`$top` returns the full set anyway), so the OData passthrough is intentionally NOT exposed — pipe the response through `jq` to slice client-side.',
   category: 'tasks',

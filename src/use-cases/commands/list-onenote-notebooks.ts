@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildListCommand } from './build-command.ts';
-import type { CommandMeta } from './command-types.ts';
+import type { ReadCommandMeta } from './command-types.ts';
 import { odataQueryOptions } from './odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildListCommand(() => '/me/onenote/notebooks', baseSchema);
 
-const meta: CommandMeta = {
+const meta: ReadCommandMeta = {
   summary: 'List the OneNote notebooks the signed-in user owns or has access to (sorted by `createdDateTime` desc by Graph; soft-deleted notebooks excluded).',
   category: 'notes',
   graphMethod: 'GET',
