@@ -6,17 +6,16 @@ import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import type { RenderContext } from '../presenter/render-to-string.ts';
-import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
+import type { CommandPackage } from '../use-cases/commands/command-package.ts';
+import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
-import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { describeWrites } from '../use-cases/commands/command-effect.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, describeOutputPathError, runRegistryCommand } from './run-registry-command.ts';
-import { commandPackage } from './single-package.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 
@@ -26,7 +25,13 @@ type CliOutput = {
   readonly fail: (message: string, code?: string, source?: ErrorSource) => void;
 };
 
+/*
+ * The CLI builder is core (package split, step 13): it builds the CLI of the
+ * package it is given and imports no registry and no lifecycle command. The
+ * composition root hands it the package (`cli.ts` for the single package).
+ */
 type CliShellDeps = {
+  readonly commandPackage: CommandPackage;
   readonly graph: GraphClient;
   readonly logger: Logger;
   readonly fs: FileSystem;
@@ -36,10 +41,10 @@ type CliShellDeps = {
   readonly addLifecycleCommands?: (program: Command, output: CliOutput) => void;
 };
 
-const CLI_REMEDY = 'Run `ask-marcel-office --help` to list every command.';
-
 const buildCliShell = (deps: CliShellDeps): Command => {
-  const { graph, logger, fs, version } = deps;
+  const { commandPackage, graph, logger, fs, version } = deps;
+  const { registry, binName } = commandPackage;
+  const cliRemedy = `Run \`${binName} --help\` to list every command.`;
   const program = new Command();
 
   const getFormat = (): OutputFormat => {
@@ -140,7 +145,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
   // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
   // POST) when search-all-accessible-sites was added without updating it.
   // GET reads only: the PDF conversions are declared GET, but they are writes.
-  const getEndpointCount = Object.values(cmdRegistry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
+  const getEndpointCount = Object.values(registry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
   // 2026-06-15 (F-03), extended 2026-07-04 and at package-split step 11: everything
   // whose `effect` is not `read` is a write (the mail drafts, and the PDF
   // conversions that upload a temporary file); everything else is a read or a
@@ -149,15 +154,15 @@ const buildCliShell = (deps: CliShellDeps): Command => {
   // took every POST command and labelled it "— searches, not mutations", which
   // silently mislabelled create-mail-draft as a search the moment it shipped (and
   // omitted the PATCH update-mail-draft entirely).
-  const writeCount = Object.values(cmdRegistry).filter((c) => c.meta.effect !== 'read').length;
-  const searchPostNames = Object.entries(cmdRegistry)
+  const writeCount = Object.values(registry).filter((c) => c.meta.effect !== 'read').length;
+  const searchPostNames = Object.entries(registry)
     .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
-  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(cmdRegistry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
+  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(registry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
 
   program
-    .name('ask-marcel-office')
+    .name(binName)
     .description(surfaceDescription)
     // override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
@@ -238,14 +243,14 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     'after',
     [
       '',
-      'For full per-command help:   ask-marcel-office <command> --help',
-      'For machine-readable docs:   ask-marcel-office help-json [--terse] [--category mail]',
-      'For per-command Markdown:    ask-marcel-office docs <command>',
-      'For the installed version:   ask-marcel-office --version   (alone: on a command it is an unknown flag)',
+      `For full per-command help:   ${binName} <command> --help`,
+      `For machine-readable docs:   ${binName} help-json [--terse] [--category mail]`,
+      `For per-command Markdown:    ${binName} docs <command>`,
+      `For the installed version:   ${binName} --version   (alone: on a command it is an unknown flag)`,
       // `mcp` is intercepted in main.ts, not registered as a subcommand (that
       // would pull the SDK into every command's module graph), so Commander
       // cannot list it by itself. Name it here or it is undiscoverable.
-      'To serve this over MCP:      ask-marcel-office mcp   (stdio; see README for `claude mcp add`)',
+      `To serve this over MCP:      ${binName} mcp   (stdio; see README for \`claude mcp add\`)`,
     ].join('\n  ')
   );
 
@@ -291,7 +296,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
         program.outputHelp();
         return;
       }
-      const result = renderSingleCommand(cmdRegistry, commandName);
+      const result = renderSingleCommand(commandPackage, commandName);
       if (result.ok) {
         process.stdout.write(`${result.value}\n`);
         return;
@@ -299,13 +304,13 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       // pass an explicit `cli_unknown_command`
       // code so error-hints can match it structurally — gives the same
       // envelope shape as Commander's own `commander.unknownCommand` path.
-      fail(unknownCommandMessage(result.error.name, result.error.available, CLI_REMEDY), 'cli_unknown_command');
+      fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy), 'cli_unknown_command');
     });
 
   program
     .command('help-json')
     .description(
-      'Print the machine-readable command manifest as JSON. **Use `--terse --category <name>` for fresh-session discovery** — that combo is the actual token-friendly path (~8 KB for one category, vs ~575 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of `ask-marcel-office --help`; reach for it only after `--terse` has narrowed the search. `--terse` alone projects to `{name, summary, category}` with each summary compacted to its first sentence (~41 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.'
+      `Print the machine-readable command manifest as JSON. **Use \`--terse --category <name>\` for fresh-session discovery** — that combo is the actual token-friendly path (~8 KB for one category, vs ~575 KB unfiltered). The unflagged form is the *full* reference (every option / example / response shape per command) and is well over 10× the size of \`${binName} --help\`; reach for it only after \`--terse\` has narrowed the search. \`--terse\` alone projects to \`{name, summary, category}\` with each summary compacted to its first sentence (~41 KB across all categories). Categories: lifecycle, drive, excel, sharepoint, tasks, mail, notes, user, calendar, chats, teams, meta.`
     )
     .option(
       '--terse',
@@ -324,17 +329,14 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       const outputSource = program.getOptionValueSource('output');
       if (outputSource === 'cli' && getFormat() === 'text') {
         fail(
-          "help-json always emits JSON (that's the contract — the manifest is the LLM-consumable serialized form of every command's meta). Drop `--output text` for this command. To browse the manifest as Markdown, use `ask-marcel-office docs <command>` instead."
+          `help-json always emits JSON (that's the contract — the manifest is the LLM-consumable serialized form of every command's meta). Drop \`--output text\` for this command. To browse the manifest as Markdown, use \`${binName} docs <command>\` instead.`
         );
         return;
       }
       // --terse projects to `{name, summary, category}`;
       // --category filters to a single category (validated against
       // CATEGORY_LABELS). Both flags compose.
-      const fullOrTerse =
-        opts.terse === true
-          ? buildTerseManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0')
-          : buildManifest(cmdRegistry, 'ask-marcel-office-cli', version ?? '0.0.0');
+      const fullOrTerse = opts.terse === true ? buildTerseManifest(commandPackage, version ?? '0.0.0') : buildManifest(commandPackage, version ?? '0.0.0');
       if (opts.category !== undefined) {
         const filtered = filterManifestByCategory(fullOrTerse, opts.category);
         if (!filtered.ok) {
@@ -350,7 +352,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
   program.commandsGroup('Lifecycle:');
 
   // The lifecycle commands that act (login, status, logout in the single package)
-  // come from the package, so this builder knows no auth.
+  // come from the package, so this builder knows no auth and no registry.
   deps.addLifecycleCommands?.(program, { print: (data) => renderOut(data), fail });
 
   const docsCmd = program
@@ -358,14 +360,14 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     .description(
       'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/status/logout/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
     )
-    .argument('<command>', 'Command name to show docs for (run `ask-marcel-office --help` to list every command).')
+    .argument('<command>', `Command name to show docs for (run \`${binName} --help\` to list every command).`)
     .action(async (commandName: string) => {
-      const result = renderSingleCommand(cmdRegistry, commandName);
+      const result = renderSingleCommand(commandPackage, commandName);
       if (!result.ok) {
         // structured `cli_unknown_command`
         // code so the envelope matches the `help <unknown>` and
         // `commander.unknownCommand` paths — single branch for LLM consumers.
-        fail(unknownCommandMessage(result.error.name, result.error.available, CLI_REMEDY), 'cli_unknown_command');
+        fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy), 'cli_unknown_command');
         return;
       }
       await writeOrPrintText(result.value, 'text/markdown', 'docs');
@@ -374,13 +376,13 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     'after',
     [
       '',
-      'Example:       ask-marcel-office docs list-mail-messages',
-      'Lifecycle:     `ask-marcel-office docs login` (or logout / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.',
+      `Example:       ${binName} docs list-mail-messages`,
+      `Lifecycle:     \`${binName} docs login\` (or logout / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.`,
     ].join('\n  ')
   );
 
   for (const category of CATEGORY_ORDER) {
-    const entries = Object.entries(cmdRegistry).filter(([, c]) => c.meta.category === category);
+    const entries = Object.entries(registry).filter(([, c]) => c.meta.category === category);
     if (entries.length === 0) continue;
     program.commandsGroup(`${CATEGORY_LABELS[category]}:`);
     for (const [name, cmd] of entries) {
@@ -439,7 +441,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
 
   // The lifecycle commands (help-json, login, docs…) suggest from their own flags too.
   for (const sub of program.commands) {
-    if (sub.name() in cmdRegistry) continue;
+    if (sub.name() in registry) continue;
     const own = sub.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
     sub.exitOverride((err) => onCommanderError(err, [...own, ...globalFlags()], sub.args));
   }
