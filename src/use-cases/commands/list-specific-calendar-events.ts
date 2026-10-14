@@ -25,11 +25,11 @@ const meta: ReadCommandMeta = {
       key: 'calendarId',
       required: true,
       description:
-        'Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `ask-marcel-office list-calendars` to discover non-default calendar IDs.',
+        'Calendar ID, or the well-known short name `primary` / `default` for the signed-in user’s default calendar. Use `{read-bin} list-calendars` to discover non-default calendar IDs.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-specific-calendar-events --calendar-id 'primary'",
+  example: "{read-bin} list-specific-calendar-events --calendar-id 'primary'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
   effect: 'read',

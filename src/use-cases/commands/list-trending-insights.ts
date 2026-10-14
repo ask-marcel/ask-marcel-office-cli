@@ -17,7 +17,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/insights/trending',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-trending',
   options: [...odataQueryOptions, WITH_ITEM_OPTION],
-  example: 'ask-marcel-office list-trending-insights',
+  example: '{read-bin} list-trending-insights',
   responseShape: 'collection of Microsoft Graph `trending` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -182,7 +182,7 @@ const meta: ReadCommandMeta = {
         'A OneDrive / SharePoint sharing URL — the address from the "Copy link" / "Share" action in the OneDrive or SharePoint UI. Examples: `https://contoso.sharepoint.com/:b:/s/sitename/EaB1cD...`, `https://contoso-my.sharepoint.com/personal/user_contoso_com/Documents/file.pdf`, `https://1drv.ms/b/s!AbCdEfGh...`. The CLI does not follow the redirect on `1drv.ms` links — the short URL itself is encoded as the share token (Graph resolves it on the server side).',
     },
   ],
-  example: "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
+  example: "{read-bin} resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
   responseShape:
     "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder).",
   effect: 'read',

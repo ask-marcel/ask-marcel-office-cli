@@ -51,7 +51,7 @@ const meta: ReadCommandMeta = {
         'KQL / free-text search query. Matches filename, content, and metadata across every drive the user can access. Add `filetype:` to narrow (e.g. `q1 budget filetype:xlsx`), or field operators like `filename:`. Free text works everywhere.',
     },
   ],
-  example: "ask-marcel-office search-all-files --query 'q1 budget filetype:xlsx'",
+  example: "{read-bin} search-all-files --query 'q1 budget filetype:xlsx'",
   bodyTemplate:
     "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit",
   responseShape:
