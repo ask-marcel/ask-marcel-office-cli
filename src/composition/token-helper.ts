@@ -8,12 +8,14 @@ import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { createBunFileSystem } from '../infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '../infra/filesystem-node.ts';
+import { fillNames } from '../use-cases/commands/bin-names.ts';
 import * as token from '../use-cases/commands/token.ts';
 import type { TokenArgs } from '../use-cases/commands/token-args.ts';
 import { parseTokenArgs } from '../use-cases/commands/token-args.ts';
 import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
+import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';
 
 /*
  * The `token` helper: `token --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`
@@ -124,12 +126,15 @@ export const runTokenHelper = async (deps: TokenHelperDeps): Promise<number> => 
   const print = deps.print ?? writeStdout;
   const paths = resolveAuthPaths(deps.home ?? homedir(), deps.env ?? process.env);
   await recordTokenHelperLocation(fs, tokenHelperLocatorPath(paths), deps.location);
+  // A failure line's message and remedy name the auth bin through its
+  // placeholder (bin-names.ts); the helper is the single package's.
+  const failure = (line: unknown): string => `${fillNames(JSON.stringify(line), SINGLE_PACKAGE_NAMES)}\n`;
   const args = parseTokenArgs(deps.argv);
   if (!args.ok) {
-    print(`${JSON.stringify(args.error)}\n`);
+    print(failure(args.error));
     return MISUSED;
   }
   const line = await token.execute(await issuerFor(deps, paths, fs, args.value), args.value);
-  print(`${JSON.stringify(line.ok ? line.value : line.error)}\n`);
+  print(line.ok ? `${JSON.stringify(line.value)}\n` : failure(line.error));
   return line.ok ? ISSUED : NOT_ISSUED;
 };

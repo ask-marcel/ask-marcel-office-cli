@@ -40,7 +40,7 @@ const knownCode = (parsed: unknown): string | undefined => {
   return KNOWN_CODES.find((known) => known === code);
 };
 
-const byHand = (tier: TokenTier): string => `ask-marcel-office token --tier ${tier}${tier === 'guest' ? ' --tenant <guid>' : ''}`;
+const byHand = (tier: TokenTier): string => `{auth-bin} token --tier ${tier}${tier === 'guest' ? ' --tenant <guid>' : ''}`;
 
 const failed = (tier: TokenTier, run: ProcessRunResult, parsed: unknown): Result<never, TokenError> => {
   const code = knownCode(parsed);

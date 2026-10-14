@@ -53,8 +53,8 @@ describe("reading the token helper's answer", () => {
     const error = failure(readHelperAnswer('guest', printed(2, { errorCode: 'invalid_arguments', tier: null, message: 'm', remedy: 'r' })));
     expect(error.code).toBe('invalid_arguments');
     expect(error.message).toContain('exit code 2');
-    expect(error.message).toContain('`ask-marcel-office token --tier guest --tenant <guid>`');
-    expect(failure(readHelperAnswer('basic', printed(1, {}))).message).toContain('`ask-marcel-office token --tier basic`');
+    expect(error.message).toContain('`{auth-bin} token --tier guest --tenant <guid>`');
+    expect(failure(readHelperAnswer('basic', printed(1, {}))).message).toContain('`{auth-bin} token --tier basic`');
   });
 
   it('never takes a token line printed with a failing exit code: only exit 0 carries a token', () => {

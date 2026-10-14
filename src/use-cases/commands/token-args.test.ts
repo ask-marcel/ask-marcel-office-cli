@@ -39,7 +39,7 @@ describe('token helper: what a caller asks for', () => {
 
   it('names the program to call in the remedy of every refusal', () => {
     for (const argv of [[], ['--tier', 'guest'], ['--tier', 'basic', '--reject', 'x']]) {
-      expect(refused(argv).remedy).toContain('`ask-marcel-office token --tier');
+      expect(refused(argv).remedy).toContain('`{auth-bin} token --tier');
     }
   });
 

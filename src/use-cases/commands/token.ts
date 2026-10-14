@@ -19,26 +19,25 @@ type FailureCode = 'not_authenticated' | 'secondary_token_unavailable' | 'sign_i
 // failure gets the code of its tier.
 const PASSED_THROUGH: ReadonlyArray<FailureCode> = ['not_authenticated', 'secondary_token_unavailable', 'sign_in_in_progress', 'token_cache_unwritable'];
 
-const SIGN_IN = 'Run `ask-marcel-office login` in a terminal to sign in, then check every token with `ask-marcel-office status`.';
+const SIGN_IN = 'Run `{auth-bin} login` in a terminal to sign in, then check every token with `{auth-bin} status`.';
 const SECONDARY_REMEDY: Readonly<Record<TokenTier, string>> = {
   basic: SIGN_IN,
   elevated:
-    'Run `ask-marcel-office login` in a terminal on a machine with a browser: the elevated token has no refresh token, and only a browser sign-in renews it. Check with `ask-marcel-office status`.',
-  chatsvcagg: 'Run `ask-marcel-office login` in a terminal; it renews the Teams chat tokens. Check with `ask-marcel-office status`.',
-  ic3: 'Run `ask-marcel-office login` in a terminal; it renews the Teams chat tokens. Check with `ask-marcel-office status`.',
+    'Run `{auth-bin} login` in a terminal on a machine with a browser: the elevated token has no refresh token, and only a browser sign-in renews it. Check with `{auth-bin} status`.',
+  chatsvcagg: 'Run `{auth-bin} login` in a terminal; it renews the Teams chat tokens. Check with `{auth-bin} status`.',
+  ic3: 'Run `{auth-bin} login` in a terminal; it renews the Teams chat tokens. Check with `{auth-bin} status`.',
   guest:
-    'Check that you are a guest in that tenant and that its administrator allows this client, then run `ask-marcel-office login` to renew the session. Check with `ask-marcel-office status`.',
+    'Check that you are a guest in that tenant and that its administrator allows this client, then run `{auth-bin} login` to renew the session. Check with `{auth-bin} status`.',
 };
 const REMEDY: Readonly<Record<Exclude<FailureCode, 'secondary_token_unavailable'>, string>> = {
   not_authenticated: SIGN_IN,
-  auth_cancelled: 'Ask again and finish the sign-in in the browser window, or run `ask-marcel-office login` in a terminal. Check with `ask-marcel-office status`.',
-  sign_in_in_progress:
-    'Wait for the other ask-marcel-office process to finish signing in or refreshing, then ask again; `ask-marcel-office status` shows the tokens once it is done.',
-  token_cache_unwritable: 'Make the folder `~/.ask-marcel` writable by this user, then run `ask-marcel-office login`. Check with `ask-marcel-office status`.',
+  auth_cancelled: 'Ask again and finish the sign-in in the browser window, or run `{auth-bin} login` in a terminal. Check with `{auth-bin} status`.',
+  sign_in_in_progress: 'Wait for the other {auth-bin} process to finish signing in or refreshing, then ask again; `{auth-bin} status` shows the tokens once it is done.',
+  token_cache_unwritable: 'Make the folder `~/.ask-marcel` writable by this user, then run `{auth-bin} login`. Check with `{auth-bin} status`.',
 };
 
 const INVALID_REGION_MESSAGE = 'The token cache names a Teams region that is not a region name, so no token was handed out.';
-const INVALID_REGION_REMEDY = 'Run `ask-marcel-office login --force` in a terminal to capture the region again. Check with `ask-marcel-office status`.';
+const INVALID_REGION_REMEDY = 'Run `{auth-bin} login --force` in a terminal to capture the region again. Check with `{auth-bin} status`.';
 
 const codeOf = (tier: TokenTier, error: TokenError): FailureCode => {
   if (error.type === 'auth_cancelled') return 'auth_cancelled';

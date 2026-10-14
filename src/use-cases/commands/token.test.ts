@@ -67,7 +67,7 @@ describe('token helper: the line it prints', () => {
     const line = await issue(['--tier', 'ic3'], fakeIssuer(ok(TOKEN), 'emea/../admin'));
     expect(line).toMatchObject({ errorCode: 'secondary_token_unavailable', tier: 'ic3', message: expect.stringContaining('not a region name') });
     expect(JSON.stringify(line)).not.toContain(TOKEN);
-    expect((line as { remedy: string }).remedy).toContain('ask-marcel-office login --force');
+    expect((line as { remedy: string }).remedy).toContain('{auth-bin} login --force');
   });
 
   // The region is read after the token is issued; a cache gone or unreadable
@@ -85,7 +85,7 @@ describe('token helper: the line it prints', () => {
       errorCode: 'not_authenticated',
       tier: 'basic',
       message: 'Not signed in.',
-      remedy: 'Run `ask-marcel-office login` in a terminal to sign in, then check every token with `ask-marcel-office status`.',
+      remedy: 'Run `{auth-bin} login` in a terminal to sign in, then check every token with `{auth-bin} status`.',
     });
   });
 
@@ -118,7 +118,7 @@ describe('token helper: the line it prints', () => {
 
   // A caller pastes the remedy in front of a person, who may not know which
   // program to run: every remedy names the bin and the command that checks.
-  it('names ask-marcel-office and its status command in the remedy of every failure', async () => {
+  it('names the auth bin and its status command in the remedy of every failure', async () => {
     const remedies: string[] = [];
     const remedyOf = async (argv: ReadonlyArray<string>, issuer: TokenIssuer): Promise<void> => {
       remedies.push(((await issue(argv, issuer)) as { remedy: string }).remedy);
@@ -139,8 +139,8 @@ describe('token helper: the line it prints', () => {
     await remedyOf(['--tier', 'ic3'], fakeIssuer(ok(TOKEN), 'emea/../admin'));
     expect(remedies).toHaveLength(31);
     for (const remedy of remedies) {
-      expect(remedy).toContain('`ask-marcel-office');
-      expect(remedy).toContain('ask-marcel-office status');
+      expect(remedy).toContain('`{auth-bin} ');
+      expect(remedy).toContain('{auth-bin} status');
     }
   });
 
