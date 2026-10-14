@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../domain/result.ts';
-import { fakeCommand, fakeReadPackage } from '../test-helpers/command-package-fake.ts';
+import { fakeCommand, fakeCommandPackage, fakeReadPackage } from '../test-helpers/command-package-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
@@ -107,5 +107,33 @@ describe('a caller sent to the server that holds what it asked for', () => {
 
   it('never offers the token helper for a near miss', async () => {
     expect(await call('run-command', { command: 'toke' })).not.toContain('token`');
+  });
+});
+
+describe('a sign-in failure on a server that has no login tool', () => {
+  it('names the login tool of the auth server under a sign-in failure, since this server has none', async () => {
+    const out = await call('run-command', { command: 'list-widgets' }, failingWith('not_authenticated', 'Not signed in. Run `{auth-bin} login` first.'));
+    expect(out).toContain('error: Not signed in. Run `widget-auth login` first. From an MCP client, call the `login` tool of the widget-auth server (`widget-auth mcp`).');
+  });
+
+  it('names it under a missing secondary token and a refused token too', async () => {
+    for (const code of ['secondary_token_unavailable', 'InvalidAuthenticationToken', 'TokenExpired']) {
+      expect(await call('run-command', { command: 'list-widgets' }, failingWith(code, 'No token.'))).toContain(
+        'No token. From an MCP client, call the `login` tool of the widget-auth server (`widget-auth mcp`).'
+      );
+    }
+  });
+
+  it('adds nothing to a failure a sign-in does not cure', async () => {
+    expect(await call('run-command', { command: 'list-widgets' }, failingWith('sign_in_in_progress', 'Another process is signing in.'))).toContain(
+      'error: Another process is signing in.\n'
+    );
+  });
+
+  it('adds nothing on the server that has the login tool itself, where auth and this package share one bin', async () => {
+    const single = fakeCommandPackage({
+      registry: { 'list-widgets': { ...fakeCommand(), execute: async () => err({ type: 'auth_failed', message: 'Not signed in.', code: 'not_authenticated' }) } },
+    });
+    expect(await call('run-command', { command: 'list-widgets' }, single)).toContain('error: Not signed in.\n');
   });
 });

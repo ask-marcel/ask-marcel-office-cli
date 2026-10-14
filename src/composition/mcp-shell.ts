@@ -67,6 +67,15 @@ const errText = (message: string, code?: string, source?: Parameters<typeof rend
   isError: true,
 });
 
+// The failures a sign-in cures. On a server without the `login` tool (any but
+// the auth package's), the message also names the server that has it.
+const SIGN_IN_CODES: ReadonlySet<string> = new Set(['not_authenticated', 'secondary_token_unavailable', 'InvalidAuthenticationToken', 'TokenExpired']);
+
+const signInPointer = (code: string | undefined, names: NameSource): string =>
+  code !== undefined && SIGN_IN_CODES.has(code) && names.bins.auth !== names.binName
+    ? ` From an MCP client, call the \`login\` tool of the ${names.bins.auth} server (\`${names.bins.auth} mcp\`).`
+    : '';
+
 // Derived from the single curated order in docs-render, never hardcoded, so a new category can never
 // drift out of sync with what the category filter actually accepts (docs-render.test pins completeness).
 const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
@@ -176,7 +185,8 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
       return failText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
     const request = { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir, surface: 'mcp' as const };
     const result = await runRegistryCommand({ graph, fs, commandPackage }, request);
-    if (!result.ok) return failText(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
+    if (!result.ok)
+      return failText(`${result.error.message}${signInPointer(result.error.code, commandPackage)}`, result.error.code, result.error.source, result.error.retryAfterSeconds);
     return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params ?? {}), commandPackage));
   };
 
