@@ -371,10 +371,7 @@ const HINT_RULES: ReadonlyArray<HintRule> = [
 // message is matched before its bin placeholders (`{bin}`, `{auth-bin}`,
 // `{read-bin}`, `{write-bin}`; bin-names.ts) are filled (render-to-string.ts).
 const ACTIONABLE_ADVICE = /`(\{(?:(?:auth|read|write)-)?bin\}\s+)?[a-z][a-z0-9-]+(\s+--[a-z-]+)?`/u;
-// The literal bin counts too until every command message names its bin
-// through a placeholder (package split, step 14).
-const LITERAL_BIN_ADVICE = /`ask-marcel-office\s+[a-z][a-z0-9-]+(\s+--[a-z-]+)?`/u;
-const hasActionableAdvice = (message: string): boolean => ACTIONABLE_ADVICE.test(message) || LITERAL_BIN_ADVICE.test(message);
+const hasActionableAdvice = (message: string): boolean => ACTIONABLE_ADVICE.test(message);
 
 const ruleMatches = (rule: HintRule, message: string, code: string | undefined): boolean => {
   if (rule.matchCode !== undefined && code !== undefined && rule.matchCode(code)) return true;

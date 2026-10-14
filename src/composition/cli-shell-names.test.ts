@@ -146,6 +146,10 @@ describe('a command the package does not hold', () => {
     expect(out).not.toContain('create-mail-draft');
   });
 
+  it('offers every auth command a terminal can run for a near miss, logout included', async () => {
+    expect(await run(['logou'])).toContain('Did you mean `widget-auth logout` or `widget-auth login`?');
+  });
+
   it('never offers the token helper for a near miss', async () => {
     expect(await run(['toke'])).not.toContain('token`');
   });

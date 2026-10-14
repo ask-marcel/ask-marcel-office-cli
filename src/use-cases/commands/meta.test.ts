@@ -274,8 +274,7 @@ describe('command meta — invariants on every registered command', () => {
       });
 
       it('provides a runnable example beginning with the bin of its package (command-directory.ts) and its own name', () => {
-        // The literal bin is accepted until every example names it through its placeholder (package split, step 14).
-        expect(cmd.meta.example.startsWith(`{${commandRole(name)}-bin} ${name}`) || cmd.meta.example.startsWith(`ask-marcel-office ${name}`)).toBe(true);
+        expect(cmd.meta.example.startsWith(`{${commandRole(name)}-bin} ${name}`)).toBe(true);
       });
 
       it('has a non-empty category, graphMethod from the HTTP-verb set, non-empty graphPathTemplate, and non-empty responseShape when declared (invariants on the meta block itself, killing inert-config-string mutants)', () => {
@@ -340,8 +339,6 @@ describe('command meta — invariants on every registered command', () => {
         const ref = m[2] ?? '';
         if (!valid.has(ref) || commandRole(ref) !== m[1]) phantom.push(`${name}: ${m[0]}`);
       }
-      // The literal bin, until every reference names it through its placeholder (package split, step 14).
-      for (const m of prose.matchAll(/ask-marcel-office\s+([a-z][a-z0-9-]+)/g)) if (!valid.has(m[1] ?? '')) phantom.push(`${name}: ask-marcel-office ${m[1]}`);
       // (b) backticked command-shaped tokens (verb-prefixed kebab) — `feeds \`get-calendar-event\``
       for (const m of prose.matchAll(/`([a-z][a-z0-9-]+)`/g)) {
         const tok = m[1] ?? '';
