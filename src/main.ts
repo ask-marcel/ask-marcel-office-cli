@@ -44,7 +44,7 @@ const TOKEN_HELPER = { execPath: process.execPath, entry: join(dirname(selfPath)
 const recordTokenHelper = (deps: BuiltDeps): Promise<void> => recordTokenHelperLocation(deps.fs, tokenHelperLocatorPath(resolveAuthPaths(homedir(), process.env)), TOKEN_HELPER);
 
 const serveMcp = async (): Promise<void> => {
-  const [{ buildMcpServer }, { StdioServerTransport }] = await Promise.all([import('./composition/mcp.ts'), import('@modelcontextprotocol/sdk/server/stdio.js')]);
+  const [{ buildMcpServer }, { StdioServerTransport }] = await Promise.all([import('./composition/mcp-shell.ts'), import('@modelcontextprotocol/sdk/server/stdio.js')]);
   const deps = buildDeps();
   await recordTokenHelper(deps);
   const server = buildMcpServer({

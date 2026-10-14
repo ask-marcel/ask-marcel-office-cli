@@ -7,7 +7,7 @@ import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
-import { buildMcpServer } from './mcp.ts';
+import { buildMcpServer } from './mcp-shell.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
   const original = process.stdout.write.bind(process.stdout);

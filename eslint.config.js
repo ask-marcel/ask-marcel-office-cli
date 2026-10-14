@@ -138,9 +138,9 @@ export default [
     //
     // So this rule is the enforcement. Render via `renderToString` /
     // `renderErrorToString` (pure) and return the string; never write it.
-    // Scoped to mcp.ts deliberately: `cli.ts` and `presenter/output.ts` own
+    // Scoped to mcp-shell.ts deliberately: `cli.ts` and `presenter/output.ts` own
     // stdout legitimately in CLI mode.
-    files: ['src/composition/mcp.ts'],
+    files: ['src/composition/mcp-shell.ts'],
     rules: {
       'no-restricted-properties': [
         'error',
