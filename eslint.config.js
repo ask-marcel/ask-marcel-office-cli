@@ -140,7 +140,7 @@ export default [
     // `renderErrorToString` (pure) and return the string; never write it.
     // Scoped to the MCP modules deliberately: `cli.ts` and `presenter/output.ts` own
     // stdout legitimately in CLI mode.
-    files: ['src/composition/{mcp,mcp-shell}.ts'],
+    files: ['src/composition/{mcp,mcp-shell,auth-mcp}.ts'],
     rules: {
       'no-restricted-properties': [
         'error',

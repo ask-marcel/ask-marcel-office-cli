@@ -63,6 +63,7 @@ import '../src/composition/single-package.ts';
 // imported by anything already listed here.
 import '../src/composition/mcp.ts';
 import '../src/composition/mcp-shell.ts';
+import '../src/composition/auth-mcp.ts';
 // The token helper is reached from main.ts and src/token.ts, which no test loads.
 import '../src/composition/token-helper.ts';
 import '../src/composition/token-source.ts';

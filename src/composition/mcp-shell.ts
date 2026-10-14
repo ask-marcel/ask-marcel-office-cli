@@ -20,7 +20,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import type { AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
 import { describeWrites, WRITE_EFFECTS, writeGroups } from '../use-cases/commands/command-effect.ts';
@@ -28,12 +27,8 @@ import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs.ts';
 import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
 import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
-import * as login from '../use-cases/commands/login.ts';
-import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
-import * as status from '../use-cases/commands/status.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { LoginAuthFactory } from './build-deps.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
 import { commandPackage } from './single-package.ts';
@@ -42,17 +37,12 @@ import { unknownCommandMessage } from '../domain/closest-names.ts';
 const MCP_REMEDY = 'Call list-commands to see every command.';
 const PACKAGE_NAME = 'ask-marcel-office-cli';
 
-type BuildMcpServerDeps = {
-  readonly auth: AuthLadder;
+type McpShellDeps = {
   readonly graph: GraphClient;
   readonly fs: FileSystem;
   readonly version?: string;
-  /**
-   * Builds the AuthManager for an interactive `login` run (it may recapture
-   * secondary tokens via the browser, unlike the command-path `auth`). Mirrors
-   * `cli.ts`: when omitted (tests), the login tool falls back to `auth`.
-   */
-  readonly makeLoginAuth?: LoginAuthFactory;
+  /** Registers the package's own tools (`login`, `status`…) after the four gateway tools. */
+  readonly addTools?: (server: McpServer) => void;
 };
 
 // The SDK's own result type rather than a hand-rolled one — it requires a
@@ -88,10 +78,10 @@ const writesAreDestructive = writeGroups(cmdRegistry).some((group) => WRITE_EFFE
 // drift out of sync with what the category filter actually accepts (docs-render.test pins completeness).
 const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 
-const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
+const buildMcpShell = (deps: McpShellDeps): McpServer => {
   // Same rule as the CLI: named days resolve in `ASKMARCEL_TZ`, else the machine's zone.
   setDateZone(resolveDateZone(undefined).zone);
-  const { auth, graph, fs } = deps;
+  const { graph, fs } = deps;
   const version = deps.version ?? '0.0.0';
   const server = new McpServer({ name: 'ask-marcel-office', version });
 
@@ -199,58 +189,11 @@ const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => {
     async ({ command, params, outputPath, outputDir }): Promise<CallToolResult> => runResolved(command, params, outputPath, outputDir, true)
   );
 
-  server.registerTool(
-    'login',
-    {
-      title: 'Sign in to Microsoft 365',
-      description:
-        "Authenticate via the Teams web client (cached token -> refresh -> browser). Opens a browser window on this machine when it needs one. Run this when a command fails with an auth error: the elevated (M365) token lapses roughly hourly and only a browser can recapture it. SLOW BY NATURE — a browser sign-in measured 37-64 seconds even with no MFA prompt, which straddles the 60s default MCP tool timeout, so this call may time out. If it does, the sign-in often completed anyway: re-run your original command before calling login again. Raise MCP_TOOL_TIMEOUT (or your client's equivalent) to ~300000 to avoid it. First-time setup, where an MFA prompt adds minutes, is better done in a terminal: `ask-marcel-office login`.",
-      inputSchema: {
-        force: z
-          .boolean()
-          .optional()
-          .describe(
-            'Ignore the cache and re-capture every token via the browser. A plain login already recaptures the elevated token when it is missing and leaves the browser session alone; force clears that session first, which deletes the 90-day "Stay signed in" cookie and usually forces the user to enter their password. Use it only when a tier is stuck after a plain login.'
-          ),
-      },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    },
-    async ({ force }): Promise<CallToolResult> => {
-      const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
-      const result = await login.execute(loginAuth, { force: force ?? false });
-      if (!result.ok) return errText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
-      const info = await loginAuth.getTokenInfo();
-      if (!info.ok) return errText(info.error.message);
-      return okText(
-        renderToString(
-          buildLoginSummary({
-            elevatedAvailable: info.value.elevated.available,
-            chatsvcaggAvailable: info.value.chatsvcagg.available,
-            ic3Available: info.value.ic3.available,
-          }),
-          'text'
-        )
-      );
-    }
-  );
-
-  server.registerTool(
-    'status',
-    {
-      title: 'Show the cached tokens',
-      description:
-        'Show the four cached tokens (basic, elevated, chatsvcagg and ic3). For each token, it shows if the token is available and the seconds before its expiry. It also shows the scopes, the refresh method, and the data that the token lets you read. It reads only the token cache, and it does not make a Graph call or open a browser. Call it before login. If the token that a command uses is available, a sign-in is not necessary.',
-      annotations: { readOnlyHint: true, idempotentHint: true },
-    },
-    async (): Promise<CallToolResult> => {
-      const result = await status.execute(auth);
-      if (!result.ok) return errText(result.error.message, result.error.code, 'cli');
-      return okText(renderToString(result.value, 'text'));
-    }
-  );
+  // The package's own tools (login and status in the single package) sit beside the gateway tools.
+  deps.addTools?.(server);
 
   return server;
 };
 
-export { buildMcpServer };
-export type { BuildMcpServerDeps };
+export { buildMcpShell, errText, okText };
+export type { McpShellDeps };
