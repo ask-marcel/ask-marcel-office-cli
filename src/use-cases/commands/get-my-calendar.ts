@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/calendar',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get-calendar',
   options: [...selectExpandOptions],
-  example: "ask-marcel-office get-my-calendar --select 'id,name'",
+  example: "{read-bin} get-my-calendar --select 'id,name'",
   responseShape: 'single Microsoft Graph `calendar` resource',
   effect: 'read',
   scopesRequired: ['Calendars.Read'],

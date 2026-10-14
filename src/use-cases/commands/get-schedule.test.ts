@@ -127,6 +127,6 @@ describe('get-schedule', () => {
   it('is a read-only POST (its effect is `read`) and documents Calendars.Read in its example', () => {
     expect(meta.effect).toBe('read');
     expect(meta.graphMethod).toBe('POST');
-    expect(meta.example).toContain('ask-marcel-office get-schedule');
+    expect(meta.example).toContain('{read-bin} get-schedule');
   });
 });

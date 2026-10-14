@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
     { name: 'end-date-time', key: 'endDateTime', required: true, description: `Upper bound. ${RELATIVE_DATE_DESCRIPTION}` },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
+  example: "{read-bin} list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
   responseShape: 'collection of Microsoft Graph `event` resources (single occurrences) under `value[]`',
   effect: 'read',
   scopesRequired: ['Calendars.Read'],

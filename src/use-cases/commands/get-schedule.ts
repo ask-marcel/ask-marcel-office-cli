@@ -75,7 +75,7 @@ const meta: ReadCommandMeta = {
         'Slot granularity in minutes for the `availabilityView` string (5-1440; Graph defaults to 30). `15` gives quarter-hour resolution — one character per 15-minute slot.',
     },
   ],
-  example: "ask-marcel-office get-schedule --schedules 'alice@contoso.com,bob@contoso.com' --start-date-time today --end-date-time +1d --availability-view-interval 30",
+  example: "{read-bin} get-schedule --schedules 'alice@contoso.com,bob@contoso.com' --start-date-time today --end-date-time +1d --availability-view-interval 30",
   bodyTemplate:
     "{ schedules: [{schedules}], startTime: { dateTime: '{start-date-time}', timeZone: 'UTC' }, endTime: { dateTime: '{end-date-time}', timeZone: 'UTC' }, availabilityViewInterval?: {availability-view-interval} }",
   responseShape:
