@@ -48,6 +48,7 @@ const SIBLING_REGISTRY_IMPORT = "import { commands } from './index.ts';\nexport 
 const LIFECYCLE_ENTRIES_IMPORT = "import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';\nexport const f = (): unknown => LIFECYCLE_ENTRIES;\n";
 const LOGIN_IMPORT = "import * as login from '../use-cases/commands/login.ts';\nexport const f = (): unknown => login;\n";
 const SINGLE_PACKAGE_IMPORT = "import { commandPackage } from './single-package.ts';\nexport const f = (): unknown => commandPackage;\n";
+const SINGLE_PACKAGE_NAMES_IMPORT = "import { SINGLE_PACKAGE_NAMES } from '../../composition/single-package-names.ts';\nexport const f = (): unknown => SINGLE_PACKAGE_NAMES;\n";
 const BARREL_REGISTRY_IMPORT = "import { commands } from '../index.ts';\nexport const f = (): unknown => commands;\n";
 const REGISTRY_DIRECTORY_IMPORT = "import * as registry from '../use-cases/commands';\nexport const f = (): unknown => registry;\n";
 const SIBLING_DIRECTORY_IMPORT = "import * as registry from '.';\nexport const f = (): unknown => registry;\n";
@@ -64,6 +65,7 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the CLI builder never imports the registry', path: 'src/composition/cli-shell.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the MCP gateway never imports a lifecycle command', path: 'src/composition/mcp-shell.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'run-registry-command never imports the single package', path: 'src/composition/run-registry-command.ts', source: SINGLE_PACKAGE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the bin placeholders never take the single package names', path: 'src/use-cases/commands/bin-names.ts', source: SINGLE_PACKAGE_NAMES_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the docs builders never import the lifecycle entries', path: 'src/use-cases/commands/docs-builders.ts', source: LIFECYCLE_ENTRIES_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the command framework never imports the registry', path: 'src/use-cases/commands/resolve-command.ts', source: SIBLING_REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'a core docs builder keeps the read-only ban', path: 'src/use-cases/commands/docs-builders.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },

@@ -39,7 +39,7 @@ const CORE_IMPORT_BANS = [
     message: 'Core never imports a package entry: index.ts re-exports the registry and buildDeps, and main.ts and token.ts are bundle entries.',
   },
   {
-    regex: '^\\.\\.?/(.*/)?(single-package|build-deps|cli|mcp|auth-cli|auth-mcp)(\\.[cm]?[jt]s)?$',
+    regex: '^\\.\\.?/(.*/)?(single-package|single-package-names|build-deps|cli|mcp|auth-cli|auth-mcp)(\\.[cm]?[jt]s)?$',
     message: 'Core never reaches the composition root that wires the single package: take what you need as a parameter (CommandPackage, a hook) instead.',
   },
 ];
@@ -288,7 +288,7 @@ export default [
     // hands them, so they never import the registry (by path, by folder, through
     // the package entry, or with a dynamic import), a lifecycle command, or the
     // modules that wire the single package (`single-package.ts`, `build-deps.ts`,
-    // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`).
+    // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`, `single-package-names.ts`).
     // A file joins a list when it becomes core (step 15 extracts the shared helpers).
     files: [
       'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',
@@ -311,6 +311,7 @@ export default [
     // The core files that the read-only block above also guards keep both bans.
     files: [
       'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command}.ts',
+      'src/use-cases/commands/{command-directory,bin-names,unknown-command}.ts',
       'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
       'src/infra/{graph-request,read-graph,graph-substrate}.ts',
     ],
