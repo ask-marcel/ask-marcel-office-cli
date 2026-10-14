@@ -13,7 +13,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/joinedTeams',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams',
   options: [],
-  example: 'ask-marcel-office list-joined-teams',
+  example: '{read-bin} list-joined-teams',
   responseShape: 'collection of Microsoft Graph `team` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -28,7 +28,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
+  example: "{read-bin} get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
   responseShape: 'single Microsoft Graph `driveItem` resource (folder)',
   effect: 'read',
   scopesRequired: ['Channel.ReadBasic.All', 'Files.Read'],

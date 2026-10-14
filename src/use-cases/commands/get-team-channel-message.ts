@@ -21,8 +21,8 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/messages/{message-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-get',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.' },
-    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`.' },
+    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.' },
+    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `{read-bin} list-team-channels`.' },
     {
       name: 'message-id',
       key: 'messageId',
@@ -31,7 +31,7 @@ const meta: ReadCommandMeta = {
     },
     ...pickODataOptions(['select']),
   ],
-  example: "ask-marcel-office get-team-channel-message --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
+  example: "{read-bin} get-team-channel-message --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
   responseShape:
     'single Microsoft Graph `chatMessage` resource: `id`, `replyToId`, `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`',
   effect: 'read',

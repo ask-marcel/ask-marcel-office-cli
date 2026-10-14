@@ -92,12 +92,12 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/messages/delta?$filter=lastModifiedDateTime gt {since}&$expand=replies',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-delta',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.' },
+    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.' },
     {
       name: 'channel-id',
       key: 'channelId',
       required: true,
-      description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`, or `get-team-primary-channel` for General.',
+      description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `{read-bin} list-team-channels`, or `get-team-primary-channel` for General.',
     },
     {
       name: 'since',
@@ -121,7 +121,7 @@ const meta: ReadCommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel-office convert-team-channel-messages-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d'",
+  example: "{read-bin} convert-team-channel-messages-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d'",
   responseShape:
     '`{ contentType: "text/markdown", size, text, note }`: a `# Transcript of <channel>` heading, then every post as `### date time · author` with its body and quoted replies. The `note` counts the posts and pages read, the system events omitted, and says when the walk was cut at `--max-pages`.',
   producesBytes: true,

@@ -65,8 +65,8 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/messages/{message-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chatmessage-get',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.' },
-    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`.' },
+    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.' },
+    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `{read-bin} list-team-channels`.' },
     {
       name: 'message-id',
       key: 'messageId',
@@ -82,7 +82,7 @@ const meta: ReadCommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel-office convert-team-channel-message-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
+  example: "{read-bin} convert-team-channel-message-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: the post heading, its body, then the replies as quoted blocks. The optional `note` reports a failed or truncated replies read.',
   producesBytes: true,
