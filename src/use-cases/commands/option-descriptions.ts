@@ -10,7 +10,7 @@
  * command. Always points the caller at how to obtain a drive id.
  */
 export const DRIVE_ID_DESCRIPTION =
-  'Microsoft Graph drive ID. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';
+  'Microsoft Graph drive ID. Use `{read-bin} list-drives` for the personal OneDrive, or `{read-bin} list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';
 
 /**
  * `--drive-id` for the Excel commands. Same guidance as the generic one, with
@@ -18,4 +18,4 @@ export const DRIVE_ID_DESCRIPTION =
  * so the five Excel commands that carry it cannot drift apart.
  */
 export const WORKBOOK_DRIVE_ID_DESCRIPTION =
-  'Microsoft Graph drive ID containing the workbook. Use `ask-marcel-office list-drives` for the personal OneDrive, or `ask-marcel-office list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';
+  'Microsoft Graph drive ID containing the workbook. Use `{read-bin} list-drives` for the personal OneDrive, or `{read-bin} list-sharepoint-site-drives --site-id <id>` for a SharePoint document library.';

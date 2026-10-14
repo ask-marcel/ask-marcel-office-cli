@@ -43,7 +43,7 @@ const meta: ReadCommandMeta = {
     },
     ...noFilterOptions,
   ],
-  example: "ask-marcel-office search-onenote-pages --query 'meeting notes' --top 25",
+  example: "{read-bin} search-onenote-pages --query 'meeting notes' --top 25",
   responseShape: 'collection of Microsoft Graph `onenotePage` resources under `value[]` whose title contains the substring',
   pagination: true,
   effect: 'read',

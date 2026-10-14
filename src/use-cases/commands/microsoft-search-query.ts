@@ -65,7 +65,7 @@ const meta: ReadCommandMeta = {
         'Hits per entity type, 1 to 25 (default 25). Six entity types are searched, so the response holds up to six times this many hits; for a deep file search, `search-all-files` pages 200 at a time.',
     },
   ],
-  example: "ask-marcel-office microsoft-search-query --query 'q3 budget'",
+  example: "{read-bin} microsoft-search-query --query 'q3 budget'",
   bodyTemplate:
     "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given",
   responseShape:

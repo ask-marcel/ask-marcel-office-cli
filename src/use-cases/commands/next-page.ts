@@ -59,7 +59,7 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
 
 const meta: ReadCommandMeta = {
   summary:
-    'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: ask-marcel-office next-page --url \'<url>\'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`. `--top` keeps a page size on the continuation (Graph drops it after page one otherwise), and a To Do task page gets the `webUrl` of each task, as the To Do listings give page one.',
+    'Fetch the next page of a paginated Graph response. Pass the cursor the previous command emitted — in text mode the `---` footer prints the whole ready-to-run command (`next: {read-bin} next-page --url \'<url>\'`), so copy the line as-is (the URL is single-quoted because it contains `$`); in JSON mode use the top-level `nextLink` field. Never reach into `data["@odata.nextLink"]`; the CLI strips that and surfaces it as a first-class envelope/footer field. Automatically signs `/me/chats` and `/chats/...` cursors with the M365ChatClient elevated token to match the chat-metadata commands. When the cursor came from a partner-tenant (guest) drive listing, pass the same `--tenant-id` you used on the originating command, since the cursor carries no tenant and without it page 2 fails with `invalidAudienceUri`. `--top` keeps a page size on the continuation (Graph drops it after page one otherwise), and a To Do task page gets the `webUrl` of each task, as the To Do listings give page one.',
   category: 'meta',
   graphMethod: 'GET',
   graphPathTemplate: '{url}',
@@ -93,7 +93,7 @@ const meta: ReadCommandMeta = {
         'Page size for this continuation (positive integer, ≤ 1000), sent as `Prefer: odata.maxpagesize=N`: Graph honours a page size only on the request that carries it, so a mail delta walk that asked for `--top 100` gets 10 a page on every continuation without it. Basic-token cursors only: a chat or partner-tenant cursor is refused with it.',
     },
   ],
-  example: "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
+  example: "{read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
   responseShape: 'same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: "..." }` with the cursor at envelope level.',
   effect: 'read',
 };
