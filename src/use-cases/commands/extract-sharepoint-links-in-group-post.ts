@@ -52,7 +52,7 @@ const meta: ReadCommandMeta = {
     { name: 'thread-id', key: 'threadId', required: true, description: 'Conversation thread ID, the `id` of a `list-group-threads` entry.' },
     { name: 'post-id', key: 'postId', required: true, description: 'Post ID inside that thread, the `id` of a `list-group-thread-posts` entry.' },
   ],
-  example: "ask-marcel-office extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
+  example: "{read-bin} extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
   responseShape:
     '`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: "onedrive", owner }` or `{ kind: "site", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.',
   effect: 'read',

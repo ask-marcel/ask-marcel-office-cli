@@ -27,7 +27,7 @@ const meta: ReadCommandMeta = {
       description: 'Outlook message ID. Returned by `list-mail-messages` or `search-mail-messages`.',
     },
   ],
-  example: "ask-marcel-office get-mail-message-mime --message-id 'AAMkAD...'",
+  example: "{read-bin} get-mail-message-mime --message-id 'AAMkAD...'",
   responseShape:
     '`{ contentType: "text/plain", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.',
   producesBytes: true,

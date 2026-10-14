@@ -43,7 +43,7 @@ const meta: ReadCommandMeta = {
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that post. Returned by `list-group-post-attachments`.' },
   ],
   example:
-    "ask-marcel-office extract-group-post-attachment-images --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./post-images",
+    "{read-bin} extract-group-post-attachment-images --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./post-images",
   responseShape:
     '`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).',
   producesMedia: true,

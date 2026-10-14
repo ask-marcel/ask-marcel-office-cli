@@ -58,7 +58,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-group-post-attachment --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
+  example: "{read-bin} get-group-post-attachment --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
   responseShape:
     'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.',
   producesBytes: true,

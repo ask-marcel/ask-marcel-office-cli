@@ -22,11 +22,11 @@ const meta: ReadCommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: true,
-      description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages` or `list-mail-folder-messages`.',
+      description: 'Outlook message ID. Returned by `{read-bin} list-mail-messages` or `list-mail-folder-messages`.',
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-mail-message --message-id 'AAMkAGI2...'",
+  example: "{read-bin} get-mail-message --message-id 'AAMkAGI2...'",
   responseShape:
     'single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML.',
   effect: 'read',

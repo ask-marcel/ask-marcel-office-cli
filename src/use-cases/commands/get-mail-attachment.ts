@@ -35,11 +35,11 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/messages/{message-id}/attachments/{attachment-id}',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/attachment-get',
   options: [
-    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages`.' },
-    { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID. Returned by `ask-marcel-office list-mail-attachments`.' },
+    { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `{read-bin} list-mail-messages`.' },
+    { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID. Returned by `{read-bin} list-mail-attachments`.' },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
+  example: "{read-bin} get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
   responseShape:
     'single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.',
   producesBytes: true,

@@ -87,7 +87,7 @@ const meta: ReadCommandMeta = {
         'Optional comma-separated recipient addresses. When given, a draft matches only if it shares at least one To or Cc address with this list, narrowing subject-only collisions.',
     },
   ],
-  example: 'ask-marcel-office find-mail-drafts --subject "Contoso Q3 budget" --to-recipients "kim@example.com"',
+  example: '{read-bin} find-mail-drafts --subject "Contoso Q3 budget" --to-recipients "kim@example.com"',
   scopesRequired: ['Mail.Read'],
   responseShape:
     '`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window.',
