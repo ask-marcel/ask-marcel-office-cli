@@ -1,6 +1,6 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
-import { commandSuggestion, didYouMean, unknownCommandMessage } from '../domain/closest-names.ts';
+import { didYouMean } from '../domain/closest-names.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
@@ -14,6 +14,7 @@ import { firstSentence } from '../use-cases/commands/first-sentence.ts';
 import { persistIfRequested } from '../use-cases/commands/output-path.ts';
 import { describeWrites } from '../use-cases/commands/command-effect.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
+import { commandSuggestion, unknownCommandMessage } from '../use-cases/commands/unknown-command.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
 import { resolveDateZone } from './date-zone.ts';
 import { buildRenderContext, describeOutputPathError, runRegistryCommand } from './run-registry-command.ts';
@@ -106,7 +107,9 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     if (command !== undefined)
       return commandSuggestion(
         command,
-        program.commands.map((c) => c.name())
+        program.commands.map((c) => c.name()),
+        commandPackage,
+        'cli'
       );
     const flag = /^error: unknown option '([^']+)'/.exec(err.message)?.[1];
     return flag === undefined ? '' : didYouMean(flag, optionFlags);
@@ -312,7 +315,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       // pass an explicit `cli_unknown_command`
       // code so error-hints can match it structurally — gives the same
       // envelope shape as Commander's own `commander.unknownCommand` path.
-      fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy), 'cli_unknown_command');
+      fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy, commandPackage, 'cli'), 'cli_unknown_command');
     });
 
   program
@@ -376,7 +379,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
         // structured `cli_unknown_command`
         // code so the envelope matches the `help <unknown>` and
         // `commander.unknownCommand` paths — single branch for LLM consumers.
-        fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy), 'cli_unknown_command');
+        fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy, commandPackage, 'cli'), 'cli_unknown_command');
         return;
       }
       await writeOrPrintText(fill(result.value), 'text/markdown', 'docs');

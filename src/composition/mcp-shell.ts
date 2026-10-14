@@ -33,8 +33,8 @@ import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
 import { resolveCommand } from '../use-cases/commands/resolve-command.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import { resolveDateZone } from './date-zone.ts';
+import { unknownCommandMessage } from '../use-cases/commands/unknown-command.ts';
 import { buildRenderContext, runRegistryCommand } from './run-registry-command.ts';
-import { unknownCommandMessage } from '../domain/closest-names.ts';
 
 const MCP_REMEDY = 'Call list-commands to see every command.';
 
@@ -83,7 +83,8 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
   const fill = (text: string): string => fillNames(text, commandPackage);
   const failText = (message: string, code?: string, source?: Parameters<typeof renderErrorToString>[3], retryAfterSeconds?: number): CallToolResult =>
     errText(message, code, source, retryAfterSeconds, commandPackage);
-  const unknownCommand = (name: string, available: ReadonlyArray<string>): CallToolResult => failText(unknownCommandMessage(name, available, MCP_REMEDY), 'cli_unknown_command');
+  const unknownCommand = (name: string, available: ReadonlyArray<string>): CallToolResult =>
+    failText(unknownCommandMessage(name, available, MCP_REMEDY, commandPackage, 'mcp'), 'cli_unknown_command');
 
   // Derived, never hardcoded — and that goes for prose about it too. This comment
   // used to name the split as a pair of literals, and those literals were stale

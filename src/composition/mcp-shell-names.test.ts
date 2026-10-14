@@ -63,3 +63,49 @@ describe('the bins the MCP server of a package names', () => {
     expect(listed).not.toMatch(PLACEHOLDER);
   });
 });
+
+describe('a caller sent to the server that holds what it asked for', () => {
+  it('tells a caller of run-command that a write command lives on the write server, and to register it', async () => {
+    expect(await call('run-command', { command: 'create-mail-draft' })).toContain(
+      'error: Unknown command "create-mail-draft". `create-mail-draft` lives in @ask-marcel/office-write: register its MCP server (`widget-write mcp`) and call it there. Call list-commands to see every command.'
+    );
+  });
+
+  it('sends the docs of an auth command to the auth server', async () => {
+    expect(await call('get-command-docs', { command: 'status' })).toContain(
+      '`status` lives in @ask-marcel/office-auth: register its MCP server (`widget-auth mcp`) and call its `status` tool there.'
+    );
+  });
+
+  it('sends a caller of logout to a terminal, since the auth server has no logout tool', async () => {
+    const out = await call('run-command', { command: 'logout' });
+    expect(out).toContain('`logout` lives in @ask-marcel/office-auth and has no MCP tool: run `widget-auth logout` in a terminal.');
+    expect(out).not.toContain('register');
+  });
+
+  it('tells a caller of token that it is the token helper, never a tool to call', async () => {
+    const out = await call('get-command-docs', { command: 'token' });
+    expect(out).toContain('`token` is the token helper of @ask-marcel/office-auth: the read and write packages run `widget-auth token` themselves.');
+    expect(out).not.toContain('register');
+  });
+
+  it('names the status tool of the auth server as what replaced scopes-check', async () => {
+    expect(await call('run-command', { command: 'scopes-check' })).toContain(
+      'error: Unknown command "scopes-check". The `status` tool of the widget-auth server replaced `scopes-check`.'
+    );
+  });
+
+  it('offers a write command for a near miss as a command of the write server', async () => {
+    expect(await call('run-command', { command: 'create-mail-draf' })).toContain('Did you mean `create-mail-draft` on the widget-write server?');
+  });
+
+  it('offers only the auth tools for a near miss of an auth command', async () => {
+    const out = await call('run-command', { command: 'logou' });
+    expect(out).toContain('Did you mean the `login` tool of the widget-auth server?');
+    expect(out).not.toContain('`logout`');
+  });
+
+  it('never offers the token helper for a near miss', async () => {
+    expect(await call('run-command', { command: 'toke' })).not.toContain('token`');
+  });
+});

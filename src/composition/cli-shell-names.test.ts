@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '../domain/result.ts';
-import { fakeCommand, fakeReadPackage } from '../test-helpers/command-package-fake.ts';
+import { fakeCommand, fakeCommandPackage, fakeReadPackage } from '../test-helpers/command-package-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
@@ -111,5 +111,62 @@ describe('the bins the CLI of a package names', () => {
       registry: { 'list-widgets': { ...fakeCommand(), execute: async () => ok({ value: [{ id: 'w1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/widgets?$skip=1' }) } },
     });
     expect(await run(['list-widgets'], commandPackage)).toContain("--- next: widget-cli next-page --url 'https://graph.microsoft.com/v1.0/widgets?$skip=1'");
+  });
+});
+
+describe('a command the package does not hold', () => {
+  it('tells the caller which package holds a write command, and the command to run there', async () => {
+    const out = await run(['create-mail-draft']);
+    expect(out).toContain(
+      "error: unknown command 'create-mail-draft'. `create-mail-draft` lives in @ask-marcel/office-write: install it and run `widget-write create-mail-draft`."
+    );
+  });
+
+  it('tells the caller of a write package which package holds a read command', async () => {
+    const writePackage = fakeReadPackage({ bins: { auth: 'widget-auth', read: 'widget-read', write: 'widget-cli' } });
+    expect(await run(['list-drives'], writePackage)).toContain(
+      "error: unknown command 'list-drives'. `list-drives` lives in @ask-marcel/office-read: install it and run `widget-read list-drives`."
+    );
+  });
+
+  it('sends the docs of an auth command to the auth package', async () => {
+    const out = await run(['docs', 'login']);
+    expect(out).toContain(
+      'error: Unknown command "login". `login` lives in @ask-marcel/office-auth: install it and run `widget-auth login`. Run `widget-cli --help` to list every command.'
+    );
+  });
+
+  it('offers a write command for a near miss, under the bin that holds it', async () => {
+    expect(await run(['create-mail-draf'])).toContain('Did you mean `widget-write create-mail-draft`?');
+  });
+
+  it('offers no command of the directory that a package with one bin for all three does not have', async () => {
+    const out = await run(['create-mail-draf'], fakeCommandPackage());
+    expect(out).toContain("error: unknown command 'create-mail-draf'");
+    expect(out).not.toContain('create-mail-draft');
+  });
+
+  it('never offers the token helper for a near miss', async () => {
+    expect(await run(['toke'])).not.toContain('token`');
+  });
+
+  it('tells the caller of token that it is the token helper of the auth package', async () => {
+    expect(await run(['token'])).toContain(
+      "error: unknown command 'token'. `token` is the token helper of @ask-marcel/office-auth: the read and write packages run `widget-auth token` themselves."
+    );
+  });
+
+  it('sends nobody elsewhere for a command of the directory that a package with one bin for all three does not list', async () => {
+    expect(await run(['docs', 'token'], fakeCommandPackage())).toContain('error: Unknown command "token". Run `widget-cli --help` to list every command.');
+  });
+
+  it('names status under the auth bin as what replaced scopes-check', async () => {
+    expect(await run(['scopes-check'])).toContain("error: unknown command 'scopes-check'. `widget-auth status` replaced `scopes-check`.");
+  });
+
+  it('answers the removed update command with the install command of the package', async () => {
+    expect(await run(['update'])).toContain(
+      "error: unknown command 'update'. `update` was removed: to upgrade, install the package again with `npm i -g @widgets/cli@latest` (or `bun add -g @widgets/cli@latest`)."
+    );
   });
 });
