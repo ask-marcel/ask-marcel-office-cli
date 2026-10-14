@@ -16,7 +16,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/mailboxSettings',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings',
   options: [],
-  example: 'ask-marcel-office get-mailbox-settings',
+  example: '{read-bin} get-mailbox-settings',
   responseShape: 'single Microsoft Graph `mailboxSettings` resource',
   effect: 'read',
   scopesRequired: ['MailboxSettings.Read'],

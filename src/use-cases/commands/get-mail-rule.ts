@@ -26,7 +26,7 @@ const meta: ReadCommandMeta = {
       description: 'Message rule ID. Returned by `list-mail-rules`.',
     },
   ],
-  example: "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
+  example: "{read-bin} get-mail-rule --message-rule-id 'AQAAANC...'",
   responseShape: 'single Microsoft Graph `messageRule` resource',
   effect: 'read',
   scopesRequired: ['MailboxSettings.Read'],
