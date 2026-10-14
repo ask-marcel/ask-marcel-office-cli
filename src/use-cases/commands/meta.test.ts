@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { commandRole } from './command-directory.ts';
 import type { Command, CommandMeta } from './command-types.ts';
 import { commands } from './index.ts';
 
@@ -272,8 +273,9 @@ describe('command meta — invariants on every registered command', () => {
         expect(cmd.meta.graphDocsUrl).toMatch(/^https:\/\/learn\.microsoft\.com\/en-us\/graph\//);
       });
 
-      it('provides a runnable example beginning with `ask-marcel-office`', () => {
-        expect(cmd.meta.example).toMatch(/^ask-marcel-office /);
+      it('provides a runnable example beginning with the bin of its package (command-directory.ts) and its own name', () => {
+        // The literal bin is accepted until every example names it through its placeholder (package split, step 14).
+        expect(cmd.meta.example.startsWith(`{${commandRole(name)}-bin} ${name}`) || cmd.meta.example.startsWith(`ask-marcel-office ${name}`)).toBe(true);
       });
 
       it('has a non-empty category, graphMethod from the HTTP-verb set, non-empty graphPathTemplate, and non-empty responseShape when declared (invariants on the meta block itself, killing inert-config-string mutants)', () => {
@@ -331,7 +333,14 @@ describe('command meta — invariants on every registered command', () => {
     const phantom: string[] = [];
     for (const [name, cmd] of populated) {
       const prose = [cmd.meta.summary, cmd.meta.example, cmd.meta.responseShape ?? '', cmd.meta.bodyTemplate ?? '', ...cmd.meta.options.map((o) => o.description)].join('\n');
-      // (a) explicit `ask-marcel-office <name>` invocations — unambiguous
+      // (a) explicit `{<package>-bin} <name>` invocations — unambiguous. The
+      // directory must place <name> in that package; `{bin}` (the bin of the
+      // package rendering the text) is only for what every package has.
+      for (const m of prose.matchAll(/\{(?:(auth|read|write)-)?bin\}\s+([a-z][a-z0-9-]+)/g)) {
+        const ref = m[2] ?? '';
+        if (!valid.has(ref) || commandRole(ref) !== m[1]) phantom.push(`${name}: ${m[0]}`);
+      }
+      // The literal bin, until every reference names it through its placeholder (package split, step 14).
       for (const m of prose.matchAll(/ask-marcel-office\s+([a-z][a-z0-9-]+)/g)) if (!valid.has(m[1] ?? '')) phantom.push(`${name}: ask-marcel-office ${m[1]}`);
       // (b) backticked command-shaped tokens (verb-prefixed kebab) — `feeds \`get-calendar-event\``
       for (const m of prose.matchAll(/`([a-z][a-z0-9-]+)`/g)) {

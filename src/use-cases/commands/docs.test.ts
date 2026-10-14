@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { commandRole } from './command-directory.ts';
 import type { CommandPackage } from './command-package.ts';
 import type { Command } from './command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from './docs-builders.ts';
@@ -325,8 +326,12 @@ describe('lifecycle entries — the invariants the registry sweep never reaches'
       expect(entry.graphPathTemplate.trim().length).toBeGreaterThan(0);
       expect(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']).toContain(entry.graphMethod);
       expect(entry.graphDocsUrl.startsWith('https://')).toBe(true);
-      // The example is what an LLM copies verbatim, so it has to be a real invocation.
-      expect(entry.example.startsWith(`ask-marcel-office ${name}`)).toBe(true);
+      // The example is what an LLM copies verbatim, so it has to be a real invocation:
+      // the bin of the package that holds the command (command-directory.ts), or
+      // `{bin}` for one every package has.
+      const role = commandRole(name);
+      const bin = role === undefined ? '{bin}' : `{${role}-bin}`;
+      expect(entry.example.startsWith(`${bin} ${name}`)).toBe(true);
       expect(entry.responseShape?.trim().length ?? 0).toBeGreaterThan(0);
       for (const opt of entry.options) {
         expect(opt.name.trim().length).toBeGreaterThan(0);
