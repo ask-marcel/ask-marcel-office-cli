@@ -23,7 +23,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-drive-special-folder --folder-name 'documents'",
+  example: "{read-bin} get-drive-special-folder --folder-name 'documents'",
   responseShape: 'single Microsoft Graph `driveItem` resource (folder)',
   effect: 'read',
   scopesRequired: ['Files.Read'],

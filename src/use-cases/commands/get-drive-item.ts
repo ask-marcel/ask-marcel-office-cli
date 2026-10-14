@@ -26,7 +26,7 @@ const meta: ReadCommandMeta = {
     TENANT_ID_OPTION,
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
+  example: "{read-bin} get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
   responseShape: 'single Microsoft Graph `driveItem` resource',
   effect: 'read',
   scopesRequired: ['Files.Read'],

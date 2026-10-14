@@ -59,7 +59,7 @@ const meta: ReadCommandMeta = {
       description: 'Optional KQL added to the date bound, e.g. `filetype:docx`, `filename:budget`, or a `path:"https://contoso.sharepoint.com/sites/finance"` to stay in one site.',
     },
   ],
-  example: "ask-marcel-office list-changed-files --since yesterday --query 'filetype:xlsx'",
+  example: "{read-bin} list-changed-files --since yesterday --query 'filetype:xlsx'",
   bodyTemplate:
     "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '({query}) AND LastModifiedTime>=<the UTC day before {since}>' }, from: <page*200>, size: 200 }] } — re-issued per page until `moreResultsAvailable` is false or the 10-page ceiling is hit",
   responseShape:
