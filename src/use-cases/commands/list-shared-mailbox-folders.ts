@@ -29,7 +29,7 @@ const meta: ReadCommandMeta = {
     INCLUDE_HIDDEN_FOLDERS_OPTION,
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-shared-mailbox-folders --user-id 'shared-mailbox@contoso.com'",
+  example: "{read-bin} list-shared-mailbox-folders --user-id 'shared-mailbox@contoso.com'",
   responseShape: 'collection of Microsoft Graph `mailFolder` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -50,7 +50,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office search-mail-messages --query 'from:alice subject:Q3'",
+  example: "{read-bin} search-mail-messages --query 'from:alice subject:Q3'",
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
   pagination: true,

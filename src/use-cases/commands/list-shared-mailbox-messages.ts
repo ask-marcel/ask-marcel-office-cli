@@ -23,7 +23,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
+  example: "{read-bin} list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
   responseShape: 'collection of Microsoft Graph `message` resources under `value[]`',
   pagination: true,
   effect: 'read',
