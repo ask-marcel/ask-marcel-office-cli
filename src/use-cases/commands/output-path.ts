@@ -7,7 +7,7 @@ import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-exte
 import { extensionOf } from './text-passthrough.ts';
 
 /**
- * Generic interceptor used by the global `--output-path` flag in `cli.ts`.
+ * Generic interceptor used by the global `--output-path` flag in `cli-shell.ts`.
  *
  * Given a use-case's success value, if the user passed `--output-path
  * <path>` the CLI calls this helper to land the inlined bytes on disk

@@ -26,7 +26,7 @@ import { convertZipArchive } from './zip-archive-to-markdown.ts';
  * server-side) and Loop/Fluid/Whiteboard (`format=html`, same reason).
  *
  * This is the one registry command executed via `executeLocal(fs, params)` —
- * the CLI wires its FileSystem in automatically (see `cli.ts`). The Graph-shaped
+ * the CLI wires its FileSystem in automatically (see `cli-shell.ts` and `run-registry-command.ts`). The Graph-shaped
  * `execute` exists because the public `commands` registry type requires it; it
  * redirects library consumers to `executeLocal`.
  */

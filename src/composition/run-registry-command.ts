@@ -1,8 +1,8 @@
 /*
  * The one place a registry command actually runs.
  *
- * Both front ends call this: `cli.ts` (commander) and `mcp.ts` (the MCP
- * gateway's run-command / run-write-command tools). Everything between "I have
+ * Both front ends call this: `cli-shell.ts` (commander) and `mcp-shell.ts` (the
+ * MCP gateway's run-command / run-write-command tools). Everything between "I have
  * a resolved command and a bag of params" and "I have a value or a failure to
  * render" lives here, so a fix reaches both surfaces at once.
  *

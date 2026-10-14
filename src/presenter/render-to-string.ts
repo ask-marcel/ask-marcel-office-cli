@@ -3,7 +3,7 @@
  * nothing.
  *
  * `output.ts` is the stdout shim over this module (the CLI's channel).
- * `composition/mcp.ts` is the second consumer: an MCP stdio server owns
+ * `composition/mcp-shell.ts` is the second consumer: an MCP stdio server owns
  * stdout as its JSON-RPC frame channel, so it MUST format without writing.
  * That is why the envelope logic lives here rather than inline in `output.ts`
  * as it did through v2.2.
@@ -199,7 +199,7 @@ const renderTextToString = (data: unknown, context?: RenderContext): string => {
 
 /**
  * Render a use-case success value to its final string, newline included.
- * `output.ts` writes this to stdout; `mcp.ts` returns it as tool content.
+ * `output.ts` writes this to stdout; `mcp-shell.ts` returns it as tool content.
  *
  * `context` is what makes the oversized-response banner honest — pass it
  * whenever a registry command produced the data. Omit it for the renders that
@@ -233,7 +233,7 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
   // bare-Graph errors was a real problem — an LLM that branched on
   // `response.source` saw `{ok, error, errorCode}` for half its Graph
   // failures and `{ok, error, errorCode, hint, source}` for the other half.
-  // The fix: `explicitSource` lets the call site (cli.ts action handler)
+  // The fix: `explicitSource` lets the call site (run-registry-command.ts)
   // stamp `source: 'graph'` from the `result.error.type` discriminator
   // regardless of whether a hint rule matched. The hint's source (when
   // matched) still wins because it's curated; the explicit source is the

@@ -2,13 +2,14 @@ import type { CommandManifestEntry } from './docs-render.ts';
 
 /**
  * Lifecycle commands aren't backed by a Graph endpoint and aren't in the
- * `commands` registry — they live inline in `cli.ts`. But an LLM that consumes
+ * `commands` registry — `docs` and `help-json` live in `cli-shell.ts`, `login`,
+ * `status` and `logout` in `auth-cli.ts`, and `mcp` in `main.ts`. But an LLM that consumes
  * `help-json` (the recommended token-efficient surface) needs to see them too,
  * otherwise it can't authenticate, log out, or fetch per-command docs. These
  * stub entries surface them under category 'lifecycle' with no graphMethod /
  * options (the path template is a `(meta) ...` description so the JSON shape
- * stays uniform with regular commands). The docs builders (`docs.ts`) merge
- * them into the manifest and the docs pages.
+ * stays uniform with regular commands). The single package hands them to the
+ * shells as its `CommandPackage.lifecycle` (`composition/single-package.ts`).
  */
 export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {

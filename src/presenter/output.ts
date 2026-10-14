@@ -2,10 +2,11 @@
  * The CLI's stdout channel — a thin shim over the pure formatters in
  * `render-to-string.ts`.
  *
- * This module is the ONLY sanctioned `process.stdout` writer in the codebase
- * (enforced at the lint level). Everything renderable lives in
+ * This module is one of the three sanctioned `process.stdout` writers, beside
+ * the CLI builder and the token helper (a lint allowlist bans it everywhere
+ * else). Everything renderable lives in
  * `render-to-string.ts` so a consumer that does NOT own stdout can reuse it:
- * `composition/mcp.ts` serves the MCP stdio protocol, where stdout carries
+ * `composition/mcp-shell.ts` serves the MCP stdio protocol, where stdout carries
  * JSON-RPC frames and a stray write corrupts the stream.
  */
 import type { Logger } from '../use-cases/ports/logger.ts';
