@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-13 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection); steps 14-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-14 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording); steps 15-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -96,7 +96,7 @@ FileSystem and ProcessRunner ports with their Bun and Node adapters (the `node:f
 quarantine is kept), `network-error`, the Graph request core with the `ReadGraph` and `WriteGraph`
 factories in separate modules, the `TokenSource` port with its env and helper implementations, the
 command framework (`command-types`, `build-command`, `format-zod-error`, `reject-unknown-params`,
-`resolve-command`, `closest-names`, did-you-mean), the docs builders (`docs`, `docs-render`,
+`resolve-command`, `closest-names`, did-you-mean), the docs builders (`docs-builders`, `docs-render`,
 `first-sentence`, `output-path`, `office-extensions`, both `date-zone` modules), the presenter
 (`render-to-string`, `output`, the error-hints engine), the registry-agnostic composition shells
 (CLI builder, MCP gateway builder, `run-registry-command`), the static command-to-package
@@ -133,13 +133,10 @@ As built in step 13 (`src/use-cases/commands/command-package.ts`, `src/compositi
 - The core shells take the package: `buildCliShell` and `buildMcpShell` (the CLI builder and the
   gateway, moved out of `cli.ts` and `mcp.ts`), `runRegistryCommand` (its deps) and the docs
   builders in `docs-builders.ts` (`buildManifest(package, version)`, `buildTerseManifest`,
-  `renderSingleCommand`). `docs.ts` keeps the old call shape (`buildManifest(registry, packageName,
-  version)`) for the single package, with its lifecycle entries built in, and
-  `formatOutputPathError(error, name, surface)` keeps three arguments for the refusals that name
-  nothing of the package (`describeOutputPathError` adds the package for the no-body refusal). So
-  `docs.test.ts`, `commands.test.ts` and `output-path-binary-extension.test.ts` stay unchanged
-  (rule 24); when an edit of their call shape is approved, the two old shapes can go. The bin
-  name is the program name, the MCP server name and the bin in the shells' own help and remedy text;
+  `renderSingleCommand`). The old call shapes (`docs.ts`, a three-argument
+  `formatOutputPathError`) went at the start of step 14, once the edit of the three suites that
+  used them was approved: they call the builders and `describeOutputPathError` with a package.
+  The bin name is the program name, the MCP server name and the bin in the shells' own help and remedy text;
   the package name is the manifest's `package`. A package adds its own lifecycle commands through a
   hook: `addLifecycleCommands(program, output)` on the CLI, `addTools(server)` on the gateway. The
   auth commands (`login`, `status`, `logout`, and the `login` / `status` tools) are in `auth-cli.ts`
@@ -153,7 +150,7 @@ As built in step 13 (`src/use-cases/commands/command-package.ts`, `src/compositi
   `commandPackage`) and the doc paths; `docs:gen` and `check:docs` pass the single package's.
 - ESLint: the core files of the list above may not import the registry, a lifecycle command
   (`login`, `logout`, `status`, `login-status`, `token`, `token-args`, `token-tier-capability`,
-  `lifecycle-entries`), the commands' `docs.ts` or the single package's wiring. The ban also covers a
+  `lifecycle-entries`), the commands' `docs.ts` (until step 14 deleted it) or the single package's wiring. The ban also covers a
   folder import (`../use-cases/commands`, `.`, `..`), the package entries (`index.ts`, `main.ts`,
   `token.ts`, and the published name), and a dynamic `import()` of any banned path
   (`no-restricted-syntax`). ESLint replaces a rule's options when two
@@ -394,6 +391,57 @@ did-you-mean, the `meta.test` phantom-command guard and the `hasActionableAdvice
 names map too: `scopes-check` to `{auth-bin} status`, `update` to the install command. Each package
 has its own MCP server name, and MCP messages use per-server wording (a write command named on the
 read server says to register the write server; auth failures name the auth server's `login` tool).
+
+As built in step 14 (`src/use-cases/commands/command-directory.ts`, `bin-names.ts`,
+`unknown-command.ts`, `src/infra/token-source-needed-by.ts`, `src/composition/single-package-names.ts`):
+
+- The rule for a placeholder: a command of the directory always takes the placeholder of its
+  package (`{auth-bin} login`, `{read-bin} list-drives`, `{write-bin} create-mail-draft`), even in
+  the meta of a command of the same package; `{bin}` stands only before what every package has
+  (`docs`, `help`, `help-json`, `mcp`, `<command> --help`). So a guard checks each reference
+  against the directory with no context: `meta.test.ts` (examples and the phantom guard) and
+  `bin-placeholders.test.ts`, which reads every non-test source line. Of the 404 literal
+  `ask-marcel-office ` in non-test source, 388 were converted and 15 are in comments. One
+  stays by hand: the browser sign-in's stderr progress line in `src/infra/browser-auth.ts`,
+  which no renderer fills (phase 4 gives it the auth bin).
+- `CommandPackage.bins` gives the bin of each package as this package names it; the single
+  package's are all `ask-marcel-office` (`single-package-names.ts`, which the token helper reads
+  without the registry). A command lives elsewhere only when the bin of its package is not this
+  package's bin, so the single package sends nobody elsewhere and its output is byte-identical
+  (checked against step 13 on every command's `--help` and `docs` page, `help-json`, the error
+  paths and an MCP session; the one change is `update`, below).
+- Fill points: the docs builders stay name-free; the CLI help builder (summaries, options,
+  examples, help text, `help-json`, `docs`), the MCP gateway (manifest, docs pages, errors), the
+  presenter (an error's message and hint, and its own success text: the `next:` footer, the
+  `--select` hint, the JSON redirect remedy; never the data, which is Graph's), `gen-docs`, the
+  token helper's failure line and the auth CLI and MCP commands (help text and their reports).
+  `hasActionableAdvice` reads the message before it is filled, so it matches the placeholders.
+- The directory holds every registry command (by effect) and the auth commands (`login`,
+  `logout`, `status`, `token`); `command-directory.test.ts` keeps it true to the registry.
+  Unknown names: `scopes-check` gets `status` (behind the auth bin where auth is elsewhere),
+  `update` gets the install command of the package (`npm i -g <package>@latest`, or `bun add
+  -g`), a command of another package gets that package and how to reach it (a CLI caller
+  installs it and runs its bin, an MCP caller registers its server), and did-you-mean also
+  offers the directory's commands of other packages, behind their bin. The MCP wording names
+  servers and tools, not command lines: the auth server has only the `login` and `status`
+  tools, so `logout` sends an MCP caller to a terminal, `scopes-check` names the `status` tool
+  of the auth server, and a near miss names the server that holds the command. `token` is the
+  token helper that read and write run themselves: its exact name says so, and no did-you-mean
+  offers it.
+- MCP: on a server whose package is not auth's, a failure that a sign-in cures
+  (`not_authenticated`, `secondary_token_unavailable`, `InvalidAuthenticationToken`,
+  `TokenExpired`) also names the `login` tool of the auth server.
+- Remedies: auth's messages and the `token` helper's `remedy` name `{auth-bin} login` and
+  `status`. A token source built by `createEnvThenHelperTokenSource` takes the asking package's
+  `neededBy` (the registry commands that need each secondary token) and adds "(Commands that
+  need this token: …)" to an elevated, chatsvcagg or ic3 failure whose code says the token is
+  missing (`secondary_token_unavailable`), as the in-process ladder already did with its
+  injected list. A configuration failure (`token_helper_unavailable`, `env_token_invalid`) gets
+  no list.
+- Library: `commands[x].meta` (including `responseShape`), the messages of a command, of the
+  auth manager and of a GraphClient, and the tier `reason` of `getTokenInfo()` carry the
+  placeholders; only the renderers above fill them, and no filler is exported (CHANGELOG,
+  Unreleased).
 
 ## Checks and CI (D7)
 

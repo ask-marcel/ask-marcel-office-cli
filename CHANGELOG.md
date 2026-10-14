@@ -44,6 +44,10 @@ get each token from a tier variable (`ASKMARCEL_TOKEN_BASIC`, `_ELEVATED`,
 not set, from the helper. This is how the read and write packages will get
 tokens. Without the variable, nothing changes: the token cache is read in
 process. New error codes: `env_token_invalid` and `token_helper_unavailable`.
+When the helper says that the elevated, chatsvcagg or ic3 token is not
+available (`secondary_token_unavailable`), the error ends with the commands
+that need that token, as it does without the helper. Other failures, for
+example a helper path that is not absolute, do not get this list.
 
 ### Changed: the three PDF conversions are write commands
 
@@ -132,7 +136,8 @@ The error hints and the auth remedies now name `status`.
 ### Breaking: `update` is removed
 
 Upgrade with `npm i -g ask-marcel-office-cli@latest`, or with `bun add -g` and
-the same package name. The passive update notice stays.
+the same package name. The passive update notice stays. If you type `update`,
+the CLI and the MCP server give you these two install commands.
 
 ### Breaking: library API
 
@@ -147,6 +152,21 @@ the same package name. The passive update notice stays.
   have `exists(path)`, the new `FileExistence` type. It tells if a file is at
   the path and does not read the file. `createBunFileSystem` and
   `createNodeFileSystem` have it.
+- A command reference names its bin with a placeholder: `{auth-bin}`,
+  `{read-bin}` or `{write-bin}` for the package that will hold the command after
+  the split, and `{bin}` for what every package has (`docs`, `help-json`,
+  `mcp`). These library values carry the placeholders:
+  - the command meta (`commands[x].meta`: summary, options, example,
+    `responseShape`);
+  - the error messages of a command, of the auth manager and of a GraphClient
+    (for example `Run \`{auth-bin} login --force\``);
+  - the `reason` of each token tier in the `getTokenInfo()` report of
+    `createAuthManager`.
+
+  The package exports no function that fills them, so a library caller gets
+  them as they are. The CLI, the MCP server, `help-json` and
+  `docs/commands.json` show `ask-marcel-office` in place of each placeholder,
+  so their output does not change.
 - `accessToken` gives `malformed_jwt` for a value that is not three base64url
   segments, for example base64 with `=` padding or a token with a line break.
   Before, only the environment token variables had this check. Every
