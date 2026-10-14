@@ -2,9 +2,20 @@
 /*
  * Documentation generator.
  *
- * Walks the `commands` registry, builds the JSON manifest at
- * `docs/commands.json`, and rewrites the per-category tables inside
- * `docs/COMMANDS.md` between the AUTO-GENERATED-COMMANDS:BEGIN/END markers.
+ * Walks a package's registry, builds the JSON manifest, and rewrites the
+ * per-category tables of the commands doc between the
+ * AUTO-GENERATED-COMMANDS:BEGIN/END markers.
+ *
+ * The package and the two paths are arguments, not imports, so one script serves
+ * every package of the split (plan "Scripts ownership"); `bun run docs:gen`
+ * passes the single package's:
+ *
+ *   bun run scripts/gen-docs.ts --package src/composition/single-package.ts \
+ *     --manifest docs/commands.json --commands-doc docs/COMMANDS.md
+ *
+ * `--package` names a module that exports `commandPackage` (a CommandPackage).
+ * Paths are relative to the working directory, and the manifest version is the
+ * one in its package.json.
  *
  * Pre-1.4.0 the auto-generated block lived inside README.md; the marketing
  * pass split docs out (README is the landing page, the deep tables moved
@@ -14,14 +25,36 @@
  * `bun build` so `dist/commands.json` is always up-to-date.
  */
 
-import pkg from '../package.json' with { type: 'json' };
-import { commands } from '../src/use-cases/commands/index.ts';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+import type { CommandPackage } from '../src/use-cases/commands/command-package.ts';
 import type { CommandManifest, CommandManifestEntry } from '../src/use-cases/commands/docs-render.ts';
 import { renderReadmeTables } from '../src/use-cases/commands/docs-render.ts';
-import { buildManifest as buildHelpJsonManifest } from '../src/use-cases/commands/docs.ts';
+import { buildManifest as buildHelpJsonManifest } from '../src/use-cases/commands/docs-builders.ts';
 
-const COMMANDS_DOC_PATH = 'docs/COMMANDS.md';
-const MANIFEST_PATH = 'docs/commands.json';
+const USAGE = 'usage: bun run scripts/gen-docs.ts --package <module exporting commandPackage> --manifest <commands.json> --commands-doc <COMMANDS.md>';
+
+const { values: args } = parseArgs({ options: { package: { type: 'string' }, manifest: { type: 'string' }, 'commands-doc': { type: 'string' } } });
+if (args.package === undefined || args.manifest === undefined || args['commands-doc'] === undefined) {
+  process.stderr.write(`gen-docs: ${USAGE}\n`);
+  process.exit(2);
+}
+
+const isCommandPackage = (value: unknown): value is CommandPackage =>
+  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value;
+
+const loaded: unknown = (await import(pathToFileURL(resolve(args.package)).href)).commandPackage;
+if (!isCommandPackage(loaded)) {
+  process.stderr.write(`gen-docs: ${args.package} exports no \`commandPackage\`. ${USAGE}\n`);
+  process.exit(2);
+}
+const commandPackage = loaded;
+const commands = commandPackage.registry;
+const { version } = (await Bun.file(resolve('package.json')).json()) as { readonly version: string };
+
+const COMMANDS_DOC_PATH = args['commands-doc'];
+const MANIFEST_PATH = args.manifest;
 const COMMANDS_DOC_BEGIN = '<!-- AUTO-GENERATED-COMMANDS:BEGIN -->';
 const COMMANDS_DOC_END = '<!-- AUTO-GENERATED-COMMANDS:END -->';
 
@@ -50,7 +83,7 @@ const buildManifest = (generatedAt: string): CommandManifest => {
     });
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
-  return { package: pkg.name, version: pkg.version, generatedAt, commands: entries };
+  return { package: commandPackage.packageName, version, generatedAt, commands: entries };
 };
 
 // Reuse the committed manifest's `generatedAt` when nothing but the timestamp
@@ -85,7 +118,7 @@ const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
   // builder (registry + lifecycle entries), not hardcoded: it sat stale at
   // "179-vs-184" long after the registry had moved on.
   const categoryCount = new Set(manifest.commands.map((c) => c.category)).size;
-  const helpJsonTotal = buildHelpJsonManifest(commands, pkg.name, pkg.version).commands.length;
+  const helpJsonTotal = buildHelpJsonManifest(commandPackage, version).commands.length;
   const text = rawText
     .replace(/All \d+ commands across \d+ categories/, `All ${manifest.commands.length} commands across ${categoryCount} categories`)
     .replace(/manifest total \(\d+\), so a \d+-vs-\d+ gap/, `manifest total (${helpJsonTotal}), so a ${manifest.commands.length}-vs-${helpJsonTotal} gap`);

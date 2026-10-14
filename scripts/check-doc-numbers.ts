@@ -6,7 +6,7 @@
  * Four numeric claims drifted during the 2.4.0 cycle and a fifth was wrong on
  * main for two releases (`docs/USAGE.md` promised "the 180 READ commands"
  * while the registry held 188, and `README.md` said 188 three sections
- * earlier). `mcp.ts` already derives its counts and carries a comment saying
+ * earlier). `mcp-shell.ts` already derives its counts and carries a comment saying
  * the prose must be derived too; nothing enforced it until this gate.
  *
  * The counts come from the registry and the rendered manifest, never from a
@@ -18,15 +18,54 @@
  *   0  every claim matches, and every anchor was found
  *   1  a claim disagrees with the registry, or an anchor matched nothing
  *
+ *   2  an argument is missing, or --package exports no `commandPackage`
+ *
  *   --selftest  proves the matcher rejects a wrong number (see rule 15.10:
  *               a gate only ever seen green is a hypothesis)
+ *
+ * The package and the three documents are arguments, not imports, so one
+ * script serves every package of the split (plan "Scripts ownership");
+ * `bun run check:docs` passes the single package's:
+ *
+ *   bun run scripts/check-doc-numbers.ts --package src/composition/single-package.ts \
+ *     --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md
+ *
+ * `--package` names a module that exports `commandPackage` (a CommandPackage);
+ * paths are relative to the working directory.
  */
 
-import { commands } from '../src/use-cases/commands/index.ts';
-import { buildManifest } from '../src/use-cases/commands/docs.ts';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+import type { CommandPackage } from '../src/use-cases/commands/command-package.ts';
+import { buildManifest } from '../src/use-cases/commands/docs-builders.ts';
+
+const USAGE =
+  'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> [--selftest]';
+
+const { values: args } = parseArgs({
+  options: { package: { type: 'string' }, readme: { type: 'string' }, 'commands-doc': { type: 'string' }, usage: { type: 'string' }, selftest: { type: 'boolean' } },
+});
+if (args.package === undefined || args.readme === undefined || args['commands-doc'] === undefined || args.usage === undefined) {
+  console.error(`check-doc-numbers: ${USAGE}`);
+  process.exit(2);
+}
+
+const isCommandPackage = (value: unknown): value is CommandPackage =>
+  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value;
+
+const loaded: unknown = (await import(pathToFileURL(resolve(args.package)).href)).commandPackage;
+if (!isCommandPackage(loaded)) {
+  console.error(`check-doc-numbers: ${args.package} exports no \`commandPackage\`. ${USAGE}`);
+  process.exit(2);
+}
+const commandPackage = loaded;
+
+/** The documents the claims sit in, by role: their paths are arguments. */
+const DOCS = { readme: args.readme, commandsDoc: args['commands-doc'], usage: args.usage } as const;
 
 type Claim = {
-  /** Repo-relative path of the document holding the claim. */
+  /** Path of the document holding the claim, relative to the working directory. */
   readonly file: string;
   /** What the sentence is about, for the failure message. */
   readonly label: string;
@@ -35,13 +74,13 @@ type Claim = {
   readonly expected: ReadonlyArray<number>;
 };
 
-const entries = Object.entries(commands);
-const manifest = buildManifest(commands, 'ask-marcel-office-cli', '0.0.0');
+const entries = Object.entries(commandPackage.registry);
+const manifest = buildManifest(commandPackage, '0.0.0');
 
-// The six lifecycle stubs (`login`, `status`, `logout`, `docs`, `help-json`,
-// `mcp`) each carry `graphMethod: 'GET'` although none calls Graph, so counting
-// verbs or categories over the whole manifest inflates GET by six and invents a
-// twelfth category. Every verb and category claim in the docs is about the Graph
+// The package's lifecycle stubs (in the single package `login`, `status`,
+// `logout`, `docs`, `help-json`, `mcp`) each carry `graphMethod: 'GET'` although
+// none calls Graph, so counting verbs or categories over the whole manifest
+// inflates GET by their number and invents a twelfth category. Every verb and category claim in the docs is about the Graph
 // surface, which is what `docs/commands.json` holds: the manifest minus these.
 const graphCommands = manifest.commands.filter((entry) => entry.category !== 'lifecycle');
 
@@ -65,27 +104,27 @@ const readGet = readEntries.filter((entry) => entry.graphMethod === 'GET').lengt
 const readOnlyPost = readEntries.filter((entry) => entry.graphMethod === 'POST').length;
 
 const CLAIMS: ReadonlyArray<Claim> = [
-  { file: 'README.md', label: 'command total in the nav and deep-docs links', pattern: /All (\d+) commands/g, expected: [total] },
+  { file: DOCS.readme, label: 'command total in the nav and deep-docs links', pattern: /All (\d+) commands/g, expected: [total] },
   {
-    file: 'README.md',
+    file: DOCS.readme,
     label: 'safety breakdown by HTTP verb',
     pattern: /The (\d+) commands break down as (\d+) GET reads, (\d+) read-only POST[^.]*, and (\d+) writes: (\d+) mail-draft operations and (\d+) PDF conversions/,
     expected: [total, readGet, readOnlyPost, write, draft, transientUpload],
   },
-  { file: 'README.md', label: 'run-command payload in the MCP tool table', pattern: /The (\d+) \*\*read\*\* commands/, expected: [read] },
+  { file: DOCS.readme, label: 'run-command payload in the MCP tool table', pattern: /The (\d+) \*\*read\*\* commands/, expected: [read] },
   {
-    file: 'README.md',
+    file: DOCS.readme,
     label: 'run-write-command payload in the MCP tool table',
     pattern: /The (\d+) \*\*write\*\* commands: (\d+) mail-draft operations and (\d+) PDF conversions/,
     expected: [write, draft, transientUpload],
   },
-  { file: 'docs/COMMANDS.md', label: 'header count and category count', pattern: /All (\d+) commands across (\d+) categories/, expected: [total, categories] },
-  { file: 'docs/COMMANDS.md', label: 'help-json manifest total', pattern: /manifest total \((\d+)\)/, expected: [manifestTotal] },
-  { file: 'docs/COMMANDS.md', label: 'the sentence explaining the lifecycle gap', pattern: /a (\d+)-vs-(\d+) gap/, expected: [total, manifestTotal] },
-  { file: 'docs/USAGE.md', label: 'run-command payload in the gateway listing', pattern: /the (\d+) READ commands/, expected: [read] },
-  { file: 'docs/USAGE.md', label: 'run-write-command payload in the gateway listing', pattern: /the (\d+) WRITE commands \((\d+) drafts, (\d+) PDF\)/, expected: [write, draft, transientUpload] },
+  { file: DOCS.commandsDoc, label: 'header count and category count', pattern: /All (\d+) commands across (\d+) categories/, expected: [total, categories] },
+  { file: DOCS.commandsDoc, label: 'help-json manifest total', pattern: /manifest total \((\d+)\)/, expected: [manifestTotal] },
+  { file: DOCS.commandsDoc, label: 'the sentence explaining the lifecycle gap', pattern: /a (\d+)-vs-(\d+) gap/, expected: [total, manifestTotal] },
+  { file: DOCS.usage, label: 'run-command payload in the gateway listing', pattern: /the (\d+) READ commands/, expected: [read] },
+  { file: DOCS.usage, label: 'run-write-command payload in the gateway listing', pattern: /the (\d+) WRITE commands \((\d+) drafts, (\d+) PDF\)/, expected: [write, draft, transientUpload] },
   {
-    file: 'docs/USAGE.md',
+    file: DOCS.usage,
     label: 'write-command counts in the MCP notes',
     pattern: /carries the (\d+) write commands\s+\((\d+) mail-draft operations and (\d+) PDF conversions\)/,
     expected: [write, draft, transientUpload],
@@ -138,7 +177,7 @@ const runSelftest = (): number => {
 };
 
 const run = async (): Promise<number> => {
-  if (process.argv.includes('--selftest')) return runSelftest();
+  if (args.selftest === true) return runSelftest();
 
   const failures: Array<string> = [];
   for (const claim of CLAIMS) {

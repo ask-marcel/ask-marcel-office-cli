@@ -89,7 +89,7 @@ jobs:
         run: bun run coverage
       - name: doc numbers match the registry (selftest first, so the gate proves it can fail)
         run: |
-          bun run scripts/check-doc-numbers.ts --selftest
+          bun run check:docs --selftest
           bun run check:docs
       - name: mutation scope selftest (a pure move mutates nothing, a sub-folder run maps its paths)
         run: bash scripts/mutation-scope-selftest.sh
