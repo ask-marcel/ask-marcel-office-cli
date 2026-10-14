@@ -2,6 +2,8 @@ import { createEnvTokenSource } from '../infra/env-token-source.ts';
 import { createHelperTokenSource } from '../infra/helper-token-source.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { locateTokenHelper } from '../infra/token-helper-locator.ts';
+import type { SecondaryTokenCommands } from '../infra/token-source-needed-by.ts';
+import { NO_SECONDARY_TOKEN_COMMANDS, withNeededBy } from '../infra/token-source-needed-by.ts';
 import { runTokenHelper } from '../infra/token-helper-run.ts';
 import type { FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
@@ -14,6 +16,9 @@ export type EnvThenHelperOptions = {
   readonly fs: Pick<FileSystem, 'readJson' | 'readBytes'> & FileExistence;
   readonly runner: ProcessRunner;
   readonly interactive: boolean;
+  // The commands of this package that need each secondary token, added to a
+  // failure of that token after auth's own remedy. None when omitted.
+  readonly neededBy?: SecondaryTokenCommands;
   // This process's platform and runtime unless a test names others.
   readonly platform?: string;
   readonly execPath?: string;
@@ -29,5 +34,5 @@ export const createEnvThenHelperTokenSource = (options: EnvThenHelperOptions): T
   const execPath = options.execPath ?? process.execPath;
   const locate = (): ReturnType<typeof locateTokenHelper> => locateTokenHelper({ env, locatorPath, fs, platform, execPath });
   const helper = createHelperTokenSource({ ask: (request) => runTokenHelper({ locate, runner, interactive }, request) });
-  return createEnvTokenSource(env, helper);
+  return withNeededBy(createEnvTokenSource(env, helper), options.neededBy ?? NO_SECONDARY_TOKEN_COMMANDS);
 };

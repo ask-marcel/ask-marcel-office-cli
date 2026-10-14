@@ -14,6 +14,8 @@ import type { ElevatedFailureReason } from './browser-auth.ts';
 import { REQUEST_TIMEOUT_LABEL, REQUEST_TIMEOUT_MS } from './network-error.ts';
 import type { LockPurpose, TokenCacheLock } from './token-cache-lock.ts';
 import { createSystemTokenCacheLock } from './token-cache-lock.ts';
+import type { SecondaryTokenCommands } from './token-source-needed-by.ts';
+import { neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './token-source-needed-by.ts';
 
 type CachedToken = {
   access_token: string;
@@ -275,27 +277,13 @@ const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: Tok
 const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>, remedy: string): string =>
   `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office status\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
 
-/**
- * Command names quoted in the secondary-token error messages, per token kind.
- * The composition root derives these from the command registry
- * (`needsElevatedToken` / `needsSubstrateToken` flags) and injects them. A
- * caller that injects none gets messages that name the token only: auth knows
- * which tokens exist, not which commands need them, and the hard-coded default
- * that used to stand in had already drifted from the registry.
- */
-type SecondaryTokenCommands = {
-  readonly elevated: ReadonlyArray<string>;
-  readonly chatsvcagg: ReadonlyArray<string>;
-  readonly ic3: ReadonlyArray<string>;
-};
-
-const NO_SECONDARY_TOKEN_COMMANDS: SecondaryTokenCommands = { elevated: [], chatsvcagg: [], ic3: [] };
-
-const commandList = (names: ReadonlyArray<string>): string => names.join(', ');
-
-// The "(Commands that need this token: …)" tail of a token-failure message,
-// empty when the caller named no commands.
-const neededByNote = (names: ReadonlyArray<string>, token: string = 'this token'): string => (names.length === 0 ? '' : ` (Commands that need ${token}: ${commandList(names)}.)`);
+// The command names quoted in the secondary-token error messages, per token
+// kind (SecondaryTokenCommands, token-source-needed-by.ts). The composition root
+// derives them from the command registry (`needsElevatedToken` /
+// `needsSubstrateToken` flags) and injects them. A caller that injects none gets
+// messages that name the token only: auth knows which tokens exist, not which
+// commands need them, and the hard-coded default that used to stand in had
+// already drifted from the registry.
 
 const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
 const RECAPTURE_ELEVATED_VIA_LOGIN =

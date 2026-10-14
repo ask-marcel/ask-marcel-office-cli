@@ -47,6 +47,7 @@ import '../src/infra/token-cache-lock.ts';
 import '../src/infra/process-runner-node.ts';
 import '../src/infra/env-token-source.ts';
 import '../src/infra/helper-token-source.ts';
+import '../src/infra/token-source-needed-by.ts';
 import '../src/infra/token-helper-answer.ts';
 import '../src/infra/token-helper-locator.ts';
 import '../src/infra/token-helper-run.ts';

@@ -117,7 +117,7 @@ export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   // ASKMARCEL_TOKEN_COMMAND switches to the package split's source (tier
   // variables, then that helper), the way read and write will get tokens.
   const graph = env['ASKMARCEL_TOKEN_COMMAND']
-    ? createTokenSourceGraphClient(createEnvThenHelperTokenSource({ env, home, fs, runner: processRunner, interactive }))
+    ? createTokenSourceGraphClient(createEnvThenHelperTokenSource({ env, home, fs, runner: processRunner, interactive, neededBy: secondaryTokenCommands }))
     : createGraphClient(auth);
   const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, browserProfileDir, logger, fs, secondaryTokenCommands });
   return { logger, auth, graph, processRunner, fs, makeLoginAuth };

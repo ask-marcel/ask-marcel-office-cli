@@ -296,7 +296,7 @@ export default [
       'src/presenter/*.ts',
       'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
       'src/infra/{write-graph,network-error,logger}.ts',
-      'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator}.ts',
+      'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator,token-source-needed-by}.ts',
       'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
       'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
       'src/domain/utilities/base64.ts',
