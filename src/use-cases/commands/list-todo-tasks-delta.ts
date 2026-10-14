@@ -23,7 +23,7 @@ const meta: ReadCommandMeta = {
       description: 'Microsoft To Do task list ID. Returned by `list-todo-task-lists`.',
     },
   ],
-  example: "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
+  example: "{read-bin} list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
   responseShape:
     'collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.',
   pagination: true,

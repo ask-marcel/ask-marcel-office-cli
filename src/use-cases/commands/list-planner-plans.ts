@@ -19,7 +19,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/planner/plans',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-plans',
   options: [...selectOnlyOptions],
-  example: 'ask-marcel-office list-planner-plans',
+  example: '{read-bin} list-planner-plans',
   responseShape: 'collection of Microsoft Graph `plannerPlan` resources under `value[]`',
   pagination: true,
   effect: 'read',
