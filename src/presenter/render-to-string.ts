@@ -12,6 +12,8 @@
  * write directly, trailing newline included — `output.test.ts` captures
  * stdout and pins that contract.
  */
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import { fillNamesOrKeep } from '../use-cases/commands/bin-names.ts';
 import type { ErrorSource } from './error-hints.ts';
 import { findErrorHint } from './error-hints.ts';
 import { canonicalizeGraphCursor } from './graph-cursor.ts';
@@ -93,7 +95,7 @@ const bytesRemedy = (context: RenderContext): string =>
 const jsonRemedy = (context: RenderContext): string =>
   context.surface === 'mcp'
     ? `${context.commandName} returns plain JSON, so \`outputPath\` is refused here: there is no body to write.`
-    : `${context.commandName} returns plain JSON, so \`--output-path\` is refused; redirect to a file instead: \`ask-marcel-office ${context.commandName} ... > out.json\`.`;
+    : `${context.commandName} returns plain JSON, so \`--output-path\` is refused; redirect to a file instead: \`{bin} ${context.commandName} ... > out.json\`.`;
 
 const slimmingRemedy = (context: RenderContext): string => {
   const levers = [...(context.supportsSelect ? ['`--select id,subject,...` to slim each item'] : []), ...(context.supportsTop ? ['`--top N` to cut the item count'] : [])];
@@ -112,7 +114,7 @@ const buildSizeHint = (bytes: number, context?: RenderContext): string => {
 };
 
 const SELECT_HINT =
-  "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `ask-marcel-office docs <command>`.";
+  "`value[]` contains entries but each is empty (only `@odata.etag`) — likely caused by `--select` field names Graph did not recognise. Graph silently drops unknown `$select` fields; check spelling against the command's `responseShape` in `{bin} docs <command>`.";
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -174,27 +176,27 @@ const wrap = (data: unknown): SuccessEnvelope => {
   };
 };
 
-const renderJsonToString = (data: unknown, context?: RenderContext): string => {
+const renderJsonToString = (data: unknown, context?: RenderContext, names?: NameSource): string => {
   const envelope = wrap(data);
-  const selectHintField = looksLikeBogusSelectResponse(data) ? { selectHint: SELECT_HINT } : {};
+  const selectHintField = looksLikeBogusSelectResponse(data) ? { selectHint: fillNamesOrKeep(SELECT_HINT, names) } : {};
   const initial = JSON.stringify({ ...envelope, ...selectHintField });
   // Adding the sizeHint AFTER the size check means a payload that's
   // borderline doesn't get flagged just because the hint itself pushes it
   // over 50 KB. (The selectHint is small enough not to need the same
   // guard.)
   if (initial.length <= SIZE_HINT_THRESHOLD_BYTES) return `${initial}\n`;
-  return `${JSON.stringify({ ...envelope, ...selectHintField, sizeHint: buildSizeHint(initial.length, context) })}\n`;
+  return `${JSON.stringify({ ...envelope, ...selectHintField, sizeHint: fillNamesOrKeep(buildSizeHint(initial.length, context), names) })}\n`;
 };
 
-const renderTextToString = (data: unknown, context?: RenderContext): string => {
-  const body = renderTextOutput(data, context?.tenantId);
-  const selectHintLine = looksLikeBogusSelectResponse(data) ? `selectHint: ${SELECT_HINT}\n` : '';
+const renderTextToString = (data: unknown, context?: RenderContext, names?: NameSource): string => {
+  const body = renderTextOutput(data, context?.tenantId, names);
+  const selectHintLine = looksLikeBogusSelectResponse(data) ? `selectHint: ${fillNamesOrKeep(SELECT_HINT, names)}\n` : '';
   if (body.length <= SIZE_HINT_THRESHOLD_BYTES) return `${selectHintLine}${body}`;
   // Prepend (not append) so the LLM sees the hint before scrolling through
   // a 50 KB body — matches the `error:` / `hint:` / `source:` placement
   // convention for the error path. selectHint comes BEFORE sizeHint so the
   // more-actionable signal (you have a typo) is at the very top.
-  return `${selectHintLine}sizeHint: ${buildSizeHint(body.length, context)}\n${body}`;
+  return `${selectHintLine}sizeHint: ${fillNamesOrKeep(buildSizeHint(body.length, context), names)}\n${body}`;
 };
 
 /**
@@ -204,12 +206,15 @@ const renderTextToString = (data: unknown, context?: RenderContext): string => {
  * `context` is what makes the oversized-response banner honest — pass it
  * whenever a registry command produced the data. Omit it for the renders that
  * have no command behind them; the banner then claims no flag-level remedy.
+ *
+ * `names` is the package whose bins fill the placeholders of the CLI's own text
+ * (the footer, the hints). The data itself is never filled: it is Graph's.
  */
-const renderToString = (data: unknown, format: OutputFormat, context?: RenderContext): string => {
+const renderToString = (data: unknown, format: OutputFormat, context?: RenderContext, names?: NameSource): string => {
   // raw-json is for piping: the payload alone, without the envelope, the hints
   // or the paging cursors (a caller that pages uses `json` and its nextLink).
   if (format === 'raw-json') return `${JSON.stringify(wrap(data).data ?? null)}\n`;
-  return format === 'json' ? renderJsonToString(data, context) : renderTextToString(data, context);
+  return format === 'json' ? renderJsonToString(data, context, names) : renderTextToString(data, context, names);
 };
 
 /**
@@ -217,7 +222,7 @@ const renderToString = (data: unknown, format: OutputFormat, context?: RenderCon
  * lookup is shared with the CLI so an MCP consumer sees the same curated
  * remedies (`error-hints.ts`) the terminal does.
  */
-const renderErrorToString = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number): string => {
+const renderErrorToString = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number, names?: NameSource): string => {
   // `errorCode` is an additive field — old consumers
   // keying on `error: string` continue to work; new consumers can branch on
   // the structured code (`itemNotFound`, `InvalidIdMalformed`, `MissingScope`,
@@ -240,12 +245,17 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
   // typed fallback. End-result envelope: `{ok, error, errorCode?, hint?,
   // source?}` where only `hint` is conditional — `source` is always present
   // when the caller knew the failure category.
-  const hint = findErrorHint(message, errorCode);
+  //
+  // The hint is looked up on the message as it was built, placeholders and all
+  // (the actionable-advice check reads them); both are filled after.
+  const found = findErrorHint(message, errorCode);
+  const hint = found === undefined ? undefined : { ...found, hint: fillNamesOrKeep(found.hint, names) };
   const source = hint?.source ?? explicitSource;
+  const filled = fillNamesOrKeep(message, names);
   if (format !== 'text') {
     const payload = {
       ok: false,
-      error: message,
+      error: filled,
       ...(errorCode ? { errorCode } : {}),
       ...(hint ? { hint: hint.hint } : {}),
       ...(source ? { source } : {}),
@@ -255,7 +265,7 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
   }
   // `code:` gives the text reader the `errorCode` that the JSON envelope
   // gives. Without it, an MCP client cannot see `not_authenticated`.
-  const lines = [`error: ${message}`];
+  const lines = [`error: ${filled}`];
   if (errorCode) lines.push(`code: ${errorCode}`);
   if (hint) lines.push(`hint: ${hint.hint}`);
   if (source) lines.push(`source: ${source}`);

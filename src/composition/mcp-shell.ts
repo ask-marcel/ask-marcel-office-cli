@@ -23,6 +23,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import { fillNames } from '../use-cases/commands/bin-names.ts';
 import { describeWrites, WRITE_EFFECTS, writeGroups } from '../use-cases/commands/command-effect.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
@@ -58,9 +60,10 @@ const okText = (text: string): CallToolResult => ({ content: [{ type: 'text', te
 // Failures come back as `isError: true` rather than a thrown exception: the
 // spec routes tool errors to the MODEL (which can correct itself) instead of
 // to the client as a protocol fault. The body is the same text envelope the
-// CLI prints, so `error-hints.ts` remedies reach MCP callers unchanged.
-const errText = (message: string, code?: string, source?: Parameters<typeof renderErrorToString>[3], retryAfterSeconds?: number): CallToolResult => ({
-  content: [{ type: 'text', text: renderErrorToString(message, 'text', code, source, retryAfterSeconds) }],
+// CLI prints, so `error-hints.ts` remedies reach MCP callers unchanged; `names`
+// fills their bin placeholders.
+const errText = (message: string, code?: string, source?: Parameters<typeof renderErrorToString>[3], retryAfterSeconds?: number, names?: NameSource): CallToolResult => ({
+  content: [{ type: 'text', text: renderErrorToString(message, 'text', code, source, retryAfterSeconds, names) }],
   isError: true,
 });
 
@@ -75,6 +78,12 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
   const { registry } = commandPackage;
   const version = deps.version ?? '0.0.0';
   const server = new McpServer({ name: commandPackage.binName, version });
+  // The gateway's own text (manifest, docs pages, hints) names commands through
+  // the bin placeholders; this package's names fill them (bin-names.ts).
+  const fill = (text: string): string => fillNames(text, commandPackage);
+  const failText = (message: string, code?: string, source?: Parameters<typeof renderErrorToString>[3], retryAfterSeconds?: number): CallToolResult =>
+    errText(message, code, source, retryAfterSeconds, commandPackage);
+  const unknownCommand = (name: string, available: ReadonlyArray<string>): CallToolResult => failText(unknownCommandMessage(name, available, MCP_REMEDY), 'cli_unknown_command');
 
   // Derived, never hardcoded — and that goes for prose about it too. This comment
   // used to name the split as a pair of literals, and those literals were stale
@@ -102,11 +111,12 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
     async ({ category }): Promise<CallToolResult> => {
+      // The manifest is the gateway's own text only, so its render is filled whole.
       const manifest = buildTerseManifest(commandPackage, version);
-      if (category === undefined) return okText(renderToString(manifest, 'text'));
+      if (category === undefined) return okText(fill(renderToString(manifest, 'text')));
       const filtered = filterManifestByCategory(manifest, category);
-      if (!filtered.ok) return errText(`Unknown category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`);
-      return okText(renderToString(filtered.value, 'text'));
+      if (!filtered.ok) return failText(`Unknown category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`);
+      return okText(fill(renderToString(filtered.value, 'text')));
     }
   );
 
@@ -127,8 +137,8 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
       // get renderSingleCommand's own `available` list.
       const resolved = resolveCommand(registry, command);
       const result = renderSingleCommand(commandPackage, resolved.ok ? resolved.value.name : command);
-      if (!result.ok) return errText(unknownCommandMessage(result.error.name, result.error.available, MCP_REMEDY), 'cli_unknown_command');
-      return okText(result.value);
+      if (!result.ok) return unknownCommand(result.error.name, result.error.available);
+      return okText(fill(result.value));
     }
   );
 
@@ -153,20 +163,20 @@ const buildMcpShell = (deps: McpShellDeps): McpServer => {
     wantMutating: boolean
   ): Promise<CallToolResult> => {
     const resolved = resolveCommand(registry, commandName);
-    if (!resolved.ok) return errText(unknownCommandMessage(resolved.error.name, resolved.error.available, MCP_REMEDY), 'cli_unknown_command');
+    if (!resolved.ok) return unknownCommand(resolved.error.name, resolved.error.available);
     const isMutating = resolved.value.command.meta.effect !== 'read';
     // Gate BEFORE executing: a write routed through run-command would silently
     // mutate under a `readOnlyHint: true` tool the client may have auto-approved.
     if (isMutating && !wantMutating)
-      return errText(
+      return failText(
         `"${resolved.value.name}" writes to Microsoft 365, so it is not available through run-command (which is declared read-only). Use run-write-command instead. Write commands: ${writeCommandNames.join(', ')}.`
       );
     if (!isMutating && wantMutating)
-      return errText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
+      return failText(`"${resolved.value.name}" is a read command — use run-command. run-write-command only accepts: ${writeCommandNames.join(', ')}.`);
     const request = { name: resolved.value.name, command: resolved.value.command, params: params ?? {}, outputPath, outputDir, surface: 'mcp' as const };
     const result = await runRegistryCommand({ graph, fs, commandPackage }, request);
-    if (!result.ok) return errText(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
-    return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params ?? {})));
+    if (!result.ok) return failText(result.error.message, result.error.code, result.error.source, result.error.retryAfterSeconds);
+    return okText(renderToString(result.value, 'text', buildRenderContext(resolved.value.name, resolved.value.command, 'mcp', params ?? {}), commandPackage));
   };
 
   server.registerTool(

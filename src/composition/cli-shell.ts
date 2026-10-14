@@ -6,6 +6,7 @@ import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
 import type { RenderContext } from '../presenter/render-to-string.ts';
+import { fillNames } from '../use-cases/commands/bin-names.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
@@ -19,7 +20,11 @@ import { buildRenderContext, describeOutputPathError, runRegistryCommand } from 
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 
-/** How a lifecycle command a package adds prints: the same output and failure paths as every command. */
+/**
+ * How a lifecycle command a package adds prints: the same output and failure
+ * paths as every command. `fail` fills the bin placeholders of its message;
+ * `print` prints the data as it is, so a command fills its own (bin-names.ts).
+ */
 type CliOutput = {
   readonly print: (data: unknown) => void;
   readonly fail: (message: string, code?: string, source?: ErrorSource) => void;
@@ -51,9 +56,12 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     const raw = program.opts<{ output?: string }>().output;
     return raw === 'json' || raw === 'raw-json' ? raw : 'text';
   };
-  const renderOut = (data: unknown, sizeHintContext?: RenderContext): void => render(data, logger, getFormat(), sizeHintContext);
+  // The CLI's own text (help, docs, hints, remedies) names commands through the
+  // bin placeholders; this package's names fill them (bin-names.ts).
+  const fill = (text: string): string => fillNames(text, commandPackage);
+  const renderOut = (data: unknown, sizeHintContext?: RenderContext): void => render(data, logger, getFormat(), sizeHintContext, commandPackage);
   const fail = (message: string, code?: string, source?: ErrorSource, retryAfterSeconds?: number): void => {
-    renderError(message, getFormat(), code, source, retryAfterSeconds);
+    renderError(message, getFormat(), code, source, retryAfterSeconds, commandPackage);
     deps.onCommandError?.();
   };
 
@@ -298,7 +306,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       }
       const result = renderSingleCommand(commandPackage, commandName);
       if (result.ok) {
-        process.stdout.write(`${result.value}\n`);
+        process.stdout.write(`${fill(result.value)}\n`);
         return;
       }
       // pass an explicit `cli_unknown_command`
@@ -343,10 +351,11 @@ const buildCliShell = (deps: CliShellDeps): Command => {
           fail(`Unknown --category "${filtered.error.category}". Available categories: ${filtered.error.available.join(', ')}.`, 'cli_unknown_category');
           return;
         }
-        await writeOrPrintText(JSON.stringify(filtered.value), 'application/json', 'help-json');
+        await writeOrPrintText(fill(JSON.stringify(filtered.value)), 'application/json', 'help-json');
         return;
       }
-      await writeOrPrintText(JSON.stringify(fullOrTerse), 'application/json', 'help-json');
+      // The manifest is the CLI's own text only, so its JSON is filled whole.
+      await writeOrPrintText(fill(JSON.stringify(fullOrTerse)), 'application/json', 'help-json');
     });
 
   program.commandsGroup('Lifecycle:');
@@ -370,7 +379,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
         fail(unknownCommandMessage(result.error.name, result.error.available, cliRemedy), 'cli_unknown_command');
         return;
       }
-      await writeOrPrintText(result.value, 'text/markdown', 'docs');
+      await writeOrPrintText(fill(result.value), 'text/markdown', 'docs');
     });
   docsCmd.addHelpText(
     'after',
@@ -386,7 +395,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     if (entries.length === 0) continue;
     program.commandsGroup(`${CATEGORY_LABELS[category]}:`);
     for (const [name, cmd] of entries) {
-      const commandDef = program.command(name).description(cmd.meta.summary);
+      const commandDef = program.command(name).description(fill(cmd.meta.summary));
       // Audit round-7 B6: every single-value flag rejects repeated occurrences.
       // Commander.js by default last-wins on `--filter A --filter B` — surprising
       // for an LLM consumer that constructed two filters expecting both to apply.
@@ -405,9 +414,9 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       // on aliased canonicals) went with the alias system.
       for (const opt of cmd.meta.options) {
         if (opt.required) {
-          commandDef.requiredOption(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
+          commandDef.requiredOption(`--${opt.name} <value>`, fill(opt.description), noRepeatParser(opt.name));
         } else {
-          commandDef.option(`--${opt.name} <value>`, opt.description, noRepeatParser(opt.name));
+          commandDef.option(`--${opt.name} <value>`, fill(opt.description), noRepeatParser(opt.name));
         }
       }
       commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()], commandDef.args));
@@ -423,7 +432,7 @@ const buildCliShell = (deps: CliShellDeps): Command => {
         ...(cmd.meta.bodyTemplate ? [`\nRequest body:\n  ${cmd.meta.bodyTemplate}`] : []),
         `\nExample:\n  ${cmd.meta.example}`,
       ];
-      commandDef.addHelpText('after', helpLines.join('\n'));
+      commandDef.addHelpText('after', fill(helpLines.join('\n')));
       commandDef.action(async (opts: Record<string, string>) => {
         const globals = program.opts<{ outputPath?: string; outputDir?: string }>();
         const result = await runRegistryCommand(

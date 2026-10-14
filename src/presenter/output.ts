@@ -9,18 +9,20 @@
  * `composition/mcp-shell.ts` serves the MCP stdio protocol, where stdout carries
  * JSON-RPC frames and a stray write corrupts the stream.
  */
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { ErrorSource } from './error-hints.ts';
 import type { OutputFormat, RenderContext } from './render-to-string.ts';
 import { renderErrorToString, renderToString } from './render-to-string.ts';
 
-const render = (data: unknown, logger: Logger, format: OutputFormat, context?: RenderContext): void => {
+// `names`: the package whose bins fill the CLI's own text (see render-to-string.ts).
+const render = (data: unknown, logger: Logger, format: OutputFormat, context?: RenderContext, names?: NameSource): void => {
   logger.info('output_rendered', {});
-  process.stdout.write(renderToString(data, format, context));
+  process.stdout.write(renderToString(data, format, context, names));
 };
 
-const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number): void => {
-  process.stdout.write(renderErrorToString(message, format, errorCode, explicitSource, retryAfterSeconds));
+const renderError = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number, names?: NameSource): void => {
+  process.stdout.write(renderErrorToString(message, format, errorCode, explicitSource, retryAfterSeconds, names));
 };
 
 export { render, renderError };

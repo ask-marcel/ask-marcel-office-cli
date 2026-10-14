@@ -278,7 +278,7 @@ describe('presenter output — the oversized-response banner only names remedies
 
   it('an oversized search from the terminal is told to redirect to a file, with the command named in the example', () => {
     const hint = hintOf({ commandName: 'search-all-files', producesBytes: false, supportsSelect: false, supportsTop: false, surface: 'cli' });
-    expect(hint).toContain('ask-marcel-office search-all-files ... > out.json');
+    expect(hint).toContain('{bin} search-all-files ... > out.json');
     expect(hint).toContain('refused');
   });
 
@@ -449,7 +449,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
       '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10',
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe("id: m1\nsubject: hi\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+    expect(out).toBe("id: m1\nsubject: hi\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
   });
 
   it('packs the nextLink + deltaLink run-commands and the raw count side-by-side into a single footer separated by middle dots', async () => {
@@ -462,7 +462,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
     expect(out).toBe(
-      "id: e1\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/events?$skip=10' · delta: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/events/delta?$dt=X' · count: 47\n"
+      "id: e1\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/events?$skip=10' · delta: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/events/delta?$dt=X' · count: 47\n"
     );
   });
 
@@ -470,7 +470,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const logger = createLoggerFake();
     const data = { value: [{ id: 'p1', displayName: 'Robin Chen' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/people?%24top=2&%24skip=2' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe("id: p1\ndisplayName: Robin Chen\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2'\n");
+    expect(out).toBe("id: p1\ndisplayName: Robin Chen\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/people?$top=2&$skip=2'\n");
   });
 
   it('emits no footer line when a listing carries no pagination cursors and no count', async () => {
@@ -490,7 +490,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const logger = createLoggerFake();
     const data = { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
     const out = await captureStream('stdout', () => render(data, logger, 'text'));
-    expect(out).toBe("(no items)\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+    expect(out).toBe("(no items)\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
   });
 
   // A partner-tenant listing signs page 1 with a guest token, and the cursor
@@ -510,7 +510,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text', context));
     expect(out).toBe(
-      "id: f1\nname: Report.docx\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
+      "id: f1\nname: Report.docx\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/items/i1/children?$skip=10' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
     );
   });
 
@@ -527,7 +527,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     };
     const out = await captureStream('stdout', () => render(data, logger, 'text', context));
     expect(out).toBe(
-      "id: f1\n\n--- delta: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/root/delta?$dt=X' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
+      "id: f1\n\n--- delta: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/drives/d1/root/delta?$dt=X' --tenant-id 6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04\n"
     );
   });
 
@@ -536,7 +536,7 @@ describe('presenter output — text format (default for LLM consumers)', () => {
     const data = { value: [{ id: 'm1' }], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skip=10' };
     const context: RenderContext = { commandName: 'list-mail-messages', producesBytes: false, supportsSelect: true, supportsTop: true, surface: 'cli' };
     const out = await captureStream('stdout', () => render(data, logger, 'text', context));
-    expect(out).toBe("id: m1\n\n--- next: ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
+    expect(out).toBe("id: m1\n\n--- next: {read-bin} next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'\n");
     expect(out).not.toContain('--tenant-id');
   });
 

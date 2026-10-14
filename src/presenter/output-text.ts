@@ -1,3 +1,5 @@
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import { fillNamesOrKeep } from '../use-cases/commands/bin-names.ts';
 import { canonicalizeGraphCursor } from './graph-cursor.ts';
 
 type Cursors = {
@@ -105,15 +107,20 @@ const extractCursors = (record: Record<string, unknown>): { readonly stripped: R
 // the flag re-signs page 2 with the home token and dies at `401
 // invalidAudienceUri`. Copy-pasteable is the whole point of this line; a line
 // that 401s is worse than no line.
-const asFollowCommand = (url: string, tenantId?: string): string => {
-  const tenantFlag = tenantId === undefined ? '' : ` --tenant-id ${tenantId}`;
-  return `ask-marcel-office next-page --url '${url}'${tenantFlag}`;
+//
+// `nextPage` is `next-page` behind the bin of the package that holds it, filled
+// once per render (bin-names.ts).
+type Follow = { readonly nextPage: string; readonly tenantId?: string };
+
+const asFollowCommand = (url: string, follow: Follow): string => {
+  const tenantFlag = follow.tenantId === undefined ? '' : ` --tenant-id ${follow.tenantId}`;
+  return `${follow.nextPage} --url '${url}'${tenantFlag}`;
 };
 
-const renderFooter = (cursors: Cursors, extraParts: ReadonlyArray<string> = [], tenantId?: string): string => {
+const renderFooter = (cursors: Cursors, follow: Follow, extraParts: ReadonlyArray<string> = []): string => {
   const parts: string[] = [];
-  if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink, tenantId)}`);
-  if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink, tenantId)}`);
+  if (cursors.nextLink !== undefined) parts.push(`next: ${asFollowCommand(cursors.nextLink, follow)}`);
+  if (cursors.deltaLink !== undefined) parts.push(`delta: ${asFollowCommand(cursors.deltaLink, follow)}`);
   if (cursors.count !== undefined) parts.push(`count: ${cursors.count}`);
   appendLines(parts, extraParts);
   return parts.length === 0 ? '' : `--- ${parts.join(' · ')}`;
@@ -129,7 +136,7 @@ const renderCollection = (items: ReadonlyArray<unknown>, footer: string): string
 
 const isScalar = (value: unknown): boolean => value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
-const renderEnveloped = (data: Record<string, unknown>, tenantId?: string): string => {
+const renderEnveloped = (data: Record<string, unknown>, follow: Follow): string => {
   if (isTextPayload(data)) {
     // The markdown commands park what a reader must know about the render
     // (a cut walk, omitted events, a failed sub-read) in `note`; the JSON
@@ -154,14 +161,15 @@ const renderEnveloped = (data: Record<string, unknown>, tenantId?: string): stri
     const siblings = Object.entries(stripped).filter(([key, value]) => key !== 'value' && value !== undefined);
     if (siblings.every(([, value]) => isScalar(value))) {
       const siblingParts = siblings.map(([key, value]) => `${key}: ${encodeScalar(value)}`);
-      return renderCollection(stripped.value, renderFooter(cursors, siblingParts, tenantId));
+      return renderCollection(stripped.value, renderFooter(cursors, follow, siblingParts));
     }
   }
-  return appendFooter(renderRecordLines(stripped, '').join('\n'), renderFooter(cursors, [], tenantId));
+  return appendFooter(renderRecordLines(stripped, '').join('\n'), renderFooter(cursors, follow));
 };
 
-const renderTextOutput = (data: unknown, tenantId?: string): string => {
-  if (isRecord(data)) return renderEnveloped(data, tenantId);
+// `names`: the package whose bins the footer names; without it the footer keeps the placeholder.
+const renderTextOutput = (data: unknown, tenantId?: string, names?: NameSource): string => {
+  if (isRecord(data)) return renderEnveloped(data, { nextPage: fillNamesOrKeep('{read-bin} next-page', names), ...(tenantId === undefined ? {} : { tenantId }) });
   if (Array.isArray(data)) return `${data.map((v) => (isRecord(v) ? renderRecordLines(v, '').join('\n') : encodeScalar(v))).join('\n')}\n`;
   return `${encodeScalar(data)}\n`;
 };
