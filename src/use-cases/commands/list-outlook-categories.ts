@@ -16,7 +16,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/outlook/masterCategories',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories',
   options: [],
-  example: 'ask-marcel-office list-outlook-categories',
+  example: '{read-bin} list-outlook-categories',
   responseShape: 'collection of Microsoft Graph `outlookCategory` resources under `value[]`',
   effect: 'read',
   scopesRequired: ['MailboxSettings.Read'],

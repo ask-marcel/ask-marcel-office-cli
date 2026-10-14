@@ -21,7 +21,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-messages',
   options: [...odataQueryOptions, EXCLUDE_MEETING_RESPONSES_OPTION],
-  example: 'ask-marcel-office list-mail-messages',
+  example: '{read-bin} list-mail-messages',
   responseShape:
     'collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.',
   pagination: true,

@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/mailFolders',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-mailfolders',
   options: [INCLUDE_HIDDEN_FOLDERS_OPTION, ...odataQueryOptions],
-  example: 'ask-marcel-office list-mail-folders',
+  example: '{read-bin} list-mail-folders',
   responseShape: 'collection of Microsoft Graph `mailFolder` resources under `value[]`',
   pagination: true,
   effect: 'read',

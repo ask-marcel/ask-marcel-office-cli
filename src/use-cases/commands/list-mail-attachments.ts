@@ -33,11 +33,11 @@ const meta: ReadCommandMeta = {
       name: 'message-id',
       key: 'messageId',
       required: true,
-      description: 'Outlook message ID. Returned by `ask-marcel-office list-mail-messages` or `list-mail-folder-messages`.',
+      description: 'Outlook message ID. Returned by `{read-bin} list-mail-messages` or `list-mail-folder-messages`.',
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-mail-attachments --message-id 'AAMkAGI2...'",
+  example: "{read-bin} list-mail-attachments --message-id 'AAMkAGI2...'",
   responseShape:
     "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
   pagination: true,
