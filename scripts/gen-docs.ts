@@ -28,6 +28,7 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { fillNames } from '../src/use-cases/commands/bin-names.ts';
 import type { CommandPackage } from '../src/use-cases/commands/command-package.ts';
 import type { CommandManifest, CommandManifestEntry } from '../src/use-cases/commands/docs-render.ts';
 import { renderReadmeTables } from '../src/use-cases/commands/docs-render.ts';
@@ -42,7 +43,7 @@ if (args.package === undefined || args.manifest === undefined || args['commands-
 }
 
 const isCommandPackage = (value: unknown): value is CommandPackage =>
-  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value;
+  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value && 'binName' in value && 'bins' in value;
 
 const loaded: unknown = (await import(pathToFileURL(resolve(args.package)).href)).commandPackage;
 if (!isCommandPackage(loaded)) {
@@ -58,21 +59,24 @@ const MANIFEST_PATH = args.manifest;
 const COMMANDS_DOC_BEGIN = '<!-- AUTO-GENERATED-COMMANDS:BEGIN -->';
 const COMMANDS_DOC_END = '<!-- AUTO-GENERATED-COMMANDS:END -->';
 
+// The command references in meta carry the bin placeholders; the docs name the package's bins.
+const fill = (text: string): string => fillNames(text, commandPackage);
+
 const buildManifest = (generatedAt: string): CommandManifest => {
   const entries: CommandManifestEntry[] = [];
   for (const [name, cmd] of Object.entries(commands)) {
     const m = cmd.meta;
     entries.push({
       name,
-      summary: m.summary,
+      summary: fill(m.summary),
       category: m.category,
       graphMethod: m.graphMethod,
       graphPathTemplate: m.graphPathTemplate,
       graphDocsUrl: m.graphDocsUrl,
-      options: m.options,
-      example: m.example,
-      ...(m.responseShape ? { responseShape: m.responseShape } : {}),
-      ...(m.bodyTemplate ? { bodyTemplate: m.bodyTemplate } : {}),
+      options: m.options.map((option) => ({ ...option, description: fill(option.description) })),
+      example: fill(m.example),
+      ...(m.responseShape ? { responseShape: fill(m.responseShape) } : {}),
+      ...(m.bodyTemplate ? { bodyTemplate: fill(m.bodyTemplate) } : {}),
       ...(m.pagination ? { pagination: m.pagination } : {}),
       ...(m.producesBytes ? { producesBytes: m.producesBytes } : {}),
       ...(m.producesMedia ? { producesMedia: m.producesMedia } : {}),

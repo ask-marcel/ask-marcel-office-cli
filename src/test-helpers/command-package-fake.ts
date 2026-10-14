@@ -55,5 +55,30 @@ export const fakeCommandPackage = (overrides: Partial<CommandPackage> = {}): Com
   lifecycle: [SIGN_IN_ENTRY],
   binName: 'widget-cli',
   packageName: '@widgets/cli',
+  // One bin for the three packages, as the single package has: no command lives elsewhere.
+  bins: { auth: 'widget-cli', read: 'widget-cli', write: 'widget-cli' },
   ...overrides,
 });
+
+/**
+ * The widget package as the read package of a split: auth and write are other
+ * bins, so a command of theirs lives elsewhere. Its texts carry the bin
+ * placeholders, so a renderer that does not fill them shows `{...bin}`.
+ */
+export const fakeReadPackage = (overrides: Partial<CommandPackage> = {}): CommandPackage =>
+  fakeCommandPackage({
+    registry: {
+      'list-widgets': fakeCommand({
+        summary: 'List the widgets. Page with `{read-bin} next-page`.',
+        options: [
+          { name: 'top', key: 'top', required: false, description: 'How many widgets; `{auth-bin} status` shows the token first.' },
+          { name: 'shelf-id', key: 'shelfId', required: true, description: 'The shelf, as `{read-bin} list-shelves` returns it.' },
+        ],
+        example: '{read-bin} list-widgets --top 3',
+      }),
+      'get-widget-file': fakeCommand({ summary: 'Download a widget file. See `{bin} docs get-widget-file`.', producesBytes: true }),
+    },
+    lifecycle: [{ ...SIGN_IN_ENTRY, summary: 'Sign in to the widget service. Check with `{auth-bin} status`.', example: '{auth-bin} sign-in' }],
+    bins: { auth: 'widget-auth', read: 'widget-cli', write: 'widget-write' },
+    ...overrides,
+  });

@@ -9,10 +9,11 @@
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { LIFECYCLE_ENTRIES } from '../use-cases/commands/lifecycle-entries.ts';
+import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';
 
 export const commandPackage: CommandPackage = {
   registry: commands,
   lifecycle: LIFECYCLE_ENTRIES,
-  binName: 'ask-marcel-office',
+  ...SINGLE_PACKAGE_NAMES,
   packageName: 'ask-marcel-office-cli',
 };

@@ -58,6 +58,7 @@ import '../src/composition/cli.ts';
 import '../src/composition/cli-shell.ts';
 import '../src/composition/auth-cli.ts';
 import '../src/composition/single-package.ts';
+import '../src/composition/single-package-names.ts';
 // Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively
 // imported by anything already listed here.

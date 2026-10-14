@@ -1,3 +1,4 @@
+import type { PackageRole } from './command-directory.ts';
 import type { Command } from './command-types.ts';
 import type { CommandManifestEntry } from './docs-render.ts';
 
@@ -19,4 +20,10 @@ export type CommandPackage = {
   readonly binName: string;
   /** The npm name, e.g. `ask-marcel-office-cli`; the manifest carries it. */
   readonly packageName: string;
+  /**
+   * The bin of each package of the split, as this package names it in a command
+   * reference (`{auth-bin} login`, see bin-names.ts). The single package holds
+   * all three, so all three are its own bin.
+   */
+  readonly bins: Readonly<Record<PackageRole, string>>;
 };
