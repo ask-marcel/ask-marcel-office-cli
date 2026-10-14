@@ -347,11 +347,17 @@ src/
   presenter/       — Output formatting: pure renderers (render-to-string) + the CLI's stdout shim (output)
 ```
 
-Two front ends, one execution path. `composition/cli.ts` (Commander) and `composition/mcp.ts` (MCP
-stdio) both call `composition/run-registry-command.ts`, which owns everything between "resolved
-command + params" and "value or failure": option-alias normalization, local-filesystem routing,
-error-source classification, and `--output-path` / `--output-dir` persistence. Adding a fix there
-reaches both surfaces.
+Two front ends, one execution path. `composition/cli-shell.ts` (Commander) and
+`composition/mcp-shell.ts` (MCP stdio) both call `composition/run-registry-command.ts`, which owns
+everything between "resolved command + params" and "value or failure": option-alias normalization,
+local-filesystem routing, error-source classification, and `--output-path` / `--output-dir`
+persistence. Adding a fix there reaches both surfaces.
+
+These three modules and the docs builders import no registry. They get the package (its registry,
+its lifecycle entries, its bin and its package name) as an argument. `composition/single-package.ts`
+holds the package of this CLI, and `composition/cli.ts` and `composition/mcp.ts` give it to the two
+builders together with the auth commands (`auth-cli.ts`, `auth-mcp.ts`). An ESLint rule stops these
+shared modules from importing the registry or a lifecycle command.
 
 The presenter split exists for the same reason. `render-to-string.ts` formats and returns a string;
 `output.ts` is the only sanctioned `process.stdout` writer. The MCP server cannot write to stdout —

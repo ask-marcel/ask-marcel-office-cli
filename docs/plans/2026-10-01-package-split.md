@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-12 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay); steps 13-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-13 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection); steps 14-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -123,6 +123,44 @@ methods so both ports satisfy them), `buildShareToken`, and the PDF and plain-te
 `run-write-command`). Write is not usable alone in practice: draft flows take message ids that read
 commands return, and duplicate-draft detection is the read command `find-mail-drafts`. Its README
 says to install it next to read.
+
+As built in step 13 (`src/use-cases/commands/command-package.ts`, `src/composition/cli-shell.ts`,
+`mcp-shell.ts`, `single-package.ts`, `auth-cli.ts`, `auth-mcp.ts`):
+
+- `CommandPackage = { registry, lifecycle, binName, packageName }`. `lifecycle` is the manifest
+  entries of the commands outside the registry; they moved from `docs.ts` to
+  `src/use-cases/commands/lifecycle-entries.ts`.
+- The core shells take the package: `buildCliShell` and `buildMcpShell` (the CLI builder and the
+  gateway, moved out of `cli.ts` and `mcp.ts`), `runRegistryCommand` (its deps) and the docs
+  builders in `docs-builders.ts` (`buildManifest(package, version)`, `buildTerseManifest`,
+  `renderSingleCommand`). `docs.ts` keeps the old call shape (`buildManifest(registry, packageName,
+  version)`) for the single package, with its lifecycle entries built in, and
+  `formatOutputPathError(error, name, surface)` keeps three arguments for the refusals that name
+  nothing of the package (`describeOutputPathError` adds the package for the no-body refusal). So
+  `docs.test.ts`, `commands.test.ts` and `output-path-binary-extension.test.ts` stay unchanged
+  (rule 24); when an edit of their call shape is approved, the two old shapes can go. The bin
+  name is the program name, the MCP server name and the bin in the shells' own help and remedy text;
+  the package name is the manifest's `package`. A package adds its own lifecycle commands through a
+  hook: `addLifecycleCommands(program, output)` on the CLI, `addTools(server)` on the gateway. The
+  auth commands (`login`, `status`, `logout`, and the `login` / `status` tools) are in `auth-cli.ts`
+  and `auth-mcp.ts`.
+- `cli.ts` and `mcp.ts` keep `buildCli` and `buildMcpServer` with their old deps: they give the
+  shells the single package (`single-package.ts`) and the auth commands. So the real-registry suites
+  (`cli.test.ts`, `mcp.test.ts` and the others) run unchanged and go with read; the core tests
+  (`cli-shell.test.ts`, `mcp-shell.test.ts`, `run-registry-command.test.ts`, `docs-package.test.ts`)
+  use a made-up package (`src/test-helpers/command-package-fake.ts`).
+- `gen-docs.ts` and `check-doc-numbers.ts` take `--package <module>` (a module that exports
+  `commandPackage`) and the doc paths; `docs:gen` and `check:docs` pass the single package's.
+- ESLint: the core files of the list above may not import the registry, a lifecycle command
+  (`login`, `logout`, `status`, `login-status`, `token`, `token-args`, `token-tier-capability`,
+  `lifecycle-entries`), the commands' `docs.ts` or the single package's wiring. The ban also covers a
+  folder import (`../use-cases/commands`, `.`, `..`), the package entries (`index.ts`, `main.ts`,
+  `token.ts`, and the published name), and a dynamic `import()` of any banned path
+  (`no-restricted-syntax`). ESLint replaces a rule's options when two
+  blocks match one file, so the core files that the read-only ban also covers get one block with both
+  bans. Fixtures in `scripts/check-lint-fixtures.ts`.
+- Not yet in core's own tests: the shells' package-independent branches are covered by the
+  real-registry suites only; phase 3 (core at 100% on its own) needs core tests for them.
 
 ## Library API per package
 
@@ -385,7 +423,8 @@ read server says to register the write server; auth failures name the auth serve
   proves each rule can fail (`scripts/check-lint-fixtures.ts`, shipped in phase 1 step 1 for the MCP
   stdout ban and the `lint:strict` type-aware rules; a fixture fails when the file its rule guards
   moves). The `WriteGraph`-import fixture lands with step 12; at step 13 the MCP stdout ban becomes an
-  allowlist (stdout banned everywhere except the CLI writers), so new MCP files are covered by default.
+  allowlist (stdout banned everywhere except the CLI writers), so new MCP files are covered by default
+  (done: the writers are `cli-shell.ts`, `presenter/output.ts` and `token-helper.ts`).
 - **`check-package-json.sh`** loops over the root and every folder `package.json`.
 - **Root pre-commit hook** is the one dispatcher: it runs the fast checks for each folder with staged
   changes, and a staged change under `core/` also runs the fast checks of auth, read and write.
