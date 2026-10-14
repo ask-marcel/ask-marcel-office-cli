@@ -148,7 +148,7 @@ describe('renderCommandMarkdown', () => {
     expect(md).toContain('**Scopes required:**');
     expect(md).toContain('`Chat.ReadBasic`');
     expect(md).toContain('`User.Read`');
-    expect(md).toContain('ask-marcel-office status');
+    expect(md).toContain('{auth-bin} status');
   });
 
   it('says what a write command leaves in Microsoft 365, worded from its effect, so an agent reads it before invoking', () => {
@@ -170,7 +170,7 @@ describe('renderCommandMarkdown', () => {
     const md = renderCommandMarkdown(elevated);
     expect(md).toContain('**Needs elevated token:**');
     expect(md).toContain('M365ChatClient');
-    expect(md).toContain('ask-marcel-office login');
+    expect(md).toContain('{auth-bin} login');
   });
 
   it('renders a Positional arguments section when positionalArguments is set', () => {

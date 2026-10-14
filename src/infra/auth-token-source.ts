@@ -11,7 +11,7 @@ import type { AuthManager } from './auth.ts';
 // The cached region is pasted into every substrate URL; one that is not a region
 // name stops the request rather than steering it to another path.
 const INVALID_REGION_MESSAGE =
-  'The token cache names a Teams region that is not a region name, so no chat request was sent. Run `ask-marcel-office login --force` to capture the region again.';
+  'The token cache names a Teams region that is not a region name, so no chat request was sent. Run `{auth-bin} login --force` to capture the region again.';
 
 // The in-process token source. Each call is the AuthManager call the Graph
 // client made before the port existed, with the same arguments, so the ladder

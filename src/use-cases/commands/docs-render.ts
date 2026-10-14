@@ -124,11 +124,11 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
   if (entry.scopesRequired && entry.scopesRequired.length > 0) {
     const tagged = entry.scopesRequired.map((s) => `\`${s}\``).join(', ');
-    lines.push(`- **Scopes required:** ${tagged} — run \`ask-marcel-office status\` to verify before invoking.`);
+    lines.push(`- **Scopes required:** ${tagged} — run \`{auth-bin} status\` to verify before invoking.`);
   }
   if (entry.needsElevatedToken) {
     lines.push(
-      '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `ask-marcel-office login` to retry the capture.'
+      '- **Needs elevated token:** This command requires the M365ChatClient token captured at login (ODSP allow-list). If the silent SSO capture failed, the command will time out — run `{auth-bin} login` to retry the capture.'
     );
   }
   if (entry.stability === 'experimental') {

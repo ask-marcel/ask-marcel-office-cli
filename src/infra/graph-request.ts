@@ -121,7 +121,7 @@ const SCOPE_DUMP_PATTERN = /^(.*Missing scope permissions[^.]*\.\s*API requires 
 const truncateScopeDump = (message: string): string => {
   const match = SCOPE_DUMP_PATTERN.exec(message);
   if (match === null) return message;
-  return `${match[1]} Run \`ask-marcel-office status\` to see granted scopes, or \`ask-marcel-office help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
+  return `${match[1]} Run \`{auth-bin} status\` to see granted scopes, or \`{bin} help-json | jq '.commands[] | select(.name=="<cmd>") | .scopesRequired'\` to see what a given command requires.`;
 };
 
 // HTTP/2 servers (chatsvcagg, Kestrel-fronted Teams substrates) routinely

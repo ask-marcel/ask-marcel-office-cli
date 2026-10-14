@@ -241,8 +241,8 @@ const decodeScopes = (token: string | undefined): ReadonlyArray<string> => {
 // Recovery hints attached to an UNAVAILABLE tier so a bare `scopes: []` on a
 // missing token reads as "not captured yet", not "this token has no scopes".
 const TIER_REASON_INTERACTIVE =
-  'not cached (absent or expired) — run `ask-marcel-office login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
-const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `ask-marcel-office login --force`';
+  'not cached (absent or expired) — run `{auth-bin} login` to re-capture it (the login command self-escalates to the browser re-capture when it is missing); the elevated token carries no refresh token of its own';
+const TIER_REASON_AUTOMATIC = 'not cached — self-heals on the next Teams-chat command from the shared refresh token, or run `{auth-bin} login --force`';
 
 const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: TokenTierInfo['refresh']): TokenTierInfo => {
   if (info.available) return { ...info, refresh };
@@ -275,7 +275,7 @@ const buildTier = (info: Omit<TokenTierInfo, 'refresh' | 'reason'>, refresh: Tok
  * lapse mid-run.
  */
 const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>, remedy: string): string =>
-  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`ask-marcel-office status\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
+  `${token} token is expired or was not captured at login. ${remedy} — the CLI does not open a browser per command for this token. Preflight token validity with \`{auth-bin} status\` (no Graph call) before a long unattended run.${neededByNote(commands, 'it')}`;
 
 // The command names quoted in the secondary-token error messages, per token
 // kind (SecondaryTokenCommands, token-source-needed-by.ts). The composition root
@@ -285,9 +285,9 @@ const failFastSecondaryMessage = (token: string, commands: ReadonlyArray<string>
 // commands need them, and the hard-coded default that used to stand in had
 // already drifted from the registry.
 
-const RECAPTURE_VIA_LOGIN = 'Run `ask-marcel-office login` to (re)capture it';
+const RECAPTURE_VIA_LOGIN = 'Run `{auth-bin} login` to (re)capture it';
 const RECAPTURE_ELEVATED_VIA_LOGIN =
-  'It carries no refresh token of its own, so re-capture it with `ask-marcel-office login`: the login command self-escalates to a browser sign-in when the elevated token is missing. That sign-in needs a host with a display and may prompt, so unlike the other tiers this one cannot be refreshed non-interactively (a warm token cache does not imply warm browser-profile cookies).';
+  'It carries no refresh token of its own, so re-capture it with `{auth-bin} login`: the login command self-escalates to a browser sign-in when the elevated token is missing. That sign-in needs a host with a display and may prompt, so unlike the other tiers this one cannot be refreshed non-interactively (a warm token cache does not imply warm browser-profile cookies).';
 
 // Stable machine-readable code for the secondary-token fail-fast (elevated /
 // chatsvcagg / ic3), so an agent can branch on `errorCode` instead of
@@ -307,7 +307,7 @@ const REGION_UNREADABLE_MESSAGE = 'The token cache could not be read for the Tea
 const NOT_AUTHENTICATED_CODE = 'not_authenticated';
 
 // The token report has nothing to decode when the cache has no basic token.
-const NO_CACHED_SESSION_MESSAGE = 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.';
+const NO_CACHED_SESSION_MESSAGE = 'Not signed in: there is no cached token to inspect. Run `{auth-bin} login`.';
 
 // A token the CLI obtained but could not save. Reported as itself, never as a
 // missing sign-in: Entra single-uses the refresh token, so a redemption whose
@@ -346,7 +346,7 @@ const sameAccount = (cachedAccess: string | undefined, access: string): boolean 
   return typeof before['oid'] === 'string' && before['oid'] === after['oid'] && typeof before['tid'] === 'string' && before['tid'] === after['tid'];
 };
 const NOT_AUTHENTICATED_MESSAGE =
-  'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `ask-marcel-office login` (on a machine with a browser) first, then retry. Preflight with `ask-marcel-office status` (no Graph call).';
+  'Not signed in, or the cached session expired and its refresh failed. This command does not open a sign-in browser — run `{auth-bin} login` (on a machine with a browser) first, then retry. Preflight with `{auth-bin} status` (no Graph call).';
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -436,7 +436,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const waited = Math.round(lockWaitMs / 1000);
     return err({
       type: 'auth_failed',
-      message: `Another ask-marcel-office process is ${HOLDER_ACTIVITY[locked.error.purpose]}; this call waited ${waited} s for it. Retry once it finishes.`,
+      message: `Another {auth-bin} process is ${HOLDER_ACTIVITY[locked.error.purpose]}; this call waited ${waited} s for it. Retry once it finishes.`,
       code: SIGN_IN_IN_PROGRESS_CODE,
     });
   };
@@ -744,7 +744,7 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   const noGuestCredentials = (tenant: TenantId): Result<AccessToken, AuthError> =>
     err({
       type: 'auth_failed',
-      message: `no cached credentials to obtain a guest token for tenant ${tenant} — run \`ask-marcel-office login\``,
+      message: `no cached credentials to obtain a guest token for tenant ${tenant} — run \`{auth-bin} login\``,
       code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
     });
 

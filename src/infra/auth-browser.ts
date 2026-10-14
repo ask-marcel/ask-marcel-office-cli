@@ -154,12 +154,12 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   const recoverableElevatedFailureMessage = (reason: ElevatedFailureReason): string => {
     const needed = neededByNote(secondaryTokenCommands.elevated);
     if (reason === 'launch_timeout') {
-      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser.${needed}`;
+      return `elevated browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock, or endpoint-security / EDR software blocking the local DevTools (CDP) connection Playwright uses to drive the browser. Run \`{auth-bin} logout && {auth-bin} login\` to wipe the profile and retry; if a browser opens but no page ever loads, it is the second cause — running under Node rather than Bun avoids some EDR policies (\`npm i -g ask-marcel-office-cli\`), otherwise add a security exclusion. \`ASKMARCEL_LAUNCH_TIMEOUT_MS\` raises the budget, \`ASKMARCEL_TRACE=1\` names the failing browser.${needed}`;
     }
     if (reason === 'navigation_failed') {
       return `elevated capture failed: navigation to m365.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the commands that need the elevated token will be unavailable.${needed}`;
     }
-    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+    return `elevated token capture timed out — silent SSO against m365.cloud.microsoft did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`{auth-bin} logout && {auth-bin} login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureElevated = async (options?: { readonly awaitSignIn?: boolean }): Promise<Result<AccessToken, AuthError>> =>
@@ -201,12 +201,12 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   const recoverableChatsvcaggFailureMessage = (reason: ElevatedFailureReason): string => {
     const needed = neededByNote(secondaryTokenCommands.chatsvcagg);
     if (reason === 'launch_timeout') {
-      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
+      return `chatsvcagg browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`{auth-bin} logout && {auth-bin} login\` to wipe the profile and retry.${needed}`;
     }
     if (reason === 'navigation_failed') {
       return 'chatsvcagg capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the Teams chat-content commands will be unavailable.';
     }
-    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+    return `chatsvcagg token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`{auth-bin} logout && {auth-bin} login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureChatsvcagg = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureChatsvcaggHoldingLock());
@@ -242,12 +242,12 @@ const createBrowserRungs = (deps: BrowserRungsDeps, cache: TokenCacheAccess): Br
   const recoverableIc3FailureMessage = (reason: ElevatedFailureReason): string => {
     const needed = neededByNote(secondaryTokenCommands.ic3);
     if (reason === 'launch_timeout') {
-      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`ask-marcel-office logout && ask-marcel-office login\` to wipe the profile and retry.${needed}`;
+      return `ic3 browser launch timed out (15s) — likely a corrupt persistent profile or filesystem lock. Run \`{auth-bin} logout && {auth-bin} login\` to wipe the profile and retry.${needed}`;
     }
     if (reason === 'navigation_failed') {
       return 'ic3 capture failed: navigation to teams.cloud.microsoft did not complete — network issue, corp-proxy block, or tenant policy. Check connectivity and retry. If persistent, the chat-history command will be unavailable.';
     }
-    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`ask-marcel-office logout && ask-marcel-office login\` — this now wipes the profile too.${needed}`;
+    return `ic3 token capture timed out — silent SSO against teams.microsoft.com did not yield a Bearer within 20s. The persistent browser-profile cookies are likely expired. Run \`{auth-bin} logout && {auth-bin} login\` — this now wipes the profile too.${needed}`;
   };
 
   const recaptureIc3 = async (): Promise<Result<AccessToken, AuthError>> => underLock('browser', async () => recaptureIc3HoldingLock());

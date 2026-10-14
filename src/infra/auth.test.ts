@@ -270,10 +270,10 @@ describe('auth manager recovery ladder', () => {
     if (elevated.ok) return;
     expect(elevated.error.type).toBe('auth_failed');
     if (elevated.error.type !== 'auth_failed') return;
-    expect(elevated.error.message).toContain('ask-marcel-office login');
+    expect(elevated.error.message).toContain('{auth-bin} login');
     expect(elevated.error.message).not.toContain('--force');
     expect(elevated.error.message).toContain('no refresh token of its own'); // elevated-specific explanation
-    expect(elevated.error.message).toContain('ask-marcel-office status'); // preflight pointer
+    expect(elevated.error.message).toContain('{auth-bin} status'); // preflight pointer
 
     for (const getToken of [auth.getChatsvcaggAccessToken, auth.getIc3AccessToken]) {
       const result = await getToken();
@@ -543,8 +543,8 @@ describe('auth manager recovery ladder', () => {
     expect(result.ok).toBe(false);
     if (result.ok || result.error.type !== 'auth_failed') return;
     expect(result.error.code).toBe('not_authenticated');
-    expect(result.error.message).toContain('ask-marcel-office login');
-    expect(result.error.message).toContain('ask-marcel-office status');
+    expect(result.error.message).toContain('{auth-bin} login');
+    expect(result.error.message).toContain('{auth-bin} status');
     expect(browserLaunched).toBe(false);
   });
 
@@ -1006,7 +1006,7 @@ describe('auth manager token report (getTokenInfo)', () => {
 
   it('gives not_authenticated, with a message that names login, when the cache has no session', async () => {
     const result = await managerWith(undefined).getTokenInfo();
-    expect(result).toEqual(err({ type: 'auth_failed', message: expect.stringContaining('ask-marcel-office login'), code: 'not_authenticated' }));
+    expect(result).toEqual(err({ type: 'auth_failed', message: expect.stringContaining('{auth-bin} login'), code: 'not_authenticated' }));
   });
 
   it('reports empty scopes and no audience or expiry when the basic token has none of those claims', async () => {
@@ -1040,7 +1040,7 @@ describe('auth manager token report (getTokenInfo)', () => {
         expiresInSeconds: undefined,
         scopes: [],
         refresh: 'interactive',
-        reason: expect.stringContaining('ask-marcel-office login'),
+        reason: expect.stringContaining('{auth-bin} login'),
       });
       // Only the text for the interactive refresh has this phrase.
       expect(result.value.elevated.reason).toContain('no refresh token of its own');
@@ -1249,7 +1249,7 @@ describe('auth manager elevated token', () => {
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'auth_failed') {
       expect(result.error.message).toContain('elevated token capture timed out');
-      expect(result.error.message).toContain('ask-marcel-office login');
+      expect(result.error.message).toContain('{auth-bin} login');
       expect(result.error.message).toContain('list-chats');
     }
   });
