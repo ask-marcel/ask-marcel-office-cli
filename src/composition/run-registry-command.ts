@@ -106,8 +106,7 @@ type ErrorWordingSource = Pick<CommandPackage, 'registry' | 'binName'>;
 /** The --output-path refusals that name nothing of the package: all of them but the no-body refusal. */
 type PackageFreeOutputPathError = Exclude<OutputPathError, { readonly type: 'no_inlined_bytes' }>;
 
-// `_surface` keeps the call shape the existing suites use; no package-free refusal depends on the surface.
-const formatOutputPathError = (error: PackageFreeOutputPathError, commandName: string, _surface?: RenderSurface): string => {
+const formatOutputPathError = (error: PackageFreeOutputPathError, commandName: string): string => {
   if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
   // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
   if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
@@ -214,4 +213,4 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
   return err({ message: describeOutputPathError(persisted.error, name, request.surface, deps.commandPackage), code: persisted.error.type });
 };
 
-export { buildRenderContext, describeOutputPathError, formatOutputDirError, formatOutputPathError };
+export { buildRenderContext, describeOutputPathError, formatOutputDirError };

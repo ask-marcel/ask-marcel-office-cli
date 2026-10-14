@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import type { CommandPackage } from './command-package.ts';
 import type { Command } from './command-types.ts';
+import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from './docs-builders.ts';
 import type { CommandManifestEntry } from './docs-render.ts';
-import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from './docs.ts';
 import { commands } from './index.ts';
+import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   schema: { _: 'fake' } as never,
@@ -22,10 +24,17 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
 
 const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'mcp', 'status'] as const;
 
+// A test registry with the single package's lifecycle entries, as the docs builders take it.
+const withLifecycle = (registry: Readonly<Record<string, Command>>, packageName = 'fake-pkg'): Pick<CommandPackage, 'registry' | 'lifecycle' | 'packageName'> => ({
+  registry,
+  lifecycle: LIFECYCLE_ENTRIES,
+  packageName,
+});
+
 describe('buildManifest', () => {
   it('builds a manifest with package name, version, generatedAt, and registry+lifecycle commands sorted alphabetically', () => {
     const registry: Readonly<Record<string, Command>> = { 'list-zebra': fakeCmd(), 'list-apple': fakeCmd() };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
+    const manifest = buildManifest(withLifecycle(registry), '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
     expect(manifest.package).toBe('fake-pkg');
     expect(manifest.version).toBe('0.0.1');
     expect(manifest.generatedAt).toBe('2026-04-30T12:00:00.000Z');
@@ -33,7 +42,7 @@ describe('buildManifest', () => {
   });
 
   it('marks every lifecycle entry with category `lifecycle` so consumers can filter them', () => {
-    const manifest = buildManifest({}, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle({}), '0.0.1');
     const lifecycle = manifest.commands.filter((c) => LIFECYCLE_NAMES.includes(c.name as (typeof LIFECYCLE_NAMES)[number]));
     expect(lifecycle).toHaveLength(LIFECYCLE_NAMES.length);
     for (const entry of lifecycle) expect(entry.category).toBe('lifecycle');
@@ -41,14 +50,14 @@ describe('buildManifest', () => {
 
   it('omits responseShape when the source registry meta does not provide one', () => {
     const registry: Readonly<Record<string, Command>> = { 'aaa-foo': fakeCmd() };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle(registry), '0.0.1');
     const fooEntry = manifest.commands.find((c) => c.name === 'aaa-foo');
     expect(fooEntry).not.toHaveProperty('responseShape');
   });
 
   it('keeps responseShape when the source registry meta provides one', () => {
     const registry: Readonly<Record<string, Command>> = { 'aaa-foo': fakeCmd({ responseShape: 'single thing' }) };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle(registry), '0.0.1');
     const fooEntry = manifest.commands.find((c) => c.name === 'aaa-foo');
     expect(fooEntry?.responseShape).toBe('single thing');
   });
@@ -59,7 +68,7 @@ describe('buildManifest', () => {
       'aaa-bytes': fakeCmd({ producesBytes: true }),
       'aaa-media': fakeCmd({ producesMedia: true }),
     };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle(registry), '0.0.1');
     const byName = (n: string): (typeof manifest.commands)[number] | undefined => manifest.commands.find((c) => c.name === n);
     expect(byName('aaa-plain')).not.toHaveProperty('producesBytes');
     expect(byName('aaa-plain')).not.toHaveProperty('producesMedia');
@@ -73,7 +82,7 @@ describe('buildManifest', () => {
       'aaa-write': fakeCmd({ graphMethod: 'PATCH', effect: 'draft' }),
       'aaa-upload': fakeCmd({ effect: 'transient-upload' }),
     };
-    const manifest = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle(registry), '0.0.1');
     const effectOf = (n: string): unknown => manifest.commands.find((c) => c.name === n)?.effect;
     expect(effectOf('aaa-plain')).toBe('read');
     expect(effectOf('aaa-write')).toBe('draft');
@@ -83,13 +92,13 @@ describe('buildManifest', () => {
   // 2026-07-24: the manifest carries one name per command; commandAliases
   // serialization was removed with the alias system.
   it('never serializes a commandAliases key, since a command has exactly one name', () => {
-    const manifest = buildManifest({ 'aaa-plain': fakeCmd() }, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle({ 'aaa-plain': fakeCmd() }), '0.0.1');
     expect(manifest.commands.find((c) => c.name === 'aaa-plain')).not.toHaveProperty('commandAliases');
   });
 
   it('uses the real `new Date()` when no clock injector is given', () => {
     const before = Date.now();
-    const manifest = buildManifest({ foo: fakeCmd() }, 'fake-pkg', '0.0.1');
+    const manifest = buildManifest(withLifecycle({ foo: fakeCmd() }), '0.0.1');
     const after = Date.now();
     const generatedAt = new Date(manifest.generatedAt).getTime();
     expect(generatedAt).toBeGreaterThanOrEqual(before);
@@ -102,7 +111,7 @@ describe('buildTerseManifest — discovery view', () => {
     const registry: Readonly<Record<string, Command>> = {
       'list-foo': fakeCmd({ summary: 'lists foos', responseShape: 'array of foos', bodyTemplate: '{ "x": 1 }', pagination: true }),
     };
-    const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
+    const manifest = buildTerseManifest(withLifecycle(registry), '0.0.1', () => new Date('2026-04-30T12:00:00Z'));
     const foo = manifest.commands.find((c) => c.name === 'list-foo');
     expect(foo).toEqual({ name: 'list-foo', summary: 'lists foos', category: 'drive' });
   });
@@ -111,13 +120,13 @@ describe('buildTerseManifest — discovery view', () => {
     const registry: Readonly<Record<string, Command>> = {
       'list-foo': fakeCmd({ summary: 'Lists the foos. A second sentence with extra detail that terse should drop.' }),
     };
-    const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildTerseManifest(withLifecycle(registry), '0.0.1');
     const foo = manifest.commands.find((c) => c.name === 'list-foo');
     expect(foo?.summary).toBe('Lists the foos.');
   });
 
   it('still includes lifecycle entries with their canonical summaries so a discovery-mode consumer sees login/logout/docs/help-json', () => {
-    const manifest = buildTerseManifest({}, 'fake-pkg', '0.0.1');
+    const manifest = buildTerseManifest(withLifecycle({}), '0.0.1');
     const names = manifest.commands.map((c) => c.name);
     for (const lifecycle of LIFECYCLE_NAMES) expect(names).toContain(lifecycle);
   });
@@ -127,7 +136,7 @@ describe('buildTerseManifest — discovery view', () => {
       'list-stable-thing': fakeCmd(),
       'list-experimental-thing': fakeCmd({ stability: 'experimental' }),
     };
-    const manifest = buildTerseManifest(registry, 'fake-pkg', '0.0.1');
+    const manifest = buildTerseManifest(withLifecycle(registry), '0.0.1');
     const stable = manifest.commands.find((c) => c.name === 'list-stable-thing');
     const experimental = manifest.commands.find((c) => c.name === 'list-experimental-thing');
     expect(stable?.stability).toBeUndefined();
@@ -138,8 +147,8 @@ describe('buildTerseManifest — discovery view', () => {
     const registry: Readonly<Record<string, Command>> = Object.fromEntries(
       Array.from({ length: 50 }, (_, i) => [`list-thing-${i}`, fakeCmd({ summary: 'x'.repeat(400), responseShape: 'y'.repeat(400), bodyTemplate: 'z'.repeat(400) })])
     );
-    const full = JSON.stringify(buildManifest(registry, 'fake-pkg', '0.0.1'));
-    const terse = JSON.stringify(buildTerseManifest(registry, 'fake-pkg', '0.0.1'));
+    const full = JSON.stringify(buildManifest(withLifecycle(registry), '0.0.1'));
+    const terse = JSON.stringify(buildTerseManifest(withLifecycle(registry), '0.0.1'));
     // Terse should be at least 50% smaller — the heavy responseShape /
     // bodyTemplate fields drop out entirely on every entry.
     expect(terse.length).toBeLessThan(full.length / 2);
@@ -147,8 +156,8 @@ describe('buildTerseManifest — discovery view', () => {
 
   it('keeps the real help-json sizes within their documented budget — a tripwire so the "~560 KB full / ~33 KB terse / ~8 KB per category" hints (USAGE/cli/docs/error-hints) cannot silently go stale as commands are added', () => {
     const stamp = (): Date => new Date(0);
-    const terse = buildTerseManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp);
-    const full = JSON.stringify(buildManifest(commands, 'ask-marcel-office-cli', '0.0.0', stamp)).length;
+    const terse = buildTerseManifest(withLifecycle(commands, 'ask-marcel-office-cli'), '0.0.0', stamp);
+    const full = JSON.stringify(buildManifest(withLifecycle(commands, 'ask-marcel-office-cli'), '0.0.0', stamp)).length;
     const terseAll = JSON.stringify(terse).length;
     // Measured across every category rather than a named one: `drive` was the
     // largest when this was written and `mail` has since overtaken it, so
@@ -172,7 +181,7 @@ describe('filterManifestByCategory — single-category projection', () => {
   };
 
   it('keeps only commands whose category matches and preserves package/version/generatedAt', () => {
-    const full = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const full = buildManifest(withLifecycle(registry), '0.0.1');
     const result = filterManifestByCategory(full, 'mail');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -181,14 +190,14 @@ describe('filterManifestByCategory — single-category projection', () => {
   });
 
   it('returns ok with empty commands when the requested category is valid but no commands match', () => {
-    const full = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const full = buildManifest(withLifecycle(registry), '0.0.1');
     const result = filterManifestByCategory(full, 'excel');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.commands).toEqual([]);
   });
 
   it('rejects an unknown category with a discriminated error listing the available categories so the LLM can recover', () => {
-    const full = buildManifest(registry, 'fake-pkg', '0.0.1');
+    const full = buildManifest(withLifecycle(registry), '0.0.1');
     const result = filterManifestByCategory(full, 'notarealcategory');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'unknown_category') {
@@ -200,7 +209,7 @@ describe('filterManifestByCategory — single-category projection', () => {
   });
 
   it('composes with --terse: a terse manifest filtered by category yields terse entries only in that category', () => {
-    const terse = buildTerseManifest(registry, 'fake-pkg', '0.0.1');
+    const terse = buildTerseManifest(withLifecycle(registry), '0.0.1');
     const result = filterManifestByCategory(terse, 'mail');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -215,7 +224,7 @@ describe('filterManifestByCategory — single-category projection', () => {
 describe('renderSingleCommand', () => {
   it('returns Markdown for an existing registry command', () => {
     const registry: Readonly<Record<string, Command>> = { 'get-current-user': fakeCmd({ summary: 'returns the user' }) };
-    const result = renderSingleCommand(registry, 'get-current-user');
+    const result = renderSingleCommand(withLifecycle(registry), 'get-current-user');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toContain('# `get-current-user`');
@@ -224,7 +233,7 @@ describe('renderSingleCommand', () => {
   });
 
   it('returns Markdown for a lifecycle command (login/logout/docs/help-json) even when the registry is empty', () => {
-    const result = renderSingleCommand({}, 'login');
+    const result = renderSingleCommand(withLifecycle({}), 'login');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toContain('# `login`');
@@ -234,7 +243,7 @@ describe('renderSingleCommand', () => {
 
   it('returns unknown_command with the alphabetically merged registry+lifecycle list when the command is missing', () => {
     const registry: Readonly<Record<string, Command>> = { 'list-zebra': fakeCmd(), 'list-apple': fakeCmd() };
-    const result = renderSingleCommand(registry, 'list-banana');
+    const result = renderSingleCommand(withLifecycle(registry), 'list-banana');
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'unknown_command') {
       expect(result.error.name).toBe('list-banana');
@@ -245,7 +254,7 @@ describe('renderSingleCommand', () => {
 
 describe('buildManifest — the conditional fields toEntry adds or omits', () => {
   const entryFor = (name: string, meta: Partial<Command['meta']>): CommandManifestEntry | undefined =>
-    buildManifest({ [name]: fakeCmd(meta) }, 'fake-pkg', '0.0.1').commands.find((c) => c.name === name);
+    buildManifest(withLifecycle({ [name]: fakeCmd(meta) }), '0.0.1').commands.find((c) => c.name === name);
 
   it('defaults a paginated command to the nextLink cursor strategy', () => {
     expect(entryFor('aaa-paged', { pagination: true })?.paginationStrategy).toBe('nextLink');
@@ -300,7 +309,7 @@ describe('lifecycle entries — the invariants the registry sweep never reaches'
   // login/logout/update/docs/help-json/mcp have no command file, so they are absent
   // from the `commands` registry and skip every invariant meta.test.ts applies to
   // the other 186. buildManifest merging them in is the only public route to them.
-  const lifecycle = buildManifest({}, 'fake-pkg', '0.0.1').commands;
+  const lifecycle = buildManifest(withLifecycle({}), '0.0.1').commands;
   const byName = (name: string): CommandManifestEntry | undefined => lifecycle.find((c) => c.name === name);
 
   it('exposes exactly the six lifecycle commands', () => {
@@ -349,7 +358,7 @@ describe('docs error payloads — discriminants and ordering', () => {
   const registry: Readonly<Record<string, Command>> = { 'list-foo': fakeCmd({ category: 'mail' }) };
 
   it('names the unknown_category discriminant outside any narrowing guard', () => {
-    const result = filterManifestByCategory(buildManifest(registry, 'fake-pkg', '0.0.1'), 'notarealcategory');
+    const result = filterManifestByCategory(buildManifest(withLifecycle(registry), '0.0.1'), 'notarealcategory');
     expect(result.ok).toBe(false);
     // Asserted unconditionally on purpose: a guard of the form
     // `if (result.error.type === '...')` skips its own body when the discriminant
@@ -358,7 +367,7 @@ describe('docs error payloads — discriminants and ordering', () => {
   });
 
   it('lists the available categories alphabetically, not in declaration order', () => {
-    const result = filterManifestByCategory(buildManifest(registry, 'fake-pkg', '0.0.1'), 'notarealcategory');
+    const result = filterManifestByCategory(buildManifest(withLifecycle(registry), '0.0.1'), 'notarealcategory');
     if (!result.ok && result.error.type === 'unknown_category') {
       const { available } = result.error;
       expect(available.length).toBeGreaterThan(1);
@@ -367,7 +376,7 @@ describe('docs error payloads — discriminants and ordering', () => {
   });
 
   it('names the unknown_command discriminant outside any narrowing guard', () => {
-    const result = renderSingleCommand(registry, 'list-banana');
+    const result = renderSingleCommand(withLifecycle(registry), 'list-banana');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('unknown_command');
   });

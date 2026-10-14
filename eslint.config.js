@@ -25,7 +25,7 @@ const READ_ONLY_IMPORT_BANS = [
 
 const CORE_IMPORT_BANS = [
   {
-    regex: '^(\\./|\\.\\./(.*/)?commands/)(index|docs|login|logout|status|login-status|token|token-args|token-tier-capability|lifecycle-entries)(\\.[cm]?[jt]s)?$',
+    regex: '^(\\./|\\.\\./(.*/)?commands/)(index|login|logout|status|login-status|token|token-args|token-tier-capability|lifecycle-entries)(\\.[cm]?[jt]s)?$',
     message: 'Core serves any package: take the registry and the lifecycle entries from the CommandPackage the composition root passes in, never import them.',
   },
   {
@@ -288,7 +288,7 @@ export default [
     // hands them, so they never import the registry (by path, by folder, through
     // the package entry, or with a dynamic import), a lifecycle command, or the
     // modules that wire the single package (`single-package.ts`, `build-deps.ts`,
-    // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`, the commands' `docs.ts`).
+    // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`).
     // A file joins a list when it becomes core (step 15 extracts the shared helpers).
     files: [
       'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',

@@ -52,7 +52,6 @@ const BARREL_REGISTRY_IMPORT = "import { commands } from '../index.ts';\nexport 
 const REGISTRY_DIRECTORY_IMPORT = "import * as registry from '../use-cases/commands';\nexport const f = (): unknown => registry;\n";
 const SIBLING_DIRECTORY_IMPORT = "import * as registry from '.';\nexport const f = (): unknown => registry;\n";
 const SELF_PACKAGE_IMPORT = "import { commands } from 'ask-marcel-office-cli';\nexport const f = (): unknown => commands;\n";
-const SINGLE_PACKAGE_DOCS_IMPORT = "import { buildManifest } from './docs.ts';\nexport const f = (): unknown => buildManifest;\n";
 const DYNAMIC_REGISTRY_IMPORT = "export const f = async (): Promise<unknown> => import('../use-cases/commands/index.ts');\n";
 const DYNAMIC_SIBLING_IMPORT = "export const f = async (): Promise<unknown> => import('./filesystem-node.ts');\n";
 
@@ -73,7 +72,6 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the CLI builder never imports the registry folder', path: 'src/composition/cli-shell.ts', source: REGISTRY_DIRECTORY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the command framework never imports its own folder', path: 'src/use-cases/commands/resolve-command.ts', source: SIBLING_DIRECTORY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the MCP gateway never imports the published package', path: 'src/composition/mcp-shell.ts', source: SELF_PACKAGE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'the docs builders never take the single package docs', path: 'src/use-cases/commands/docs-builders.ts', source: SINGLE_PACKAGE_DOCS_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the CLI builder never loads the registry with a dynamic import', path: 'src/composition/cli-shell.ts', source: DYNAMIC_REGISTRY_IMPORT, rule: 'no-restricted-syntax', fires: true, strict: false },
   { name: 'a core docs builder never loads the registry with a dynamic import', path: 'src/use-cases/commands/docs-builders.ts', source: DYNAMIC_REGISTRY_IMPORT.replace('../use-cases/commands/index.ts', './index.ts'), rule: 'no-restricted-syntax', fires: true, strict: false },
   { name: 'control: the core file system loads its Node half dynamically', path: 'src/infra/filesystem-bun.ts', source: DYNAMIC_SIBLING_IMPORT, rule: 'no-restricted-syntax', fires: false, strict: false },

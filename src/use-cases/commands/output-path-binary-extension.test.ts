@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { formatOutputPathError } from '../../composition/run-registry-command.ts';
+import { describeOutputPathError } from '../../composition/run-registry-command.ts';
+import { fakeCommandPackage } from '../../test-helpers/command-package-fake.ts';
 import { createFileSystemFake } from '../../test-helpers/filesystem-fake.ts';
 import { persistIfRequested } from './output-path.ts';
 
@@ -52,7 +53,12 @@ describe('saving a text answer under a binary file name', () => {
   });
 
   it('points at the raw-bytes commands in the CLI message', () => {
-    const message = formatOutputPathError({ type: 'text_under_binary_extension', requestedExtension: '.pdf', contentType: 'text/plain' }, 'read-mail-attachment', 'cli');
+    const message = describeOutputPathError(
+      { type: 'text_under_binary_extension', requestedExtension: '.pdf', contentType: 'text/plain' },
+      'read-mail-attachment',
+      'cli',
+      fakeCommandPackage()
+    );
     expect(message).toBe(
       '--output-path: read-mail-attachment returned text (`text/plain`), not the bytes of a `.pdf`; saving it under that name would make a file no reader can open. Save it as `.md` or `.txt`, or fetch the original bytes with `get-mail-attachment` (a mail attachment), `download-drive-item-content` (a drive file) or `download-drive-item-version --format original` (a version).'
     );

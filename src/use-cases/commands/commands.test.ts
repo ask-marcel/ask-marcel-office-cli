@@ -23,7 +23,7 @@ import {
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import type { CommandExecute } from './command-types.ts';
-import { renderSingleCommand } from './docs.ts';
+import { renderSingleCommand } from './docs-builders.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
@@ -7480,7 +7480,7 @@ describe('search-mail-messages rejects --filter client-side', () => {
   });
 
   it('renders docs for search-mail-messages with the documented response shape, the KQL-query option description, and the pagination hint — guards the meta block content against silent rewrites', () => {
-    const rendered = renderSingleCommand(cmdRegistry, 'search-mail-messages');
+    const rendered = renderSingleCommand({ registry: cmdRegistry, lifecycle: [] }, 'search-mail-messages');
     expect(rendered.ok).toBe(true);
     if (rendered.ok) {
       expect(rendered.value).toContain('GET /me/messages');
