@@ -13,7 +13,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/events',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-events',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-calendar-events',
+  example: '{read-bin} list-calendar-events',
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -21,7 +21,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
+  example: "{read-bin} list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
   responseShape: 'collection of Microsoft Graph `calendar` resources under `value[]`',
   pagination: true,
   effect: 'read',

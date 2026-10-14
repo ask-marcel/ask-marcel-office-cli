@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-group-events --group-id 'a1b2c3d4-...'",
+  example: "{read-bin} list-group-events --group-id 'a1b2c3d4-...'",
   responseShape: 'collection of Microsoft Graph `event` resources under `value[]`',
   pagination: true,
   effect: 'read',

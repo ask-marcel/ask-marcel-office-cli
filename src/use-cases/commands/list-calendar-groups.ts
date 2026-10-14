@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/calendarGroups',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-calendargroups',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-calendar-groups',
+  example: '{read-bin} list-calendar-groups',
   responseShape: 'collection of Microsoft Graph `calendarGroup` resources under `value[]`',
   pagination: true,
   effect: 'read',
