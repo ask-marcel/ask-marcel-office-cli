@@ -26,7 +26,7 @@ const meta: ReadCommandMeta = {
       description: 'Microsoft Teams team ID.',
     },
   ],
-  example: "ask-marcel-office list-team-installed-apps --team-id 'tm1'",
+  example: "{read-bin} list-team-installed-apps --team-id 'tm1'",
   responseShape:
     'collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)',
   pagination: true,

@@ -13,7 +13,7 @@ const idOf = (params: Record<string, string>, key: string): string => params[key
 /** Reads the channel (and message, when present) ids out of raw CLI params. */
 const channelScopeOf = (params: Record<string, string>): ChannelScope => ({ channelId: idOf(params, 'channelId'), messageId: params['messageId'] });
 
-const LIST_CHANNELS_HINT = 'Verify it exists in this team via `ask-marcel-office list-team-channels --team-id <team-id>`.';
+const LIST_CHANNELS_HINT = 'Verify it exists in this team via `{read-bin} list-team-channels --team-id <team-id>`.';
 
 const channelNotFound = (status: number, channelId: string, cause = ''): GraphError => ({
   type: 'api_error',
@@ -28,7 +28,7 @@ const messageNotFound = (status: number, scope: ChannelScope): GraphError => ({
   message:
     `NotFound: Microsoft Teams channel message not found (channel-id: "${scope.channelId}", message-id: "${scope.messageId}"). ` +
     `Graph answers \`${status} Forbidden: UnknownError\` for a message id it cannot resolve in this channel; this is not a missing scope. ` +
-    'Source the id via `ask-marcel-office list-team-channel-messages --team-id <team-id> --channel-id <channel-id>`.',
+    'Source the id via `{read-bin} list-team-channel-messages --team-id <team-id> --channel-id <channel-id>`.',
   code: 'cli_rewrite_channel_message_not_found',
 });
 
@@ -39,8 +39,8 @@ const badId = (status: number, scope: ChannelScope): GraphError => {
     status,
     message:
       `BadRequest: Microsoft Graph could not parse an id on this channel route (${ids}). ` +
-      `Graph answers \`${status} UnknownError\` for a malformed channel or message id: a channel id looks like \`19:<thread>@thread.tacv2\` (from \`ask-marcel-office list-team-channels\`) ` +
-      'and a message id is the numeric id from `ask-marcel-office list-team-channel-messages`.',
+      `Graph answers \`${status} UnknownError\` for a malformed channel or message id: a channel id looks like \`19:<thread>@thread.tacv2\` (from \`{read-bin} list-team-channels\`) ` +
+      'and a message id is the numeric id from `{read-bin} list-team-channel-messages`.',
     code: 'cli_rewrite_channel_bad_id',
   };
 };

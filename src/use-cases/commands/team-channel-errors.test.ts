@@ -24,7 +24,7 @@ describe('naming the channel or message behind an opaque Graph error', () => {
     expect(rewritten.error.status).toBe(404);
     expect(rewritten.error.code).toBe('cli_rewrite_channel_not_found');
     expect(rewritten.error.message).toBe(
-      `NotFound: Microsoft Teams channel not found (channel-id: "${CHANNEL}"). Verify it exists in this team via \`ask-marcel-office list-team-channels --team-id <team-id>\`.`
+      `NotFound: Microsoft Teams channel not found (channel-id: "${CHANNEL}"). Verify it exists in this team via \`{read-bin} list-team-channels --team-id <team-id>\`.`
     );
   });
 
@@ -105,7 +105,7 @@ describe('naming the channel or message behind an opaque Graph error', () => {
     expect(rewritten.error.message).toContain('channel-id: "x"');
     expect(rewritten.error.message).not.toContain('message-id');
     expect(rewritten.error.message).toContain('19:<thread>@thread.tacv2');
-    expect(rewritten.error.message).toContain('numeric id from `ask-marcel-office list-team-channel-messages`');
+    expect(rewritten.error.message).toContain('numeric id from `{read-bin} list-team-channel-messages`');
   });
 
   it('reads the channel and message ids out of raw params, and marks a missing channel id as unknown', () => {

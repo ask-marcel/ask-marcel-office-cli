@@ -25,11 +25,11 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/tabs?$expand=teamsApp',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/channel-list-tabs',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.' },
-    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`.' },
+    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.' },
+    { name: 'channel-id', key: 'channelId', required: true, description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `{read-bin} list-team-channels`.' },
     ...filterSelectOptions,
   ],
-  example: "ask-marcel-office list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
+  example: "{read-bin} list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
   responseShape:
     'collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`',
   effect: 'read',

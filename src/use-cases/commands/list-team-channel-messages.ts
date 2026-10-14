@@ -22,12 +22,12 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/teams/{team-id}/channels/{channel-id}/messages',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/channel-list-messages',
   options: [
-    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.' },
+    { name: 'team-id', key: 'teamId', required: true, description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.' },
     {
       name: 'channel-id',
       key: 'channelId',
       required: true,
-      description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `ask-marcel-office list-team-channels`, or `get-team-primary-channel` for General.',
+      description: 'Channel ID (`19:<thread>@thread.tacv2`). Returned by `{read-bin} list-team-channels`, or `get-team-primary-channel` for General.',
     },
     CHANNEL_MESSAGES_TOP_OPTION,
     ...pickODataOptions(['select']),
@@ -38,7 +38,7 @@ const meta: ReadCommandMeta = {
       description: "OData $expand: pass `replies` to inline each root post's replies (the only navigation Graph expands on this collection). Increases response size.",
     },
   ],
-  example: "ask-marcel-office list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
+  example: "{read-bin} list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
   responseShape:
     'collection of Microsoft Graph `chatMessage` resources under `value[]`: `id`, `replyToId` (null on a root post), `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`',
   pagination: true,

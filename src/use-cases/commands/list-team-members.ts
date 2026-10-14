@@ -23,11 +23,11 @@ const meta: ReadCommandMeta = {
       name: 'team-id',
       key: 'teamId',
       required: true,
-      description: 'Microsoft Teams team ID. Returned by `ask-marcel-office list-joined-teams`.',
+      description: 'Microsoft Teams team ID. Returned by `{read-bin} list-joined-teams`.',
     },
     ...filterSelectOptions,
   ],
-  example: "ask-marcel-office list-team-members --team-id 'abc-1234-...'",
+  example: "{read-bin} list-team-members --team-id 'abc-1234-...'",
   responseShape:
     'collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`',
   pagination: true,
