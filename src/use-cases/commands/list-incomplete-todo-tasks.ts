@@ -49,12 +49,12 @@ const meta: ReadCommandMeta = {
       key: 'todoTaskListId',
       required: true,
       description:
-        'todoTaskList ID. Returned by `ask-marcel-office list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
+        'todoTaskList ID. Returned by `{read-bin} list-todo-task-lists`. The well-known name `tasks` (the default list) is accepted on this incomplete-tasks endpoint specifically — sibling commands like `list-todo-tasks` and `list-todo-tasks-delta` only accept resolved IDs. There is no Graph endpoint that returns incomplete tasks across every list — call this once per list.',
     },
     DUE_BEFORE_OPTION,
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
+  example: "{read-bin} list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
   responseShape:
     'collection of Microsoft Graph `todoTask` resources under `value[]` where `status != "completed"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)',
   pagination: true,

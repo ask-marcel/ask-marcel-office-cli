@@ -33,7 +33,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/planner/tasks?$filter=percentComplete ne 100',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/planneruser-list-tasks',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-incomplete-planner-tasks --top 25',
+  example: '{read-bin} list-incomplete-planner-tasks --top 25',
   responseShape: 'collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`',
   pagination: true,
   effect: 'read',
