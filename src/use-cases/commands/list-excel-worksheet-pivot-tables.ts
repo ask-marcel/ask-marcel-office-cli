@@ -39,7 +39,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
+  example: "{read-bin} list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
   responseShape: 'collection of Microsoft Graph `workbookPivotTable` resources under `value[]`',
   pagination: true,
   effect: 'read',

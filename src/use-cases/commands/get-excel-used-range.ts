@@ -105,7 +105,7 @@ const meta: ReadCommandMeta = {
       key: 'worksheetId',
       required: true,
       description:
-        "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`. If neither matches Graph responds `itemNotFound: The requested resource doesn't exist.` — when that happens, double-check spelling case-sensitively against `ask-marcel-office list-excel-worksheets --drive-id <d> --item-id <i>`.",
+        "Accepts either the worksheet display name (e.g. `Sheet1`, `PROJECT`) or the worksheet `id` GUID returned by `list-excel-worksheets`. If neither matches Graph responds `itemNotFound: The requested resource doesn't exist.` — when that happens, double-check spelling case-sensitively against `{read-bin} list-excel-worksheets --drive-id <d> --item-id <i>`.",
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -123,7 +123,7 @@ const meta: ReadCommandMeta = {
         'Cap (positive integer; default 50 000) on the size of the projected `values[]` in slim mode. When the used-range exceeds the cap, the response keeps `address` / `rowCount` / `columnCount` but drops `values[]` and adds `truncated: true` plus a hint pointing at `get-excel-range` for band-by-band reads. Ignored when `--full true` is set (the caller has opted into the full payload regardless of size).',
     },
   ],
-  example: "ask-marcel-office get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
+  example: "{read-bin} get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
   responseShape:
     "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`).",
   effect: 'read',

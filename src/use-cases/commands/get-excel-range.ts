@@ -76,7 +76,7 @@ const meta: ReadCommandMeta = {
       name: 'worksheet-id',
       key: 'worksheetId',
       required: true,
-      description: 'Worksheet ID or worksheet name. Returned by `ask-marcel-office list-excel-worksheets`.',
+      description: 'Worksheet ID or worksheet name. Returned by `{read-bin} list-excel-worksheets`.',
       argumentHint: { kind: 'idOrName' },
     },
     {
@@ -88,7 +88,7 @@ const meta: ReadCommandMeta = {
       argumentHint: { kind: 'a1Address' },
     },
   ],
-  example: "ask-marcel-office get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
+  example: "{read-bin} get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
   responseShape: 'single Microsoft Graph `workbookRange` resource (values, formulas, format)',
   effect: 'read',
   scopesRequired: ['Files.Read'],

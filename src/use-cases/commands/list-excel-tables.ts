@@ -31,7 +31,7 @@ const meta: ReadCommandMeta = {
     { name: 'item-id', key: 'itemId', required: true, description: 'driveItem ID of the .xlsx file. Returned by `list-folder-files` or `search-onedrive-files`.' },
     ...pickODataOptions(TABLES_ODATA_KEYS),
   ],
-  example: "ask-marcel-office list-excel-tables --drive-id 'b!1234' --item-id '01XLSX'",
+  example: "{read-bin} list-excel-tables --drive-id 'b!1234' --item-id '01XLSX'",
   responseShape: 'collection of Microsoft Graph `workbookTable` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -66,7 +66,7 @@ const meta: ReadCommandMeta = {
       argumentHint: { kind: 'idOrName' },
     },
   ],
-  example: "ask-marcel-office get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
+  example: "{read-bin} get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
   responseShape:
     '`{ contentType: "image/png", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`).',
   producesBytes: true,
