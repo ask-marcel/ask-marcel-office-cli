@@ -28,7 +28,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/directReports',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-directreports',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-my-direct-reports',
+  example: '{read-bin} list-my-direct-reports',
   responseShape: 'collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`',
   pagination: true,
   effect: 'read',

@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/informationProtection/sensitivityLabels',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/security-informationprotection-list-sensitivitylabels',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-sensitivity-labels',
+  example: '{read-bin} list-sensitivity-labels',
   responseShape: 'collection of Microsoft Graph `sensitivityLabel` resources under `value[]`',
   pagination: true,
   effect: 'read',

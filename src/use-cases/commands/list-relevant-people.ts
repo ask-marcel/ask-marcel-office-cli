@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/people',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-people',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-relevant-people',
+  example: '{read-bin} list-relevant-people',
   responseShape: 'collection of Microsoft Graph `person` resources under `value[]`',
   pagination: true,
   effect: 'read',

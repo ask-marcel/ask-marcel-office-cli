@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/transitiveMemberOf',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-list-transitivememberof',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-my-transitive-memberships',
+  example: '{read-bin} list-my-transitive-memberships',
   responseShape: 'collection of Microsoft Graph `directoryObject` resources under `value[]`',
   pagination: true,
   effect: 'read',
