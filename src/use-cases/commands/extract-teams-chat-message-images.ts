@@ -63,7 +63,7 @@ const meta: ReadCommandMeta = {
     },
     { name: 'message-id', key: 'messageId', required: true, description: 'The message `id`, from `list-teams-chat-messages` or `list-teams-chat-history`.' },
   ],
-  example: "ask-marcel-office extract-teams-chat-message-images --chat-id '19:abc@thread.v2' --message-id '1727000000000'",
+  example: "{read-bin} extract-teams-chat-message-images --chat-id '19:abc@thread.v2' --message-id '1727000000000'",
   responseShape:
     '`{ count, media: [{ path, contentType, sizeBytes, base64 }] }` — `path` is `image-<n>.<ext>`, in the order the images appear. Pair with the global `--output-dir <dir>` to write each image there (the response then carries `savedTo` in place of `base64`). `count: 0` with a `note` means the message holds no pasted image.',
   producesMedia: true,

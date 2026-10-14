@@ -30,7 +30,7 @@ const meta: ReadCommandMeta = {
     { name: 'chat-id', key: 'chatId', required: true, description: 'Teams chat ID. Source via `list-chats` or `list-teams-chats-with-messages`.' },
     { name: 'message-id', key: 'messageId', required: true, description: 'Teams chat message ID. Source via `list-teams-chats-with-messages` or `list-teams-chat-messages`.' },
   ],
-  example: "ask-marcel-office get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
+  example: "{read-bin} get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
   responseShape:
     'single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc., plus `webUrl`, and `event`, `files` and `reactions` when present. **Microsoft-internal schema — fields may change without notice.**',
   stability: 'experimental',

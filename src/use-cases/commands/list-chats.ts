@@ -32,7 +32,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/chats',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/chat-list',
   options: [...pickODataOptions(CHATS_ODATA_KEYS)],
-  example: 'ask-marcel-office list-chats',
+  example: '{read-bin} list-chats',
   responseShape: 'collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).',
   pagination: true,
   needsElevatedToken: true,

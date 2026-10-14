@@ -35,7 +35,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-chat --chat-id '19:abc...@thread.v2'",
+  example: "{read-bin} get-chat --chat-id '19:abc...@thread.v2'",
   responseShape:
     'single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.',
   needsElevatedToken: true,
