@@ -17,7 +17,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/insights/shared',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-shared',
   options: [...odataQueryOptions, WITH_ITEM_OPTION],
-  example: 'ask-marcel-office list-shared-insights',
+  example: '{read-bin} list-shared-insights',
   responseShape: 'collection of Microsoft Graph `sharedInsight` resources under `value[]`',
   pagination: true,
   effect: 'read',

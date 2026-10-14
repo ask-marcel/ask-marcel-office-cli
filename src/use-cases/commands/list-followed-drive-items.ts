@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/drive/following',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list-following',
   options: [...noSkipOptions],
-  example: 'ask-marcel-office list-followed-drive-items',
+  example: '{read-bin} list-followed-drive-items',
   responseShape: 'collection of Microsoft Graph `driveItem` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

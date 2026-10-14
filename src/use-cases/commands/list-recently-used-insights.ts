@@ -17,7 +17,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/insights/used',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/insights-list-used',
   options: [...odataQueryOptions, WITH_ITEM_OPTION],
-  example: 'ask-marcel-office list-recently-used-insights',
+  example: '{read-bin} list-recently-used-insights',
   responseShape: 'collection of Microsoft Graph `usedInsight` resources under `value[]`',
   pagination: true,
   effect: 'read',

@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/drives',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/drive-list',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-drives',
+  example: '{read-bin} list-drives',
   responseShape: 'collection of Microsoft Graph `drive` resources under `value[]`',
   pagination: true,
   effect: 'read',

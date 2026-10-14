@@ -30,7 +30,7 @@ const meta: ReadCommandMeta = {
     ...noSkipOptions,
     TENANT_ID_OPTION,
   ],
-  example: "ask-marcel-office list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
+  example: "{read-bin} list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'collection of Microsoft Graph `thumbnailSet` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
