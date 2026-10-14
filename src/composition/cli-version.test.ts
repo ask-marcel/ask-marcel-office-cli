@@ -3,7 +3,7 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { buildCli } from './cli-shell.ts';
+import { buildCli } from './cli.ts';
 
 const run = async (args: ReadonlyArray<string>): Promise<{ readonly out: string; readonly threw: boolean; readonly graphCalls: number }> => {
   let graphCalls = 0;

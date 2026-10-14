@@ -4,7 +4,7 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { buildCli } from './cli-shell.ts';
+import { buildCli } from './cli.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
   const original = process.stdout.write.bind(process.stdout);

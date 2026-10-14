@@ -10,7 +10,7 @@ import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
-import { buildCli } from './cli-shell.ts';
+import { buildCli } from './cli.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<unknown>): Promise<string> => {
   const target = process[stream];

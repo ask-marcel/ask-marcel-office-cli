@@ -6,7 +6,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
-import { buildCli } from './cli-shell.ts';
+import { buildCli } from './cli.ts';
 import { buildMcpServer } from './mcp.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
