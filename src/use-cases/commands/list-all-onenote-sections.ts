@@ -13,7 +13,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/onenote/sections',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/onenote-list-sections',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-all-onenote-sections',
+  example: '{read-bin} list-all-onenote-sections',
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
   pagination: true,
   effect: 'read',

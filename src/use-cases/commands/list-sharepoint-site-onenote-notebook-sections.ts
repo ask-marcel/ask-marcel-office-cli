@@ -30,7 +30,7 @@ const meta: ReadCommandMeta = {
     },
     ...odataQueryOptions,
   ],
-  example: "ask-marcel-office list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
+  example: "{read-bin} list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
   responseShape: 'collection of Microsoft Graph `onenoteSection` resources under `value[]`',
   pagination: true,
   effect: 'read',

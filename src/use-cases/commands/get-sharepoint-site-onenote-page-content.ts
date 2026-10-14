@@ -40,7 +40,7 @@ const meta: ReadCommandMeta = {
       description: 'OneNote page ID inside the site.',
     },
   ],
-  example: "ask-marcel-office get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
+  example: "{read-bin} get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
   responseShape:
     '`{ contentType: "text/html", size: <chars>, text: "<html>..." }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk.',
   producesBytes: true,

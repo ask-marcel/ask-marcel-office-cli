@@ -13,7 +13,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me/onenote/notebooks',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/onenote-list-notebooks',
   options: [...odataQueryOptions],
-  example: 'ask-marcel-office list-onenote-notebooks',
+  example: '{read-bin} list-onenote-notebooks',
   responseShape: 'collection of Microsoft Graph `notebook` resources under `value[]`',
   pagination: true,
   effect: 'read',
