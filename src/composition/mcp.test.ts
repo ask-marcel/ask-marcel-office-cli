@@ -7,8 +7,8 @@ import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
-import { buildMcpServer } from './mcp-shell.ts';
-import type { BuildMcpServerDeps } from './mcp-shell.ts';
+import { buildMcpServer } from './mcp.ts';
+import type { BuildMcpServerDeps } from './mcp.ts';
 
 /**
  * Drives the REAL MCP protocol: a real Client and a real McpServer joined by
