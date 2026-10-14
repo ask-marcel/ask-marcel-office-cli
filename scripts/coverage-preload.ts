@@ -54,7 +54,7 @@ import '../src/infra/token-helper-run.ts';
 import '../src/index.ts';
 
 import '../src/composition/build-deps.ts';
-import '../src/composition/cli.ts';
+import '../src/composition/cli-shell.ts';
 import '../src/composition/single-package.ts';
 // Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively

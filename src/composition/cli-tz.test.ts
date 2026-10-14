@@ -4,7 +4,7 @@ import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
 import { currentDateZone, setDateZone } from '../use-cases/commands/date-zone.ts';
-import { buildCli } from './cli.ts';
+import { buildCli } from './cli-shell.ts';
 import { machineTimeZone } from './date-zone.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {

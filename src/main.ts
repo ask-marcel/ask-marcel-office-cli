@@ -5,7 +5,7 @@ import updateNotifier from 'update-notifier';
 import pkg from '../package.json' with { type: 'json' };
 import { buildDeps } from './composition/build-deps.ts';
 import type { BuiltDeps } from './composition/build-deps.ts';
-import { buildCli } from './composition/cli.ts';
+import { buildCli } from './composition/cli-shell.ts';
 import { recordTokenHelperLocation, runTokenHelper, tokenHelperLocatorPath } from './composition/token-helper.ts';
 import { formatError } from './domain/utilities/format-error.ts';
 import { resolveAuthPaths } from './infra/auth-paths.ts';
