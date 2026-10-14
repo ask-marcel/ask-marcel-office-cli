@@ -69,7 +69,7 @@ const meta: ReadCommandMeta = {
     MAX_CELLS_OPTION,
     SHEET_OPTION,
   ],
-  example: "ask-marcel-office diff-drive-items --drive-id 'b!1234' --item-id '01WEEK6' --other-drive-id 'b!1234' --other-item-id '01WEEK7'",
+  example: "{read-bin} diff-drive-items --drive-id 'b!1234' --item-id '01WEEK6' --other-drive-id 'b!1234' --other-item-id '01WEEK7'",
   responseShape:
     '`{ contentType: "text/x-diff", size, text, added, removed }` — `text` is the unified diff; `note` says when the two render the same (empty `text`, zero counts), when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.',
   effect: 'read',

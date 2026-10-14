@@ -97,7 +97,7 @@ const meta: ReadCommandMeta = {
     },
     SHEET_OPTION,
   ],
-  example: "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
+  example: "{read-bin} download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "text/markdown", size: <chars>, text: "..." }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: "text/plain", size, text }` for plain-text passthrough sources (txt/md/json/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.',
   producesBytes: true,

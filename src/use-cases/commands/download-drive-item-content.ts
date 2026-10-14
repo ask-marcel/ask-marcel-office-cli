@@ -71,11 +71,11 @@ const meta: ReadCommandMeta = {
       name: 'item-id',
       key: 'itemId',
       required: true,
-      description: 'driveItem ID of the file to download. Returned by `ask-marcel-office list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.',
+      description: 'driveItem ID of the file to download. Returned by `{read-bin} list-folder-files` (works on SharePoint library drives too) or `search-onedrive-files`.',
     },
     TENANT_ID_OPTION,
   ],
-  example: "ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
+  example: "{read-bin} download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ contentType: "text/plain", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.',
   producesBytes: true,

@@ -94,7 +94,7 @@ const meta: ReadCommandMeta = {
       description: 'driveItem ID of the .docx/.xlsx/.pptx or .odt/.ods/.odp file. Returned by `list-folder-files` or `search-onedrive-files`.',
     },
   ],
-  example: "ask-marcel-office extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
+  example: "{read-bin} extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
   responseShape:
     '`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: "onedrive", owner }` or `{ kind: "site", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.',
   effect: 'read',
