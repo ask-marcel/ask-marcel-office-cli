@@ -35,7 +35,7 @@ const meta: WriteCommandMeta = {
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that post. Returned by `list-group-post-attachments`.' },
   ],
   example:
-    "ask-marcel-office convert-group-post-attachment-to-pdf --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
+    "{write-bin} convert-group-post-attachment-to-pdf --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.',
   producesBytes: true,

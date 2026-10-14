@@ -91,7 +91,7 @@ const meta: ReadCommandMeta = {
     keepQuotedOption,
     MAX_CELLS_OPTION,
   ],
-  example: "ask-marcel-office convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
+  example: "{read-bin} convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
   responseShape:
     '`{ contentType: "text/markdown", size, text }` on success (file and reference attachments run through the conversion dispatch; an embedded item is rendered locally). Plain-text sources return the raw-bytes envelope, and a PDF source carries `pageCount`. Unsupported types return an api_error with status 415 naming `get-group-post-attachment` as the way to the bytes.',
   producesBytes: true,

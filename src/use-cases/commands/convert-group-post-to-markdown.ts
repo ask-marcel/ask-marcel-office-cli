@@ -87,7 +87,7 @@ const meta: ReadCommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['true', 'false'] },
     },
   ],
-  example: "ask-marcel-office convert-group-post-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
+  example: "{read-bin} convert-group-post-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
   responseShape:
     '`{ contentType: "text/markdown", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: headers, the turndown-rendered body and, when present, an attachments list. The optional `note` carries the attachments-list failure hint and/or the quoted-chain notice with the share of the body text it removed.',
   producesBytes: true,

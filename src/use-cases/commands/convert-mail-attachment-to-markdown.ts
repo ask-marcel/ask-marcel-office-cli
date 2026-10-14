@@ -194,7 +194,7 @@ const meta: ReadCommandMeta = {
     SHEET_OPTION,
     MAX_CELLS_OPTION,
   ],
-  example: "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "{read-bin} convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ contentType: "text/markdown", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.',
   producesBytes: true,

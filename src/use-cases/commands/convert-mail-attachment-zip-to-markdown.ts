@@ -74,7 +74,7 @@ const meta: ReadCommandMeta = {
     keepQuotedOption,
     MAX_CELLS_OPTION,
   ],
-  example: "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "{read-bin} convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path; non-mojibake names). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }`. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted. A non-fileAttachment (itemAttachment / referenceAttachment) or a non-zip payload returns an api_error.',
   effect: 'read',

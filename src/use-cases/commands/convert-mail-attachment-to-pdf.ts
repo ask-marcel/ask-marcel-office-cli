@@ -199,7 +199,7 @@ const meta: WriteCommandMeta = {
     { name: 'message-id', key: 'messageId', required: true, description: 'Outlook message ID. Returned by `list-mail-messages` or `list-mail-folder-messages`.' },
     { name: 'attachment-id', key: 'attachmentId', required: true, description: 'Attachment ID inside that message. Returned by `list-mail-attachments`.' },
   ],
-  example: "ask-marcel-office convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+  example: "{write-bin} convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
   responseShape:
     '`{ contentType: "application/pdf", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.',
   producesBytes: true,

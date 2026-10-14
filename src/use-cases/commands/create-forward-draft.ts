@@ -38,7 +38,7 @@ const readDraftBody = async (graph: WriteGraph, created: unknown, draftId: strin
       type: 'api_error',
       status: 500,
       code: 'draft_body_unreadable',
-      message: `Draft ${draftId} was created but its body could not be read back, so the comment was never written into it. The draft exists - review it in Outlook Drafts, or revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode (see \`ask-marcel-office docs update-mail-draft\`).`,
+      message: `Draft ${draftId} was created but its body could not be read back, so the comment was never written into it. The draft exists - review it in Outlook Drafts, or revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode (see \`{bin} docs update-mail-draft\`).`,
     });
   }
   return ok(parsed.data.body);
@@ -171,7 +171,7 @@ const meta: WriteCommandMeta = {
       argumentHint: { kind: 'magicValue', values: ['Text', 'HTML'] },
     },
   ],
-  example: 'ask-marcel-office create-forward-draft --forward-message-id "AAMkAD..." --to-recipients "bob@example.com" --comment "Bob owns this now, forwarding for your action."',
+  example: '{write-bin} create-forward-draft --forward-message-id "AAMkAD..." --to-recipients "bob@example.com" --comment "Bob owns this now, forwarding for your action."',
   bodyTemplate:
     "Text: POST { comment: '{comment}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
   effect: 'draft',
