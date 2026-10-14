@@ -14,7 +14,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/organization',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/organization-list',
   options: [...selectExpandOptions],
-  example: "ask-marcel-office get-organization --select 'id,displayName,verifiedDomains'",
+  example: "{read-bin} get-organization --select 'id,displayName,verifiedDomains'",
   responseShape: 'collection of one Microsoft Graph `organization` resource under `value[]`',
   effect: 'read',
   scopesRequired: ['User.Read'],

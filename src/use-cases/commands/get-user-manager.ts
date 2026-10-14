@@ -54,7 +54,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
+  example: "{read-bin} get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
   responseShape:
     'single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`).',
   effect: 'read',

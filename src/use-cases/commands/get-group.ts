@@ -21,7 +21,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
+  example: "{read-bin} get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
   responseShape: 'single Microsoft Graph `group` resource',
   effect: 'read',
   scopesRequired: ['GroupMember.Read.All'],

@@ -20,7 +20,7 @@ const meta: ReadCommandMeta = {
   graphPathTemplate: '/me',
   graphDocsUrl: 'https://learn.microsoft.com/en-us/graph/api/user-get',
   options: [...selectExpandOptions],
-  example: 'ask-marcel-office get-current-user',
+  example: '{read-bin} get-current-user',
   responseShape: 'single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)',
   effect: 'read',
   scopesRequired: ['User.Read'],
