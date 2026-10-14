@@ -17,12 +17,16 @@
  *
  * Deliberately NOT here: rendering. This returns a value; the caller decides
  * whether it becomes stdout (CLI) or MCP tool content.
+ *
+ * Core (package split, step 13): the commands an error names and the bin a
+ * shell remedy types come from the `CommandPackage` in the deps, never from a
+ * registry import.
  */
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { RenderContext, RenderSurface } from '../presenter/render-to-string.ts';
+import type { CommandPackage } from '../use-cases/commands/command-package.ts';
 import type { Command } from '../use-cases/commands/command-types.ts';
-import { commands as cmdRegistry } from '../use-cases/commands/index.ts';
 import type { OutputDirError, OutputPathError } from '../use-cases/commands/output-path.ts';
 import { persistIfRequested, persistMediaIfRequested } from '../use-cases/commands/output-path.ts';
 import type { Result } from '../domain/result.ts';
@@ -44,17 +48,19 @@ const sourceFromGraphError = (error: GraphError): ErrorSource => {
   return 'graph';
 };
 
+// The package's own commands, not a module-level registry: this module is core
+// and serves whichever package hands it its registry.
+const commandNamesWhere = (registry: CommandPackage['registry'], matches: (command: Command) => boolean): ReadonlyArray<string> =>
+  Object.entries(registry)
+    .filter(([, c]) => matches(c))
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+
 // manifest-driven --output-path-supporting list.
-const bytesProducingCommands = Object.entries(cmdRegistry)
-  .filter(([, c]) => c.meta.producesBytes === true)
-  .map(([n]) => n)
-  .toSorted((a, b) => a.localeCompare(b));
+const bytesProducingCommands = (registry: CommandPackage['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesBytes === true);
 
 // Parallel manifest-driven list for the --output-dir flag.
-const mediaProducingCommands = Object.entries(cmdRegistry)
-  .filter(([, c]) => c.meta.producesMedia === true)
-  .map(([n]) => n)
-  .toSorted((a, b) => a.localeCompare(b));
+const mediaProducingCommands = (registry: CommandPackage['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesMedia === true);
 
 const hasOption = (command: Command, name: string): boolean => command.meta.options.some((option) => option.name === name);
 
@@ -89,14 +95,19 @@ const buildRenderContext = (commandName: string, command: Command, surface: Rend
 // A shell redirect is the CLI's answer to "this command has no body to write".
 // An MCP client has no shell, so it gets the honest version instead: there is
 // no remedy at this layer, narrow the request.
-const noBodyRemedy = (commandName: string, surface: RenderSurface): string =>
+const noBodyRemedy = (commandName: string, surface: RenderSurface, binName: string): string =>
   surface === 'mcp'
     ? 'Narrow the request instead (fewer items, a tighter query); there is no body to write.'
-    : `Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`ask-marcel-office ${commandName} ... > out.json\`.`;
+    : `Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`${binName} ${commandName} ... > out.json\`.`;
 
-const formatOutputPathError = (error: OutputPathError, commandName: string, surface: RenderSurface): string => {
-  if (error.type === 'no_inlined_bytes')
-    return `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands.join(', ')}. ${noBodyRemedy(commandName, surface)}`;
+/** What the error wording needs from the package: the commands it can name, and the bin a shell remedy types. */
+type ErrorWordingSource = Pick<CommandPackage, 'registry' | 'binName'>;
+
+/** The --output-path refusals that name nothing of the package: all of them but the no-body refusal. */
+type PackageFreeOutputPathError = Exclude<OutputPathError, { readonly type: 'no_inlined_bytes' }>;
+
+// `_surface` keeps the call shape the existing suites use; no package-free refusal depends on the surface.
+const formatOutputPathError = (error: PackageFreeOutputPathError, commandName: string, _surface?: RenderSurface): string => {
   if (error.type === 'empty_path') return '--output-path: path argument is empty (likely a shell-quoting mistake — pass a real filesystem path)';
   // paths ending in `/` or `\` look like a directory; reject upfront instead of Node's `EISDIR`.
   if (error.type === 'is_directory') return '--output-path: must be a file path, not a directory (paths ending in `/` or `\\` look like a directory).';
@@ -115,9 +126,15 @@ const formatOutputPathError = (error: OutputPathError, commandName: string, surf
   return `--output-path: write failed: ${error.message}`;
 };
 
-const formatOutputDirError = (error: OutputDirError, commandName: string): string => {
+/** Every --output-path refusal: the no-body one names the package's bytes commands and, on the CLI, its bin. */
+const describeOutputPathError = (error: OutputPathError, commandName: string, surface: RenderSurface, commandPackage: ErrorWordingSource): string =>
+  error.type === 'no_inlined_bytes'
+    ? `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands(commandPackage.registry).join(', ')}. ${noBodyRemedy(commandName, surface, commandPackage.binName)}`
+    : formatOutputPathError(error, commandName);
+
+const formatOutputDirError = (error: OutputDirError, commandName: string, registry: CommandPackage['registry']): string => {
   if (error.type === 'no_media')
-    return `--output-dir: ${commandName} did not return a media array — this flag works only with the image-extraction commands. Supported: ${mediaProducingCommands.join(', ')}.`;
+    return `--output-dir: ${commandName} did not return a media array — this flag works only with the image-extraction commands. Supported: ${mediaProducingCommands(registry).join(', ')}.`;
   if (error.type === 'empty_path') return '--output-dir: directory argument is empty (likely a shell-quoting mistake — pass a real directory path)';
   return `--output-dir: write failed: ${error.message}`;
 };
@@ -125,6 +142,8 @@ const formatOutputDirError = (error: OutputDirError, commandName: string): strin
 export type RunRegistryCommandDeps = {
   readonly graph: GraphClient;
   readonly fs: FileSystem;
+  /** The package the command belongs to: its errors name the package's commands and bin. */
+  readonly commandPackage: ErrorWordingSource;
 };
 
 export type RunRegistryCommandRequest = {
@@ -186,13 +205,13 @@ export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: 
     if (persistedMedia.ok) return ok(persistedMedia.value);
     // The error's discriminant doubles as a machine-readable errorCode (`no_media`, `empty_path`,
     // `write_failed`) so an agent routes on the code instead of substring-matching the message.
-    return err({ message: formatOutputDirError(persistedMedia.error, name), code: persistedMedia.error.type });
+    return err({ message: formatOutputDirError(persistedMedia.error, name, deps.commandPackage.registry), code: persistedMedia.error.type });
   }
   const persisted = await persistIfRequested(deps.fs, request.outputPath, result.value, { sourceText: command.meta.returnsSourceText === true });
   if (persisted.ok) return ok(persisted.value);
   // Discriminant as errorCode: `no_inlined_bytes` (this flag on a plain-JSON command), `is_directory`,
   // `passthrough_extension_mismatch`, `text_under_binary_extension`, `inline_too_large`, `empty_path`, `write_failed`.
-  return err({ message: formatOutputPathError(persisted.error, name, request.surface), code: persisted.error.type });
+  return err({ message: describeOutputPathError(persisted.error, name, request.surface, deps.commandPackage), code: persisted.error.type });
 };
 
-export { buildRenderContext, formatOutputDirError, formatOutputPathError };
+export { buildRenderContext, describeOutputPathError, formatOutputDirError, formatOutputPathError };

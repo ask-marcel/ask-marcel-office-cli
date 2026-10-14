@@ -20,7 +20,8 @@ import { describeWrites } from '../use-cases/commands/command-effect.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { isValidTimeZone } from '../domain/iso-datetime.ts';
 import { resolveDateZone } from './date-zone.ts';
-import { buildRenderContext, formatOutputPathError, runRegistryCommand } from './run-registry-command.ts';
+import { buildRenderContext, describeOutputPathError, runRegistryCommand } from './run-registry-command.ts';
+import { commandPackage } from './single-package.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import type { Logger } from '../use-cases/ports/logger.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
@@ -83,7 +84,7 @@ const buildCli = (deps: BuildCliDeps): Command => {
       renderOut(persisted.value);
       return;
     }
-    fail(formatOutputPathError(persisted.error, commandName, 'cli'));
+    fail(describeOutputPathError(persisted.error, commandName, 'cli', commandPackage));
   };
 
   // Single-stream JSON contract: commander's parser errors (unknown option,
@@ -525,7 +526,10 @@ const buildCli = (deps: BuildCliDeps): Command => {
       commandDef.addHelpText('after', helpLines.join('\n'));
       commandDef.action(async (opts: Record<string, string>) => {
         const globals = program.opts<{ outputPath?: string; outputDir?: string }>();
-        const result = await runRegistryCommand({ graph, fs }, { name, command: cmd, params: opts, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli' });
+        const result = await runRegistryCommand(
+          { graph, fs, commandPackage },
+          { name, command: cmd, params: opts, outputPath: globals.outputPath, outputDir: globals.outputDir, surface: 'cli' }
+        );
         if (result.ok) {
           renderOut(result.value, buildRenderContext(name, cmd, 'cli', opts));
           return;
