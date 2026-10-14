@@ -18,11 +18,41 @@ const listing = (overrides: Partial<RenderContext> = {}): RenderContext => ({
 });
 
 describe('the bins a rendered error names', () => {
+  it('sends an expired token to the login of the auth package, in the message and in the hint', () => {
+    const out = renderErrorToString('Token expired. Run `{auth-bin} login`.', 'text', 'InvalidAuthenticationToken', 'graph', undefined, READ_PACKAGE);
+    expect(out).toContain('error: Token expired. Run `widget-auth login`.');
+    expect(out).toContain('hint: The cached access token is invalid or expired. Run `widget-auth login` to re-authenticate, then retry. Use `widget-auth status`');
+  });
+
   it('fills the error of the JSON envelope, as it fills the text one', () => {
     const out = JSON.parse(renderErrorToString('Token expired. Run `{auth-bin} login`.', 'json', 'InvalidAuthenticationToken', 'graph', undefined, READ_PACKAGE)) as {
       readonly error: string;
     };
     expect(out.error).toBe('Token expired. Run `widget-auth login`.');
+  });
+
+  it('names the bin of this package for the help every package has', () => {
+    const out = renderErrorToString("unknown option '--nope'", 'json', 'commander.unknownOption', 'cli', undefined, READ_PACKAGE);
+    expect(JSON.parse(out).hint).toBe(
+      'Unknown CLI flag. Run `widget-read <command> --help` for the supported flags on that command, or `widget-read help-json --terse --category <name>` (~8 KB) to scan the whole category.'
+    );
+  });
+
+  it('takes a validation message that already names a command as the remedy, and adds no generic hint', () => {
+    const out = renderErrorToString(
+      "--user-id 'x' looks like a contact id. Re-run `{read-bin} get-user --user-id` with the mail instead.",
+      'text',
+      undefined,
+      'validation',
+      undefined,
+      READ_PACKAGE
+    );
+    expect(out).toBe("error: --user-id 'x' looks like a contact id. Re-run `widget-read get-user --user-id` with the mail instead.\nsource: validation\n");
+  });
+
+  it('points a bare validation message at the help of this package', () => {
+    const out = renderErrorToString('--message-id is required', 'text', undefined, undefined, undefined, READ_PACKAGE);
+    expect(out).toContain('hint: CLI input failed schema validation. Re-read the per-command help (`widget-read <cmd> --help` or `widget-read docs <cmd>`)');
   });
 });
 

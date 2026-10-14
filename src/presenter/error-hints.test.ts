@@ -103,7 +103,7 @@ describe('findErrorHint — Graph error translation', () => {
     const result = findErrorHint('ErrorInvalidParameter: The argument is invalid.', 'ErrorInvalidParameter');
     expect(result?.source).toBe('graph');
     expect(result?.hint).toContain('input parameter');
-    expect(result?.hint).toContain('ask-marcel-office <command> --help');
+    expect(result?.hint).toContain('{bin} <command> --help');
   });
 
   it('maps `invalidArgument` (Excel range malformed is the canonical case) to an A1-syntax explainer', () => {
@@ -125,8 +125,8 @@ describe('findErrorHint — Graph error translation', () => {
   it('extends the existing `accessDenied` rule to also cover `ErrorAccessDenied` (Outlook / EWS spelling) so both share the same status + login hint', () => {
     const result = findErrorHint('ErrorAccessDenied: Access is denied.', 'ErrorAccessDenied');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('ask-marcel-office status');
-    expect(result?.hint).toContain('ask-marcel-office login');
+    expect(result?.hint).toContain('{auth-bin} status');
+    expect(result?.hint).toContain('{auth-bin} login');
   });
 
   // v1.4.0 re-audit Nit 2 — three malformed-ID surfaces that fell
@@ -174,7 +174,7 @@ describe('findErrorHint — Graph error translation', () => {
   it('detects "Missing scope" anywhere in the message (not just as a structured code) and points at status + the appid scope ceiling', () => {
     const result = findErrorHint("Missing scope permissions on the request. API: 'Read.All' on resource '/me/...'", 'Forbidden');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('ask-marcel-office status');
+    expect(result?.hint).toContain('{auth-bin} status');
     expect(result?.hint).toContain('fixed scope ceiling');
   });
 
@@ -187,7 +187,7 @@ describe('findErrorHint — Graph error translation', () => {
   it('maps `InvalidAuthenticationToken` to a `login` instruction (the actionable remedy)', () => {
     const result = findErrorHint('Lifetime validation failed.', 'InvalidAuthenticationToken');
     expect(result?.source).toBe('graph');
-    expect(result?.hint).toContain('ask-marcel-office login');
+    expect(result?.hint).toContain('{auth-bin} login');
     expect(result?.hint).toContain('expiresInSeconds');
   });
 
@@ -241,14 +241,14 @@ describe('findErrorHint — CLI-side rewrites and rejections', () => {
   it('matches `cli_reject_calendar_link_on_mail_resolver` with a hint pointing at the right sibling (`resolve-calendar-link`) instead of generic validation boilerplate', () => {
     const result = findErrorHint('--url looks like an Outlook calendar link, not a mail message link.', 'cli_reject_calendar_link_on_mail_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-calendar-link');
+    expect(result?.hint).toContain('{read-bin} resolve-calendar-link');
     expect(result?.hint).toContain('eventId');
   });
 
   it('matches the inverse `cli_reject_mail_link_on_calendar_resolver` with a hint pointing at `resolve-mail-link`', () => {
     const result = findErrorHint('--url looks like an Outlook mail message link, not a calendar item link.', 'cli_reject_mail_link_on_calendar_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-mail-link');
+    expect(result?.hint).toContain('{read-bin} resolve-mail-link');
     expect(result?.hint).toContain('messageId');
   });
 
@@ -260,49 +260,49 @@ describe('findErrorHint — CLI-side rewrites and rejections', () => {
   it('maps `cli_reject_teams_link_on_mail_resolver` to a hint pointing at `resolve-teams-link`', () => {
     const result = findErrorHint('--url looks like a Teams message link, not an Outlook mail message link.', 'cli_reject_teams_link_on_mail_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-teams-link');
+    expect(result?.hint).toContain('{read-bin} resolve-teams-link');
     expect(result?.hint).toContain('chatId');
   });
 
   it('maps `cli_reject_mail_link_on_drive_share_resolver` to a hint pointing at `resolve-mail-link`', () => {
     const result = findErrorHint('--url looks like an Outlook mail message link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_mail_link_on_drive_share_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-mail-link');
+    expect(result?.hint).toContain('{read-bin} resolve-mail-link');
     expect(result?.hint).toContain('messageId');
   });
 
   it('maps `cli_reject_calendar_link_on_drive_share_resolver` to a hint pointing at `resolve-calendar-link`', () => {
     const result = findErrorHint('--url looks like an Outlook calendar item link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_calendar_link_on_drive_share_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-calendar-link');
+    expect(result?.hint).toContain('{read-bin} resolve-calendar-link');
     expect(result?.hint).toContain('eventId');
   });
 
   it('maps `cli_reject_teams_link_on_drive_share_resolver` to a hint pointing at `resolve-teams-link`', () => {
     const result = findErrorHint('--url looks like a Teams message link, not a OneDrive / SharePoint sharing URL.', 'cli_reject_teams_link_on_drive_share_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-teams-link');
+    expect(result?.hint).toContain('{read-bin} resolve-teams-link');
     expect(result?.hint).toContain('chatId');
   });
 
   it('maps `cli_reject_drive_share_link_on_teams_resolver` to a hint pointing at `resolve-drive-share-link` and mentioning the /shares/{token}/driveItem path', () => {
     const result = findErrorHint('--url looks like a OneDrive / SharePoint sharing URL, not a Teams message link.', 'cli_reject_drive_share_link_on_teams_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-drive-share-link');
+    expect(result?.hint).toContain('{read-bin} resolve-drive-share-link');
     expect(result?.hint).toContain('graphPath');
   });
 
   it('maps `cli_reject_mail_link_on_teams_resolver` to a hint pointing at `resolve-mail-link`', () => {
     const result = findErrorHint('--url looks like an Outlook mail message link, not a Teams message link.', 'cli_reject_mail_link_on_teams_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-mail-link');
+    expect(result?.hint).toContain('{read-bin} resolve-mail-link');
     expect(result?.hint).toContain('messageId');
   });
 
   it('maps `cli_reject_calendar_link_on_teams_resolver` to a hint pointing at `resolve-calendar-link`', () => {
     const result = findErrorHint('--url looks like an Outlook calendar item link, not a Teams message link.', 'cli_reject_calendar_link_on_teams_resolver');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office resolve-calendar-link');
+    expect(result?.hint).toContain('{read-bin} resolve-calendar-link');
     expect(result?.hint).toContain('eventId');
   });
 });
@@ -311,7 +311,7 @@ describe('findErrorHint — Commander.js parser errors', () => {
   it('maps `commander.unknownOption` to an actionable hint pointing at `<command> --help` and the terse manifest', () => {
     const result = findErrorHint("unknown option '--notarealflag'", 'commander.unknownOption');
     expect(result?.source).toBe('cli');
-    expect(result?.hint).toContain('ask-marcel-office <command> --help');
+    expect(result?.hint).toContain('{bin} <command> --help');
     expect(result?.hint).toContain('help-json --terse --category');
   });
 
@@ -320,7 +320,7 @@ describe('findErrorHint — Commander.js parser errors', () => {
     expect(result?.source).toBe('cli');
     expect(result?.hint).toContain('item--id');
     expect(result?.hint).toContain('--item-id');
-    expect(result?.hint).toContain('ask-marcel-office <command> --help');
+    expect(result?.hint).toContain('{bin} <command> --help');
   });
 
   it('maps `commander.missingMandatoryOptionValue` to a "required flag missing — re-read --help" hint', () => {
@@ -372,7 +372,7 @@ describe('findErrorHint — substrate errors', () => {
     expect(result?.source).toBe('substrate');
     expect(result?.hint).toContain('chatsvcagg');
     expect(result?.hint).toContain('experimental');
-    expect(result?.hint).toContain('ask-marcel-office login');
+    expect(result?.hint).toContain('{auth-bin} login');
   });
 
   it('maps `substrateHttp{status}_ic3` codes through the same rule (single hint covers both substrate identities)', () => {
@@ -392,7 +392,7 @@ describe('findErrorHint — validation (Zod / CLI flag parsing)', () => {
   it("treats messages that start with `--<flag>` as Zod validation rejections and tags them source='validation'", () => {
     const result = findErrorHint('--message-id is required', undefined);
     expect(result?.source).toBe('validation');
-    expect(result?.hint).toContain('ask-marcel-office <cmd> --help');
+    expect(result?.hint).toContain('{bin} <cmd> --help');
   });
 
   it('also matches the generic "Validation error" prefix that Zod uses for nested-shape failures', () => {
