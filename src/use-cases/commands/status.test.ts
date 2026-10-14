@@ -27,7 +27,7 @@ describe('status', () => {
         elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive', reads: 'file version history, Teams chat list' },
         chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic', reads: 'Teams chat message content' },
         ic3: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'automatic', reason: 'not cached', reads: 'Teams chat history' },
-        hint: expect.stringContaining('ask-marcel-office login'),
+        hint: expect.stringContaining('{auth-bin} login'),
       })
     );
   });
@@ -54,7 +54,7 @@ describe('status', () => {
         expiresInSeconds: seconds,
         scopes: ['Mail.Read', 'Files.Read.All'],
         refresh: 'automatic',
-        reason: expect.stringContaining('ask-marcel-office login'),
+        reason: expect.stringContaining('{auth-bin} login'),
         reads: BASIC_READS,
       });
   });

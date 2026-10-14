@@ -10,6 +10,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { AuthLadder } from '../infra/auth.ts';
 import { renderToString } from '../presenter/render-to-string.ts';
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import { fillNames, fillNamesIn } from '../use-cases/commands/bin-names.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as status from '../use-cases/commands/status.ts';
@@ -24,16 +26,21 @@ type AuthToolsDeps = {
    * `auth-cli.ts`: when omitted (tests), the login tool falls back to `auth`.
    */
   readonly makeLoginAuth?: LoginAuthFactory;
+  /** The package the tools are part of: its bins fill the placeholders of their text. */
+  readonly names: NameSource;
 };
 
 const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
-  const { auth } = deps;
+  const { auth, names } = deps;
+  const failText = (message: string, code?: string, source?: 'cli'): CallToolResult => errText(message, code, source, undefined, names);
   server.registerTool(
     'login',
     {
       title: 'Sign in to Microsoft 365',
-      description:
-        "Authenticate via the Teams web client (cached token -> refresh -> browser). Opens a browser window on this machine when it needs one. Run this when a command fails with an auth error: the elevated (M365) token lapses roughly hourly and only a browser can recapture it. SLOW BY NATURE — a browser sign-in measured 37-64 seconds even with no MFA prompt, which straddles the 60s default MCP tool timeout, so this call may time out. If it does, the sign-in often completed anyway: re-run your original command before calling login again. Raise MCP_TOOL_TIMEOUT (or your client's equivalent) to ~300000 to avoid it. First-time setup, where an MFA prompt adds minutes, is better done in a terminal: `ask-marcel-office login`.",
+      description: fillNames(
+        "Authenticate via the Teams web client (cached token -> refresh -> browser). Opens a browser window on this machine when it needs one. Run this when a command fails with an auth error: the elevated (M365) token lapses roughly hourly and only a browser can recapture it. SLOW BY NATURE — a browser sign-in measured 37-64 seconds even with no MFA prompt, which straddles the 60s default MCP tool timeout, so this call may time out. If it does, the sign-in often completed anyway: re-run your original command before calling login again. Raise MCP_TOOL_TIMEOUT (or your client's equivalent) to ~300000 to avoid it. First-time setup, where an MFA prompt adds minutes, is better done in a terminal: `{auth-bin} login`.",
+        names
+      ),
       inputSchema: {
         force: z
           .boolean()
@@ -47,19 +54,15 @@ const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
     async ({ force }): Promise<CallToolResult> => {
       const loginAuth = deps.makeLoginAuth ? deps.makeLoginAuth() : auth;
       const result = await login.execute(loginAuth, { force: force ?? false });
-      if (!result.ok) return errText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
+      if (!result.ok) return failText(result.error.type === 'auth_cancelled' ? 'Authentication cancelled' : result.error.message);
       const info = await loginAuth.getTokenInfo();
-      if (!info.ok) return errText(info.error.message);
-      return okText(
-        renderToString(
-          buildLoginSummary({
-            elevatedAvailable: info.value.elevated.available,
-            chatsvcaggAvailable: info.value.chatsvcagg.available,
-            ic3Available: info.value.ic3.available,
-          }),
-          'text'
-        )
-      );
+      if (!info.ok) return failText(info.error.message);
+      const summary = buildLoginSummary({
+        elevatedAvailable: info.value.elevated.available,
+        chatsvcaggAvailable: info.value.chatsvcagg.available,
+        ic3Available: info.value.ic3.available,
+      });
+      return okText(renderToString(fillNamesIn(summary, names), 'text'));
     }
   );
 
@@ -73,8 +76,8 @@ const addAuthTools = (server: McpServer, deps: AuthToolsDeps): void => {
     },
     async (): Promise<CallToolResult> => {
       const result = await status.execute(auth);
-      if (!result.ok) return errText(result.error.message, result.error.code, 'cli');
-      return okText(renderToString(result.value, 'text'));
+      if (!result.ok) return failText(result.error.message, result.error.code, 'cli');
+      return okText(renderToString(fillNamesIn(result.value, names), 'text'));
     }
   );
 };

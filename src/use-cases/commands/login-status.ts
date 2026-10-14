@@ -4,7 +4,7 @@
 // duplicate it; it just points there and to `login --force` for a refresh.
 //
 // `available` is the machine-readable tier list and is part of the documented
-// contract (see docs.ts), so it stays a plain string[]. `unlocked` and `missing`
+// contract (see lifecycle-entries.ts), so it stays a plain string[]. `unlocked` and `missing`
 // are additive, human-facing companions: the tier NAMES alone ("chatsvcagg") say
 // nothing about what a caller can actually read, and an absent tier is otherwise
 // invisible until a command fails later for reasons the output never mentioned.
@@ -26,16 +26,16 @@ type LoginSummaryInput = {
   readonly ic3Available: boolean;
 };
 
-const LOGIN_HINT = "For each token's scopes + expiry, run `ask-marcel-office status`. To re-capture every token, run `ask-marcel-office login --force`.";
+const LOGIN_HINT = "For each token's scopes + expiry, run `{auth-bin} status`. To re-capture every token, run `{auth-bin} login --force`.";
 
 // Per tier, because they do not fail the same way. Elevated is browser-only and
 // simply was not captured. The two substrate tiers are only ever reported missing
 // AFTER `login` has already redeemed the shared refresh token for them, so their
 // absence means that headless attempt failed, not that nothing was tried.
 const RECAPTURE_REMEDY: Readonly<Record<OptionalTier, string>> = {
-  elevated: 're-capture with `ask-marcel-office login --force`',
-  chatsvcagg: 'still unavailable after a headless refresh; re-capture with `ask-marcel-office login --force`',
-  ic3: 'still unavailable after a headless refresh; re-capture with `ask-marcel-office login --force`',
+  elevated: 're-capture with `{auth-bin} login --force`',
+  chatsvcagg: 'still unavailable after a headless refresh; re-capture with `{auth-bin} login --force`',
+  ic3: 'still unavailable after a headless refresh; re-capture with `{auth-bin} login --force`',
 };
 
 const isPresent = (tier: OptionalTier, input: LoginSummaryInput): boolean => {

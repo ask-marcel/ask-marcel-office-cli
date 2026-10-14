@@ -7,6 +7,8 @@
  */
 import type { Command } from 'commander';
 import type { AuthLadder } from '../infra/auth.ts';
+import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import { fillNames, fillNamesIn } from '../use-cases/commands/bin-names.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
@@ -24,6 +26,8 @@ type AuthCliDeps = {
    * drives both `login.execute` and `getLastElevatedOutcome`.
    */
   readonly makeLoginAuth?: LoginAuthFactory;
+  /** The package the commands are part of: its bins fill the placeholders of their help and their reports. */
+  readonly names: NameSource;
 };
 
 /**
@@ -37,10 +41,11 @@ type AuthCliDeps = {
  * 2026-09-07, against a SentinelOne policy).
  */
 const AUTH_CANCELLED_MESSAGE =
-  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g ask-marcel-office-cli`, then `ask-marcel-office login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
+  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g ask-marcel-office-cli`, then `{auth-bin} login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
 
 const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps): void => {
-  const { auth } = deps;
+  const { auth, names } = deps;
+  const fill = (text: string): string => fillNames(text, names);
   const loginCmd = program
     .command('login')
     .description(
@@ -70,27 +75,28 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
         output.fail(info.error.message);
         return;
       }
-      output.print(
-        buildLoginSummary({
-          elevatedAvailable: info.value.elevated.available,
-          chatsvcaggAvailable: info.value.chatsvcagg.available,
-          ic3Available: info.value.ic3.available,
-        })
-      );
+      const summary = buildLoginSummary({
+        elevatedAvailable: info.value.elevated.available,
+        chatsvcaggAvailable: info.value.chatsvcagg.available,
+        ic3Available: info.value.ic3.available,
+      });
+      output.print(fillNamesIn(summary, names));
     });
   loginCmd.addHelpText(
     'after',
-    [
-      '',
-      'Examples:      ask-marcel-office login          (sign in the first time, or show all four token statuses if already signed in)',
-      '               ask-marcel-office login --force  (re-capture every token via the browser, ignoring the cache)',
-      'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
-      'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
-      'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
-      '               this CLI cannot request additional scopes. To inspect the granted set,',
-      '               run `ask-marcel-office status`.',
-      'Stuck flow:    `ask-marcel-office logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
-    ].join('\n  ')
+    fill(
+      [
+        '',
+        'Examples:      {auth-bin} login          (sign in the first time, or show all four token statuses if already signed in)',
+        '               {auth-bin} login --force  (re-capture every token via the browser, ignoring the cache)',
+        'Token cache:   ~/.ask-marcel/token-cache.json (access + refresh tokens, JSON, 0600).',
+        'Browser data:  ~/.ask-marcel/browser-profile/ (Playwright persistent context).',
+        'Scopes:        granted by Microsoft to the Teams web client (CLIENT_ID 5e3ce6c0-...);',
+        '               this CLI cannot request additional scopes. To inspect the granted set,',
+        '               run `{auth-bin} status`.',
+        'Stuck flow:    `{auth-bin} logout` then re-run; the browser fallback opens a fresh Edge / Chrome window.',
+      ].join('\n  ')
+    )
   );
 
   const statusCmd = program
@@ -100,12 +106,12 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
     )
     .action(async () => {
       const result = await status.execute(auth);
-      if (result.ok) output.print(result.value);
+      if (result.ok) output.print(fillNamesIn(result.value, names));
       else output.fail(result.error.message, result.error.code, 'cli');
     });
   statusCmd.addHelpText(
     'after',
-    ['', 'Example:       ask-marcel-office status', 'Not signed in: the error code is `not_authenticated`. Run `ask-marcel-office login` first.'].join('\n  ')
+    fill(['', 'Example:       {auth-bin} status', 'Not signed in: the error code is `not_authenticated`. Run `{auth-bin} login` first.'].join('\n  '))
   );
 
   const logoutCmd = program
@@ -118,13 +124,15 @@ const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps)
     });
   logoutCmd.addHelpText(
     'after',
-    [
-      '',
-      'Example:       ask-marcel-office logout',
-      'Removes:       ~/.ask-marcel/token-cache.json (access + refresh tokens).',
-      'Leaves alone:  ~/.ask-marcel/browser-profile/ (delete it manually if you want a clean Playwright session too).',
-      'Verify clean:  ls ~/.ask-marcel/  (token-cache.json should be gone).',
-    ].join('\n  ')
+    fill(
+      [
+        '',
+        'Example:       {auth-bin} logout',
+        'Removes:       ~/.ask-marcel/token-cache.json (access + refresh tokens).',
+        'Leaves alone:  ~/.ask-marcel/browser-profile/ (delete it manually if you want a clean Playwright session too).',
+        'Verify clean:  ls ~/.ask-marcel/  (token-cache.json should be gone).',
+      ].join('\n  ')
+    )
   );
 };
 

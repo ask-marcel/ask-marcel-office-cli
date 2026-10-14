@@ -11,9 +11,10 @@ import type { CliShellDeps } from './cli-shell.ts';
 import { buildCliShell } from './cli-shell.ts';
 import { commandPackage } from './single-package.ts';
 
-type BuildCliDeps = Omit<CliShellDeps, 'commandPackage' | 'addLifecycleCommands'> & AuthCliDeps;
+type BuildCliDeps = Omit<CliShellDeps, 'commandPackage' | 'addLifecycleCommands'> & Omit<AuthCliDeps, 'names'>;
 
-const buildCli = (deps: BuildCliDeps): Command => buildCliShell({ ...deps, commandPackage, addLifecycleCommands: (program, output) => addAuthCommands(program, output, deps) });
+const buildCli = (deps: BuildCliDeps): Command =>
+  buildCliShell({ ...deps, commandPackage, addLifecycleCommands: (program, output) => addAuthCommands(program, output, { ...deps, names: commandPackage }) });
 
 export { buildCli };
 export type { BuildCliDeps };

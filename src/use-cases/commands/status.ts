@@ -5,13 +5,13 @@ import type { OptionalTier } from './token-tier-capability.ts';
 import { TIER_CAPABILITY } from './token-tier-capability.ts';
 
 const REFRESH_HINT =
-  'To refresh: run `ask-marcel-office login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token. Run `ask-marcel-office login --force` to re-capture every tier unconditionally.';
+  'To refresh: run `{auth-bin} login` — it re-captures the elevated token when missing, and the other tiers self-heal from the shared refresh token. Run `{auth-bin} login --force` to re-capture every tier unconditionally.';
 
 // The basic token uses the same 5-minute buffer as the other three tokens.
 // Thus `available` has the same meaning in each block.
 const FRESHNESS_BUFFER_SECONDS = 300;
 
-const BASIC_REASON = 'expired, or expires in 5 minutes or less. The next command refreshes it from the shared refresh token. To refresh it now, run `ask-marcel-office login`.';
+const BASIC_REASON = 'expired, or expires in 5 minutes or less. The next command refreshes it from the shared refresh token. To refresh it now, run `{auth-bin} login`.';
 
 type StatusTier = TokenTierInfo & { readonly reads: string };
 

@@ -11,9 +11,10 @@ import type { McpShellDeps } from './mcp-shell.ts';
 import { buildMcpShell } from './mcp-shell.ts';
 import { commandPackage } from './single-package.ts';
 
-type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'> & AuthToolsDeps;
+type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'> & Omit<AuthToolsDeps, 'names'>;
 
-const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => buildMcpShell({ ...deps, commandPackage, addTools: (server) => addAuthTools(server, deps) });
+const buildMcpServer = (deps: BuildMcpServerDeps): McpServer =>
+  buildMcpShell({ ...deps, commandPackage, addTools: (server) => addAuthTools(server, { ...deps, names: commandPackage }) });
 
 export { buildMcpServer };
 export type { BuildMcpServerDeps };
