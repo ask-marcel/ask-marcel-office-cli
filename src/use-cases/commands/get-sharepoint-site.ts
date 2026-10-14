@@ -18,11 +18,11 @@ const meta: ReadCommandMeta = {
       key: 'siteId',
       required: true,
       description:
-        'SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `ask-marcel-office search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site.',
+        'SharePoint site ID. Either the composite ID (`hostname,site-collection-id,site-id`) returned by `{read-bin} search-sharepoint-sites-by-name`, or the literal `root` to refer to the tenant root site.',
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
+  example: "{read-bin} get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
   responseShape: 'single Microsoft Graph `site` resource',
   effect: 'read',
   scopesRequired: ['Sites.Read.All'],

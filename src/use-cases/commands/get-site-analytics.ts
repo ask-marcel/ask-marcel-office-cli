@@ -20,7 +20,7 @@ const meta: ReadCommandMeta = {
       description: 'SharePoint site ID.',
     },
   ],
-  example: "ask-marcel-office get-site-analytics --site-id 'contoso.sharepoint.com,...'",
+  example: "{read-bin} get-site-analytics --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'single Microsoft Graph `itemAnalytics` resource',
   effect: 'read',
   scopesRequired: ['Sites.Read.All'],

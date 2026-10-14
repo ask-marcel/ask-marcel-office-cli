@@ -32,7 +32,7 @@ const meta: ReadCommandMeta = {
       description: '`--path` (server-relative) starts with `/`, e.g. `/sites/Marketing` or `/teams/Marketing/Subsite`. Take the URL pathname after the hostname.',
     },
   ],
-  example: "ask-marcel-office get-sharepoint-site-by-path --hostname 'contoso.sharepoint.com' --path '/sites/Marketing'",
+  example: "{read-bin} get-sharepoint-site-by-path --hostname 'contoso.sharepoint.com' --path '/sites/Marketing'",
   responseShape: 'single Microsoft Graph `site` resource',
   effect: 'read',
   scopesRequired: ['Sites.Read.All'],

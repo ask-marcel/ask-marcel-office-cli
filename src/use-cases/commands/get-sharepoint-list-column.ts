@@ -34,7 +34,7 @@ const meta: ReadCommandMeta = {
     },
     ...selectExpandOptions,
   ],
-  example: "ask-marcel-office get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
+  example: "{read-bin} get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
   responseShape: 'single Microsoft Graph `columnDefinition` resource',
   effect: 'read',
   scopesRequired: ['Sites.Read.All'],

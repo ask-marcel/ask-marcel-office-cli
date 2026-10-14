@@ -31,7 +31,7 @@ const meta: ReadCommandMeta = {
     ...selectExpandOptions,
     TENANT_ID_OPTION,
   ],
-  example: "ask-marcel-office get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
+  example: "{read-bin} get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
   responseShape: 'single Microsoft Graph `listItem` resource',
   effect: 'read',
   scopesRequired: ['Files.Read', 'Sites.Read.All'],
