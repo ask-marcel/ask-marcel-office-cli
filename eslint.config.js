@@ -6,6 +6,52 @@ import unicornPlugin from 'eslint-plugin-unicorn';
 import globals from 'globals';
 import tsPlugin from 'typescript-eslint';
 
+/*
+ * Import bans shared by more than one block below. ESLint replaces a rule's
+ * options when two blocks match the same file (it does not merge them), so a
+ * file under two bans gets a block that lists both.
+ */
+const READ_ONLY_IMPORT_BANS = [
+  {
+    regex: '(^|/)write-graph(\\.[cm]?[jt]s)?$',
+    message: 'Read-only code never holds the write graph: type a read command against ReadGraph (read-graph.ts), which POSTs only to the two query endpoints.',
+  },
+  {
+    regex: '(^|/)graph-client(\\.[cm]?[jt]s)?$',
+    allowTypeImports: true,
+    message: 'graph-client.ts builds the full client, write graph included: read code takes the read graph (read-graph.ts) instead.',
+  },
+];
+
+const CORE_IMPORT_BANS = [
+  {
+    regex: '^(\\./|\\.\\./(.*/)?commands/)(index|docs|login|logout|status|login-status|token|token-args|token-tier-capability|lifecycle-entries)(\\.[cm]?[jt]s)?$',
+    message: 'Core serves any package: take the registry and the lifecycle entries from the CommandPackage the composition root passes in, never import them.',
+  },
+  {
+    // A folder import loads the folder's index.ts: commands/ is the registry, and
+    // a path of dots only (`.`, `..`, `../..`) can reach src/index.ts.
+    regex: '(^|/)commands/?$|^[./]+$',
+    message: 'A folder import loads its index.ts: commands/ is the registry and src/ is the package entry. Take the registry from the CommandPackage instead.',
+  },
+  {
+    regex: '^(\\.\\./)+(index|main|token)(\\.[cm]?[jt]s)?$|^ask-marcel-office-cli(/.*)?$',
+    message: 'Core never imports a package entry: index.ts re-exports the registry and buildDeps, and main.ts and token.ts are bundle entries.',
+  },
+  {
+    regex: '^\\.\\.?/(.*/)?(single-package|build-deps|cli|mcp|auth-cli|auth-mcp)(\\.[cm]?[jt]s)?$',
+    message: 'Core never reaches the composition root that wires the single package: take what you need as a parameter (CommandPackage, a hook) instead.',
+  },
+];
+
+// no-restricted-imports does not see `import(...)`, so the same specifiers are
+// banned in a dynamic import too. Other dynamic imports stay legal in core (the
+// Bun file system loads its Node half that way).
+const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
+  selector: `ImportExpression[source.value=/${regex.replaceAll('/', '\\/')}/]`,
+  message,
+}));
+
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   pluginJs.configs.recommended,
@@ -138,9 +184,12 @@ export default [
     //
     // So this rule is the enforcement. Render via `renderToString` /
     // `renderErrorToString` (pure) and return the string; never write it.
-    // Scoped to the MCP modules deliberately: `cli.ts` and `presenter/output.ts` own
-    // stdout legitimately in CLI mode.
-    files: ['src/composition/{mcp,mcp-shell,auth-mcp}.ts'],
+    // An allowlist since package-split step 13: stdout is banned everywhere
+    // except the CLI writers (the CLI builder, the presenter's `output.ts`, and
+    // the token helper's one JSON line), so a new MCP file is covered the day it
+    // lands, whatever its name.
+    files: ['src/**/*.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/cli-shell.ts', 'src/presenter/output.ts', 'src/composition/token-helper.ts'],
     rules: {
       'no-restricted-properties': [
         'error',
@@ -148,7 +197,7 @@ export default [
           object: 'process',
           property: 'stdout',
           message:
-            'stdout is the MCP JSON-RPC frame channel — writing to it corrupts the protocol and no test can see it. Return text from the tool handler (renderToString / renderErrorToString) instead. Use the stderr-backed Logger port if you need diagnostics.',
+            'stdout is the MCP JSON-RPC frame channel — writing to it corrupts the protocol and no test can see it. Return text from the tool handler (renderToString / renderErrorToString) instead. Use the stderr-backed Logger port if you need diagnostics. Only the CLI writers (cli-shell.ts, presenter/output.ts, token-helper.ts) own stdout.',
         },
       ],
     },
@@ -192,7 +241,7 @@ export default [
           patterns: [
             {
               regex:
-                '^(commander|winston|update-notifier|playwright(-core)?)(/.*)?$|(^|/)(cli|build-deps|mcp|run-registry-command)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
+                '^(commander|winston|update-notifier|playwright(-core)?)(/.*)?$|(^|/)(cli|cli-shell|build-deps|mcp|mcp-shell|run-registry-command)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
               allowTypeImports: true,
               message: 'The token helper loads only the auth ladder, the file system and the token endpoint call; bring the browser in with a dynamic import, never the CLI.',
             },
@@ -223,19 +272,51 @@ export default [
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
-          patterns: [
-            {
-              regex: '(^|/)write-graph(\\.[cm]?[jt]s)?$',
-              message: 'Read-only code never holds the write graph: type a read command against ReadGraph (read-graph.ts), which POSTs only to the two query endpoints.',
-            },
-            {
-              regex: '(^|/)graph-client(\\.[cm]?[jt]s)?$',
-              allowTypeImports: true,
-              message: 'graph-client.ts builds the full client, write graph included: read code takes the read graph (read-graph.ts) instead.',
-            },
-          ],
+          patterns: READ_ONLY_IMPORT_BANS,
         },
       ],
+    },
+  },
+  {
+    // Core never knows which package it serves (package split, step 13). The
+    // two blocks below hold the plan's core list ("What goes where"): the CLI
+    // builder, the MCP gateway, run-registry-command, the docs builders, the
+    // command framework, the presenter, the Graph request core and both graphs,
+    // the token source, the file system, process runner and logger with their
+    // ports, and the shared domain types. They take the registry, the lifecycle
+    // entries and the names from the `CommandPackage` the composition root
+    // hands them, so they never import the registry (by path, by folder, through
+    // the package entry, or with a dynamic import), a lifecycle command, or the
+    // modules that wire the single package (`single-package.ts`, `build-deps.ts`,
+    // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`, the commands' `docs.ts`).
+    // A file joins a list when it becomes core (step 15 extracts the shared helpers).
+    files: [
+      'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',
+      'src/use-cases/commands/{command-types,command-graph}.ts',
+      'src/presenter/*.ts',
+      'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
+      'src/infra/{write-graph,network-error,logger}.ts',
+      'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator}.ts',
+      'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
+      'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
+      'src/domain/utilities/base64.ts',
+    ],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: CORE_IMPORT_BANS }],
+      'no-restricted-syntax': ['error', ...CORE_DYNAMIC_IMPORT_BANS],
+    },
+  },
+  {
+    // The core files that the read-only block above also guards keep both bans.
+    files: [
+      'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command}.ts',
+      'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
+      'src/infra/{graph-request,read-graph,graph-substrate}.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...READ_ONLY_IMPORT_BANS, ...CORE_IMPORT_BANS] }],
+      'no-restricted-syntax': ['error', ...CORE_DYNAMIC_IMPORT_BANS],
     },
   },
   {

@@ -43,12 +43,42 @@ const WRITE_GRAPH_IMPORT = "import { createWriteGraph } from '../../infra/write-
 const WRITE_GRAPH_TYPE_IMPORT = "import type { WriteGraph } from '../../infra/write-graph.ts';\nexport type F = WriteGraph;\n";
 const FULL_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
 const SIBLING_WRITE_GRAPH_IMPORT = "import { createWriteGraph } from './write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
+const REGISTRY_IMPORT = "import { commands } from '../use-cases/commands/index.ts';\nexport const f = (): unknown => commands;\n";
+const SIBLING_REGISTRY_IMPORT = "import { commands } from './index.ts';\nexport const f = (): unknown => commands;\n";
+const LIFECYCLE_ENTRIES_IMPORT = "import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';\nexport const f = (): unknown => LIFECYCLE_ENTRIES;\n";
+const LOGIN_IMPORT = "import * as login from '../use-cases/commands/login.ts';\nexport const f = (): unknown => login;\n";
+const SINGLE_PACKAGE_IMPORT = "import { commandPackage } from './single-package.ts';\nexport const f = (): unknown => commandPackage;\n";
+const BARREL_REGISTRY_IMPORT = "import { commands } from '../index.ts';\nexport const f = (): unknown => commands;\n";
+const REGISTRY_DIRECTORY_IMPORT = "import * as registry from '../use-cases/commands';\nexport const f = (): unknown => registry;\n";
+const SIBLING_DIRECTORY_IMPORT = "import * as registry from '.';\nexport const f = (): unknown => registry;\n";
+const SELF_PACKAGE_IMPORT = "import { commands } from 'ask-marcel-office-cli';\nexport const f = (): unknown => commands;\n";
+const SINGLE_PACKAGE_DOCS_IMPORT = "import { buildManifest } from './docs.ts';\nexport const f = (): unknown => buildManifest;\n";
+const DYNAMIC_REGISTRY_IMPORT = "export const f = async (): Promise<unknown> => import('../use-cases/commands/index.ts');\n";
+const DYNAMIC_SIBLING_IMPORT = "export const f = async (): Promise<unknown> => import('./filesystem-node.ts');\n";
 
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'the MCP gateway never writes stdout', path: 'src/composition/mcp-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'the auth MCP tools never write stdout', path: 'src/composition/auth-mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
-  { name: 'control: the CLI owns stdout', path: 'src/composition/cli.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
+  { name: 'stdout is banned by default, not only in MCP files', path: 'src/composition/run-registry-command.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
+  { name: 'control: the CLI builder owns stdout', path: 'src/composition/cli-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
+  { name: 'the CLI builder never imports the registry', path: 'src/composition/cli-shell.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the MCP gateway never imports a lifecycle command', path: 'src/composition/mcp-shell.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'run-registry-command never imports the single package', path: 'src/composition/run-registry-command.ts', source: SINGLE_PACKAGE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the docs builders never import the lifecycle entries', path: 'src/use-cases/commands/docs-builders.ts', source: LIFECYCLE_ENTRIES_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the command framework never imports the registry', path: 'src/use-cases/commands/resolve-command.ts', source: SIBLING_REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'a core docs builder keeps the read-only ban', path: 'src/use-cases/commands/docs-builders.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the read graph keeps the core ban', path: 'src/infra/read-graph.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the CLI builder never takes the registry through the package entry', path: 'src/composition/cli-shell.ts', source: BARREL_REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the CLI builder never imports the registry folder', path: 'src/composition/cli-shell.ts', source: REGISTRY_DIRECTORY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the command framework never imports its own folder', path: 'src/use-cases/commands/resolve-command.ts', source: SIBLING_DIRECTORY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the MCP gateway never imports the published package', path: 'src/composition/mcp-shell.ts', source: SELF_PACKAGE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the docs builders never take the single package docs', path: 'src/use-cases/commands/docs-builders.ts', source: SINGLE_PACKAGE_DOCS_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the CLI builder never loads the registry with a dynamic import', path: 'src/composition/cli-shell.ts', source: DYNAMIC_REGISTRY_IMPORT, rule: 'no-restricted-syntax', fires: true, strict: false },
+  { name: 'a core docs builder never loads the registry with a dynamic import', path: 'src/use-cases/commands/docs-builders.ts', source: DYNAMIC_REGISTRY_IMPORT.replace('../use-cases/commands/index.ts', './index.ts'), rule: 'no-restricted-syntax', fires: true, strict: false },
+  { name: 'control: the core file system loads its Node half dynamically', path: 'src/infra/filesystem-bun.ts', source: DYNAMIC_SIBLING_IMPORT, rule: 'no-restricted-syntax', fires: false, strict: false },
+  { name: 'control: the composition root wires the registry', path: 'src/composition/single-package.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
+  { name: 'control: the auth CLI commands import login', path: 'src/composition/auth-cli.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the auth ladder never loads the browser', path: 'src/infra/auth.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: the browser half of auth loads it', path: 'src/infra/auth-browser.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the token helper never loads winston', path: 'src/composition/token-helper.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
