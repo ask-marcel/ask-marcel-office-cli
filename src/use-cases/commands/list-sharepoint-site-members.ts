@@ -76,7 +76,7 @@ const meta: ReadCommandMeta = {
         'SharePoint site ID (`contoso.sharepoint.com,<guid>,<guid>`), from `search-sharepoint-sites-by-name`, `get-sharepoint-site-by-path` or `search-all-accessible-sites`.',
     },
   ],
-  example: "ask-marcel-office list-sharepoint-site-members --site-id 'contoso.sharepoint.com,11111111-2222-3333-4444-555555555555,66666666-7777-8888-9999-000000000000'",
+  example: "{read-bin} list-sharepoint-site-members --site-id 'contoso.sharepoint.com,11111111-2222-3333-4444-555555555555,66666666-7777-8888-9999-000000000000'",
   responseShape:
     '`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`).',
   effect: 'read',

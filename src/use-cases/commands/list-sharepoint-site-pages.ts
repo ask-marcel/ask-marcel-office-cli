@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel-office list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
+  example: "{read-bin} list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `sitePage` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',

@@ -22,7 +22,7 @@ const meta: ReadCommandMeta = {
     },
     ...noSkipOptions,
   ],
-  example: "ask-marcel-office list-site-content-types --site-id 'contoso.sharepoint.com,...'",
+  example: "{read-bin} list-site-content-types --site-id 'contoso.sharepoint.com,...'",
   responseShape: 'collection of Microsoft Graph `contentType` resources under `value[]`',
   pagination: true,
   paginationStrategy: 'nextLinkNoSkip',
