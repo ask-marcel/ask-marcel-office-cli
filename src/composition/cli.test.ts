@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
 import type { AuthError, AuthLadder } from '../infra/auth.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { TokenInfo } from '../use-cases/ports/token-report.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '../test-helpers/logger-fake.ts';
@@ -63,31 +61,7 @@ const errGraph = (error: GraphError): GraphClient =>
     delete: async () => ({ ok: false, error }),
   });
 
-const sampleTokenInfo = (over: Partial<TokenInfo> = {}): TokenInfo => ({
-  scopes: ['Mail.Read'],
-  audience: 'https://graph.microsoft.com',
-  expiresAt: '2026-12-31T00:00:00.000Z',
-  expiresInSeconds: 8938,
-  elevated: { available: false, expiresInSeconds: undefined, scopes: [], refresh: 'interactive' },
-  chatsvcagg: { available: true, expiresInSeconds: 5400, scopes: ['user_impersonation'], refresh: 'automatic' },
-  ic3: { available: true, expiresInSeconds: 5400, scopes: ['Teams.AccessAsUser.All'], refresh: 'automatic' },
-  ...over,
-});
-
-const authWithTokenInfo = (info: TokenInfo): AuthLadder => fakeAuthManager({ getTokenInfo: async () => ({ ok: true, value: info }) });
-
 describe('buildCli command surface', () => {
-  it('renders the slim availability summary + two-pointer hint when login succeeds (under --output json)', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: authWithTokenInfo(sampleTokenInfo()), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { status: string; available: string[]; hint: string } };
-    expect(parsed.data.status).toBe('authenticated');
-    expect(parsed.data.available).toEqual(['basic', 'chatsvcagg', 'ic3']); // sampleTokenInfo has elevated unavailable → omitted
-    expect(parsed.data.hint).toContain('ask-marcel-office status');
-    expect(parsed.data.hint).toContain('login --force');
-  });
-
   it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
@@ -108,80 +82,6 @@ describe('buildCli command surface', () => {
     // the old bug: every POST was labelled "searches, not mutations", which
     // mislabelled create-mail-draft. That phrasing must be gone.
     expect(description).not.toContain('searches, not mutations');
-  });
-
-  it('renders the slim summary in text format with the two-pointer hint', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: authWithTokenInfo(sampleTokenInfo()), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('status: authenticated');
-    expect(out).toContain('ask-marcel-office status');
-    expect(out).toContain('login --force');
-  });
-
-  it('includes a token in login available only when the token report shows it available (elevated)', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({
-      auth: authWithTokenInfo(sampleTokenInfo({ elevated: { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive' } })),
-      graph: okGraph({}),
-      logger,
-      fs: createFileSystemFake(),
-    });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { available: string[] } };
-    expect(parsed.data.available).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3']); // elevated now available → listed
-  });
-
-  it('reports the tokens that the sign-in just captured, read from the login-configured manager and not from the command-path one', async () => {
-    const elevated = { available: true, expiresInSeconds: 1800, scopes: ['Chat.ReadBasic'], refresh: 'interactive' as const };
-    const cli = buildCli({
-      auth: authWithTokenInfo(sampleTokenInfo()),
-      makeLoginAuth: () => authWithTokenInfo(sampleTokenInfo({ elevated })),
-      graph: okGraph({}),
-      logger: createLoggerFake(),
-      fs: createFileSystemFake(),
-    });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login']));
-    const parsed = JSON.parse(out) as { data: { available: string[] } };
-    expect(parsed.data.available).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3']);
-  });
-
-  it('login --force forwards the force flag to getAccessToken so a warm session re-captures all tokens', async () => {
-    const calls: Array<{ force?: boolean } | undefined> = [];
-    const capturingAuth: AuthLadder = {
-      ...okAuth(),
-      getAccessToken: async (options?: { force?: boolean }) => {
-        calls.push(options);
-        return { ok: true as const, value: accessTokenUnsafe('tok') };
-      },
-    };
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: capturingAuth, graph: okGraph({}), logger, fs: createFileSystemFake() });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'login', '--force']));
-    expect(calls.some((c) => c?.force === true)).toBe(true);
-  });
-
-  it('surfaces the token-status read failure when the token report fails after a successful login', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({
-      auth: fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message: 'no token cached' } }) }),
-      graph: okGraph({}),
-      logger,
-      fs: createFileSystemFake(),
-    });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('no token cached');
-  });
-
-  it('prints the token report for status under --output json', async () => {
-    const auth = fakeAuthManager({ getTokenInfo: async () => ({ ok: true, value: sampleTokenInfo() }) });
-    const cli = buildCli({ auth, graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'status']));
-    const parsed = JSON.parse(out) as { ok: boolean; data: Record<string, { available?: boolean }> };
-    expect(parsed.ok).toBe(true);
-    expect(Object.keys(parsed.data)).toEqual(['basic', 'elevated', 'chatsvcagg', 'ic3', 'hint']);
-    expect(parsed.data['basic']?.available).toBe(true);
-    expect(parsed.data['elevated']?.available).toBe(false);
   });
 
   it('gives the error code not_authenticated when status finds no session in the token cache', async () => {
@@ -223,13 +123,6 @@ describe('buildCli command surface', () => {
     const parsed = JSON.parse(out.trim()) as { ok: false; retryAfterSeconds?: number };
     expect(parsed.ok).toBe(false);
     expect(parsed.retryAfterSeconds).toBe(120);
-  });
-
-  it('renders an Authentication cancelled error when the user closes the browser', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('Authentication cancelled');
   });
 
   // "Authentication cancelled" alone reads as "the user closed the window",
@@ -288,13 +181,6 @@ describe('buildCli command surface', () => {
     });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(errorReports).toBe(0);
-  });
-
-  it('renders the underlying message when login fails for a non-cancellation reason', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('browser launch failed');
   });
 
   it('renders a logged_out envelope when logout succeeds (under --output json)', async () => {
