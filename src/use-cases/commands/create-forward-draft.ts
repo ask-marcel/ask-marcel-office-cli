@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
 import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';

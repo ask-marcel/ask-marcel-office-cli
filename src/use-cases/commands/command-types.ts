@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
 import type { FileSystem } from '../ports/filesystem.ts';
@@ -8,8 +8,12 @@ import type { FileSystem } from '../ports/filesystem.ts';
 type CommandSchema = z.ZodType;
 /** A command's run on the graph `G` it is given. */
 type GraphExecute<G> = (graph: G, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
-/** A command's run on the single package's full client, which holds both graphs. */
-type CommandExecute = GraphExecute<GraphClient>;
+/**
+ * A command's run on the single package's full client, which holds both graphs
+ * (`GraphClient` in graph-client.ts). Named here by its two halves, so the
+ * command framework needs no module of the single package's wiring.
+ */
+type CommandExecute = GraphExecute<ReadGraph & WriteGraph>;
 
 // `'auth'` and `'contacts'` were declared
 // but no command ever used them — removed so the type system enforces "no

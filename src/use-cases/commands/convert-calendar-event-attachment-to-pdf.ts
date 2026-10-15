@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
 import type { WriteCommandMeta } from './command-types.ts';
 import { convertAttachmentToPdf } from './convert-mail-attachment-to-pdf.ts';

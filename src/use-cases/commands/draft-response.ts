@@ -1,5 +1,5 @@
 import { ok, type Result } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 
 /**
  * Graph answers createReply / createForward / PATCH with the ENTIRE message,
