@@ -257,6 +257,133 @@ describe('commands', () => {
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
     expect(calls.some((c) => c.url.includes('format=pdf'))).toBe(false);
   });
+
+  it('convert-mail-attachment-to-pdf short-circuits a pdf referenceAttachment to its raw bytes via /content (no format=pdf), follows the CDN redirect internally', async () => {
+    let formatPdfCalled = false;
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefPdf')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/report.pdf' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-pdf', name: 'report.pdf', parentReference: { driveId: 'd1' } });
+      }
+      if (url.endsWith('/drives/d1/items/i-pdf/content')) {
+        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/report.pdf' });
+      }
+      if (url === 'https://contoso.sharepoint.com/cdn/report.pdf') {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      }
+      if (url.includes('format=pdf')) {
+        formatPdfCalled = true;
+        return new Response(null, { status: 500 });
+      }
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefPdf' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
+    expect(formatPdfCalled).toBe(false);
+  });
+
+  it('convert-mail-attachment-to-pdf tags a plain-text referenceAttachment short-circuit as passthrough so --output-path cannot write it into a .pdf', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefTxt')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/notes.txt' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-txt', name: 'notes.txt', parentReference: { driveId: 'd1' } });
+      }
+      if (url.endsWith('/drives/d1/items/i-txt/content')) {
+        return new Response('plain text body', { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      throw new Error(`unexpected ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'aRefTxt' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; passthrough: boolean };
+      expect(v.contentType).toBe('text/plain');
+      expect(v.passthrough).toBe(true);
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf resolves a referenceAttachment via /shares/{token}/driveItem, converts in place, and inlines the PDF bytes (CDN redirect followed internally)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRef')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/q3.docx' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-q3', name: 'q3.docx', parentReference: { driveId: 'd1' } });
+      }
+      if (url.endsWith('/drives/d1/items/i-q3/content?format=pdf')) {
+        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/q3.pdf' });
+      }
+      if (url === 'https://contoso.sharepoint.com/cdn/q3.pdf') {
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRef' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const v = result.value as { contentType: string; base64: string };
+      expect(v.contentType).toBe('application/pdf');
+      expect(atob(v.base64)).toBe('%PDF-');
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf rejects an image fileAttachment with a friendly hint pointing at get-mail-attachment + a vision-capable model', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aPng')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'screenshot.png', contentBytes: btoa('fake-png-bytes') });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aPng' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('png attachment is an image');
+      expect(result.error.message).toContain('get-mail-attachment');
+      expect(result.error.message).toContain('vision-capable model');
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf rejects an image referenceAttachment with the same friendly hint (no upload-then-fail dance)', async () => {
+    const fetchFn: FetchFn = async (url) => {
+      if (url.endsWith('/attachments/aRefImg')) {
+        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/diagram.svg' });
+      }
+      if (url.includes('/shares/u!')) {
+        return Response.json({ id: 'i-svg', name: 'diagram.svg', parentReference: { driveId: 'd1' } });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    };
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefImg' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(415);
+      expect(result.error.message).toContain('svg attachment is an image');
+    }
+  });
 });
 
 describe('calendar event attachments', () => {
