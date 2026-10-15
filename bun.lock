@@ -40,12 +40,24 @@
         "typescript-eslint": "^8.33.1",
       },
     },
+    "auth": {
+      "name": "@ask-marcel/office-auth",
+      "version": "1.0.0",
+      "bin": {
+        "ask-marcel-office-auth": "./dist/cli.js",
+      },
+      "devDependencies": {
+        "@ask-marcel/office-core": "workspace:*",
+      },
+    },
     "core": {
       "name": "@ask-marcel/office-core",
       "version": "1.0.0",
     },
   },
   "packages": {
+    "@ask-marcel/office-auth": ["@ask-marcel/office-auth@workspace:auth"],
+
     "@ask-marcel/office-core": ["@ask-marcel/office-core@workspace:core"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.0", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.28.5", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw=="],
