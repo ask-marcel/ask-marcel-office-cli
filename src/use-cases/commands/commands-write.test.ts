@@ -534,6 +534,128 @@ describe('commands', () => {
     expect(result.error.type).toBe('api_error');
     if (result.error.type === 'api_error') expect(result.error.status).toBe(404); // mutant skips the guard → reads undefined.value → throws
   });
+
+  it('convert-mail-attachment-to-pdf errs unconditionally for itemAttachment, missing @odata.type, and unknown type', async () => {
+    const item = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => Response.json({ '@odata.type': '#microsoft.graph.itemAttachment', item: {} })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(item.ok).toBe(false);
+    if (!item.ok) {
+      expect(item.error.type).toBe('api_error');
+      expect(item.error.message).toContain('convert-mail-attachment-to-markdown');
+      if (item.error.type === 'api_error') expect(item.error.status).toBe(400);
+    }
+    const noType = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => Response.json({ name: 'x.docx' })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(noType.ok).toBe(false);
+    if (!noType.ok) {
+      expect(noType.error.type).toBe('api_error');
+      expect(noType.error.message).toContain('missing @odata.type discriminator');
+      if (noType.error.type === 'api_error') expect(noType.error.status).toBe(400);
+    }
+    const unknown = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => Response.json({ '@odata.type': '#microsoft.graph.weird' })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) {
+      expect(unknown.error.type).toBe('api_error');
+      expect(unknown.error.message).toContain('unsupported attachment type: #microsoft.graph.weird');
+      if (unknown.error.type === 'api_error') expect(unknown.error.status).toBe(400);
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf errs unconditionally on referenceAttachment edge cases (missing/empty sourceUrl, resolved missing id, resolved missing driveId, image source) and on resolve / upload failures', async () => {
+    // missing sourceUrl (undefined)
+    const noUrl = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment' })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(noUrl.ok).toBe(false);
+    if (!noUrl.ok) {
+      expect(noUrl.error.type).toBe('api_error');
+      expect(noUrl.error.message).toContain('referenceAttachment missing sourceUrl');
+      if (noUrl.error.type === 'api_error') expect(noUrl.error.status).toBe(400);
+    }
+
+    // empty-string sourceUrl exercises the `=== ''` operand specifically
+    const emptyUrl = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: '' })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(emptyUrl.ok).toBe(false);
+    if (!emptyUrl.ok) {
+      expect(emptyUrl.error.type).toBe('api_error');
+      expect(emptyUrl.error.message).toContain('referenceAttachment missing sourceUrl');
+    }
+
+    // resolved driveItem with no id (driveId present → the itemId operand is the deciding one)
+    const itemIdMissing: FetchFn = async (url) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://x/q.docx' });
+      return Response.json({ name: 'q.docx', parentReference: { driveId: 'd1' } });
+    };
+    const iim = await pdfCmd().execute(createGraphClient(fakeAuth(), itemIdMissing), { messageId: 'm1', attachmentId: 'a1' });
+    expect(iim.ok).toBe(false);
+    if (!iim.ok) {
+      expect(iim.error.type).toBe('api_error');
+      expect(iim.error.message).toContain('resolved driveItem missing id or driveId');
+    }
+
+    // resolved driveItem with no driveId (the first operand)
+    const driveIdMissing: FetchFn = async (url) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://x/q.docx' });
+      return Response.json({ id: 'i1', name: 'q.docx' });
+    };
+    const dim = await pdfCmd().execute(createGraphClient(fakeAuth(), driveIdMissing), { messageId: 'm1', attachmentId: 'a1' });
+    expect(dim.ok).toBe(false);
+    if (!dim.ok) {
+      expect(dim.error.type).toBe('api_error');
+      expect(dim.error.message).toContain('resolved driveItem missing id or driveId');
+      if (dim.error.type === 'api_error') expect(dim.error.status).toBe(500);
+    }
+
+    // resolved driveItem that is an image → 415 (reference-side image guard)
+    const refImage: FetchFn = async (url) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://x/photo.png' });
+      return Response.json({ id: 'i1', name: 'photo.png', parentReference: { driveId: 'd1' } });
+    };
+    const ri = await pdfCmd().execute(createGraphClient(fakeAuth(), refImage), { messageId: 'm1', attachmentId: 'a1' });
+    expect(ri.ok).toBe(false);
+    if (!ri.ok) {
+      expect(ri.error.type).toBe('api_error');
+      expect(ri.error.message).toContain('png attachment is an image');
+      if (ri.error.type === 'api_error') expect(ri.error.status).toBe(415);
+    }
+
+    // /shares resolve failure propagates
+    const resolveFail: FetchFn = async (url) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://x/q.docx' });
+      return new Response('nope', { status: 404 });
+    };
+    const rf = await pdfCmd().execute(createGraphClient(fakeAuth(), resolveFail), { messageId: 'm1', attachmentId: 'a1' });
+    expect(rf.ok).toBe(false);
+    if (rf.ok) return;
+    expect(rf.error.type).toBe('api_error');
+    if (rf.error.type === 'api_error') expect(rf.error.status).toBe(404);
+  });
+
+  it('convert-mail-attachment-to-pdf errs unconditionally when the upload returns no driveItem id', async () => {
+    const noUploadId: FetchFn = async (url, init) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'r.docx', contentBytes: btoa('hi') });
+      if (init?.method === 'PUT') return Response.json({ name: 'no-id-returned' }); // upload response without `id`
+      throw new Error(`unexpected ${url}`);
+    };
+    const uploadNoId = await pdfCmd().execute(createGraphClient(fakeAuth(), noUploadId), { messageId: 'm1', attachmentId: 'a1' });
+    expect(uploadNoId.ok).toBe(false);
+    if (!uploadNoId.ok) {
+      expect(uploadNoId.error.type).toBe('api_error');
+      expect(uploadNoId.error.message).toContain('upload returned no driveItem id');
+      if (uploadNoId.error.type === 'api_error') expect(uploadNoId.error.status).toBe(500);
+    }
+  });
 });
 
 describe('calendar event attachments', () => {
