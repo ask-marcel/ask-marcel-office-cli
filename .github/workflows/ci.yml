@@ -79,6 +79,8 @@ jobs:
         run: bun run scripts/check-lint-fixtures.ts
       - name: read bundle (the read graph and the read commands, built alone, hold no write method; a control with the write graph shows them)
         run: bun run check:read-bundle
+      - name: package imports (a write module reaches only core and write; no read command and no core module reaches write; fixtures prove it can fail)
+        run: bun run check:package-imports
       - name: typecheck
         run: bun run typecheck
       - name: tests
