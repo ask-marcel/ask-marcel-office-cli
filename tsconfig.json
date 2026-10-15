@@ -17,5 +17,8 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun"]
-  }
+  },
+  // Each workspace folder (core/, auth/, read/, write/) typechecks itself with
+  // its own tsconfig.json (package split, D7).
+  "exclude": ["node_modules", "auth", "core", "read", "write"]
 }

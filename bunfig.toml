@@ -1,4 +1,12 @@
+[install]
+# Bun workspaces (package split, D3): each folder resolves its dependencies
+# from the root node_modules, as the single package always did.
+linker = "hoisted"
+
 [test]
+# The root src/ only: each workspace folder (core/, auth/, read/, write/) runs
+# its own tests with its own bunfig.toml. `bun run test` runs them all.
+root = "src"
 # Fails any test that reaches the real network. See scripts/no-network-preload.ts.
 preload = ["./scripts/no-network-preload.ts"]
 coverage = true
