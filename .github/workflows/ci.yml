@@ -27,6 +27,12 @@
 #      files, so on 2026-08-30 two of three commits were never mutated at all
 #      and the survivors they added surfaced a push later. Run the full
 #      `bun run mutate` as a periodic manual audit, not per push.
+#
+# Package split (docs/plans/2026-10-01-package-split.md, Checks and CI): `gates`
+# and `smoke` are the root src/ job and keep every gate until phase 6 deletes
+# src/. `workspace` runs one job per workspace folder (core, auth, read, write)
+# with the folder's own configs; `gates` fails when the matrix misses a folder.
+# `windows-helper` runs the token helper round trip on Windows.
 name: ci
 on:
   push:
@@ -48,6 +54,14 @@ jobs:
         run: |
           bash scripts/check-package-json.sh --selftest
           bash scripts/check-package-json.sh
+      - name: workspace check selftests (hook dispatch, folder coverage preload, packed output, CI matrix)
+        run: |
+          bash scripts/staged-folders.sh --selftest
+          bun scripts/coverage-preload-tiers-selftest.ts
+          bun scripts/check-packed-package.ts --selftest
+          bun scripts/check-ci-matrix.ts --selftest
+      - name: the workspace matrix covers every workspace folder (no folder goes ungated or unmutated)
+        run: bun scripts/check-ci-matrix.ts
       - name: commit-msg hook selftest (a non-conventional header is rejected)
         run: bash scripts/commit-msg-selftest.sh
       - name: commit messages (every pushed commit passes the commit-msg hook, --no-verify included)
@@ -138,3 +152,78 @@ jobs:
       - name: packed-install smoke (the tarball installs and runs outside the repo)
         timeout-minutes: 10
         run: bun scripts/qa-packed-install-smoke.ts
+  workspace:
+    # One job per workspace folder (package split, D7), run from the folder with
+    # its own configs. scripts/check-ci-matrix.ts (in `gates`) fails when a
+    # folder of the root package.json has no entry here. `published` folders
+    # also build, pack, and install the tarball into a clean consumer (node 20 is
+    # the floor that `engines` promises).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - folder: core
+            published: false
+          - folder: auth
+            published: true
+          - folder: read
+            published: true
+          - folder: write
+            published: true
+    defaults:
+      run:
+        working-directory: ${{ matrix.folder }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for mutate:changed
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - name: lint (strict, type-aware, zero errors AND zero warnings)
+        run: bun run lint:strict
+      - name: typecheck
+        run: bun run typecheck
+      - name: tests
+        run: bun test
+      - name: coverage (every tier at 100%; the preload lists the folder's tier files itself)
+        run: bun run coverage
+      - name: mutation (changed files of this folder; see deviation 3 in the header)
+        env:
+          PUSHED_FROM: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bun run mutate:changed
+          elif [ -n "$PUSHED_FROM" ] \
+            && [ "$PUSHED_FROM" != "0000000000000000000000000000000000000000" ] \
+            && git rev-parse --verify --quiet "$PUSHED_FROM^{commit}" >/dev/null; then
+            BASE="$PUSHED_FROM" bun run mutate:changed
+          else
+            BASE=HEAD~1 bun run mutate:changed
+          fi
+      - name: build (bundles with core inlined, declarations with core under dist/shared)
+        if: matrix.published
+        run: bun run build
+      - name: packed output (no core outside devDependencies or in a .d.ts) and a clean consumer (bin, library, deliberate type errors)
+        if: matrix.published
+        timeout-minutes: 10
+        run: bun run check:packed
+  windows-helper:
+    # The token helper round trip on Windows, where spawning through an npm .cmd
+    # shim fails without a shell: a fixture cache, then `token --tier basic`
+    # spawned through the locator file the way read spawns it. Offline.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: bun install --frozen-lockfile
+      - name: token helper round trip (node and bun runners)
+        timeout-minutes: 5
+        run: bun scripts/qa-token-helper-roundtrip.ts

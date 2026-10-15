@@ -32,6 +32,10 @@ type Fixture = {
   readonly rule: string;
   readonly fires: boolean;
   readonly strict: boolean;
+  // A workspace folder (package split, D7): the fixture is linted from there,
+  // with that folder's eslint.config.js and lint:strict script, and its path is
+  // relative to it.
+  readonly cwd?: string;
 };
 
 const STDOUT_WRITE = "export const f = (): void => {\n  process.stdout.write('banner');\n};\n";
@@ -55,6 +59,14 @@ const SIBLING_DIRECTORY_IMPORT = "import * as registry from '.';\nexport const f
 const SELF_PACKAGE_IMPORT = "import { commands } from 'ask-marcel-office-cli';\nexport const f = (): unknown => commands;\n";
 const DYNAMIC_REGISTRY_IMPORT = "export const f = async (): Promise<unknown> => import('../use-cases/commands/index.ts');\n";
 const DYNAMIC_SIBLING_IMPORT = "export const f = async (): Promise<unknown> => import('./filesystem-node.ts');\n";
+
+// One real source file per workspace folder, relative to the folder.
+const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
+  ['core', 'src/domain/result.ts'],
+  ['auth', 'src/composition/bin.ts'],
+  ['read', 'src/composition/bin.ts'],
+  ['write', 'src/composition/bin.ts'],
+];
 
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
@@ -92,6 +104,10 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'strict lint rejects a needless assertion', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true },
   { name: 'strict lint rejects a string rejection', path: 'src/domain/result.ts', source: STRING_REJECTION, rule: '@typescript-eslint/prefer-promise-reject-errors', fires: true, strict: true },
   { name: 'control: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false },
+  // Each workspace folder spreads the root's eslint.base.js; its type-aware block
+  // names `src/**`, which must resolve inside the folder.
+  ...WORKSPACE_FILES.map(([cwd, path]): Fixture => ({ name: `${cwd}: strict lint rejects a needless assertion`, path, source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true, cwd })),
+  { name: 'control: core: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false, cwd: 'core' },
 ];
 
 type LintMessage = { readonly ruleId: string | null; readonly message: string };
@@ -114,6 +130,7 @@ const command = (fixture: Fixture): ReadonlyArray<string> => {
 const lint = async (fixture: Fixture): Promise<Outcome> => {
   const proc = Bun.spawn([...command(fixture)], {
     stdin: new TextEncoder().encode(fixture.source),
+    cwd: fixture.cwd,
     stdout: 'pipe',
     stderr: 'pipe',
     env: envWithoutStrict(),
@@ -130,7 +147,7 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
 
 const check = async (fixture: Fixture): Promise<boolean> => {
   const label = `${fixture.name}  (${fixture.path}, ${fixture.rule})`;
-  if (!(await Bun.file(fixture.path).exists())) {
+  if (!(await Bun.file(fixture.cwd === undefined ? fixture.path : `${fixture.cwd}/${fixture.path}`).exists())) {
     console.log(`  FAIL  ${label}\n        ${fixture.path} no longer exists: move this fixture and the rule's glob in eslint.config.js with it`);
     return false;
   }
