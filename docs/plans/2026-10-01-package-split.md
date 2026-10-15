@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-14 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording); steps 15-16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-15 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check); step 16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -102,8 +102,10 @@ command framework (`command-types`, `build-command`, `format-zod-error`, `reject
 (CLI builder, MCP gateway builder, `run-registry-command`), the static command-to-package
 directory, and every helper both read and write import: the quote-boundary finders from
 `mail-quote-stripper.ts` (the `--keep-quoted` flag definitions stay in read), `base64ToBytes`,
-`tagPdfPassthrough`, `inlineBinary` and `fetchRawBytes` (typed against a `Pick` of the binary
-methods so both ports satisfy them), `buildShareToken`, and the PDF and plain-text predicates in
+`tagPdfPassthrough`, `inlineBinary`, `fetchRawBytes` and `inlineBasicBinary` (`fetchRawBytes` and
+`inlineBinary` take the four-member binary `Pick`, so only the read graph satisfies them;
+`inlineBasicBinary` takes `Pick<…, 'getBinary' | 'fetchUrl'>`, which both ports satisfy; see the
+step-15 note), `buildShareToken`, and the PDF and plain-text predicates in
 `text-passthrough.ts`. `build-deps.ts` is not core: each package has its own composition root.
 
 **auth**: the token cache, refresh for the basic, chatsvcagg, ic3 and guest tokens, browser capture
@@ -158,6 +160,54 @@ As built in step 13 (`src/use-cases/commands/command-package.ts`, `src/compositi
   bans. Fixtures in `scripts/check-lint-fixtures.ts`.
 - Not yet in core's own tests: the shells' package-independent branches are covered by the
   real-registry suites only; phase 3 (core at 100% on its own) needs core tests for them.
+
+As built in step 15 (`scripts/check-package-imports.ts`, `src/use-cases/commands/quote-boundary.ts`,
+`share-token.ts`; the ownership lists `WRITE_FILES`, `CORE_FILES` and `CORE_READ_ONLY_FILES` in
+`eslint.config.js`):
+
+- The modules that a write module (the 7 write commands, `draft-comment-splicer`,
+  `draft-response`, `parse-recipients`) and a read command both reach, type imports included,
+  and where each goes:
+
+  | Shared module | Package | How |
+  |:--|:--|:--|
+  | `domain/result`, `tenant-id`, `teams-region`, `access-token`, `jwt-utils`, `domain/utilities/base64` | core | already core |
+  | `ports/filesystem`, `ports/token-source` | core | already core |
+  | `infra/graph-request`, `read-graph`, `graph-substrate`, `write-graph`, `network-error` | core | already core |
+  | `commands/command-types`, `format-zod-error`, `read-only-post` | core | already core |
+  | `domain/utilities/spo-tenant` (read-graph uses it) | core | joined the core list |
+  | `commands/fetch-raw-bytes` | core | whole module; `fetchRawBytes` and `inlineBinary` take `Pick<ReadGraph, 'getBinary' \| 'getBinaryElevated' \| 'getBinaryGuest' \| 'fetchUrl'>` |
+  | `commands/text-passthrough` | core | whole module (core's `output-path` already took `extensionOf`) |
+  | `commands/mail-quote-stripper` | read | split: the two finders went to `quote-boundary.ts` (core); the strippers, their markers and the `--keep-quoted` flag stay; a transitional re-export of the finders stays until step 16 |
+  | `commands/sharepoint-link-extractor` | read | split: `buildShareToken` went to `share-token.ts` (core); the link parsers and resolver stay; a transitional re-export of `buildShareToken` stays until step 16 |
+  | `infra/graph-client` (and through it the auth ladder, the browser and the token cache lock) | single package only | the write side stopped importing it: write commands and `draft-response` take `GraphError` from `graph-request.ts`, and `command-types.ts` names the full client `ReadGraph & WriteGraph` |
+
+- `WriteGraph` has only the basic binary members (`getBinary`, `fetchUrl`), so of the byte helpers
+  it satisfies `inlineBasicBinary` only (step 12). The other two take the elevated and guest GETs,
+  which only the read graph has.
+- `scripts/check-package-imports.ts` (`bun run check:package-imports`, in CI) reads every non-test
+  module under `src/` with `ts.preProcessFile` (type imports and dynamic imports count) and fails
+  when a write module reaches a module outside core and write, or when a read command or a core
+  module reaches a write module. The read commands are the registry's `read` commands; the
+  registry's other commands must all be in `WRITE_FILES`. Three fixtures (a write command
+  importing a read helper, a read command importing a write helper, a core module loading a
+  write command dynamically) replace one real file's source on each run and must be reported.
+  A lint fixture proves the step-15 core files are under the core ban.
+- Not in this step: core modules that still reach a module outside core on paths that write does
+  not take (phase 3 needs them closed): `cli-shell`, `mcp-shell` and `run-registry-command` take
+  the `GraphClient` type from `graph-client.ts`, `reject-unknown-params` takes `GraphError` from
+  it, `build-command` imports `tenant-option` and `odata-query`, `token-helper-run` and
+  `token-helper-answer` import the `token-issuer` port, and `filesystem-bun` imports
+  `domain/utilities/format-error`. Read commands still take the `GraphError`
+  type from `graph-client.ts` (about 200 files). The finder tests stay in
+  `mail-quote-stripper.test.ts` and the `buildShareToken` tests in the link-extractor suites;
+  core's own tests for them come with phase 3.
+- Production code imports each moved function from its owner (`quote-boundary.ts`,
+  `share-token.ts`). The existing tests are unchanged (rule 24), so `mail-quote-stripper.ts` and
+  `sharepoint-link-extractor.ts` re-export the moved functions for them. Step 16's rule-24 batch
+  moves the four test imports (`mail-quote-stripper.test.ts`, `sharepoint-link-extractor.test.ts`,
+  `sharepoint-link-location.test.ts`, `commands.test.ts`) to the owners and removes the two
+  re-exports.
 
 ## Library API per package
 
