@@ -112,7 +112,6 @@ import * as extractMailAttachmentImages from './extract-mail-attachment-images.t
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
-import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
@@ -269,7 +268,6 @@ const cmdMap: Record<string, { execute: CommandExecute }> = {
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,
   'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
-  'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,
   'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
   'list-onenote-notebook-sections': listOnenoteNotebookSections,
@@ -2984,65 +2982,6 @@ describe('commands', () => {
     }
   });
 
-  it('convert-mail-attachment-to-pdf uploads a fileAttachment, converts via ?format=pdf, follows the CDN redirect internally to inline the PDF bytes, then deletes the temp item', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/a1')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx-bytes') });
-      }
-      if (url.includes(':/content') && init?.method === 'PUT') {
-        return Response.json({ id: 'temp-i1', name: 'plan-temp' });
-      }
-      if (url.endsWith('/content?format=pdf')) {
-        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/plan.pdf' });
-      }
-      if (url === 'https://contoso.sharepoint.com/cdn/plan.pdf') {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
-      }
-      if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') {
-        return new Response(null, { status: 204 });
-      }
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'a1' });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      const v = result.value as { contentType: string; base64: string };
-      expect(v.contentType).toBe('application/pdf');
-      expect(atob(v.base64)).toBe('%PDF-');
-    }
-    expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
-    expect(calls.some((c) => c.url.endsWith('/content?format=pdf'))).toBe(true);
-  });
-
-  it('convert-mail-attachment-to-pdf turns a 406 from the format=pdf transform (an input it refuses — xlsx observed live) into an actionable error pointing at the markdown fallback, NOT the misleading "endpoint may have moved" text, and still cleans up the temp item', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/a1')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'budget.xlsx', contentBytes: btoa('xlsx-bytes') });
-      if (url.includes(':/content') && init?.method === 'PUT') return Response.json({ id: 'temp-i1' });
-      if (url.endsWith('/content?format=pdf')) return new Response(null, { status: 406 });
-      if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') return new Response(null, { status: 204 });
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'a1' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toContain('convert-mail-attachment-to-markdown');
-      expect(result.error.message).toContain('get-mail-attachment');
-      expect(result.error.message).toMatch(/406|refused|could not/i);
-      expect(result.error.message).not.toContain('endpoint may have moved');
-    }
-    expect(calls.some((c) => c.method === 'DELETE')).toBe(true); // temp item cleaned up even on failure
-  });
-
   it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (folder used to linger at OneDrive root)', async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: FetchFn = async (url, init) => {
@@ -4315,26 +4254,6 @@ describe('calendar event attachments', () => {
     expect(result?.ok).toBe(false);
     if (result && !result.ok) expect(result.error.type).toBe('validation_error');
   });
-
-  it('convert-calendar-event-attachment-to-pdf short-circuits a pdf event attachment to raw bytes through the shared pipeline', async () => {
-    const fetchFn: FetchFn = async (url) => {
-      if (url.includes('/me/events/e1/attachments/a1')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'deck.pdf', contentBytes: btoa('PDFB') });
-      throw new Error(`unexpected ${url}`);
-    };
-    const result = await cmdMap['convert-calendar-event-attachment-to-pdf']?.execute(createGraphClient(fakeAuth(), fetchFn), { eventId: 'e1', attachmentId: 'a1' });
-    expect(result?.ok).toBe(true);
-    if (result?.ok) {
-      const v = result.value as { contentType: string; note?: string };
-      expect(v.contentType).toBe('application/pdf');
-      expect(String(v.note)).toContain('raw bytes');
-    }
-  });
-
-  it('convert-calendar-event-attachment-to-pdf returns a validation_error when eventId is missing', async () => {
-    const result = await cmdMap['convert-calendar-event-attachment-to-pdf']?.execute(createGraphClient(fakeAuth(), fakeFetch({})), { attachmentId: 'a1' });
-    expect(result?.ok).toBe(false);
-    if (result && !result.ok) expect(result.error.type).toBe('validation_error');
-  });
 });
 
 describe('convert-drive-item-zip-to-markdown', () => {
@@ -5333,11 +5252,6 @@ const allCommandFixtures: CommandFixture[] = [
     params: { eventId: 'e1', attachmentId: 'a1' },
     responseBody: { '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt', contentBytes: 'aGk=' },
   },
-  {
-    name: 'convert-calendar-event-attachment-to-pdf',
-    params: { eventId: 'e1', attachmentId: 'a1' },
-    responseBody: { '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt', contentBytes: 'aGk=' },
-  },
   { name: 'microsoft-search-query', params: { query: 'q3 budget' } },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' } },
   { name: 'get-drive-root-delta', params: {} },
@@ -5389,7 +5303,6 @@ describe('command schema rejection', () => {
     { name: 'extract-sharepoint-links-in-mail', params: {} },
     { name: 'extract-sharepoint-links-in-documents', params: { driveId: 'd1' } },
     { name: 'convert-mail-to-markdown', params: {} },
-    { name: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1' } },
     { name: 'convert-mail-attachment-to-markdown', params: { messageId: 'm1' } },
     { name: 'search-my-documents', params: {} },
     { name: 'list-calendar-view', params: {} },
@@ -5756,7 +5669,6 @@ const pathFixtures: Array<{ name: string; params: Record<string, string>; expect
     expectedPath: "/drives/d1/items/i1/workbook/worksheets/Sheet1/charts/c1/Image(width=0,height=0,fittingMode='Fit')",
   },
   { name: 'convert-calendar-event-attachment-to-markdown', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
-  { name: 'convert-calendar-event-attachment-to-pdf', params: { eventId: 'e1', attachmentId: 'a1' }, expectedPath: '/me/events/e1/attachments/a1' },
   { name: 'convert-drive-item-zip-to-markdown', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'extract-sharepoint-links-in-documents', params: { driveId: 'd1', itemId: 'i1' }, expectedPath: '/drives/d1/items/i1/content' },
   { name: 'get-drive-special-folder', params: { folderName: 'documents' }, expectedPath: '/me/drive/special/documents' },
