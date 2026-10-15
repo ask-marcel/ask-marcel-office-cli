@@ -684,3 +684,18 @@ Rule for next time: before each move commit, find the helpers and imports that t
 
 Package-split phase 2 moved the lint rules that the root and every workspace folder share, unchanged, from `eslint.config.js` to `eslint.base.js` (`baseConfig(tsconfigRootDir)`). The root `eslint.config.js` and each folder's `eslint.config.js` (`core/`, `auth/`, `read/`, `write/`) spread that base. The `prettier/prettier` options (single quotes, 180 columns, lf, es5 trailing commas) and the `@typescript-eslint/no-unused-vars` `argsIgnorePattern: '^_'` are now in `eslint.base.js` only. Rejected: a copy of the rules in each folder (the copies would drift, and `lint:strict` would mean a different thing per folder).
 Rule for next time: in the 2026-06-13 and 2026-10-03 entries, `eslint.config.js` means `eslint.base.js` for these options. A rule that every folder must obey goes in `eslint.base.js`; a rule for one folder goes in that folder's `eslint.config.js`. The 2026-10-03 rule stays: format with `bunx eslint --fix <files>`, never with bare prettier.
+
+## [gotcha] 2026-10-16 | In a linked git worktree, a hook gets an absolute GIT_DIR, so a git command in a subfolder sees no path prefix
+
+During a hook, git sets `GIT_DIR` to an absolute path. In a linked worktree, `git diff --relative` that runs from `core/` then does not remove the `core/` prefix from the staged paths. In phase 2, the staged lint gave ESLint paths such as `core/src/x.ts` from inside `core/`, and ESLint stopped with exit 123. The commit worked in the main checkout and failed in the worktree. `scripts/lint-staged.sh` now finds its folder from its own location and does not ask git for the prefix.
+Rule for next time: a hook script must not use git's idea of the current folder. Find the folder from the script's own path, and give git explicit paths. Do a test of each hook in a linked worktree and with `GIT_DIR` set by hand.
+
+## [gotcha] 2026-10-16 | `bun pm pack` changes `workspace:*` to the version number, also in devDependencies
+
+The plan keeps `@ask-marcel/office-core` out of `dependencies`, because core is never published and an install would get a 404. Core stays only in `devDependencies` as `workspace:*`. `bun pm pack` changes that `workspace:*` to the version of core in the packed `package.json`, also in `devDependencies`. An install does not get devDependencies, so the packed package still installs. But a check that searches the packed manifest for `workspace:` finds nothing. `scripts/check-packed-package.ts` checks that core is in no field except `devDependencies`.
+Rule for next time: check the packed `package.json` in the tarball, not the source manifest. Do not expect `workspace:*` in a packed file.
+
+## [gotcha] 2026-10-16 | A spawned token helper gets the HOME and the ASKMARCEL_* variables of its caller, so a round-trip test must remove both
+
+The token helper round trip spawns `dist/token.js` the way read spawns it. The child gets the environment of the parent. If the person who runs the test has `ASKMARCEL_TOKEN_BASIC` or `ASKMARCEL_TOKEN_COMMAND` set, or a real `~/.ask-marcel/` cache, the test uses those values and not the fixture. The test then passes or fails for the wrong reason, and it can write the real locator file. The round trip now gives the helper and the caller a temporary HOME and an environment with no `ASKMARCEL_*` variable.
+Rule for next time: a test that spawns the CLI or the helper sets HOME (and USERPROFILE) to a temporary folder and removes every `ASKMARCEL_*` variable. Do a test of it with such a variable set to a bad value.
