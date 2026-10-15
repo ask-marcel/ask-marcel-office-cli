@@ -12,6 +12,10 @@ strict TDD (red-green-refactor), `Result<T, E>` at IO boundaries, branded types 
 Bun-only toolchain, and the eight-gate pre-commit hook. Rules are non-negotiable — when in doubt,
 consult the skill before acting. If the skill and any doc disagree, the skill wins.
 
+Each of `auth/ core/ read/ write/` is an atelier Bun TypeScript script repo (package split, ADR 0003):
+its own `src/{domain,use-cases,infra,presenter,composition}`, coverage tiers and mutation, run from
+that folder. The root `src/` is the single package until the split moves it out.
+
 Always use Atelier Skill
 
 Before Commit always use Atelier Review Me

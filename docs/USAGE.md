@@ -406,9 +406,16 @@ bun run check:read-bundle  # the read graph and the read commands, built alone, 
 bun run check:package-imports  # a write module imports only core and write modules; read and core never reach write; a test file imports one package besides core
 ```
 
+The repo is also a Bun workspace for the package split (`docs/plans/2026-10-01-package-split.md`):
+`core/`, `auth/`, `read/` and `write/` each hold their own `package.json`, configs, tests and gates.
+At the root, `bun test` runs the root `src/` only; `bun run test` runs it and then every folder's
+tests. In a folder, the same commands run that folder's gates (`bun test`, `bun run lint`,
+`bun run typecheck`, `bun run coverage`, `bun run mutate:changed`), and a published folder adds
+`bun run build` and `bun run check:packed` (the packed tarball, installed into a clean consumer).
+
 ### Pre-commit hook (fast gates; the rest run in CI)
 
-The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → staged lint → typecheck). Each is O(staged files) or O(1), so the hook stays within a few seconds. The full test suite, per-tier coverage and Stryker mutation deliberately run in CI instead (`.github/workflows/ci.yml`), which is the line that cannot be skipped — a green commit has NOT run them locally. CI also builds the bundle and smoke-tests it under Node and Bun, both from `dist/` and installed from the packed tarball into an empty directory. Install once per clone:
+The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → staged lint → typecheck). Staged lint and typecheck run in the root and in each workspace folder with a staged change; a change under `core/` also runs them in `auth/`, `read/` and `write/`, and a moved file counts in the folder it leaves and in the folder it enters. Each is O(staged files) or O(1), so the hook stays within a few seconds. The full test suite, per-tier coverage and Stryker mutation deliberately run in CI instead (`.github/workflows/ci.yml`), which is the line that cannot be skipped — a green commit has NOT run them locally. CI also builds the bundle and smoke-tests it under Node and Bun, both from `dist/` and installed from the packed tarball into an empty directory. Install once per clone:
 
 ```bash
 git config core.hooksPath .githooks

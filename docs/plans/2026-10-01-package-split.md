@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1).** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -791,6 +791,95 @@ walking-skeleton test per folder; CI matrix, root-`src/` job and Windows job, pl
 matrix covers every workspace folder (no folder's sources go unmutated); hook dispatch; the `.d.ts`
 spike and the packed-output assertions. Exit: four skeleton packages green in CI, packed
 output clean, consumer typecheck reports the deliberate errors.
+
+As built in phase 2 (2026-10-15; nothing moved out of the root `src/`):
+
+- Root. `package.json` is `private` with `workspaces: ["core", "auth", "read", "write"]`, so
+  `ask-marcel-office-cli` can no longer be published (D12 freezes it at 2.8.0). `bunfig.toml` pins
+  `linker = "hoisted"` and sets `[test] root = "src"`: a root `bun test` runs the root `src/` only,
+  with the no-network preload, and gives the same 5996 tests as before. The `test` script runs it
+  and then each folder (`bun run --filter '@ask-marcel/*' test`). `globals` is a root
+  devDependency. The root `tsconfig.json`, `eslint.config.js` and `stryker.conf.json` leave the
+  four folders to their own configs. The lint rules that every folder shares moved, unchanged, to
+  `eslint.base.js` (`baseConfig(tsconfigRootDir)`); `eslint --print-config` gives the same result
+  as before on the root files, with and without `LINT_STRICT`.
+- Each folder: `package.json`, `bunfig.toml` (the root's no-network preload, `../scripts/...`),
+  `tsconfig.json` (extends the root's, its own files), `eslint.config.js` (spreads the base; its
+  `src/**` globs resolve in the folder), `stryker.conf.json` (the folder alone; `*.toml` stays
+  out of the sandbox, as at the root) and `src/{domain,use-cases,infra,presenter,composition}`
+  (`.gitkeep` where a tier has no file yet). The published folders add `tsconfig.build.json`,
+  `README.md`, `CHANGELOG.md` and `LICENSE` (D13). Scripts: `lint`, `lint:staged`, `lint:strict`,
+  `typecheck`, `test`, `coverage`, `mutate`, `mutate:changed`, `mutate:staged`, and in the
+  published folders `build`, `check:packed`, `prepublishOnly`.
+- Core exports `"./*": "./src/*"`; auth, read and write import it as
+  `@ask-marcel/office-core/<tier>/<file>.ts` and list it in `devDependencies` as `workspace:*`
+  only. `dependencies` is `{}` in all three: the skeletons import no runtime package.
+- Walking skeletons (TDD, new tests only). Core: `src/composition/skeleton-cli.ts` (`--version`
+  prints the version; anything else says that the package has no commands yet, exit 1) and
+  `src/domain/result.ts` with its test, byte-identical copies of the root's, so that the packages
+  can re-export the real `Result`. Phase 3 deletes the two copies in its first commit, before the
+  move of `src/domain/result.ts`. Auth, read and write: `src/composition/bin.ts` (the package's
+  name and version from its `package.json`, given to the skeleton CLI) with its test,
+  `src/main.ts` (the bin entry) and `src/index.ts` (`export type { Result }` from core). Phases 4
+  to 6 replace `bin.ts` and `main.ts` with the package's own wiring; the skeleton CLI goes when
+  the last package stops using it.
+- Coverage: `scripts/coverage-preload-tiers.ts` finds the tier files of the folder that runs it
+  (`Bun.Glob`, minus tests and `ports/`); `scripts/coverage-preload-tiers-selftest.ts` proves an
+  untested file shows at 0% and a port is not loaded. `check-coverage.ts` takes
+  `--preload <path>`, skips the root's two shared preloads as a folder sees them
+  (`../scripts/...`), and skips `../core/src/` rows in auth, read and write (core gates them in
+  its own run). Another `../` row still has no tier and fails.
+- Build. `scripts/build-package.ts` builds the files that `bin` and `exports` name
+  (`dist/cli.js` from `src/main.ts`, `dist/index.js` from `src/index.ts`, `dist/token.js` from
+  `src/token.ts`) with `external` equal to the keys of `dependencies`, so the two cannot drift.
+  `add-shebang.ts` takes the bin paths as arguments (none: the root's two).
+- The `.d.ts` spike chose per-file `tsc` output with the core imports rewritten
+  (`scripts/build-types.ts`): `tsconfig.build.json` compiles the closure of `src/index.ts`, with
+  `paths` mapping `@ask-marcel/office-core/*` to `../core/src/*` (rootDir `..`); the package's
+  declarations go to `dist/`, core's to `dist/shared/`, and each specifier is resolved against
+  the emitted tree and written again as a relative `.js` path. A specifier that names another
+  package or a file that was not emitted fails the build. Tried on the real `Result` (a generic
+  union of two unexported types) and on inferred types that make `tsc` write
+  `import("@ask-marcel/office-core/...")` itself (rewritten to `import("../shared/...")`).
+  No declaration bundler was added.
+- Packed output: `scripts/check-packed-package.ts` (`bun run check:packed`) packs with
+  `bun pm pack`, then checks the files (the four top files, the `bin` and `exports` targets,
+  declarations under `dist/`, nothing else), `@ask-marcel/office-core` outside every runtime
+  dependency field (`bun pm pack` writes `workspace:*` as `1.0.0` in `devDependencies`), and no
+  `.d.ts` naming `office-core` or `../core`. Then a consumer in the OS temp dir installs the
+  tarball: the bin answers `--version` and the library loads by name under node and bun, and
+  `tsc --noEmit --skipLibCheck false` (nodenext, strict) on one right and one wrong use of each
+  exported type must report exactly TS2322 on the wrong line. An exported type with no wrong use
+  in the script's `MISUSES` table fails. Each run also replaces the installed `index.d.ts` with
+  one that imports core (TS2307) and one whose types are `any` (a silent pass); the check fails
+  if the consumer typecheck passes either. `--selftest` covers the file, manifest and
+  declaration rules.
+- Hook: `scripts/staged-folders.sh` (with `--selftest`) prints the folders to check: a folder with
+  a staged path, every folder for a path under `core/` or a change of `tsconfig.json` or
+  `eslint.base.js`, and the root for a path outside the folders. It lists the staged paths with
+  `--no-renames`, so a move counts on both sides: `git mv src/x.ts core/src/x.ts` (phase 3) runs
+  the root as well as every folder. The hook runs `lint:staged` and
+  `typecheck` in each. `lint-staged.sh` takes the staged files of the folder it runs in, and finds that folder from its own location: in a linked worktree a hook gets an absolute `GIT_DIR`, and git then sees no folder prefix.
+  `check-package-json.sh` already looped over `*/package.json` (step 1).
+- Lint fixtures: one per folder proves that the type-aware block of the shared base fires in the
+  folder (`lint:strict` run from it), with a plain-lint control in core.
+- CI: `gates` and `smoke` stay the root `src/` jobs. `workspace` is a matrix (core, auth, read,
+  write; `published` adds the build and `check:packed`) that runs `lint:strict`, `typecheck`,
+  `bun test`, `coverage` and `mutate:changed` from the folder. `scripts/check-ci-matrix.ts` (in
+  `gates`, with `--selftest`) fails when the matrix and the workspaces differ. `windows-helper`
+  runs `scripts/qa-token-helper-roundtrip.ts`: a fixture cache in a temporary HOME, then
+  `node dist/token.js --tier basic`, then the env-then-helper token source spawning the helper
+  through the locator file with the Node and the Bun process runners.
+- Commits. Each workspace folder has 12 to 17 files, so one green commit per folder (as the
+  Migration sequence says) is above the 10-file gate. Each folder landed in two green commits:
+  first the skeleton (`package.json`, `bunfig.toml`, `tsconfig.json`, `eslint.config.js`, the
+  `src` tiers and the walking-skeleton test), then the build and publish files (`stryker.conf.json`,
+  the empty tiers, and in the published folders `tsconfig.build.json`, `README.md`, `CHANGELOG.md`
+  and `LICENSE`). The root and CI changes are separate commits. No commit used `--no-verify`.
+- Not in phase 2: the doc-number gate and the bundle smoke per folder (no registry or converter
+  yet; they come with each package's commands), auth's `dist/token.js` entry (phase 4: the
+  build already maps it), and the `qa-*` script moves. The Windows job and the CI matrix ran
+  only locally on Linux in this session; they need their first CI run.
 
 **Phase 3: core.** Mass-move procedure. Exit: core at 100% coverage on every tier, mutation at or
 above threshold.
