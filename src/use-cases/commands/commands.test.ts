@@ -109,7 +109,6 @@ import * as searchSharepointSitesByName from './search-sharepoint-sites-by-name.
 import * as extractSharepointLinksInMail from './extract-sharepoint-links-in-mail.ts';
 import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-markdown.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
-import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
@@ -264,7 +263,6 @@ const cmdMap: Record<string, { execute: CommandExecute }> = {
   'convert-mail-to-markdown': convertMailToMarkdown,
   'convert-drive-item-zip-to-markdown': convertDriveItemZip,
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
-  'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'list-calendar-event-attachments': listCalendarEventAttachments,
   'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
@@ -3243,16 +3241,6 @@ describe('commands', () => {
     expect(v.text).not.toContain('## OpenDocument metadata');
   });
 
-  it('convert-mail-attachment-to-pdf rejects a referenceAttachment with no sourceUrl', async () => {
-    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment' });
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefBad' });
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('missing sourceUrl');
-  });
-
   it('extract-mail-attachment-images returns a media envelope for a pptx fileAttachment', async () => {
     const bytes = await buildMediaSamples();
     let binary = '';
@@ -3452,55 +3440,6 @@ describe('commands', () => {
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.type).toBe('validation_error');
-  });
-
-  it('convert-mail-attachment-to-pdf rejects a referenceAttachment whose resolved driveItem lacks ids', async () => {
-    const fetchFn: FetchFn = async (url) => {
-      if (url.endsWith('/attachments/aRefBad2')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/x.docx' });
-      }
-      if (url.includes('/shares/u!')) return Response.json({ id: 'no-drive' });
-      throw new Error('unexpected');
-    };
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefBad2' });
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('missing id or driveId');
-  });
-
-  it('convert-mail-attachment-to-pdf short-circuits a referenceAttachment to raw bytes for plain-text source', async () => {
-    const fetchFn: FetchFn = async (url) => {
-      if (url.endsWith('/attachments/aRefText')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment', sourceUrl: 'https://contoso.sharepoint.com/sites/X/notes.txt' });
-      }
-      if (url.includes('/shares/u!')) return Response.json({ id: 'i-text', name: 'notes.txt', parentReference: { driveId: 'd1' } });
-      if (url.endsWith('/drives/d1/items/i-text/content')) return new Response('plain', { status: 200, headers: { 'content-type': 'text/plain' } });
-      throw new Error('unexpected');
-    };
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aRefText' });
-    expect(result.ok).toBe(true);
-  });
-
-  it('convert-mail-attachment-to-pdf returns api_error when upload returns no driveItem id', async () => {
-    // Distinct attachment id so the fake's URL-suffix check differs from the markdown variant's test above.
-    const fetchFn: FetchFn = async (url, init) => {
-      if (url.endsWith('/attachments/aFilePdf')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx-bytes') });
-      }
-      if (init?.method === 'PUT') return Response.json({ name: 'no-id' });
-      throw new Error('unexpected');
-    };
-    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
-    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
-    const graph = createGraphClient(fakeAuth(), fetchFn);
-    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aFilePdf' });
-    expect(result.ok).toBe(false);
-    if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('upload returned no driveItem id');
   });
 
   it('convert-mail-attachment-to-markdown decodes a docx fileAttachment locally and runs it through mammoth — no upload, no Graph format=html', async () => {
