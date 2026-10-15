@@ -9,7 +9,7 @@ Run it with the `/qa-audit` skill, or hand this document to a fresh session and 
 ## 0. Ground rules
 
 **Prerequisites**
-- Clean working tree on `main`, freshly built (`bun run build`) and locally deployed (`npm i -g .` — never `ask-marcel-office update`, which pulls npm `@latest` and clobbers local builds).
+- Clean working tree on `main`, freshly built (`bun run build`) and locally deployed (`npm i -g .`).
 - Logged in (`ask-marcel-office login`); token cache valid at `~/.ask-marcel/token-cache.json` (includes the elevated M365ChatClient token for the 3 historical-version commands).
 - `docs/commands.json` regenerated this run (`bun run docs:gen`) — every matrix below is driven from it.
 
