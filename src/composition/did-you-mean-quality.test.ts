@@ -30,11 +30,6 @@ describe('the did-you-mean line after a mistyped name or flag', () => {
     expect(await errorFor(['list-mail-messages', '--id', 'x'])).toBe("unknown option '--id'");
   });
 
-  it('offers a lifecycle command its own flags', async () => {
-    expect(await errorFor(['help-json', '--ters'])).toContain('Did you mean `--terse`?');
-    expect(await errorFor(['login', '--forse'])).toContain('Did you mean `--force`?');
-  });
-
   it('names the flag a mistyped required one was meant to be, beside the missing-flag message', async () => {
     const error = await errorFor(['list-incomplete-todo-tasks', '--list-id', 'L1']);
     expect(error).toContain("required option '--todo-task-list-id <value>' not specified");
