@@ -1,0 +1,60 @@
+{
+  "name": "@ask-marcel/office-write",
+  "version": "1.0.0",
+  "description": "Microsoft Graph write commands for agents: mail drafts and attachment-to-PDF conversion.",
+  "license": "MIT",
+  "author": "Vincent Delacourt <vincent.delacourt@adama-development.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ask-marcel/ask-marcel-office-cli.git",
+    "directory": "write"
+  },
+  "bugs": {
+    "url": "https://github.com/ask-marcel/ask-marcel-office-cli/issues"
+  },
+  "homepage": "https://github.com/ask-marcel/ask-marcel-office-cli/tree/main/write#readme",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "ask-marcel-office-write": "./dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "lint": "eslint --cache --max-warnings=0",
+    "lint:staged": "bash ../scripts/lint-staged.sh",
+    "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
+    "typecheck": "bun --bun x tsc --noEmit",
+    "test": "bun test",
+    "coverage": "bun run ../scripts/check-coverage.ts --preload ../scripts/coverage-preload-tiers.ts",
+    "mutate": "stryker run",
+    "mutate:changed": "bash ../scripts/mutate-changed.sh",
+    "mutate:staged": "bash ../scripts/mutate-staged.sh",
+    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts",
+    "check:packed": "bun run ../scripts/check-packed-package.ts",
+    "prepublishOnly": "bun run build && bun run lint:strict && bun run typecheck && bun run coverage && bun run check:packed"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@ask-marcel/office-core": "workspace:*"
+  }
+}
