@@ -61,6 +61,10 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
  *
  * WRITE_FILES: the write commands and their write-only helpers. A new write
  * command joins the list (meta.test.ts pins the write set).
+ *
+ * A test file belongs to one package too (step 16): the check reads AUTH_FILES
+ * and SINGLE_PACKAGE_FILES for that, and no lint block reads them yet. A module
+ * in no list is read's.
  */
 const WRITE_FILES = [
   'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
@@ -79,6 +83,9 @@ const CORE_FILES = [
   'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
   'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
   'src/domain/utilities/{base64,spo-tenant}.ts',
+  // The shared test fakes (the plan's core/src/test-helpers).
+  'src/test-helpers/{atomic-file-writes-contract,command-package-fake,fetch-mock,file-exists-contract,filesystem-fake,format-error,jwt,logger-fake}.ts',
+  'src/test-helpers/{process-runner-contract,process-runner-fake,read-graph-fake,write-graph-fake}.ts',
 ];
 
 // CORE_READ_ONLY_FILES: the core modules that the read-only ban also guards.
@@ -88,6 +95,30 @@ const CORE_READ_ONLY_FILES = [
   'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
   'src/use-cases/commands/{fetch-raw-bytes,quote-boundary,share-token,text-passthrough}.ts',
   'src/infra/{graph-request,read-graph,graph-substrate}.ts',
+];
+
+// AUTH_FILES: the auth commands of the command directory (login, logout, status,
+// token) with their helpers, the auth ladder, the browser sign-in and the token
+// helper's entry.
+const AUTH_FILES = [
+  'src/use-cases/commands/{login,logout,status,login-status,token,token-args,token-tier-capability}.ts',
+  'src/use-cases/ports/{token-issuer,token-report}.ts',
+  'src/composition/{auth-cli,auth-mcp,token-helper}.ts',
+  'src/infra/{auth,auth-browser,auth-paths,browser-auth,playwright-loader,token-cache-lock}.ts',
+  'src/token.ts',
+];
+
+// SINGLE_PACKAGE_FILES: the wiring of the single package, which holds the three
+// packages in one bin: its registry and lifecycle entries, its CLI, MCP server
+// and composition root, its entries, the full client over the in-process ladder,
+// and the fakes of that client and that ladder. No package of the split takes
+// them; phases 4 to 6 replace them with each package's own wiring.
+const SINGLE_PACKAGE_FILES = [
+  'src/{index,main}.ts',
+  'src/composition/{cli,mcp,single-package,single-package-names,build-deps}.ts',
+  'src/use-cases/commands/{index,lifecycle-entries}.ts',
+  'src/infra/{graph-client,auth-token-source}.ts',
+  'src/test-helpers/{graph-client-fake,auth-manager-fake}.ts',
 ];
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -341,4 +372,4 @@ export default [
   },
 ];
 
-export { CORE_FILES, CORE_READ_ONLY_FILES, WRITE_FILES };
+export { AUTH_FILES, CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES };

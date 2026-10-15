@@ -14,21 +14,34 @@
  * file has one owner everywhere. The read commands are the registry's commands
  * whose effect is `read`; every other registry command must be a write module.
  *
+ * Test files (step 16): each belongs to one package, so a later phase moves it
+ * whole. A test file imports no module of another package; core and the single
+ * package's wiring (SINGLE_PACKAGE_FILES: its registry, shells and full client,
+ * which phases 4 to 6 replace) are open to every test. Its package is the side
+ * its name gives (`-write.test.ts`, `-auth.test.ts`), else the owner of the
+ * module it is named after, else the one package its imports name, else read
+ * when it imports the single package's wiring (the real-registry suites go with
+ * read, step 13), else core. AUTH_FILES lists auth; a module in no list is read's.
+ * Only imports are read: a case that runs another package's command through the
+ * registry by name is not seen, so such a case goes in a test file named for its
+ * side. `--test-map` prints each test file's package.
+ *
  * Fixtures: each run also checks the tree with one file's source replaced by a
- * violating import, and each must be reported, so a check that can no longer
- * see an import fails instead of passing (rule 15.10: a gate only ever seen
+ * violating import, and the ownership lists with one auth file put in a second
+ * list. Each must be reported, so a check that can no longer see an import or a
+ * doubled file fails instead of passing (rule 15.10: a gate only ever seen
  * green is a hypothesis).
  *
  * Exit codes:
  *   0  no boundary is crossed, and every fixture is reported
  *   1  a boundary is crossed, a fixture is missed, an import does not resolve,
- *      or the ownership lists disagree with the registry
+ *      or the ownership lists disagree with the registry or with each other
  */
 
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { CORE_FILES, CORE_READ_ONLY_FILES, WRITE_FILES } from '../eslint.config.js';
+import { AUTH_FILES, CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from '../eslint.config.js';
 
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
@@ -37,6 +50,8 @@ type Sources = ReadonlyMap<string, string>;
 type Graph = ReadonlyMap<string, ReadonlyArray<string>>;
 type Owners = { readonly core: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly reads: ReadonlyArray<string> };
 type Fixture = { readonly name: string; readonly path: string; readonly source: string; readonly reported: string };
+type Owner = 'core' | 'auth' | 'read' | 'write' | 'single';
+type OwnerOf = (path: string) => Owner;
 
 const FIXTURES: ReadonlyArray<Fixture> = [
   {
@@ -59,13 +74,40 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   },
 ];
 
+// Each must be reported by the test-file rule. The first two are new files, the
+// third replaces a real test's source.
+const TEST_FIXTURES: ReadonlyArray<Fixture> = [
+  {
+    name: 'a write-side test that imports a read helper',
+    path: `${COMMANDS}/fixture-write.test.ts`,
+    source: "import { extractSharepointUrls } from './sharepoint-link-extractor.ts';\nexport const f = extractSharepointUrls;\n",
+    reported: `${COMMANDS}/fixture-write.test.ts (write) imports ${COMMANDS}/sharepoint-link-extractor.ts (read)`,
+  },
+  {
+    name: 'a test that imports modules of two packages',
+    path: `${COMMANDS}/fixture-mixed.test.ts`,
+    source: "import type { AuthManager } from '../../infra/auth.ts';\nimport { extractSharepointUrls } from './sharepoint-link-extractor.ts';\nexport type F = AuthManager;\nexport const f = extractSharepointUrls;\n",
+    reported: `${COMMANDS}/fixture-mixed.test.ts imports modules of auth and read`,
+  },
+  {
+    name: 'a test named after a write command that imports an auth module',
+    path: `${COMMANDS}/create-mail-draft.test.ts`,
+    source: "import { parseTokenArgs } from './token-args.ts';\nexport const f = parseTokenArgs;\n",
+    reported: `${COMMANDS}/create-mail-draft.test.ts (write) imports ${COMMANDS}/token-args.ts (auth)`,
+  },
+];
+
+// Must be reported by the rule that refuses a file in two ownership lists.
+const OVERLAP_FIXTURE = { name: 'a file in two ownership lists', path: 'src/token.ts', reported: 'src/token.ts (auth, single)' } as const;
+
 const glob = (patterns: ReadonlyArray<string>): ReadonlySet<string> =>
   new Set(patterns.flatMap((pattern) => [...new Bun.Glob(pattern).scanSync(ROOT)]).filter((path) => !path.endsWith('.test.ts')));
 
-const readSources = async (): Promise<Sources> => {
+const readSources = async (tests: boolean): Promise<Sources> => {
   const sources = new Map<string, string>();
   for (const path of new Bun.Glob('src/**/*.ts').scanSync(ROOT)) {
-    if (path.endsWith('.test.ts') || path.startsWith('src/test-helpers/')) continue;
+    const test = path.endsWith('.test.ts');
+    if (test !== tests || (!test && path.startsWith('src/test-helpers/'))) continue;
     sources.set(path, await Bun.file(join(ROOT, path)).text());
   }
   return sources;
@@ -117,6 +159,56 @@ const violations = (graph: Graph, owners: Owners): ReadonlyArray<string> => {
   return [...writeReach, ...readReach];
 };
 
+type Lists = { readonly core: ReadonlySet<string>; readonly auth: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly single: ReadonlySet<string> };
+
+const PACKAGES: ReadonlyArray<Owner> = ['auth', 'read', 'write'];
+
+const ownerOf = (lists: Lists, path: string): Owner => {
+  if (lists.core.has(path)) return 'core';
+  if (lists.auth.has(path)) return 'auth';
+  if (lists.write.has(path)) return 'write';
+  if (lists.single.has(path)) return 'single';
+  return 'read';
+};
+
+// The files that two ownership lists both claim.
+const overlaps = (lists: Lists): ReadonlyArray<string> => {
+  const claims = Object.entries(lists).flatMap(([name, paths]) => [...paths].map((path) => [path, name] as const));
+  const first = new Map<string, string>();
+  const twice: string[] = [];
+  for (const [path, name] of claims) {
+    const earlier = first.get(path);
+    if (earlier !== undefined) twice.push(`${path} (${earlier}, ${name})`);
+    first.set(path, name);
+  }
+  return twice;
+};
+
+// The packages that a test file's imports name; core and the single wiring are open to all.
+const importedPackages = (imports: ReadonlyArray<string>, owner: OwnerOf): ReadonlySet<Owner> => new Set(imports.map(owner).filter((role) => PACKAGES.includes(role)));
+
+// A test file's package, or undefined when its imports name two packages and nothing else decides.
+const testPackage = (path: string, imports: ReadonlyArray<string>, owner: OwnerOf): Owner | undefined => {
+  const side = /-(write|auth)\.test\.ts$/.exec(path)?.[1];
+  if (side === 'write' || side === 'auth') return side;
+  const namesake = path.replace(/\.test\.ts$/, '.ts');
+  if (existsSync(join(ROOT, namesake)) && PACKAGES.includes(owner(namesake))) return owner(namesake);
+  const named = [...importedPackages(imports, owner)];
+  if (named.length > 1) return undefined;
+  return named[0] ?? (imports.some((target) => owner(target) === 'single') ? 'read' : 'core');
+};
+
+const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
+  [...tests].flatMap(([path, imports]) => {
+    const own = testPackage(path, imports, owner);
+    if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
+    const foreign = imports.filter((target) => PACKAGES.includes(owner(target)) && owner(target) !== own);
+    return [...new Set(foreign)].map((target) => `${path} (${own}) imports ${target} (${owner(target)})`);
+  });
+
+// The test graph keeps only the imports of modules under src/ (not package.json, not a package).
+const buildTestGraph = (sources: Sources): Graph => new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => target.startsWith('src/'))]));
+
 type CommandModule = { readonly meta?: { readonly effect?: unknown }; readonly execute?: unknown };
 
 // The registry's commands, split by effect.
@@ -135,22 +227,35 @@ const registryCommands = async (): Promise<{ readonly reads: ReadonlyArray<strin
 const main = async (): Promise<number> => {
   const core = glob([...CORE_FILES, ...CORE_READ_ONLY_FILES]);
   const write = glob(WRITE_FILES);
+  const lists: Lists = { core, auth: glob(AUTH_FILES), write, single: glob(SINGLE_PACKAGE_FILES) };
+  const owner: OwnerOf = (path) => ownerOf(lists, path);
+  const tests = await readSources(true);
+  if (process.argv.includes('--test-map')) {
+    console.log([...buildTestGraph(tests)].map(([path, imports]) => `${testPackage(path, imports, owner) ?? 'mixed'}\t${path}`).sort().join('\n'));
+    return 0;
+  }
   const { reads, writes } = await registryCommands();
   const unlisted = writes.filter((path) => !write.has(path));
   const misplaced = [...write].filter((path) => reads.includes(path) || core.has(path));
-  if (unlisted.length > 0 || misplaced.length > 0 || reads.length === 0) {
-    console.error(`check-package-imports: the ownership lists disagree with the registry. Write commands outside WRITE_FILES: ${unlisted.join(', ') || 'none'}. WRITE_FILES that are read commands or core: ${misplaced.join(', ') || 'none'}. Read commands found: ${reads.length}.`);
+  const doubled = overlaps(lists);
+  if (unlisted.length > 0 || misplaced.length > 0 || doubled.length > 0 || reads.length === 0) {
+    console.error(`check-package-imports: the ownership lists disagree with the registry or with each other. Write commands outside WRITE_FILES: ${unlisted.join(', ') || 'none'}. WRITE_FILES that are read commands or core: ${misplaced.join(', ') || 'none'}. Files in two lists: ${doubled.join(', ') || 'none'}. Read commands found: ${reads.length}.`);
     return 1;
   }
   const owners: Owners = { core, write, reads };
-  const sources = await readSources();
-  const found = violations(buildGraph(sources), owners);
-  const missed = FIXTURES.filter((fixture) => !violations(buildGraph(new Map([...sources, [fixture.path, fixture.source]])), owners).some((line) => line.startsWith(fixture.reported)));
-  console.log(`check-package-imports: ${write.size} write modules, ${core.size} core modules, ${reads.length} read commands, ${sources.size} modules read.`);
+  const sources = await readSources(false);
+  const found = [...violations(buildGraph(sources), owners), ...testViolations(buildTestGraph(tests), owner)];
+  const doubledFixture = overlaps({ ...lists, single: new Set([...lists.single, OVERLAP_FIXTURE.path]) });
+  const missed = [
+    ...FIXTURES.filter((fixture) => !violations(buildGraph(new Map([...sources, [fixture.path, fixture.source]])), owners).some((line) => line.startsWith(fixture.reported))),
+    ...TEST_FIXTURES.filter((fixture) => !testViolations(buildTestGraph(new Map([...tests, [fixture.path, fixture.source]])), owner).some((line) => line.startsWith(fixture.reported))),
+    ...(doubledFixture.includes(OVERLAP_FIXTURE.reported) ? [] : [OVERLAP_FIXTURE]),
+  ];
+  console.log(`check-package-imports: ${write.size} write modules, ${core.size} core modules, ${lists.auth.size} auth modules, ${reads.length} read commands, ${sources.size} modules and ${tests.size} test files read.`);
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; every fixture is reported.');
+  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; no test file imports a module of another package; every fixture is reported.');
   return 0;
 };
 

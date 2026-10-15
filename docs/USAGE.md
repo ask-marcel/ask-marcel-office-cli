@@ -403,7 +403,7 @@ bun run typecheck  # tsc --noEmit
 bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
 bun run mutate:changed  # mutation testing on changed domain/use-case files (>90% kill threshold)
 bun run check:read-bundle  # the read graph and the read commands, built alone, hold no write method
-bun run check:package-imports  # a write module imports only core and write modules; read and core never reach write
+bun run check:package-imports  # a write module imports only core and write modules; read and core never reach write; a test file imports one package besides core
 ```
 
 ### Pre-commit hook (fast gates; the rest run in CI)
