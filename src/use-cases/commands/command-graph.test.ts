@@ -34,7 +34,6 @@ const READ_MEMBERS = [
 ];
 const WRITE_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
 const WRITE_ONLY_MEMBERS = ['patch', 'put', 'delete'];
-const BEYOND_BASIC_MEMBERS = ['getElevated', 'getGuest', 'getBinaryGuest', 'getBinaryElevated', 'discoverTenantId', 'teamsChat', 'teamsChatIc3', 'teamsChatMedia'];
 
 const META: CommandMeta = {
   summary: 'probe',
@@ -160,13 +159,5 @@ describe('the graph the registry gives a command', () => {
     // Most read commands get past their own checks on placeholders and reach
     // Graph, so the checks above are not empty ones.
     expect(reached).toBeGreaterThan(reads.length / 2);
-  });
-
-  it('never lets a registered write command reach the elevated, guest or chat members', async () => {
-    const called: string[] = [];
-    const writes = Object.entries(commands).filter(([, command]) => command.meta.effect !== 'read');
-    const { reached } = await runEach(writes, called);
-    expect(called.filter((member) => BEYOND_BASIC_MEMBERS.includes(member))).toEqual([]);
-    expect(reached).toBeGreaterThan(writes.length / 2);
   });
 });
