@@ -384,6 +384,156 @@ describe('commands', () => {
       expect(result.error.message).toContain('svg attachment is an image');
     }
   });
+
+  it('convert-mail-attachment-to-pdf rejects itemAttachment with a clear unsupported error pointing at the markdown variant', async () => {
+    const fetchFn: FetchFn = async () =>
+      Response.json({ '@odata.type': '#microsoft.graph.itemAttachment', item: { '@odata.type': '#microsoft.graph.message', subject: 'embedded' } });
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aItem' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.status).toBe(400);
+      expect(result.error.message).toContain('convert-mail-attachment-to-markdown');
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf returns api_error when @odata.type is missing (FIX #3 discriminator guard)', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ name: 'no-type.docx' });
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aBad' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain('missing @odata.type discriminator');
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf returns api_error when the @odata.type is unknown', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.weirdNewType' });
+    const cmd = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
+    const graph = createGraphClient(fakeAuth(), fetchFn);
+    const result = await cmd.execute(graph, { messageId: 'm1', attachmentId: 'aWeird' });
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.error.type === 'api_error') {
+      expect(result.error.message).toContain('unsupported attachment type');
+    }
+  });
+
+  // --- mutation hardening: unconditional error assertions (the `if (error.type === ...)`
+  // guards above let type/object/message mutants survive — LESSONS.md), the full
+  // IMAGE_EXTENSIONS set, and safeExtension's temp-filename extension via the PUT path. ---
+  const pdfCmd = (): { execute: CommandExecute } => {
+    const c = cmdMap['convert-mail-attachment-to-pdf'];
+    if (!c) throw new Error('convert-mail-attachment-to-pdf not registered');
+    return c;
+  };
+  const fileAtt =
+    (name: string): FetchFn =>
+    async (url) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name, contentBytes: btoa('bytes') });
+      throw new Error(`unexpected ${url}`);
+    };
+  // Records every PUT (url + decoded body + content-type) and every DELETE url,
+  // and serves the convert + cleanup-children responses. `children` controls the
+  // cleanup probe body so the `(value ?? [])` default is observable; `putStatus`
+  // forces an upload failure.
+  type PutRecord = { readonly url: string; readonly body: string; readonly contentType: string };
+  const uploadRecorder =
+    (name: string, opts: { puts?: PutRecord[]; deletes?: string[]; children?: unknown; putStatus?: number }): FetchFn =>
+    async (url, init) => {
+      if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name, contentBytes: btoa('PDFDATA') });
+      if (init?.method === 'PUT') {
+        const decoded = init.body instanceof Uint8Array ? new TextDecoder().decode(init.body) : String(init.body);
+        const ct = (init.headers as Record<string, string> | undefined)?.['content-type'] ?? '';
+        opts.puts?.push({ url, body: decoded, contentType: ct });
+        if (opts.putStatus !== undefined && opts.putStatus >= 400) return new Response('nope', { status: opts.putStatus });
+        return Response.json({ id: 'temp-h1' });
+      }
+      if (url.endsWith('/content?format=pdf')) return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
+      if (url.includes('/.ask-marcel-temp:/children')) return Response.json(opts.children ?? { value: [] });
+      if (init?.method === 'DELETE') {
+        opts.deletes?.push(url);
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected ${init?.method ?? 'GET'} ${url}`);
+    };
+
+  it('convert-mail-attachment-to-pdf rejects every IMAGE_EXTENSIONS member with a 415 image hint', async () => {
+    for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico', 'heic', 'heif']) {
+      const result = await pdfCmd().execute(createGraphClient(fakeAuth(), fileAtt(`pic.${ext}`)), { messageId: 'm1', attachmentId: 'a1' });
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.error.type).toBe('api_error');
+      expect(result.error.message).toContain(`${ext} attachment is an image`);
+      if (result.error.type === 'api_error') expect(result.error.status).toBe(415);
+    }
+  });
+
+  it('convert-mail-attachment-to-pdf uploads the decoded bytes under a UUID temp name (safe ext, octet-stream content-type)', async () => {
+    const docxPuts: PutRecord[] = [];
+    await pdfCmd().execute(createGraphClient(fakeAuth(), uploadRecorder('report.docx', { puts: docxPuts })), { messageId: 'm1', attachmentId: 'a1' });
+    expect(docxPuts[0]?.url).toContain('.ask-marcel-temp/');
+    expect(docxPuts[0]?.url.endsWith('.docx') || (docxPuts[0]?.url.includes('.docx:') ?? false)).toBe(true);
+    expect(docxPuts[0]?.url).not.toContain('report.docx'); // never the attacker filename
+    expect(docxPuts[0]?.body).toBe('PDFDATA'); // decodeBase64 round-trips the payload exactly (kills the loop mutants)
+    expect(docxPuts[0]?.contentType).toBe('application/octet-stream'); // kills the L72 content-type literal
+
+    const weirdPuts: PutRecord[] = [];
+    await pdfCmd().execute(createGraphClient(fakeAuth(), uploadRecorder('archive.spreadsheet', { puts: weirdPuts })), { messageId: 'm1', attachmentId: 'a1' });
+    expect(weirdPuts[0]?.url.endsWith('.bin') || (weirdPuts[0]?.url.includes('.bin:') ?? false)).toBe(true); // ext > 8 chars → bin
+
+    const noExtPuts: PutRecord[] = [];
+    await pdfCmd().execute(createGraphClient(fakeAuth(), uploadRecorder('README', { puts: noExtPuts })), { messageId: 'm1', attachmentId: 'a1' });
+    // 'README' is ≤8 alnum chars: a broken no-dot guard would slice the whole
+    // name → '.readme'. The correct guard returns 'bin'.
+    expect(noExtPuts[0]?.url.endsWith('.bin') || (noExtPuts[0]?.url.includes('.bin:') ?? false)).toBe(true);
+  });
+
+  it('convert-mail-attachment-to-pdf returns an empty raw-bytes envelope for a plain-text attachment with no contentBytes', async () => {
+    const fetchFn: FetchFn = async () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'note.txt' }); // no contentBytes field
+    const result = await pdfCmd().execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm1', attachmentId: 'a1' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const env = result.value as { contentType: string; size: number; base64: string; note: string };
+    expect(env.contentType).toBe('text/plain');
+    expect(env.size).toBe(0); // empty contentBytes default '' → 0 bytes (mutant default is non-empty)
+    expect(env.base64).toBe('');
+    expect(env.note).toContain('note.txt');
+  });
+
+  it('convert-mail-attachment-to-pdf deletes the temp file AND the temp folder when the cleanup probe shows it empty', async () => {
+    const deletes: string[] = [];
+    await pdfCmd().execute(createGraphClient(fakeAuth(), uploadRecorder('report.docx', { deletes, children: {} })), { messageId: 'm1', attachmentId: 'a1' });
+    expect(deletes.some((u) => u.includes('/me/drive/items/temp-h1'))).toBe(true); // temp file always deleted
+    // children body has no `value` → the `?? []` default makes it empty → folder
+    // deleted. A non-empty default mutant would skip this delete.
+    expect(deletes.some((u) => u.endsWith('/.ask-marcel-temp'))).toBe(true);
+  });
+
+  it('convert-mail-attachment-to-pdf propagates an upload (PUT) failure rather than mislabelling it as a missing id', async () => {
+    const puts: PutRecord[] = [];
+    const result = await pdfCmd().execute(createGraphClient(fakeAuth(), uploadRecorder('report.docx', { puts, putStatus: 403 })), { messageId: 'm1', attachmentId: 'a1' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(403); // mutant skips the guard → 500 'no driveItem id'
+    expect(result.error.message).not.toContain('upload returned no driveItem id');
+  });
+
+  it('convert-mail-attachment-to-pdf propagates the initial attachment-fetch failure', async () => {
+    const result = await pdfCmd().execute(
+      createGraphClient(fakeAuth(), async () => new Response('nope', { status: 404 })),
+      { messageId: 'm1', attachmentId: 'a1' }
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(404); // mutant skips the guard → reads undefined.value → throws
+  });
 });
 
 describe('calendar event attachments', () => {
