@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "core",
-    "auth"
+    "auth",
+    "read"
   ],
   "description": "Microsoft Graph CLI + library — typed Bun/TypeScript wrapper around 200+ Graph operations (read + on-the-fly PDF/markdown conversion + federated Microsoft Search) reachable from a Teams browser-OAuth token.",
   "license": "MIT",
