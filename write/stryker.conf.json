@@ -1,0 +1,27 @@
+{
+  "$schema": "../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing for this workspace folder alone: run from this folder (bun run mutate, bun run mutate:changed). The settings and their reasons are the root's stryker.conf.json.",
+  "packageManager": "npm",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bash -o pipefail -c 'bun test 2>&1 | tail -n 20'"
+  },
+  "mutate": ["src/domain/**/*.ts", "src/use-cases/**/*.ts", "!**/*.test.ts", "!**/ports/**"],
+  "thresholds": {
+    "high": 95,
+    "low": 90,
+    "break": 90
+  },
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "concurrency": 4,
+  "timeoutMS": 10000,
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true,
+  "_ignorePatterns_comment": "The sandbox needs the sources and their tests only. bunfig.toml stays out, as in the root config: its preload path is relative to this folder and does not resolve from the sandbox.",
+  "ignorePatterns": [".stryker-tmp/", "reports/", "node_modules/", "dist/", "coverage/", "*.md", "*.toml", "*.lock"]
+}
