@@ -117,6 +117,3 @@ const resolveSharepointUrls = async (graph: ReadGraph, urls: ReadonlyArray<strin
 
 export { extractSharepointUrls, resolveSharepointUrls };
 export type { ResolvedLink, ResolvedLinks };
-// Transitional: buildShareToken lives in share-token.ts (core). Existing tests still import it
-// from here; the re-export goes when those imports move (package-split step 16, rule-24 batch).
-export { buildShareToken } from './share-token.ts';

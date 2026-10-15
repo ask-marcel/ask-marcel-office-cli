@@ -45,6 +45,3 @@ const keepQuotedOption: CommandOptionMeta = {
 };
 
 export { keepQuotedOption, keepQuotedSchemaField, stripQuotedPlainText, stripQuotedReplies };
-// Transitional: the finders live in quote-boundary.ts (core). Existing tests still import them
-// from here; the re-export goes when those imports move (package-split step 16, rule-24 batch).
-export { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';

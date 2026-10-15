@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { findPlainTextQuoteBoundary, findQuoteBoundary, stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
+import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
 
 // The markers the strippers append. Hardcoded rather than imported: they are the
 // user-visible contract of `--keep-quoted`, so a test that reads them from the

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { buildShareToken, extractSharepointUrls } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
+import { extractSharepointUrls } from './sharepoint-link-extractor.ts';
 
 describe('extractSharepointUrls — surface every *.sharepoint.com link in an email body', () => {
   it('finds a single href to a SharePoint document', () => {

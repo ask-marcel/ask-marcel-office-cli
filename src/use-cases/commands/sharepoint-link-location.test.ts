@@ -4,7 +4,7 @@ import { err, ok } from '../../domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
 import { commands } from './index.ts';
-import { buildShareToken } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
 
 const DENIED: GraphError = { type: 'api_error', status: 403, message: 'accessDenied: Access denied', code: 'accessDenied' };
 const MISSING: GraphError = { type: 'api_error', status: 404, message: 'itemNotFound: The resource could not be found.', code: 'itemNotFound' };

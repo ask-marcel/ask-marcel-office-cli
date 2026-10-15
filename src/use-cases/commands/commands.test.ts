@@ -116,7 +116,8 @@ import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-a
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
-import { buildShareToken, resolveSharepointUrls } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
+import { resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 import { embedOnenoteResources } from './onenote-resource-embedder.ts';
 import { formatOnenoteMetadata } from './onenote-metadata.ts';
