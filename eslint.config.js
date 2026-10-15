@@ -52,6 +52,44 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
   message,
 }));
 
+/*
+ * Who owns each module after the package split (docs/plans/2026-10-01-package-split.md,
+ * "What goes where"). The blocks below read these lists, and
+ * scripts/check-package-imports.ts reads them too: a write module may import only
+ * core and write modules, and no read command and no core module may reach a
+ * write module. A file joins a list when it becomes core or write.
+ *
+ * WRITE_FILES: the write commands and their write-only helpers. A new write
+ * command joins the list (meta.test.ts pins the write set).
+ */
+const WRITE_FILES = [
+  'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
+  'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
+  'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
+];
+
+// CORE_FILES: the core modules that the read-only ban does not reach.
+const CORE_FILES = [
+  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',
+  'src/use-cases/commands/{command-types,command-graph}.ts',
+  'src/presenter/*.ts',
+  'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
+  'src/infra/{write-graph,network-error,logger}.ts',
+  'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator,token-source-needed-by}.ts',
+  'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
+  'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
+  'src/domain/utilities/{base64,spo-tenant}.ts',
+];
+
+// CORE_READ_ONLY_FILES: the core modules that the read-only ban also guards.
+const CORE_READ_ONLY_FILES = [
+  'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command}.ts',
+  'src/use-cases/commands/{command-directory,bin-names,unknown-command}.ts',
+  'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
+  'src/use-cases/commands/{fetch-raw-bytes,quote-boundary,share-token,text-passthrough}.ts',
+  'src/infra/{graph-request,read-graph,graph-substrate}.ts',
+];
+
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   pluginJs.configs.recommended,
@@ -256,18 +294,11 @@ export default [
     // write-graph.ts (its type included, so no read command can be typed against
     // it) nor a value from graph-client.ts, which builds the full client. Type
     // imports from graph-client.ts (`GraphError`) are erased at build time.
-    // The write commands, their write-only helpers, and the registry and
-    // command framework that hold both kinds are the exceptions. A new write
-    // command joins the list (meta.test.ts pins the write set).
+    // The write commands and their write-only helpers (WRITE_FILES), and the
+    // registry and command framework that hold both kinds are the exceptions.
     // scripts/check-read-bundle.ts checks the same boundary on the built code.
     files: ['src/use-cases/commands/**/*.ts', 'src/infra/read-graph.ts', 'src/infra/graph-request.ts', 'src/infra/graph-substrate.ts'],
-    ignores: [
-      '**/*.test.ts',
-      'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
-      'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
-      'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
-      'src/use-cases/commands/{index,command-graph,command-types}.ts',
-    ],
+    ignores: ['**/*.test.ts', ...WRITE_FILES, 'src/use-cases/commands/{index,command-graph,command-types}.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -289,18 +320,8 @@ export default [
     // the package entry, or with a dynamic import), a lifecycle command, or the
     // modules that wire the single package (`single-package.ts`, `build-deps.ts`,
     // `cli.ts`, `mcp.ts`, `auth-cli.ts`, `auth-mcp.ts`, `single-package-names.ts`).
-    // A file joins a list when it becomes core (step 15 extracts the shared helpers).
-    files: [
-      'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',
-      'src/use-cases/commands/{command-types,command-graph}.ts',
-      'src/presenter/*.ts',
-      'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
-      'src/infra/{write-graph,network-error,logger}.ts',
-      'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator,token-source-needed-by}.ts',
-      'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
-      'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
-      'src/domain/utilities/base64.ts',
-    ],
+    // A file joins CORE_FILES or CORE_READ_ONLY_FILES when it becomes core.
+    files: CORE_FILES,
     ignores: ['**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: CORE_IMPORT_BANS }],
@@ -309,12 +330,7 @@ export default [
   },
   {
     // The core files that the read-only block above also guards keep both bans.
-    files: [
-      'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command}.ts',
-      'src/use-cases/commands/{command-directory,bin-names,unknown-command}.ts',
-      'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
-      'src/infra/{graph-request,read-graph,graph-substrate}.ts',
-    ],
+    files: CORE_READ_ONLY_FILES,
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...READ_ONLY_IMPORT_BANS, ...CORE_IMPORT_BANS] }],
       'no-restricted-syntax': ['error', ...CORE_DYNAMIC_IMPORT_BANS],
@@ -324,3 +340,5 @@ export default [
     ignores: ['dist/**', '.stryker-tmp/**', 'reports/**', 'docs/**', 'scripts/**', '.claude/**', '.agents/**'],
   },
 ];
+
+export { CORE_FILES, CORE_READ_ONLY_FILES, WRITE_FILES };
