@@ -10,7 +10,7 @@ import type { PageRange } from '../../domain/page-range.ts';
 import { extractEml } from '../../infra/eml-parser-adapter.ts';
 import { readEmbeddedItem } from './embedded-item.ts';
 import { extractImagesFromBytes, imagesOfFiles, PAGES_OPTION, pagesField } from './image-extraction.ts';
-import { buildShareToken } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
 
 const schema = z.object({ messageId: z.string().min(1), attachmentId: z.string().min(1), pages: pagesField.optional() });
 

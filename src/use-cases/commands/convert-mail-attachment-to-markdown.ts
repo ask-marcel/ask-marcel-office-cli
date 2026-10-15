@@ -20,7 +20,7 @@ import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.t
 import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
-import { buildShareToken } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),

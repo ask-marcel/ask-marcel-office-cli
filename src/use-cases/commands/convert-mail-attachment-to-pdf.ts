@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
 import type { WriteCommandMeta } from './command-types.ts';
 import { base64ToBytes, inlineBasicBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
-import { buildShareToken } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
 

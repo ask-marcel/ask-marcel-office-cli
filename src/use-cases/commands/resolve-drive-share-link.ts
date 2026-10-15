@@ -4,7 +4,7 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
-import { buildShareToken } from './sharepoint-link-extractor.ts';
+import { buildShareToken } from './share-token.ts';
 
 // Resolver for Microsoft Graph's `/shares/{token}` endpoint. Takes any OneDrive /
 // SharePoint sharing URL, encodes it to the `u!<base64url>` share token that
@@ -20,10 +20,9 @@ import { buildShareToken } from './sharepoint-link-extractor.ts';
 //   - `*-my.sharepoint.com`        — personal OneDrive share URLs
 //   - `1drv.ms`                    — Microsoft's short-link shortener
 //
-// Internal helper `buildShareToken` lives in `sharepoint-link-extractor.ts`
-// because three other commands (extract-sharepoint-links-in-mail,
-// convert-mail-attachment-to-markdown, convert-mail-attachment-to-pdf) also
-// use it. Don't inline-duplicate it here.
+// Internal helper `buildShareToken` lives in `share-token.ts` (core) because
+// read commands and the write command convert-mail-attachment-to-pdf both use
+// it. Don't inline-duplicate it here.
 const schema = z.object({
   url: z.url(),
 });

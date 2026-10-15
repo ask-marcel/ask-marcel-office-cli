@@ -1,6 +1,6 @@
-import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '../../infra/read-graph.ts';
+import { buildShareToken } from './share-token.ts';
 
 /**
  * Shared helpers for the SharePoint-link-extraction commands
@@ -11,17 +11,10 @@ import type { ReadGraph } from '../../infra/read-graph.ts';
  * of an OOXML package's external relationships — and returns the
  * deduplicated list (both `<a href=...>` and bare-text occurrences).
  *
- * `buildShareToken(url)` encodes a URL for Graph's `/shares/{token}`
- * resolver per [shares-get](https://learn.microsoft.com/en-us/graph/api/shares-get):
- * `u!` + base64url of the URL's UTF-8 bytes, with no padding. Encoding the
- * UTF-8 bytes (not the raw string) is what lets non-ASCII paths resolve — a
- * OneDrive URL with an accented or CJK filename otherwise mints a wrong token
- * (or throws, above U+00FF).
- *
  * `resolveSharepointUrls(graph, urls)` fans out one `/shares/{token}/driveItem`
- * resolve per URL (capped at `MAX_LINKS`, per-link errors captured in the
- * entry rather than failing the whole call) — the orchestration shared by
- * both commands.
+ * resolve per URL (the token from `buildShareToken` in share-token.ts; capped at
+ * `MAX_LINKS`, per-link errors captured in the entry rather than failing the
+ * whole call) — the orchestration shared by both commands.
  */
 
 const SP_URL_PATTERN = /https:\/\/[\w-]+(?:\.[\w-]+)*\.sharepoint\.com[^\s"'<>)]*/gi;
@@ -64,11 +57,6 @@ const extractSharepointUrls = (htmlBody: string): ReadonlyArray<string> => {
     out.push(cleaned);
   }
   return out;
-};
-
-const buildShareToken = (url: string): string => {
-  const b64 = bytesToBase64(new TextEncoder().encode(url)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-  return `u!${b64}`;
 };
 
 // A link Graph refuses gives no owner, so the URL is read instead: a OneDrive lives
@@ -127,5 +115,8 @@ const resolveSharepointUrls = async (graph: ReadGraph, urls: ReadonlyArray<strin
   return { links, truncated, skippedCount };
 };
 
-export { buildShareToken, extractSharepointUrls, resolveSharepointUrls };
+export { extractSharepointUrls, resolveSharepointUrls };
 export type { ResolvedLink, ResolvedLinks };
+// Transitional: buildShareToken lives in share-token.ts (core). Existing tests still import it
+// from here; the re-export goes when those imports move (package-split step 16, rule-24 batch).
+export { buildShareToken } from './share-token.ts';
