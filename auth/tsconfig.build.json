@@ -1,0 +1,19 @@
+{
+  // The declarations of the public entry (scripts/build-types.ts). Core is
+  // compiled from source through `paths` (the same mapping as core's
+  // `exports`), so its declarations are emitted too and the build can ship
+  // them inside dist/; rootDir is the repo root because the program holds both
+  // folders.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "..",
+    "outDir": "./dist/.types",
+    "paths": {
+      "@ask-marcel/office-core/*": ["../core/src/*"]
+    }
+  },
+  "files": ["src/index.ts"]
+}
