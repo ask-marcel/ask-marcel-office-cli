@@ -14,6 +14,10 @@
  *   --selftest  proves the gate rejects a file below its threshold and a file
  *               outside every tier, without running the suite (rule 15.10: a
  *               gate only ever seen green is a hypothesis)
+ *   --preload <path>  the coverage preload to run with the suite; the default
+ *               is the root's ./scripts/coverage-preload.ts. A workspace folder
+ *               runs this script as its working directory and passes the shared
+ *               ../scripts/coverage-preload-tiers.ts.
  *
  * A file that matches no tier and no skip rule is a violation, not a pass.
  * Tiers are path prefixes, so moving sources (the package split moves
@@ -48,6 +52,13 @@ const COVERAGE_RULES: ReadonlyArray<Tier> = [
   { name: 'presenter', prefix: 'src/presenter/', threshold: 100 },
 ];
 
+const TEST_PRELOADS: ReadonlyArray<string> = [
+  'scripts/coverage-preload.ts',
+  'scripts/no-network-preload.ts',
+  '../scripts/no-network-preload.ts',
+  '../scripts/coverage-preload-tiers.ts',
+];
+
 const SKIPPED: ReadonlyArray<SkipRule> = [
   { name: 'test-helpers', match: (p) => p.startsWith('src/test-helpers/') },
   { name: 'entry point', match: (p) => p === 'src/main.ts' || p === 'src/token.ts' },
@@ -59,7 +70,11 @@ const SKIPPED: ReadonlyArray<SkipRule> = [
   { name: 'library barrel', match: (p) => p === 'src/index.ts' },
   // the coverage and no-network preloads: test plumbing that loads with the suite.
   // Named exactly, so any other non-src row still surfaces as a file with no tier.
-  { name: 'test preloads', match: (p) => p === 'scripts/coverage-preload.ts' || p === 'scripts/no-network-preload.ts' },
+  // A workspace folder loads the root's shared preloads, one level up.
+  { name: 'test preloads', match: (p) => TEST_PRELOADS.includes(p) },
+  // core's own sources, as auth, read and write load them: core/ holds them to
+  // its tiers in its own run (package split, D7).
+  { name: 'core, gated in core/', match: (p) => p.startsWith('../core/src/') },
 ];
 // NOTE: src/composition/build-deps.ts USED to be skipped here. It is now
 // fully unit-testable via the optional `BuildDepsConfig` argument pattern
@@ -114,9 +129,14 @@ const parseRow = (line: string): FileRow | undefined => {
 // third-party SDKs (whatever the infra adapters wrap) that add 1–2s to
 // every plain `bun test` run. Loading the preload only when computing
 // coverage keeps the inner-loop tests fast without losing the gate.
+const preloadArg = (): string => {
+  const at = process.argv.indexOf('--preload');
+  return at === -1 ? './scripts/coverage-preload.ts' : (process.argv[at + 1] ?? '');
+};
+
 const runTestsWithCoverage = async (): Promise<{ readonly status: number; readonly output: string }> => {
   const proc = Bun.spawn(
-    ['bun', 'test', '--coverage', '--preload', './scripts/coverage-preload.ts'],
+    ['bun', 'test', '--coverage', '--preload', preloadArg()],
     { stdout: 'pipe', stderr: 'pipe' }
   );
   const [stdoutText, stderrText] = await Promise.all([
@@ -202,6 +222,8 @@ const SELFTEST_HEADER = [
   '----------------------------------|---------|---------|-------------------',
   'All files                         |   99.00 |   99.00 |',
   ' scripts/coverage-preload.ts      |  100.00 |  100.00 | ',
+  ' ../scripts/no-network-preload.ts |   50.00 |   50.00 | 25-30',
+  ' ../scripts/coverage-preload-tiers.ts |  100.00 |  100.00 | ',
   ' src/main.ts                      |    0.00 |    0.00 | 1-9',
 ];
 const SELFTEST_CASES: ReadonlyArray<{ readonly name: string; readonly row: string; readonly expected: number }> = [
@@ -209,6 +231,9 @@ const SELFTEST_CASES: ReadonlyArray<{ readonly name: string; readonly row: strin
   { name: 'a file below on funcs', row: ' src/use-cases/b.ts               |   99.00 |  100.00 | ', expected: 1 },
   { name: 'a file below on lines', row: ' src/infra/c.ts                   |  100.00 |   99.00 | 7', expected: 1 },
   { name: 'a file outside every tier', row: ' read/src/domain/a.ts             |  100.00 |  100.00 | ', expected: 1 },
+  { name: 'a core source as a package loads it', row: ' ../core/src/infra/d.ts           |   50.00 |   50.00 | 3', expected: 0 },
+  { name: 'a source of another package', row: ' ../read/src/domain/a.ts          |  100.00 |  100.00 | ', expected: 1 },
+  { name: 'a root script other than the preloads', row: ' ../scripts/gen-docs.ts           |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a JavaScript file outside every tier', row: ' src/legacy.js                    |  100.00 |  100.00 | ', expected: 1 },
 ];
 
