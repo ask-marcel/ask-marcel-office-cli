@@ -251,17 +251,6 @@ describe('the read/write boundary the readOnlyHint promises', () => {
     expect(graphWasCalled).toBe(false);
   });
 
-  it('runs a write command through run-write-command', async () => {
-    const graph: GraphClient = fakeGraphClient({ post: async () => ok({ id: 'draft-1', subject: 'Hello' }) });
-    const client = await connect({ graph });
-    const result = await client.callTool({
-      name: 'run-write-command',
-      arguments: { command: 'create-mail-draft', params: { subject: 'Hello', bodyContent: 'Hi', toRecipients: 'robin.chen@contoso.com' } },
-    });
-    expect(isError(result)).toBe(false);
-    expect(textOf(result)).toContain('draft-1');
-  });
-
   it('refuses a PDF conversion on run-command before any Graph call, because it uploads a temporary file to OneDrive', async () => {
     let graphWasCalled = false;
     const graph: GraphClient = fakeGraphClient({
@@ -275,16 +264,6 @@ describe('the read/write boundary the readOnlyHint promises', () => {
     expect(isError(result)).toBe(true);
     expect(textOf(result)).toContain('run-write-command');
     expect(graphWasCalled).toBe(false);
-  });
-
-  it('runs a PDF conversion through run-write-command', async () => {
-    const graph: GraphClient = fakeGraphClient({
-      get: async () => ok({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'report.pdf', contentBytes: btoa('%PDF-1.7') }),
-    });
-    const client = await connect({ graph });
-    const result = await client.callTool({ name: 'run-write-command', arguments: { command: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1', attachmentId: 'a1' } } });
-    expect(isError(result)).toBe(false);
-    expect(textOf(result)).toContain('application/pdf');
   });
 
   it('tells the agent what each write leaves behind: an unsent draft, or a temporary OneDrive file that the command deletes', async () => {

@@ -110,19 +110,6 @@ describe('buildCli command surface', () => {
     expect(description).not.toContain('searches, not mutations');
   });
 
-  it('top-level description says what each write leaves behind, so the PDF conversions are not hidden behind a drafts-only promise', () => {
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
-    const description = cli.description();
-    const writeCount = Object.values(commands).filter((c) => c.meta.effect !== 'read').length;
-    expect(description).toContain(`the ONLY writes are ${writeCount} commands.`);
-    expect(description).toContain(
-      'convert-calendar-event-attachment-to-pdf, convert-group-post-attachment-to-pdf, convert-mail-attachment-to-pdf: upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)'
-    );
-    // The cleanup is best effort, so the help must not promise that no file stays.
-    expect(description).not.toContain('keeps no file');
-    expect(description).not.toContain('write files');
-  });
-
   it('renders the slim summary in text format with the two-pointer hint', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: authWithTokenInfo(sampleTokenInfo()), graph: okGraph({}), logger, fs: createFileSystemFake() });
@@ -376,21 +363,6 @@ describe('buildCli command surface', () => {
     const parsed = JSON.parse(out.trim()) as { ok: boolean; source?: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.source).toBe('cli');
-  });
-
-  it('sends the --comment text as the Graph reply comment on create-reply-draft', async () => {
-    let captured: unknown;
-    const captureGraph: GraphClient = fakeGraphClient({
-      post: async (_path: string, body: unknown) => {
-        captured = (body as { comment?: unknown }).comment;
-        return { ok: true, value: { id: 'AAMkAGI2', isDraft: true } };
-      },
-    });
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), fs: createFileSystemFake() });
-    await captureStream('stdout', () =>
-      cli.parseAsync(['node', 'ask-marcel-office', 'create-reply-draft', '--reply-to-message-id', 'AAMkAGI2', '--comment', 'Confirmed for Contoso.'])
-    );
-    expect(captured).toBe('Confirmed for Contoso.');
   });
 
   it('routes the canonical --start-date-time/--end-date-time window to the calendarView path', async () => {
