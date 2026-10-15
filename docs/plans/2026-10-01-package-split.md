@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-15 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check); step 16 open.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1).** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -178,8 +178,8 @@ As built in step 15 (`scripts/check-package-imports.ts`, `src/use-cases/commands
   | `domain/utilities/spo-tenant` (read-graph uses it) | core | joined the core list |
   | `commands/fetch-raw-bytes` | core | whole module; `fetchRawBytes` and `inlineBinary` take `Pick<ReadGraph, 'getBinary' \| 'getBinaryElevated' \| 'getBinaryGuest' \| 'fetchUrl'>` |
   | `commands/text-passthrough` | core | whole module (core's `output-path` already took `extensionOf`) |
-  | `commands/mail-quote-stripper` | read | split: the two finders went to `quote-boundary.ts` (core); the strippers, their markers and the `--keep-quoted` flag stay; a transitional re-export of the finders stays until step 16 |
-  | `commands/sharepoint-link-extractor` | read | split: `buildShareToken` went to `share-token.ts` (core); the link parsers and resolver stay; a transitional re-export of `buildShareToken` stays until step 16 |
+  | `commands/mail-quote-stripper` | read | split: the two finders went to `quote-boundary.ts` (core); the strippers, their markers and the `--keep-quoted` flag stay; a transitional re-export of the finders stayed until step 16 removed it |
+  | `commands/sharepoint-link-extractor` | read | split: `buildShareToken` went to `share-token.ts` (core); the link parsers and resolver stay; a transitional re-export of `buildShareToken` stayed until step 16 removed it |
   | `infra/graph-client` (and through it the auth ladder, the browser and the token cache lock) | single package only | the write side stopped importing it: write commands and `draft-response` take `GraphError` from `graph-request.ts`, and `command-types.ts` names the full client `ReadGraph & WriteGraph` |
 
 - `WriteGraph` has only the basic binary members (`getBinary`, `fetchUrl`), so of the byte helpers
@@ -208,6 +208,116 @@ As built in step 15 (`scripts/check-package-imports.ts`, `src/use-cases/commands
   moves the four test imports (`mail-quote-stripper.test.ts`, `sharepoint-link-extractor.test.ts`,
   `sharepoint-link-location.test.ts`, `commands.test.ts`) to the owners and removes the two
   re-exports.
+
+As built in step 16 (`scripts/check-package-imports.ts`, the lists `AUTH_FILES` and
+`SINGLE_PACKAGE_FILES` in `eslint.config.js`, ten new test files named for their side):
+
+- The four test imports take the moved functions from their owners: `mail-quote-stripper.test.ts`
+  takes the finders from `quote-boundary.ts`, and `sharepoint-link-extractor.test.ts`,
+  `sharepoint-link-location.test.ts` and `commands.test.ts` take `buildShareToken` from
+  `share-token.ts` (`commands.test.ts` imports no finder). The two transitional re-exports are
+  removed.
+- Owners. `AUTH_FILES`: the auth commands of the directory (`login`, `logout`, `status`, `token`)
+  with `login-status`, `token-args` and `token-tier-capability`, the `token-issuer` and
+  `token-report` ports, `auth-cli`, `auth-mcp`, `token-helper`, the ladder (`auth`,
+  `auth-browser`, `browser-auth`, `playwright-loader`, `auth-paths`, `token-cache-lock`) and
+  `src/token.ts`. `SINGLE_PACKAGE_FILES`: the wiring of the single package, which no package of
+  the split takes (`src/index.ts`, `main.ts`, `cli.ts`, `mcp.ts`, `single-package.ts`,
+  `single-package-names.ts`, `build-deps.ts`, the registry `index.ts`, `lifecycle-entries.ts`,
+  `graph-client.ts`, `auth-token-source.ts`, and the fakes `graph-client-fake` and
+  `auth-manager-fake`). The shared test fakes joined `CORE_FILES`, so the core lint ban also
+  covers them. A module in no list is read's. The check fails when two lists hold one file, and a fixture
+  (`src/token.ts` put in a second list) proves that this rule can fail.
+- The package of a test file: the side that its name gives (`-write.test.ts`, `-auth.test.ts`),
+  else the owner of the module it is named after, else the one package that its imports name,
+  else read when it imports the single wiring (step 13: the real-registry suites go with read),
+  else core. The check fails when a test file imports a module of another package (core and the
+  single wiring are open to all tests), or modules of two packages when nothing else decides.
+  Three fixtures must be reported: a `-write` test that imports a read helper, a test that
+  imports an auth module and a read module, and a test named after a write command that imports
+  an auth module. A fourth fixture, the auth file `src/token.ts` added to
+  `SINGLE_PACKAGE_FILES`, must be reported by the two-lists rule. `bun run check:package-imports --test-map` prints the map below.
+- The check reads imports only. It does not see a case that runs a command of another package
+  through the registry by its name. Such a case is now in a file named for its side, and the map
+  records that file.
+- `auth-manager-fake.ts` re-exports the types `AuthLadder` and `AuthManager`. A suite that builds
+  the single package's client over that fake (`commands.test.ts`, `commands-write.test.ts`,
+  `cli.test.ts`, `cli-write.test.ts`) thus names no auth module.
+- A case goes to package P when each of its assertions holds in P alone. The moves (one rule-24
+  batch; the moved text is byte-identical; the full names of all 5996 tests are the same before
+  and after, checked on the JUnit output):
+
+  | From | To | Moved |
+  |:--|:--|:--|
+  | `commands.test.ts` | `commands-write.test.ts` | the 28 `convert-mail-attachment-to-pdf` cases of `commands` with their 4 helpers (`pdfCmd`, `fileAtt`, `PutRecord`, `uploadRecorder`), the 2 `convert-calendar-event-attachment-to-pdf` cases of `calendar event attachments`, and the 3 PDF rows of the schema-acceptance, schema-rejection and Graph-URL tables (with a copy of each `it.each`) |
+  | `draft-dedup-docs.test.ts` | `draft-dedup-docs-write.test.ts` | the caveat on the 3 draft-writing commands (`draftWriteCommands` and its loop) |
+  | `cli.test.ts` | `cli-auth.test.ts` | 17: `login` (6), `status` (2), the cancelled sign-in (3), `onCommandError` through `login` (2), a failed `login` (1), `logout` (2), `docs login` (1) |
+  | `cli.test.ts` | `cli-write.test.ts` | 2: what each write leaves behind in the help text; `create-reply-draft --comment` |
+  | `mcp.test.ts` | `mcp-auth.test.ts` | 10: the `status` tool annotations, the docs of `login`, and the 8 cases of `authenticating from an MCP client` |
+  | `mcp.test.ts` | `mcp-write.test.ts` | 2: a draft and a PDF conversion through `run-write-command` |
+  | `docs.test.ts` | `docs-auth.test.ts` | 8 statements (13 tests): the pins on the six lifecycle entries (`login`, `logout`, `status` with `docs`, `help-json`, `mcp`), the `docs login` page, the `login --force` flag |
+  | `meta.test.ts` | `meta-write.test.ts` | 1: `Files.ReadWrite` on each PDF converter |
+  | `did-you-mean-quality.test.ts` | `did-you-mean-quality-auth.test.ts` | 1: the flags of a lifecycle command (`help-json --ters`, `login --forse`) |
+  | `command-graph.test.ts` | `command-graph-write.test.ts` | 1: no registered write command reaches a member past the basic tier |
+
+  Edits in the sources other than the deletions: `commands.test.ts` takes `AuthManager` from the
+  fake and drops the two PDF converter imports and their `cmdMap` rows; `cli.test.ts` takes
+  `AuthLadder` from the fake and drops `AuthError`, `TokenInfo`, `accessTokenUnsafe` and the four
+  helpers that only the moved cases used (`cancelledAuth`, `failedAuth`, `sampleTokenInfo`,
+  `authWithTokenInfo`); `docs.test.ts` drops `commandRole` and `LIFECYCLE_NAMES`;
+  `command-graph.test.ts` drops `BEYOND_BASIC_MEMBERS`. Each new file starts with copies of the
+  helpers its cases use. The formatter put the one-row `rejectCases` table of
+  `commands-write.test.ts` on one line.
+- Pins that stay in a read file because one case names two packages (a move cannot split them;
+  the first commit of phase 4 or 5 rewrites them): in `mcp.test.ts`, the six gateway tools, the
+  read-only hints of the read tools and of `run-write-command`, the refusals of a write command
+  on `run-command` (the `it.each`, the draft and the PDF conversion), the refusal of a read
+  command on `run-write-command`, and the two cases on the tool descriptions; in `cli.test.ts`,
+  the top-level description (GET counts and the write names) and the bare `--help` (`login` and
+  `list-drives`); in `meta.test.ts`, the effect of every command (the draft and PDF sets, and the
+  read count); in `command-graph.test.ts`, the library caller's graph (`list-drives` and
+  `create-mail-draft`); in `docs.test.ts`, the real `help-json` sizes.
+- Suites that run on every registry command (the per-command invariants of `meta.test.ts`, the
+  source sweep of `bin-placeholders.test.ts`, the registry check of `command-directory.test.ts`)
+  stay with read and cover the write commands while the single registry holds them. When phase 5's first commit takes the write commands out of the registry, write
+  needs its own copy of these invariants.
+- Write and auth test files that import the single wiring: `cli-auth`, `cli-write`, `mcp-auth`,
+  `mcp-write` and `did-you-mean-quality-auth` build the single CLI or MCP server;
+  `commands-write` builds the full client over the in-process ladder; `command-graph-write`,
+  `meta-write`, `draft-dedup-docs-write` and `convert-group-post-attachment-to-pdf` read the
+  registry; `create-mail-draft`, `create-reply-draft`, `create-forward-draft`,
+  `update-mail-draft`, `draft-echo`, `convert-mail-attachment-to-pdf`, `login-logout` and
+  `auth-names` take `fakeGraphClient` or `fakeAuthManager`; `graph-client`, `auth-token-source`
+  and `build-deps` test the single wiring itself. Phases 4 and 5 point them at the package's own
+  wiring and at core's fakes (`fakeWriteGraph`).
+- Tests of core modules that the map gives to read, because they reach the single wiring (the
+  registry, `graph-client.ts` or `fakeGraphClient`): `cli-shell`, `mcp-shell`,
+  `run-registry-command`, `build-command`, `command-directory`, `command-graph`,
+  `commands/date-zone`, `fetch-raw-bytes`, `reject-unknown-params`, `resolve-command`. Phase 3
+  (core at 100% on its own) needs core tests for them.
+- The map of test file to package (`--test-map`, 265 files):
+
+  - **core** (51):
+    - `composition/` (1): `date-zone`
+    - `domain/` (13): `access-token`, `closest-names`, `env-var`, `iso-datetime`, `iso-datetime-shapes`, `iso-datetime-zone`, `json`, `jwt-utils`, `page-range`, `result`, `substrate-access-token`, `tenant-id`, `token-fingerprint`
+    - `domain/utilities/` (1): `base64`
+    - `infra/` (17): `env-token-source`, `env-token-source-graph-replay`, `filesystem-bun`, `filesystem-node`, `graph-token-replay`, `helper-token-source`, `helper-token-source-graph-replay`, `logger`, `network-error`, `process-runner-bun`, `process-runner-node`, `read-graph`, `rename-with-retry`, `token-helper-answer`, `token-helper-locator`, `token-helper-run`, `write-graph`
+    - `presenter/` (6): `bin-names-render`, `error-hints`, `media-note-text`, `moved-message-hint`, `output`, `render-raw-json`
+    - `test-helpers/` (1): `test-helpers`
+    - `use-cases/commands/` (12): `bin-names`, `bin-placeholders`, `command-graph-views`, `docs-package`, `docs-render`, `fetch-raw-bytes-members`, `first-sentence`, `format-zod-error`, `output-dir-media`, `output-path`, `output-path-binary-extension`, `text-passthrough`
+  - **auth** (20):
+    - `composition/` (6): `auth-names`, `build-deps`, `cli-auth`, `did-you-mean-quality-auth`, `mcp-auth`, `token-helper`
+    - `infra/` (8): `auth`, `auth-issue-token`, `auth-paths`, `auth-token-endpoint`, `auth-token-source`, `browser-auth`, `graph-client`, `token-cache-lock`
+    - `use-cases/commands/` (6): `docs-auth`, `login-logout`, `login-status`, `status`, `token`, `token-args`
+  - **write** (16):
+    - `composition/` (2): `cli-write`, `mcp-write`
+    - `use-cases/commands/` (14): `command-graph-write`, `commands-write`, `convert-group-post-attachment-to-pdf`, `convert-mail-attachment-to-pdf`, `create-forward-draft`, `create-mail-draft`, `create-reply-draft`, `draft-comment-splicer`, `draft-dedup-docs-write`, `draft-echo`, `draft-response`, `meta-write`, `parse-recipients`, `update-mail-draft`
+  - **read** (178):
+    - `composition/` (16): `build-deps-token-source`, `cli`, `cli-raw-json`, `cli-shell`, `cli-shell-names`, `cli-tz`, `cli-version`, `did-you-mean`, `did-you-mean-quality`, `mcp`, `mcp-shell`, `mcp-shell-names`, `run-registry-command`, `save-source-text`, `single-package`, `token-source-needed-by`
+    - `domain/utilities/` (1): `format-error`
+    - `infra/` (16): `eml-parser-adapter`, `graph-client-binary-timeout`, `graph-client-teams-media`, `graph-client-token-source`, `legacy-doc-extractor`, `line-diff-adapter`, `mammoth-adapter`, `msg-reader-adapter`, `ooxml-media-extractor`, `pdf-image-extractor`, `pdf-image-pages`, `pdf-text-extractor`, `png-encode`, `sheetjs-adapter`, `turndown-adapter`, `zip-reader`
+    - `test-helpers/` (1): `graph-fakes`
+    - `use-cases/commands/` (144): `build-command`, `channel-message-html`, `channel-message-html-shapes`, `channel-message-images`, `channel-message-markdown`, `channel-message-page`, `channel-reactions`, `chat-files-reactions`, `command-directory`, `command-graph`, `commands`, `container-edges`, `convert-calendar-event-attachment-to-markdown`, `convert-group-post-attachment-to-markdown`, `convert-group-post-to-markdown`, `convert-local-file-to-markdown`, `convert-mail-attachment-to-markdown`, `convert-mail-attachment-zip-to-markdown`, `convert-mail-to-markdown`, `convert-team-channel-message-to-markdown`, `convert-team-channel-messages-to-markdown`, `convert-team-channel-messages-to-markdown-walk`, `date-zone`, `diff-capped-sheets`, `diff-drive-item-versions`, `diff-drive-items`, `diff-wording`, `doc-to-markdown`, `docs`, `document-comments`, `docx-comment-anchors`, `docx-metadata`, `docx-to-markdown`, `download-drive-item-as-markdown`, `download-drive-item-version`, `download-drive-item-version-before`, `draft-dedup`, `draft-dedup-docs`, `embedded-item-attachment`, `embedded-item-to-markdown`, `embedded-mail-images`, `eml-to-markdown`, `excel-error`, `extract-group-post-attachment-images`, `extract-local-file-images`, `extract-sharepoint-links-in-group-post`, `extract-teams-chat-message-images`, `fetch-raw-bytes`, `file-counts`, `filter-archived-sites`, `find-mail-drafts`, `get-group-post`, `get-group-post-attachment`, `get-mail-signature`, `get-my-manager`, `get-schedule`, `get-team-channel-message`, `get-teams-chat-message`, `get-user`, `get-user-manager`, `html-render-cap`, `html-to-markdown`, `impossible-instant`, `index`, `inline-image-embedder`, `iso-datetime-schema`, `keep-quoted-attachment`, `keep-quoted-containers`, `list-accessible-drives`, `list-calendar-events-delta`, `list-changed-files`, `list-document-comments`, `list-group-post-attachments`, `list-group-thread-posts`, `list-mail-folder-messages-delta`, `list-sharepoint-site-members`, `list-team-channel-members`, `list-team-channel-message-replies`, `list-team-channel-messages`, `list-team-channel-messages-delta`, `list-team-channel-tabs`, `list-team-members`, `list-teams-chat-history`, `list-teams-chat-messages`, `list-teams-chats-with-messages`, `loop-recent-save`, `loop-version`, `mail-folder-page`, `mail-message-select`, `mail-quote-stripper`, `mail-response-filter`, `markdown-pipeline`, `max-cells-everywhere`, `max-cells-option`, `media-files`, `meta`, `metadata-renderers`, `microsoft-search-query`, `msg-to-markdown`, `my-quick-context`, `next-page`, `next-page-continuations`, `odata-query`, `odf-content-to-markdown`, `odf-metadata`, `office-to-markdown`, `office-to-markdown-loop`, `ooxml-metadata`, `ooxml-metadata-to-markdown`, `ooxml-xml-walker`, `pages-option`, `pdf-to-markdown`, `pptx-comments`, `pptx-metadata`, `pptx-slides`, `pptx-to-markdown`, `raw-download-edges`, `read-mail-attachment`, `reject-unknown-params`, `resolve-command`, `resolve-drive-share-link`, `search-all-accessible-sites`, `search-all-files`, `search-escape`, `search-index-total`, `search-sharepoint-sites-by-name`, `sharepoint-link-extractor`, `sharepoint-link-location`, `sheet-option`, `sheet-option-drive-local`, `signature-extractor`, `substrate-message`, `team-channel-errors`, `tenant-option`, `tenant-routing`, `todo-due-before`, `todo-web-url`, `unknown-param-message`, `version-defaults`, `version-picker`, `with-item`, `xlsx-comments`, `xlsx-metadata`, `xlsx-to-markdown`
 
 ## Library API per package
 
@@ -630,6 +740,50 @@ Exit: every check green; a live smoke passes twice, once on the default in-proce
 with `ASKMARCEL_TOKEN_COMMAND` pointing at the single bin's `token` entry: `login --force`, `token`
 for each tier, one read per tier, `scripts/qa-write-smoke.ts` (after its stale `--body-content`
 flags are fixed); helper latency measured against the 150 ms target.
+
+Phase 1 exit, as prepared in step 16. The offline half ran on the step-16 working tree on
+2026-10-15: `typecheck`, `lint`, `lint:strict`, the lint fixtures, `check:docs`,
+`check:read-bundle`, `check:package-imports`, `docs:gen` (no diff), and, as user `nobody` on a
+copy, the full suite (5996 pass) and `coverage` (100% on every tier); Stryker on the
+`mutate:changed` scope (the changed sources and the sources of the changed tests:
+`mail-quote-stripper.ts` and `sharepoint-link-extractor.ts` changed, `command-graph.ts` through its
+changed test file), 98.37%;
+the three survivors are regex mutants on line 20 of `sharepoint-link-extractor.ts`, which the step did not touch. The stale flags of `qa-write-smoke.ts` were fixed in
+`14e87d5` (`--comment` for the reply and forward drafts). The live half is for the maintainer,
+on a machine with a browser and the real account. Do not run it from an agent session.
+
+1. Build: `bun run build`. It writes `dist/cli.js` and `dist/token.js`, both executable with a
+   shebang. Set `BIN=$PWD/dist/cli.js` and `export HELPER=$PWD/dist/token.js`.
+2. Pass A, the default in-process path. Make sure that `ASKMARCEL_TOKEN_COMMAND` and the
+   `ASKMARCEL_TOKEN_*` variables are not set.
+   1. `$BIN login --force`. A browser opens. Then `$BIN status` shows basic, elevated,
+      chatsvcagg and ic3 as available.
+   2. One token per tier: `$BIN token --tier basic`, then `--tier elevated`, `--tier chatsvcagg`,
+      `--tier ic3`, and `--tier guest --tenant <partner tenant id>` when you have a partner
+      tenant. Each prints one JSON line (`accessToken`, `expiresOn`, and `region` for chatsvcagg
+      and ic3) and exits 0. The line holds a bearer: do not paste it anywhere.
+   3. One read per tier: basic `$BIN get-current-user`; elevated `$BIN list-chats --top 1`;
+      chatsvcagg `$BIN list-teams-chats-with-messages --page-size 1`; ic3
+      `$BIN list-teams-chat-history --chat-id <a chat id from the chatsvcagg read> --page-size 1`;
+      guest `$BIN get-drive-item --tenant-id <partner tenant id> --drive-id <id> --item-id <id>` on
+      an item that the partner tenant shares with you.
+   4. Writes: `SMOKE_BIN=$BIN bun scripts/qa-write-smoke.ts --yes-create-drafts`. It creates three
+      unsent drafts (a reply, a forward and a new draft, which update-mail-draft then changes) and
+      prints their ids. Delete the drafts in Outlook after.
+3. Pass B, through the helper: `export ASKMARCEL_TOKEN_COMMAND=$HELPER`, then do 2.1 to 2.4
+   again. With this variable set, the single package takes each bearer from the helper (step
+   10), so each read spawns `dist/token.js`.
+4. Helper latency, on a cache hit (target: 150 ms p50). After a read of pass B, the cache is
+   warm. Run the helper 21 times and take the median:
+   `bun -e 'const t=[];for(let i=0;i<21;i++){const s=performance.now();Bun.spawnSync([process.env.HELPER,"--tier","basic"]);t.push(performance.now()-s)}t.sort((a,b)=>a-b);console.log(t[10].toFixed(0)+" ms p50")'`.
+   The plan names `microsoft-search-query` for the measure: also time
+   `$BIN microsoft-search-query --query budget` in pass B and in pass A (five runs each). The
+   difference is the cost of the helper per bearer.
+5. After the smoke: each run of `dist/cli.js` or `dist/token.js` writes this checkout's
+   `dist/token.js` into `~/.ask-marcel/token-helper.json` (LESSONS, 2026-10-04). Unset
+   `ASKMARCEL_TOKEN_COMMAND` and run the installed `ask-marcel-office status` once, so that the
+   locator names the installed helper again.
+6. Record each result (pass or fail per item, and the p50) here, and mark phase 1 done.
 
 **Phase 2: workspace skeleton** (no code moves). Root `package.json` private with
 `workspaces: ["core", "auth", "read", "write"]`; per-folder configs from the template; a
