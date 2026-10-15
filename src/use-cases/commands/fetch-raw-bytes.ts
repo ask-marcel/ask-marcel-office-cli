@@ -2,7 +2,7 @@ import { bytesToBase64 } from '../../domain/utilities/base64.ts';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { ReadGraph } from '../../infra/read-graph.ts';
 
 /**
@@ -45,6 +45,15 @@ import type { ReadGraph } from '../../infra/read-graph.ts';
  */
 export type FetchOptions = { readonly elevated?: boolean; readonly tenantId?: TenantId };
 
+/**
+ * The members of a graph these helpers use: the binary GETs of each identity and
+ * the CDN follow. Typed as a slice rather than the whole read graph, so the
+ * helpers stay core and a write command can call the basic one
+ * (`inlineBasicBinary`) on the write graph, which has only `getBinary` and
+ * `fetchUrl`.
+ */
+type BinaryReader = Pick<ReadGraph, 'getBinary' | 'getBinaryElevated' | 'getBinaryGuest' | 'fetchUrl'>;
+
 export type InlineBinary = {
   readonly contentType: string;
   readonly size: number;
@@ -72,12 +81,12 @@ const decodeBlobBytes = (blob: Record<string, unknown>): Result<Uint8Array, Grap
 // `inlineBinary` come through here. `tenantId` is checked FIRST: a partner-tenant
 // file is unreadable on every home token, elevated included, so a caller that
 // passed both would otherwise get a guaranteed 401 instead of its file.
-const callBinary = (graph: ReadGraph, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> => {
+const callBinary = (graph: BinaryReader, contentPath: string, opts: FetchOptions): Promise<Result<unknown, GraphError>> => {
   if (opts.tenantId !== undefined) return graph.getBinaryGuest(contentPath, opts.tenantId);
   return opts.elevated ? graph.getBinaryElevated(contentPath) : graph.getBinary(contentPath);
 };
 
-export const fetchRawBytes = async (graph: ReadGraph, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
+export const fetchRawBytes = async (graph: BinaryReader, contentPath: string, opts: FetchOptions = {}): Promise<Result<Uint8Array, GraphError>> => {
   const initial = await callBinary(graph, contentPath, opts);
   if (!initial.ok) return initial;
   const value = initial.value as Record<string, unknown>;
@@ -121,7 +130,7 @@ const inlineAnswer = async (graph: Pick<ReadGraph, 'fetchUrl'>, initial: Result<
   return toInlineBinary(value);
 };
 
-export const inlineBinary = async (graph: ReadGraph, contentPath: string, opts: FetchOptions = {}): Promise<Result<InlineBinary, GraphError>> =>
+export const inlineBinary = async (graph: BinaryReader, contentPath: string, opts: FetchOptions = {}): Promise<Result<InlineBinary, GraphError>> =>
   inlineAnswer(graph, await callBinary(graph, contentPath, opts));
 
 /**
