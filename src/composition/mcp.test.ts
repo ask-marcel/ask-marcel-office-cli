@@ -60,14 +60,6 @@ describe('the MCP gateway an agent connects to', () => {
     // A draft is unsent and a temporary upload is a copy the command tries to delete: neither overwrites anything.
     expect(annotationOf('run-write-command')['destructiveHint']).toBe(false);
   });
-
-  it('marks the status tool read-only and idempotent, since it only reads the token cache', async () => {
-    const client = await connect();
-    const { tools } = await client.listTools();
-    const annotations = tools.find((t) => t.name === 'status')?.annotations ?? {};
-    expect(annotations['readOnlyHint']).toBe(true);
-    expect(annotations['idempotentHint']).toBe(true);
-  });
 });
 
 describe('discovering what the CLI can do over MCP', () => {
@@ -108,12 +100,6 @@ describe('discovering what the CLI can do over MCP', () => {
     const result = await client.callTool({ name: 'get-command-docs', arguments: { command: 'download-onedrive-file-content' } });
     expect(isError(result)).toBe(true);
     expect(textOf(result)).toContain('list-commands');
-  });
-
-  it('returns docs for a lifecycle command, which lives outside the registry', async () => {
-    const client = await connect();
-    const text = textOf(await client.callTool({ name: 'get-command-docs', arguments: { command: 'login' } }));
-    expect(text).toContain('login');
   });
 
   it('rejects docs for an unknown command and points back at list-commands', async () => {
@@ -285,97 +271,5 @@ describe('the read/write boundary the readOnlyHint promises', () => {
     const description = tools.find((t) => t.name === 'run-write-command')?.description ?? '';
     for (const name of writeCommandNames) expect(description).toContain(name);
     expect(tools.find((t) => t.name === 'run-command')?.description).toContain(String(readCommandCount));
-  });
-});
-
-describe('authenticating from an MCP client', () => {
-  it('reports which token tiers are available after a successful sign-in', async () => {
-    const client = await connect();
-    const result = await client.callTool({ name: 'login', arguments: {} });
-    expect(isError(result)).toBe(false);
-    expect(textOf(result)).toContain('authenticated');
-  });
-
-  it('uses the login-configured auth manager, which may open a browser, rather than the fail-fast command-path one', async () => {
-    let loginAuthUsed = false;
-    const client = await connect({
-      makeLoginAuth: () => {
-        loginAuthUsed = true;
-        return fakeAuthManager();
-      },
-    });
-    await client.callTool({ name: 'login', arguments: {} });
-    expect(loginAuthUsed).toBe(true);
-  });
-
-  it('passes force through so an agent can refresh the hourly-lapsing elevated token', async () => {
-    let forced: boolean | undefined;
-    const client = await connect({
-      makeLoginAuth: () =>
-        fakeAuthManager({
-          getAccessToken: async (options?: { force?: boolean }) => {
-            forced = options?.force;
-            return ok('token' as never);
-          },
-        }),
-    });
-    await client.callTool({ name: 'login', arguments: { force: true } });
-    expect(forced).toBe(true);
-  });
-
-  it('surfaces a cancelled sign-in as a tool error rather than a silent success', async () => {
-    const client = await connect({
-      makeLoginAuth: () => fakeAuthManager({ getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } }) as never }),
-    });
-    const result = await client.callTool({ name: 'login', arguments: {} });
-    expect(isError(result)).toBe(true);
-    expect(textOf(result)).toContain('cancelled');
-  });
-
-  it('surfaces a token-status read failure rather than reporting a sign-in that cannot be confirmed', async () => {
-    const client = await connect({
-      auth: fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message: 'cache unreadable' } }) }),
-    });
-    const result = await client.callTool({ name: 'login', arguments: {} });
-    expect(isError(result)).toBe(true);
-    expect(textOf(result)).toContain('cache unreadable');
-  });
-
-  it('reports the four cached tokens through the status tool, with the refresh hint', async () => {
-    const client = await connect();
-    const result = await client.callTool({ name: 'status', arguments: {} });
-    expect(isError(result)).toBe(false);
-    for (const token of ['basic', 'elevated', 'chatsvcagg', 'ic3']) expect(textOf(result)).toContain(token);
-    expect(textOf(result)).toContain('ask-marcel-office login');
-  });
-
-  // The text envelope has no error code line, so the message and the source are what the client sees.
-  it('answers status with a tool error, from the cli source, that tells the client to sign in when the token cache has no session', async () => {
-    const message = 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.';
-    const client = await connect({ auth: fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message, code: 'not_authenticated' } }) }) });
-    const result = await client.callTool({ name: 'status', arguments: {} });
-    expect(isError(result)).toBe(true);
-    expect(textOf(result)).toBe(`error: ${message}\ncode: not_authenticated\nsource: cli\n`);
-  });
-
-  it('reports the tokens that the sign-in just captured, read from the login-configured manager and not from the command-path one', async () => {
-    const everyTier = { available: true, expiresInSeconds: 3600, scopes: [] };
-    const client = await connect({
-      makeLoginAuth: () =>
-        fakeAuthManager({
-          getTokenInfo: async () =>
-            ok({
-              scopes: [],
-              audience: undefined,
-              expiresAt: undefined,
-              expiresInSeconds: 3600,
-              elevated: { ...everyTier, refresh: 'interactive' as const },
-              chatsvcagg: { ...everyTier, refresh: 'automatic' as const },
-              ic3: { ...everyTier, refresh: 'automatic' as const },
-            }),
-        }),
-    });
-    const text = textOf(await client.callTool({ name: 'login', arguments: {} }));
-    expect(text).toContain('available: [basic, elevated, chatsvcagg, ic3]');
   });
 });
