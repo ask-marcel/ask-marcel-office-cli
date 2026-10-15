@@ -6,11 +6,15 @@
  * (`ASKMARCEL_TOKEN_COMMAND=/path/to/dist/token.js`).
  *
  * Bun build does not insert shebangs, so this runs after `bun build`.
+ *
+ * A workspace folder names its own bins: `bun run ../scripts/add-shebang.ts
+ * dist/cli.js`. With no argument, the root's two targets.
  */
 
 import { chmodSync } from 'node:fs';
 
-const TARGETS = ['dist/cli.js', 'dist/token.js'];
+const named = process.argv.slice(2);
+const TARGETS = named.length > 0 ? named : ['dist/cli.js', 'dist/token.js'];
 const SHEBANG = '#!/usr/bin/env node\n';
 
 for (const target of TARGETS) {
