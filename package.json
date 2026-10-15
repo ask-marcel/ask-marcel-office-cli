@@ -2,6 +2,9 @@
   "name": "ask-marcel-office-cli",
   "version": "2.8.0",
   "private": true,
+  "workspaces": [
+    "core"
+  ],
   "description": "Microsoft Graph CLI + library — typed Bun/TypeScript wrapper around 200+ Graph operations (read + on-the-fly PDF/markdown conversion + federated Microsoft Search) reachable from a Teams browser-OAuth token.",
   "license": "MIT",
   "author": "Vincent Delacourt <vincent.delacourt@adama-development.com>",
@@ -72,6 +75,7 @@
   ],
   "scripts": {
     "start": "bun run src/main.ts",
+    "test": "bun test && bun run --filter '@ask-marcel/*' test",
     "lint": "eslint --cache --max-warnings=0",
     "lint:staged": "bash scripts/lint-staged.sh",
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",

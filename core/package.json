@@ -1,0 +1,22 @@
+{
+  "name": "@ask-marcel/office-core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared kernel of the @ask-marcel/office-* packages. Never published: each package's build inlines it.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint --cache --max-warnings=0",
+    "lint:staged": "bash ../scripts/lint-staged.sh",
+    "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
+    "typecheck": "bun --bun x tsc --noEmit",
+    "test": "bun test",
+    "coverage": "bun run ../scripts/check-coverage.ts --preload ../scripts/coverage-preload-tiers.ts",
+    "mutate": "stryker run",
+    "mutate:changed": "bash ../scripts/mutate-changed.sh",
+    "mutate:staged": "bash ../scripts/mutate-staged.sh"
+  }
+}
