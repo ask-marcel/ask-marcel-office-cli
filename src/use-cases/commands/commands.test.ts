@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '../../domain/access-token.ts';
 import type { Result } from '../../domain/result.ts';
 import { ok } from '../../domain/result.ts';
-import type { AuthManager } from '../../infra/auth.ts';
+import type { AuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
 import {

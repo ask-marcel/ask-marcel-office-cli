@@ -42,3 +42,7 @@ export const fakeAuthManager = (overrides: Partial<AuthLadder> = {}): AuthLadder
   }),
   ...overrides,
 });
+
+// The single package's suites build its client over this fake, so they take the ladder's
+// types from here too: a read or write suite then names no auth module (package split, step 16).
+export type { AuthLadder, AuthManager } from '../infra/auth.ts';
