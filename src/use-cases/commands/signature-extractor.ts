@@ -1,4 +1,4 @@
-import { findQuoteBoundary } from './mail-quote-stripper.ts';
+import { findQuoteBoundary } from './quote-boundary.ts';
 
 /**
  * Lifts the sender's own signature out of a message they sent, so a draft Graph

@@ -8,7 +8,7 @@
 // first so `FWD` wins over `FW` and `RV` over `R`. Each must be followed by an
 // optional count marker (AW[2]:) and a colon, so a real word that merely starts
 // with a prefix letter ("Report:") is never mistaken for one. Built from a
-// string constant (like mail-quote-stripper's label patterns) to keep the
+// string constant (like quote-boundary's label patterns) to keep the
 // alternation readable and out of the regex-literal complexity budget.
 const REPLY_FORWARD_TOKENS = 'FWD|ODP|FW|AW|WG|TR|RV|SV|VS|RE|R|V';
 const REPLY_FORWARD_PREFIX = new RegExp(`^(?:(?:${REPLY_FORWARD_TOKENS})(?:\\[\\d+\\]|\\(\\d+\\))?\\s*[:：]\\s*)+`, 'i');

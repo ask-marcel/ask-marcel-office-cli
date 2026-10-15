@@ -7,7 +7,8 @@ import type { ReadCommandMeta } from './command-types.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages, replaceUnresolvedCidImages, type InlineAttachment } from './inline-image-embedder.ts';
 import { formatZodError } from './format-zod-error.ts';
-import { findPlainTextQuoteBoundary, findQuoteBoundary, stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
+import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
 
 // `--inline-images true` opts INTO the per-image bytes-fetch + base64
 // embedding. The default is text-first: an LLM that just wants the body of

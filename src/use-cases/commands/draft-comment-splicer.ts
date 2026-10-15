@@ -1,4 +1,4 @@
-import { findPlainTextQuoteBoundary, findQuoteBoundary } from './mail-quote-stripper.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
 
 /**
  * Places an author's reply text into a draft body Graph already minted, without
