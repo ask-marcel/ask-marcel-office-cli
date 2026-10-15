@@ -152,6 +152,17 @@ describe('buildCli command surface', () => {
     expect(parsed.data['elevated']?.available).toBe(false);
   });
 
+  it('gives the error code not_authenticated when status finds no session in the token cache', async () => {
+    const message = 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.';
+    const auth = fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message, code: 'not_authenticated' } }) });
+    const cli = buildCli({ auth, graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'status']));
+    const parsed = JSON.parse(out.trim()) as { ok: boolean; errorCode?: string; error: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.errorCode).toBe('not_authenticated');
+    expect(parsed.error).toContain('ask-marcel-office login');
+  });
+
   it('renders an Authentication cancelled error when the user closes the browser', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
@@ -159,10 +170,91 @@ describe('buildCli command surface', () => {
     expect(out).toContain('Authentication cancelled');
   });
 
+  // "Authentication cancelled" alone reads as "the user closed the window",
+  // which is the one thing it is NOT when an endpoint-security agent blocks the
+  // local control connection: the browser opens, sits on about:blank, and is
+  // never driveable. That case cost four rounds of diagnosis on 2026-09-07, so
+  // the message names it and points at the trace.
+  it('points a cancelled login at the EDR / control-connection cause, not just the user closing the window', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(out).toContain('about:blank');
+    expect(out).toContain('security');
+    expect(out).toContain('ASKMARCEL_TRACE=1');
+  });
+
+  // A SentinelOne policy on one Windows box blocked the CDP pipe only under Bun;
+  // the same login ran fine under Node (npm install, node shebang). The message
+  // should offer that runtime switch, since it is cheaper than a security
+  // exclusion.
+  it('offers the run-under-Node workaround on a cancelled login', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(out).toContain('Node');
+    expect(out).toContain('Bun');
+  });
+
+  it('invokes onCommandError exactly once when a command fails', async () => {
+    const logger = createLoggerFake();
+    let errorReports = 0;
+    const cli = buildCli({
+      auth: cancelledAuth(),
+      graph: okGraph({}),
+      logger,
+      fs: createFileSystemFake(),
+      onCommandError: () => {
+        errorReports += 1;
+      },
+    });
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(errorReports).toBe(1);
+  });
+
+  it('does not invoke onCommandError when a command succeeds', async () => {
+    const logger = createLoggerFake();
+    let errorReports = 0;
+    const cli = buildCli({
+      auth: okAuth(),
+      graph: okGraph({}),
+      logger,
+      fs: createFileSystemFake(),
+      onCommandError: () => {
+        errorReports += 1;
+      },
+    });
+    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
+    expect(errorReports).toBe(0);
+  });
+
   it('renders the underlying message when login fails for a non-cancellation reason', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
     expect(out).toContain('browser launch failed');
+  });
+
+  it('renders a logged_out envelope when logout succeeds (under --output json)', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'logout']));
+    expect(out).toContain('"status":"logged_out"');
+  });
+
+  it('renders the underlying message when logout fails', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'logout']));
+    expect(out).toContain('rm denied');
+  });
+
+  it('prints rich Markdown docs when `docs <lifecycle-command>` is invoked, since lifecycle commands now have manifest entries', async () => {
+    const logger = createLoggerFake();
+    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'login']));
+    expect(out).toContain('# `login`');
+    expect(out).toContain('**Category:** Lifecycle');
+    expect(out).toContain('Authenticate against Microsoft Graph');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { AuthError, AuthLadder } from '../infra/auth.ts';
+import type { AuthLadder } from '../test-helpers/auth-manager-fake.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { FileSystem } from '../use-cases/ports/filesystem.ts';
 import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
@@ -28,18 +28,6 @@ const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Prom
 };
 
 const okAuth = (): AuthLadder => fakeAuthManager();
-
-const cancelledAuth = (): AuthLadder =>
-  fakeAuthManager({
-    getAccessToken: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
-    logout: async () => ({ ok: false, error: { type: 'auth_cancelled' } as AuthError }),
-  });
-
-const failedAuth = (): AuthLadder =>
-  fakeAuthManager({
-    getAccessToken: async () => ({ ok: false, error: { type: 'auth_failed', message: 'browser launch failed' } as AuthError }),
-    logout: async () => ({ ok: false, error: { type: 'auth_failed', message: 'rm denied' } as AuthError }),
-  });
 
 const okGraph = (value: unknown): GraphClient =>
   fakeGraphClient({
@@ -84,17 +72,6 @@ describe('buildCli command surface', () => {
     expect(description).not.toContain('searches, not mutations');
   });
 
-  it('gives the error code not_authenticated when status finds no session in the token cache', async () => {
-    const message = 'Not signed in: there is no cached token to inspect. Run `ask-marcel-office login`.';
-    const auth = fakeAuthManager({ getTokenInfo: async () => ({ ok: false, error: { type: 'auth_failed', message, code: 'not_authenticated' } }) });
-    const cli = buildCli({ auth, graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'status']));
-    const parsed = JSON.parse(out.trim()) as { ok: boolean; errorCode?: string; error: string };
-    expect(parsed.ok).toBe(false);
-    expect(parsed.errorCode).toBe('not_authenticated');
-    expect(parsed.error).toContain('ask-marcel-office login');
-  });
-
   it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — round 2 — stamps the source even when the hint table did not match)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
@@ -123,78 +100,6 @@ describe('buildCli command surface', () => {
     const parsed = JSON.parse(out.trim()) as { ok: false; retryAfterSeconds?: number };
     expect(parsed.ok).toBe(false);
     expect(parsed.retryAfterSeconds).toBe(120);
-  });
-
-  // "Authentication cancelled" alone reads as "the user closed the window",
-  // which is the one thing it is NOT when an endpoint-security agent blocks the
-  // local control connection: the browser opens, sits on about:blank, and is
-  // never driveable. That case cost four rounds of diagnosis on 2026-09-07, so
-  // the message names it and points at the trace.
-  it('points a cancelled login at the EDR / control-connection cause, not just the user closing the window', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('about:blank');
-    expect(out).toContain('security');
-    expect(out).toContain('ASKMARCEL_TRACE=1');
-  });
-
-  // A SentinelOne policy on one Windows box blocked the CDP pipe only under Bun;
-  // the same login ran fine under Node (npm install, node shebang). The message
-  // should offer that runtime switch, since it is cheaper than a security
-  // exclusion.
-  it('offers the run-under-Node workaround on a cancelled login', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: cancelledAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(out).toContain('Node');
-    expect(out).toContain('Bun');
-  });
-
-  it('invokes onCommandError exactly once when a command fails', async () => {
-    const logger = createLoggerFake();
-    let errorReports = 0;
-    const cli = buildCli({
-      auth: cancelledAuth(),
-      graph: okGraph({}),
-      logger,
-      fs: createFileSystemFake(),
-      onCommandError: () => {
-        errorReports += 1;
-      },
-    });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(errorReports).toBe(1);
-  });
-
-  it('does not invoke onCommandError when a command succeeds', async () => {
-    const logger = createLoggerFake();
-    let errorReports = 0;
-    const cli = buildCli({
-      auth: okAuth(),
-      graph: okGraph({}),
-      logger,
-      fs: createFileSystemFake(),
-      onCommandError: () => {
-        errorReports += 1;
-      },
-    });
-    await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'login']));
-    expect(errorReports).toBe(0);
-  });
-
-  it('renders a logged_out envelope when logout succeeds (under --output json)', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'logout']));
-    expect(out).toContain('"status":"logged_out"');
-  });
-
-  it('renders the underlying message when logout fails', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: failedAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'logout']));
-    expect(out).toContain('rm denied');
   });
 
   it('runs a generic Graph command and renders the value as JSON', async () => {
@@ -541,15 +446,6 @@ describe('buildCli command surface', () => {
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'this-is-not-a-real-command']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('this-is-not-a-real-command');
-  });
-
-  it('prints rich Markdown docs when `docs <lifecycle-command>` is invoked, since lifecycle commands now have manifest entries', async () => {
-    const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
-    const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'login']));
-    expect(out).toContain('# `login`');
-    expect(out).toContain('**Category:** Lifecycle');
-    expect(out).toContain('Authenticate against Microsoft Graph');
   });
 
   it('falls back to the unknown-command error when `docs help` is invoked (commander does not register `help` as a regular subcommand)', async () => {
