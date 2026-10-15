@@ -16,6 +16,11 @@
 #   4. staged lint   - eslint on the staged TS files only (fast, not type-aware)
 #   5. typecheck     - tsc --noEmit
 #
+# Gates 4 and 5 run per folder (package split, D7): the root and each workspace
+# folder (core/, auth/, read/, write/) with a staged change, each with its own
+# config. A staged change under core/ also runs auth, read and write.
+# scripts/staged-folders.sh picks the folders.
+#
 # Budget: keep the hook under ~5s. A gate's home is chosen by its speed, not its
 # importance: if a gate here exceeds the budget on your repo (typecheck is the
 # one that grows with the codebase), move it to CI. Never add the test suite,
@@ -52,10 +57,15 @@ else
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
 fi
 
-echo "[4/5] bun run lint:staged"
-bun run lint:staged
-
-echo "[5/5] bun run typecheck"
-bun run typecheck
+folders=$(bash scripts/staged-folders.sh)
+if [ -z "$folders" ]; then
+  echo "[4-5/5] no staged change to lint or typecheck"
+fi
+for folder in $folders; do
+  echo "[4/5] bun run lint:staged ($folder)"
+  (cd "$folder" && bun run lint:staged)
+  echo "[5/5] bun run typecheck ($folder)"
+  (cd "$folder" && bun run typecheck)
+done
 
 echo "pre-commit: fast gates passed. The full suite, coverage, and mutation run in CI (assets/ci.yml)."

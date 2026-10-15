@@ -7,9 +7,30 @@
 #
 # Wire it in package.json:  "lint:staged": "bash scripts/lint-staged.sh"
 #
+# Each folder lints its own files with its own eslint.config.js (package
+# split, D7). Run from a workspace folder (`bash ../scripts/lint-staged.sh`),
+# it takes the staged files under that folder; run from the root, the staged
+# files outside every workspace folder.
+#
 set -euo pipefail
 
-files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' || true)
+# The folder comes from where this script lives, not from git: during a hook
+# in a linked worktree, git exports an absolute GIT_DIR, and git then takes
+# the current directory as the top of the work tree, so `--relative` and
+# `--show-prefix` see no folder.
+root=$(cd "$(dirname "$0")/.." && pwd -P)
+here=$(pwd -P)
+prefix=${here#"$root"}
+prefix=${prefix#/}
+
+files=$(cd "$root" && git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' || true)
+
+if [ -n "$prefix" ]; then
+  files=$(printf '%s\n' "$files" | sed -n "s|^${prefix}/||p")
+else
+  workspaces=$(bun --print "((await Bun.file('package.json').json()).workspaces ?? []).join('|')")
+  files=$(printf '%s\n' "$files" | grep -vE "^(${workspaces})/" || true)
+fi
 
 if [ -z "$files" ]; then
   echo "  no staged TS files"
