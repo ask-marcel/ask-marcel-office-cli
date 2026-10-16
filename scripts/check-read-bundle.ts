@@ -22,14 +22,17 @@
  *   1  the read bundle has a marker, the control misses one, or a build failed
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = join(ROOT, 'src/use-cases/commands');
-const READ_GRAPH = join(ROOT, 'src/infra/read-graph.ts');
-const WRITE_GRAPH = join(ROOT, 'src/infra/write-graph.ts');
+// The two graphs are core's (package split, phase 3): in core/src once moved,
+// in the root src/ before.
+const coreModule = (path: string): string => (existsSync(join(ROOT, 'core', path)) ? join(ROOT, 'core', path) : join(ROOT, path));
+const READ_GRAPH = coreModule('src/infra/read-graph.ts');
+const WRITE_GRAPH = coreModule('src/infra/write-graph.ts');
 
 type Marker = { readonly name: string; readonly pattern: RegExp };
 

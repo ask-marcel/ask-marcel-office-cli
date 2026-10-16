@@ -13,6 +13,8 @@
  * must exist: when it moves, the fixture fails until both the fixture path and
  * the rule's glob in eslint.config.js move with it. (A virtual path alone would
  * keep matching the old glob and stay green while the moved file lost the rule.)
+ * One move is followed: a root file found under core/ instead (package split,
+ * phase 3) is linted from core/ with core's config, which must hold the rule.
  *
  * The strict fixtures run through `bun run lint:strict`, the command CI runs,
  * so they prove that script still turns the type-aware block on, not only that
@@ -145,8 +147,14 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
   }
 };
 
-const check = async (fixture: Fixture): Promise<boolean> => {
-  const label = `${fixture.name}  (${fixture.path}, ${fixture.rule})`;
+// A guarded file of the root src/ that phase 3 moved to core/ (package split)
+// is linted from core/, with core's config: the rule must hold there too.
+const located = async (fixture: Fixture): Promise<Fixture> =>
+  fixture.cwd === undefined && !(await Bun.file(fixture.path).exists()) && (await Bun.file(`core/${fixture.path}`).exists()) ? { ...fixture, cwd: 'core' } : fixture;
+
+const check = async (listed: Fixture): Promise<boolean> => {
+  const fixture = await located(listed);
+  const label = `${fixture.name}  (${fixture.cwd === undefined ? '' : `${fixture.cwd}/`}${fixture.path}, ${fixture.rule})`;
   if (!(await Bun.file(fixture.cwd === undefined ? fixture.path : `${fixture.cwd}/${fixture.path}`).exists())) {
     console.log(`  FAIL  ${label}\n        ${fixture.path} no longer exists: move this fixture and the rule's glob in eslint.config.js with it`);
     return false;

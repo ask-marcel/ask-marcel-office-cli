@@ -97,6 +97,7 @@
     "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage"
   },
   "devDependencies": {
+    "@ask-marcel/office-core": "workspace:*",
     "@eslint/js": "^9.28.0",
     "@stryker-mutator/core": "^9.6.1",
     "@types/bun": "^1.2.0",

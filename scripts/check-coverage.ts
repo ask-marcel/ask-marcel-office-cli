@@ -72,9 +72,10 @@ const SKIPPED: ReadonlyArray<SkipRule> = [
   // Named exactly, so any other non-src row still surfaces as a file with no tier.
   // A workspace folder loads the root's shared preloads, one level up.
   { name: 'test preloads', match: (p) => TEST_PRELOADS.includes(p) },
-  // core's own sources, as auth, read and write load them: core/ holds them to
-  // its tiers in its own run (package split, D7).
-  { name: 'core, gated in core/', match: (p) => p.startsWith('../core/src/') },
+  // core's own sources, as auth, read and write load them, and as the root src/
+  // loads them since phase 3 moved them: core/ holds them to its tiers in its
+  // own run (package split, D7).
+  { name: 'core, gated in core/', match: (p) => p.startsWith('../core/src/') || p.startsWith('core/src/') },
 ];
 // NOTE: src/composition/build-deps.ts USED to be skipped here. It is now
 // fully unit-testable via the optional `BuildDepsConfig` argument pattern
@@ -232,6 +233,8 @@ const SELFTEST_CASES: ReadonlyArray<{ readonly name: string; readonly row: strin
   { name: 'a file below on lines', row: ' src/infra/c.ts                   |  100.00 |   99.00 | 7', expected: 1 },
   { name: 'a file outside every tier', row: ' read/src/domain/a.ts             |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a core source as a package loads it', row: ' ../core/src/infra/d.ts           |   50.00 |   50.00 | 3', expected: 0 },
+  { name: 'a core source as the root loads it', row: ' core/src/infra/d.ts              |   50.00 |   50.00 | 3', expected: 0 },
+  { name: 'another file of core/', row: ' core/scripts/e.ts                |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a source of another package', row: ' ../read/src/domain/a.ts          |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a root script other than the preloads', row: ' ../scripts/gen-docs.ts           |  100.00 |  100.00 | ', expected: 1 },
   { name: 'a JavaScript file outside every tier', row: ' src/legacy.js                    |  100.00 |  100.00 | ', expected: 1 },

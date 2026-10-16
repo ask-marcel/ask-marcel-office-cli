@@ -7,7 +7,12 @@
  *
  *   - a write module (a write command or a write-only helper) reaches only core
  *     and write modules;
- *   - a read command and a core module never reach a write module.
+ *   - a read command and a core module never reach a write module;
+ *   - a core module reaches only core modules (phase 3: core builds alone).
+ *
+ * Phase 3 moves core from src/ to core/src/: the lists name `src/...` and match
+ * a core file in either place, and the root imports core by its workspace name
+ * (`@ask-marcel/office-core/<path>`, read here as core/src/<path>).
  *
  * Ownership comes from eslint.config.js (WRITE_FILES, CORE_FILES,
  * CORE_READ_ONLY_FILES), the lists the core and read-only lint bans use, so a
@@ -22,6 +27,7 @@
  * module it is named after, else the one package its imports name, else read
  * when it imports the single package's wiring (the real-registry suites go with
  * read, step 13), else core. AUTH_FILES lists auth; a module in no list is read's.
+ * A test under core/ imports core modules only: core runs its tests alone.
  * Only imports are read: a case that runs another package's command through the
  * registry by name is not seen, so such a case goes in a test file named for its
  * side. `--test-map` prints each test file's package.
@@ -45,6 +51,18 @@ import { AUTH_FILES, CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRI
 
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
+const CORE_PACKAGE = '@ask-marcel/office-core/';
+
+// Where a module of the root src/ is now: in core/ once phase 3 moved it there.
+const located = (path: string): string => (existsSync(join(ROOT, 'core', path)) ? `core/${path}` : path);
+// A relative specifier from `from` to the module `to`, both repo-relative.
+const specifierTo = (from: string, to: string): string => {
+  const path = relative(dirname(from), to);
+  return path.startsWith('.') ? path : `./${path}`;
+};
+const CORE_FIXTURE = located(`${COMMANDS}/format-zod-error.ts`);
+const CORE_READER_FIXTURE = located(`${COMMANDS}/quote-boundary.ts`);
+const CORE_TEST_FIXTURE = 'core/src/use-cases/commands/fixture-core.test.ts';
 
 type Sources = ReadonlyMap<string, string>;
 type Graph = ReadonlyMap<string, ReadonlyArray<string>>;
@@ -68,9 +86,15 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   },
   {
     name: 'a core module that loads a write command with a dynamic import',
-    path: `${COMMANDS}/format-zod-error.ts`,
-    source: "export const f = async (): Promise<unknown> => import('./create-reply-draft.ts');\n",
-    reported: `${COMMANDS}/format-zod-error.ts reaches ${COMMANDS}/create-reply-draft.ts`,
+    path: CORE_FIXTURE,
+    source: `export const f = async (): Promise<unknown> => import('${specifierTo(CORE_FIXTURE, `${COMMANDS}/create-reply-draft.ts`)}');\n`,
+    reported: `${CORE_FIXTURE} reaches ${COMMANDS}/create-reply-draft.ts`,
+  },
+  {
+    name: 'a core module that imports a read helper',
+    path: CORE_READER_FIXTURE,
+    source: `import { extractSharepointUrls } from '${specifierTo(CORE_READER_FIXTURE, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${CORE_READER_FIXTURE} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
   },
 ];
 
@@ -90,6 +114,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     reported: `${COMMANDS}/fixture-mixed.test.ts imports modules of auth and read`,
   },
   {
+    name: 'a test under core/ that imports the single package wiring',
+    path: CORE_TEST_FIXTURE,
+    source: `import { commands } from '${specifierTo(CORE_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
+    reported: `${CORE_TEST_FIXTURE} (core) imports ${COMMANDS}/index.ts (single)`,
+  },
+  {
     name: 'a test named after a write command that imports an auth module',
     path: `${COMMANDS}/create-mail-draft.test.ts`,
     source: "import { parseTokenArgs } from './token-args.ts';\nexport const f = parseTokenArgs;\n",
@@ -100,14 +130,20 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
 // Must be reported by the rule that refuses a file in two ownership lists.
 const OVERLAP_FIXTURE = { name: 'a file in two ownership lists', path: 'src/token.ts', reported: 'src/token.ts (auth, single)' } as const;
 
+// The lists name `src/...`; a listed core file may be in core/src/ already.
 const glob = (patterns: ReadonlyArray<string>): ReadonlySet<string> =>
-  new Set(patterns.flatMap((pattern) => [...new Bun.Glob(pattern).scanSync(ROOT)]).filter((path) => !path.endsWith('.test.ts')));
+  new Set(
+    patterns
+      .flatMap((pattern) => [...[...new Bun.Glob(pattern).scanSync(ROOT)], ...[...new Bun.Glob(pattern).scanSync(join(ROOT, 'core'))].map((path) => `core/${path}`)])
+      .filter((path) => !path.endsWith('.test.ts'))
+  );
 
 const readSources = async (tests: boolean): Promise<Sources> => {
   const sources = new Map<string, string>();
-  for (const path of new Bun.Glob('src/**/*.ts').scanSync(ROOT)) {
+  const paths = [...[...new Bun.Glob('src/**/*.ts').scanSync(ROOT)], ...[...new Bun.Glob('src/**/*.ts').scanSync(join(ROOT, 'core'))].map((path) => `core/${path}`)];
+  for (const path of paths) {
     const test = path.endsWith('.test.ts');
-    if (test !== tests || (!test && path.startsWith('src/test-helpers/'))) continue;
+    if (test !== tests || (!test && /^(core\/)?src\/test-helpers\//.test(path))) continue;
     sources.set(path, await Bun.file(join(ROOT, path)).text());
   }
   return sources;
@@ -117,6 +153,7 @@ const readSources = async (tests: boolean): Promise<Sources> => {
 // package.json), or undefined for a package import. A relative specifier that
 // names no file is an error.
 const resolveSpecifier = (from: string, specifier: string): string | undefined => {
+  if (specifier.startsWith(CORE_PACKAGE)) return resolveSpecifier('core/src/index.ts', `./${specifier.slice(CORE_PACKAGE.length)}`);
   if (!specifier.startsWith('.')) return undefined;
   const path = relative(ROOT, resolve(ROOT, dirname(from), specifier));
   const candidates = [path, `${path}.ts`, join(path, 'index.ts')];
@@ -156,7 +193,8 @@ const crossing = (graph: Graph, start: string, allowed: (path: string) => boolea
 const violations = (graph: Graph, owners: Owners): ReadonlyArray<string> => {
   const writeReach = [...owners.write].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.write.has(path)));
   const readReach = [...owners.reads, ...owners.core].flatMap((start) => crossing(graph, start, (path) => !owners.write.has(path)));
-  return [...writeReach, ...readReach];
+  const coreReach = [...owners.core].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path)));
+  return [...new Set([...writeReach, ...readReach, ...coreReach])];
 };
 
 type Lists = { readonly core: ReadonlySet<string>; readonly auth: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly single: ReadonlySet<string> };
@@ -189,6 +227,7 @@ const importedPackages = (imports: ReadonlyArray<string>, owner: OwnerOf): Reado
 
 // A test file's package, or undefined when its imports name two packages and nothing else decides.
 const testPackage = (path: string, imports: ReadonlyArray<string>, owner: OwnerOf): Owner | undefined => {
+  if (path.startsWith('core/')) return 'core';
   const side = /-(write|auth)\.test\.ts$/.exec(path)?.[1];
   if (side === 'write' || side === 'auth') return side;
   const namesake = path.replace(/\.test\.ts$/, '.ts');
@@ -202,12 +241,13 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
   [...tests].flatMap(([path, imports]) => {
     const own = testPackage(path, imports, owner);
     if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
-    const foreign = imports.filter((target) => PACKAGES.includes(owner(target)) && owner(target) !== own);
+    // A test under core/ runs with core alone: the single wiring is not open to it.
+    const foreign = imports.filter((target) => (PACKAGES.includes(owner(target)) || path.startsWith('core/')) && owner(target) !== own);
     return [...new Set(foreign)].map((target) => `${path} (${own}) imports ${target} (${owner(target)})`);
   });
 
 // The test graph keeps only the imports of modules under src/ (not package.json, not a package).
-const buildTestGraph = (sources: Sources): Graph => new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => target.startsWith('src/'))]));
+const buildTestGraph = (sources: Sources): Graph => new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => /^(core\/)?src\//.test(target))]));
 
 type CommandModule = { readonly meta?: { readonly effect?: unknown }; readonly execute?: unknown };
 
@@ -255,7 +295,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; no test file imports a module of another package; every fixture is reported.');
+  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; no test file imports a module of another package; every fixture is reported.');
   return 0;
 };
 
