@@ -76,6 +76,33 @@ scope_untracked() {
 # hide a weakened test. Partial by construction: a shared test file with no
 # sibling source maps to nothing, and the existence check drops those misses
 # (and files deleted in the working tree).
+# Keep only the files of one shard, so CI can divide a large scope over
+# parallel jobs (a push of 241 commits ran into the 6-hour job limit on
+# 2026-10-15). SHARD_INDEX (from 0) and SHARD_COUNT set the shard. The files go
+# round-robin in the order they arrive, which scope_filter sorts. With no
+# SHARD_COUNT, every file is kept. A bad setting fails, so a typo in CI cannot
+# make a shard mutate nothing and pass.
+scope_shard() {
+  local index="${SHARD_INDEX:-}" count="${SHARD_COUNT:-}"
+  if [ -z "$count" ]; then
+    if [ -n "$index" ]; then
+      echo "mutation-scope: SHARD_INDEX needs SHARD_COUNT" >&2
+      return 1
+    fi
+    cat
+    return 0
+  fi
+  case "$index$count" in *[!0-9]*)
+    echo "mutation-scope: SHARD_INDEX and SHARD_COUNT must be whole numbers" >&2
+    return 1 ;;
+  esac
+  if [ -z "$index" ] || [ "$count" -lt 1 ] || [ "$index" -ge "$count" ]; then
+    echo "mutation-scope: SHARD_INDEX must be from 0 to SHARD_COUNT - 1" >&2
+    return 1
+  fi
+  awk -v i="$index" -v c="$count" '(NR - 1) % c == i'
+}
+
 scope_filter() {
   local prefix p f
   prefix=$(git rev-parse --show-prefix)

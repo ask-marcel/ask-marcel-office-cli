@@ -42,6 +42,9 @@ echo "mutate:changed: base ${BASE} $(git rev-parse --short "$BASE")" \
 # shellcheck source=scripts/mutation-scope.sh
 . "$(dirname "$0")/mutation-scope.sh"
 
+# With SHARD_INDEX and SHARD_COUNT set, only one shard of the files is
+# mutated (scope_shard in mutation-scope.sh); CI runs the shards in parallel.
+#
 # Files that differ from BASE, plus uncommitted and staged edits, plus
 # untracked files. Untracked matters: a brand-new source file appears in NO
 # diff, so without it a new domain or use-case file is never mutated and the run
@@ -65,7 +68,7 @@ files=$( {
     scope_changed_paths HEAD &&
     scope_changed_paths --cached &&
     scope_untracked
-} | scope_filter)
+} | scope_filter | scope_shard)
 
 if [ -z "$files" ]; then
   echo "mutate:changed: no files in mutation scope changed since ${BASE}"
@@ -73,7 +76,7 @@ if [ -z "$files" ]; then
 fi
 
 count=$(echo "$files" | wc -l | tr -d ' ')
-echo "mutate:changed: testing ${count} file(s)"
+echo "mutate:changed: testing ${count} file(s)${SHARD_COUNT:+ (shard $((SHARD_INDEX + 1)) of ${SHARD_COUNT})}"
 
 # Stryker's --mutate takes ONE comma-separated value; repeated flags
 # overwrite each other (the CLI keeps only the last one), so join the list.

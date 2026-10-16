@@ -155,6 +155,28 @@ git reset -q --soft HEAD~1
 PATH="$work/bin:$PATH" bash "$here/mutate-staged.sh" > /dev/null
 expect 'mutate:staged hands stryker the staged file' 'src/domain/d.ts' "$(cat "$STRYKER_ARGS" 2>/dev/null || true)"
 
+# Shards: CI divides a large scope over parallel jobs. Each file goes to
+# exactly one shard, every file goes to one, and no shard setting keeps all.
+four=$(printf 'src/a.ts\nsrc/b.ts\nsrc/c.ts\nsrc/d.ts\nsrc/e.ts\n')
+expect 'no shard setting keeps every file' "$four" "$(echo "$four" | scope_shard)"
+expect 'shard 0 of 2 takes the first, third and fifth file' "$(printf 'src/a.ts\nsrc/c.ts\nsrc/e.ts')" "$(echo "$four" | SHARD_INDEX=0 SHARD_COUNT=2 scope_shard)"
+expect 'shard 1 of 2 takes the second and fourth file' "$(printf 'src/b.ts\nsrc/d.ts')" "$(echo "$four" | SHARD_INDEX=1 SHARD_COUNT=2 scope_shard)"
+expect 'the shards together hold every file once' "$four" "$(for i in 0 1 2; do echo "$four" | SHARD_INDEX=$i SHARD_COUNT=3 scope_shard; done | sort)"
+status=0
+echo "$four" | SHARD_INDEX=2 SHARD_COUNT=2 scope_shard > /dev/null 2>&1 || status=$?
+expect 'a shard index past the count fails' 'failed' "$([ "$status" -ne 0 ] && echo failed || echo passed)"
+status=0
+echo "$four" | SHARD_INDEX=0 scope_shard > /dev/null 2>&1 || status=$?
+expect 'a shard index without a count fails' 'failed' "$([ "$status" -ne 0 ] && echo failed || echo passed)"
+rm -f "$STRYKER_ARGS"
+edit_commit src/domain/d.ts 's/5/6/'
+edit_commit src/use-cases/y.ts 's/3/4/'
+PATH="$work/bin:$PATH" MUTATE_NO_FETCH=1 BASE=HEAD~2 SHARD_INDEX=1 SHARD_COUNT=2 bash "$here/mutate-changed.sh" > /dev/null
+expect 'mutate:changed hands stryker only the files of its shard' 'src/use-cases/y.ts' "$(cat "$STRYKER_ARGS" 2>/dev/null || true)"
+status=0
+PATH="$work/bin:$PATH" MUTATE_NO_FETCH=1 BASE=HEAD~2 SHARD_INDEX=2 SHARD_COUNT=2 bash "$here/mutate-changed.sh" > /dev/null 2>&1 || status=$?
+expect 'mutate:changed fails on a bad shard setting' 'failed' "$([ "$status" -ne 0 ] && echo failed || echo passed)"
+
 if [ "$failures" -gt 0 ]; then
   echo "mutation-scope selftest: ${failures} case(s) failed" >&2
   exit 1
