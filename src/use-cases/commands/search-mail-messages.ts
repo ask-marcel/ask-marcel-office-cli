@@ -20,7 +20,7 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
   if (typeof params['filter'] === 'string' && params['filter'].length > 0) {
     // short `error` headline, with the
     // actionable remedy carried by the matching `hint` rule in
-    // src/presenter/error-hints.ts (matched by `code`). Prior shape packed
+    // core/src/presenter/error-hints.ts (matched by `code`). Prior shape packed
     // both diagnosis AND remedy into `message`, leaving the generic
     // validation hint as boilerplate noise.
     return err({
