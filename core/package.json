@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./test-helpers/*": "./src/test-helpers/*",
     "./*": "./src/*"
   },
   "scripts": {

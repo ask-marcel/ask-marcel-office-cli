@@ -17,6 +17,21 @@ import tsPlugin from 'typescript-eslint';
  * (LINT_STRICT) reads; pass `import.meta.dirname` of the spreading config.
  */
 
+const MOCK_BAN = {
+  name: 'bun:test',
+  importNames: ['mock'],
+  message:
+    '`mock` from bun:test is forbidden — it leaks across test files. Use dependency injection: refactor the production code to accept the SDK as a parameter, then pass a fake at construction.',
+};
+
+// The shared test fakes (core/src/test-helpers, reached through core's dev-only
+// `./test-helpers/*` export, and each folder's own src/test-helpers) are for
+// tests only: no build may carry one (package split, Target layout).
+const TEST_HELPERS_BAN = {
+  regex: '(^|/)test-helpers/',
+  message: 'A test fake is dev-only: production code never imports test-helpers/. Take the real port, and pass the fake from the test.',
+};
+
 /** @type {(tsconfigRootDir: string) => import('eslint').Linter.Config[]} */
 export const baseConfig = (tsconfigRootDir) => [
   pluginJs.configs.recommended,
@@ -32,19 +47,7 @@ export const baseConfig = (tsconfigRootDir) => [
       'no-console': ['error'],
       'prefer-template': 'error',
       quotes: ['error', 'single', { avoidEscape: true }],
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: 'bun:test',
-              importNames: ['mock'],
-              message:
-                '`mock` from bun:test is forbidden — it leaks across test files. Use dependency injection: refactor the production code to accept the SDK as a parameter, then pass a fake at construction.',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': ['error', { paths: [MOCK_BAN] }],
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // The rule ships no default argsIgnorePattern, so it flags deliberately-unused
@@ -53,6 +56,15 @@ export const baseConfig = (tsconfigRootDir) => [
       // implementation uses neither). Allow a leading underscore to mark them.
       // Atelier rule 15: project-level severity/config, never an inline ignore.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // The same rule with the test-helpers ban added: ESLint replaces a rule's
+    // options when two blocks match a file, so this block repeats the mock ban.
+    files: ['src/**/*.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [MOCK_BAN], patterns: [TEST_HELPERS_BAN] }],
     },
   },
   ...(process.env['LINT_STRICT']
