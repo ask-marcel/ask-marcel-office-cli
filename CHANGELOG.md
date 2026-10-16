@@ -4,6 +4,14 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Fixed: PDF conversion on Node 20
+
+`unpdf` 1.9.0 (2026-10-15) needs Node 22. A new install of 2.8.0 on Node 20
+got it through the range `^1.6.2`, and PDF text and image extraction then
+failed with a "Serverless" error. The range is now `>=1.6.2 <1.8.0`. These
+versions do not ask for Node 22, so they match the Node 20 floor that
+`engines` promises.
+
 These changes come from phase 1 of the package split
 (`docs/plans/2026-10-01-package-split.md`).
 
