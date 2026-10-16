@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
-import { tenantIdUnsafe } from '../../domain/tenant-id.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute as convertZip } from './convert-drive-item-zip-to-markdown.ts';
 import { execute as asMarkdown } from './download-drive-item-as-markdown.ts';
 import { execute as asPdf } from './download-drive-item-as-pdf.ts';

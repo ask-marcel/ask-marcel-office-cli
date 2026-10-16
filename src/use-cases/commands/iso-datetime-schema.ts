@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { parseIsoDateTime } from '../../domain/iso-datetime.ts';
-import { currentDateZone } from './date-zone.ts';
+import { parseIsoDateTime } from '@ask-marcel/office-core/domain/iso-datetime.ts';
+import { currentDateZone } from '@ask-marcel/office-core/use-cases/commands/date-zone.ts';
 
 /**
  * Reusable Zod field for an ISO-8601 UTC datetime parameter that ALSO accepts

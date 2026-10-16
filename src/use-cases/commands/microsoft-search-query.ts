@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 const ALL_ENTITY_TYPES = ['driveItem', 'listItem', 'site', 'message', 'event', 'person'] as const;
 type EntityType = (typeof ALL_ENTITY_TYPES)[number];

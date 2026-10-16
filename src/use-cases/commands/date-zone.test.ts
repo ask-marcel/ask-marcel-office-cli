@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { currentDateZone, setDateZone } from './date-zone.ts';
+import { currentDateZone, setDateZone } from '@ask-marcel/office-core/use-cases/commands/date-zone.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 
 describe('the run zone the date fields resolve in', () => {

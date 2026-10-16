@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
-import type { Result } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildPdfNoImages, buildSampleDocx, buildScannedPdf } from '../../test-helpers/office-fixtures.ts';
 import { MAIL_HINTS } from './convert-mail-attachment-to-markdown.ts';
 import { pagesField } from './image-extraction.ts';

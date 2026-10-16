@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import type { ReadCommand } from './command-types.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
 
 const graph = fakeGraphClient();

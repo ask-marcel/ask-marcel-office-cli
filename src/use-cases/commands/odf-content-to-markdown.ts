@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { openOoxmlZip } from '../../infra/ooxml-zip-adapter.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { escapeCell } from './ooxml-metadata-to-markdown.ts';

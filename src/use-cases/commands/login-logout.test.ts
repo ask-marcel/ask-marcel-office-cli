@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../../domain/access-token.ts';
-import { err, ok } from '../../domain/result.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { execute as login } from './login.ts';
 import { execute as logout } from './logout.ts';

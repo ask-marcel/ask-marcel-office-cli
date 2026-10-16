@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import type { FetchFn, GraphClient } from './graph-client.ts';
 import { createGraphClient } from './graph-client.ts';

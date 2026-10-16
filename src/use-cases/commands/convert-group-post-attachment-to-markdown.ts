@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { convertAttachmentToMarkdown } from './convert-mail-attachment-to-markdown.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';

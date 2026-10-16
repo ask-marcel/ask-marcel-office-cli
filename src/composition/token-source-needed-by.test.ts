@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../domain/result.ts';
-import { tenantIdUnsafe } from '../domain/tenant-id.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { buildDeps } from './build-deps.ts';
 import { createEnvThenHelperTokenSource } from './token-source.ts';
 

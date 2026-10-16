@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
-import { tenantIdUnsafe } from '../../domain/tenant-id.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute } from './resolve-drive-share-link.ts';
 
 const PARTNER = tenantIdUnsafe('6f1e3a92-4b7c-4d51-9e2f-8a3b5c7d1e04');

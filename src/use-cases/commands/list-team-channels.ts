@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildFilterSelectListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { filterSelectOptions } from './odata-query.ts';
+import { buildFilterSelectListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { filterSelectOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1) });
 const { execute, schema } = buildFilterSelectListCommand((p) => `/teams/${p.teamId}/channels`, baseSchema);

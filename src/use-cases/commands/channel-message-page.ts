@@ -1,5 +1,5 @@
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, CommandOptionMeta } from './command-types.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
  * Graph caps a page of channel messages (and of a message's replies) at 50:

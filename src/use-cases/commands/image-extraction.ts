@@ -1,17 +1,17 @@
 import { z } from 'zod';
-import { includesPage, parsePageRange } from '../../domain/page-range.ts';
-import type { PageRange } from '../../domain/page-range.ts';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import { includesPage, parsePageRange } from '@ask-marcel/office-core/domain/page-range.ts';
+import type { PageRange } from '@ask-marcel/office-core/domain/page-range.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { extractOoxmlMedia } from '../../infra/ooxml-media-extractor.ts';
 import type { MediaPart } from '../../infra/ooxml-media-extractor.ts';
 import { extractPdfImages } from '../../infra/pdf-image-extractor.ts';
 import { buildMediaResponse, isImagePath } from './media-files.ts';
-import type { CommandOptionMeta } from './command-types.ts';
+import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { MediaEnvelope } from './media-files.ts';
-import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
-import { extensionOf } from './text-passthrough.ts';
+import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from '@ask-marcel/office-core/use-cases/commands/office-extensions.ts';
+import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 
 const isOoxml = (ext: string): boolean => DOCX_FAMILY.has(ext) || XLSX_FAMILY.has(ext) || PPTX_FAMILY.has(ext);
 

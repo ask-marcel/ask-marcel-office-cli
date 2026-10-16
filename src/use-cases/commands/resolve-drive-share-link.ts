@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { detectSiblingResolver } from './link-shape.ts';
-import { buildShareToken } from './share-token.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 
 // Resolver for Microsoft Graph's `/shares/{token}` endpoint. Takes any OneDrive /
 // SharePoint sharing URL, encodes it to the `u!<base64url>` share token that

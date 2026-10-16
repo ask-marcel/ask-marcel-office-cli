@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { odataQueryOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), worksheetId: z.string().min(1) });

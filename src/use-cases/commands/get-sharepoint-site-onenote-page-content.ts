@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
 
 const schema = z.object({ siteId: z.string().min(1), onenotePageId: z.string().min(1) });

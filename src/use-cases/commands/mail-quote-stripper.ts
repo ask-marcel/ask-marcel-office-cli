@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { CommandOptionMeta } from './command-types.ts';
-import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
+import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary } from '@ask-marcel/office-core/use-cases/commands/quote-boundary.ts';
 
 /**
  * Strips quoted reply chains / forwarded-message blocks from an Outlook or

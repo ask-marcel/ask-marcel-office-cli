@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import {
   embeddedContactToMarkdown,
   embeddedEventToMarkdown,
@@ -12,15 +12,15 @@ import {
   type EmbeddedEvent,
   type EmbeddedMessage,
 } from './embedded-item-to-markdown.ts';
-import { base64ToBytes } from './fetch-raw-bytes.ts';
+import { base64ToBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { readEmbeddedItem } from './embedded-item.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown, NESTED_HINTS } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
-import { buildShareToken } from './share-token.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),

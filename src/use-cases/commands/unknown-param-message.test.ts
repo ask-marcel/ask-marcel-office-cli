@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from './index.ts';
 
 const messageFor = async (params: Record<string, string>): Promise<string> => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 
 // A graph fake whose /search/query POST returns `totalFor(queryString)` as the

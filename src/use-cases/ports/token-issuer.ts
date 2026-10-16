@@ -1,8 +1,8 @@
-import type { AccessToken } from '../../domain/access-token.ts';
-import type { Result } from '../../domain/result.ts';
-import type { TenantId } from '../../domain/tenant-id.ts';
-import type { TokenFingerprint } from '../../domain/token-fingerprint.ts';
-import type { TokenError, TokenTier } from './token-source.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { TenantId } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
+import type { TokenError, TokenTier } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 
 // A guest token is issued by a partner tenant's authority, so it names one.
 type TokenRequest = { readonly tier: Exclude<TokenTier, 'guest'> } | { readonly tier: 'guest'; readonly tenant: TenantId };

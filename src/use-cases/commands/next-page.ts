@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { err, map } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { topOnlyShape } from './odata-query.ts';
-import { brandTenantId, tenantIdShape } from './tenant-option.ts';
+import { err, map } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { topOnlyShape } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
+import { brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 import { withTaskLinks } from './todo-web-url.ts';
 
 const PREFIX = 'https://graph.microsoft.com/v1.0';

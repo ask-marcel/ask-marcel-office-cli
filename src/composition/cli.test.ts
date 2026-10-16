@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import type { AuthLadder } from '../test-helpers/auth-manager-fake.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
 

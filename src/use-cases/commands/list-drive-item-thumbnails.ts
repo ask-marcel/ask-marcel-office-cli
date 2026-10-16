@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { buildNoSkipListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { noSkipOptions } from './odata-query.ts';
+import { buildNoSkipListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { noSkipOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, tenantIdShape } from './tenant-option.ts';
+import { TENANT_ID_OPTION, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 const { execute, schema } = buildNoSkipListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/thumbnails`, baseSchema);

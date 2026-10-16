@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildElevatedPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { pickODataOptions } from './odata-query.ts';
+import { buildElevatedPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // round-6 hypothesized that `/me/chats` would succeed
 // against the basic Teams web client token; the audit verified it does

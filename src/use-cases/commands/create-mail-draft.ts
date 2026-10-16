@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { slimDraftResult } from './draft-response.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
 const schema = z.object({

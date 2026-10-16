@@ -33,10 +33,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createEnvThenHelperTokenSource } from '../src/composition/token-source.ts';
-import { createNodeFileSystem } from '../src/infra/filesystem-node.ts';
-import { createBunProcessRunner } from '../src/infra/process-runner-bun.ts';
-import { createNodeProcessRunner } from '../src/infra/process-runner-node.ts';
-import type { ProcessRunner } from '../src/use-cases/ports/process-runner.ts';
+import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
+import { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
+import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';
+import type { ProcessRunner } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
 
 const segment = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url');
 const inAnHour = Math.floor(Date.now() / 1000) + 3600;

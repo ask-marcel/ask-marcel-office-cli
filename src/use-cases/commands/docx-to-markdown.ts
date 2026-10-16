@@ -1,5 +1,5 @@
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { mammothToHtml } from '../../infra/mammoth-adapter.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';

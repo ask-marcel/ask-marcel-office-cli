@@ -1,4 +1,4 @@
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 
 /**
  * OneNote page HTML references images as absolute Graph resource URLs:

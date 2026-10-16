@@ -1,16 +1,16 @@
 import { basename } from 'node:path';
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { FileSystem } from '../ports/filesystem.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
-import { extensionOf } from './text-passthrough.ts';
+import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 

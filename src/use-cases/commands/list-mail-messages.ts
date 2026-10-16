@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
 import { EXCLUDE_MEETING_RESPONSES_OPTION, withMeetingResponseFilter } from './mail-response-filter.ts';
-import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { odataQueryOptions, odataQuerySchema } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 // Slim default projection shared with search-mail-messages / get-mail-message

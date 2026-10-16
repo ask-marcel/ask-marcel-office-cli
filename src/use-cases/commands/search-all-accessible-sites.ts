@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { searchIndexTotal } from './search-index-total.ts';
 
 /**

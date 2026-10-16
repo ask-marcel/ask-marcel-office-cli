@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { diffEnvelope, readDriveFile, renderSide } from './drive-item-diff.ts';
 import type { Render, RenderOptions } from './drive-item-diff.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 import { MAX_CELLS_OPTION, maxCellsField, SHEET_OPTION } from './xlsx-to-markdown.ts';
 

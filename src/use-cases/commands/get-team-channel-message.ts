@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { pickODataOptions } from './odata-query.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
 const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().min(1), messageId: z.string().min(1) });

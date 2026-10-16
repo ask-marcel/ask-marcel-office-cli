@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { wrapExcelExecute } from './excel-error.ts';
-import { pickODataOptions } from './odata-query.ts';
+import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 // Graph's `/workbook/worksheets` honors `$skip`, `$select`, `$expand` but

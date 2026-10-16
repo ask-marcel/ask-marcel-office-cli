@@ -5,7 +5,7 @@
  * the token helper entry (src/token.ts) fills its remedies with these names and
  * must not load the registry.
  */
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
+import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 
 const BIN = 'ask-marcel-office';
 

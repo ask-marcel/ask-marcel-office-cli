@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildSelectableCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { buildSelectableCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectExpandOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });

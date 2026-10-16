@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
-import { tenantIdUnsafe } from '../domain/tenant-id.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import type { AuthManager } from './auth.ts';
 import type { FetchFn } from './graph-client.ts';

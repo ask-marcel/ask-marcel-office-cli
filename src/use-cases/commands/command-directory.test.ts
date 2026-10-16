@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { COMMAND_DIRECTORY, commandRole } from './command-directory.ts';
+import { COMMAND_DIRECTORY, commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
 import { commands } from './index.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 

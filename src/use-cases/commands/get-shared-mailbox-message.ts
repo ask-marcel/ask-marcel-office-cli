@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildSelectableCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { buildSelectableCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectExpandOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({ userId: z.string().min(1), messageId: z.string().min(1) });
 // encodeURIComponent(userId) so a guest UPN (`…#EXT#@…`) is not cut at the raw `#` fragment delimiter.

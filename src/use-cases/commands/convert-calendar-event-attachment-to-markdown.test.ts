@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from './index.ts';
 
 const command = commands['convert-calendar-event-attachment-to-markdown'];

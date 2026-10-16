@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });

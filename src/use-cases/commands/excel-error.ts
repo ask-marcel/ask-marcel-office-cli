@@ -1,7 +1,7 @@
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 
 const WAC_NEEDLE = 'Could not obtain a WAC access token';
 // Graph's `/workbook` endpoint also surfaces a different leaky error when

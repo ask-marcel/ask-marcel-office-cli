@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
-import { tenantIdUnsafe } from '../domain/tenant-id.ts';
-import type { FetchMock } from '../test-helpers/fetch-mock.ts';
-import { installFetchMock } from '../test-helpers/fetch-mock.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import type { ProcessRunnerCall } from '../test-helpers/process-runner-fake.ts';
-import { createProcessRunnerFake } from '../test-helpers/process-runner-fake.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import type { FetchMock } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
+import { installFetchMock } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import type { ProcessRunnerCall } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
+import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { buildDeps } from './build-deps.ts';
 import { createEnvThenHelperTokenSource } from './token-source.ts';
 

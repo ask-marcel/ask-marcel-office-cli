@@ -1,4 +1,4 @@
-import type { CommandOptionMeta } from './command-types.ts';
+import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // The `includeHiddenFolders` flag shared by the four mail-folder LISTING
 // commands (`list-mail-folders`, `list-mail-child-folders` and their

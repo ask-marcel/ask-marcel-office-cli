@@ -1,17 +1,17 @@
 import { homedir } from 'node:os';
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken } from '../domain/access-token.ts';
-import type { Result } from '../domain/result.ts';
-import { err, ok } from '../domain/result.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { Logger } from '../use-cases/ports/logger.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { AuthError, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder } from './auth.ts';
 import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
 import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
-import { createBunFileSystem } from './filesystem-bun.ts';
-import { createNodeFileSystem } from './filesystem-node.ts';
+import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
+import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import type { TokenCacheLock } from './token-cache-lock.ts';
 
 // The browser half of auth: the rungs of the ladder that drive the Playwright

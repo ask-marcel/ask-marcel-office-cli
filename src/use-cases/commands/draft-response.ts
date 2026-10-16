@@ -1,5 +1,5 @@
-import { ok, type Result } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
+import { ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
 
 /**
  * Graph answers createReply / createForward / PATCH with the ENTIRE message,

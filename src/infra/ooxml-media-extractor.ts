@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
-import type { Result } from '../domain/result.ts';
-import { err, ok } from '../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
 
 /**

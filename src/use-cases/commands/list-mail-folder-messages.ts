@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { EXCLUDE_MEETING_RESPONSES_OPTION, withMeetingResponseFilter } from './mail-response-filter.ts';
-import { odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { odataQueryOptions, odataQuerySchema } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({ mailFolderId: z.string().min(1) });
 const inner = buildListCommand((p) => `/me/mailFolders/${p.mailFolderId}/messages`, baseSchema);

@@ -1,5 +1,5 @@
-import type { Result } from '../../domain/result.ts';
-import { err, map, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { htmlToMarkdown, stripHtmlToText } from '../../infra/turndown-adapter.ts';
 import { docToMarkdown } from './doc-to-markdown.ts';
@@ -7,10 +7,10 @@ import { docxToMarkdown, stripInlineImages } from './docx-to-markdown.ts';
 import { emlToMarkdown } from './eml-to-markdown.ts';
 import { msgToMarkdown } from './msg-to-markdown.ts';
 import { odfToMarkdown } from './odf-to-markdown.ts';
-import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from '@ask-marcel/office-core/use-cases/commands/office-extensions.ts';
 import { pdfToMarkdown } from './pdf-to-markdown.ts';
 import { pptxToMarkdown } from './pptx-to-markdown.ts';
-import { decodeUtf8Text, extensionOf } from './text-passthrough.ts';
+import { decodeUtf8Text, extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet, renderCsvCapped, xlsxToMarkdown } from './xlsx-to-markdown.ts';
 
 // Image extensions that have no markdown text representation. NOTE: `svg` is NOT

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { buildCli } from './cli.ts';
 
 // The error line an agent reads after a mistyped name or flag.

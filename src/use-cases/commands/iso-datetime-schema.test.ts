@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isoDateTimeUnsafe } from '../../domain/iso-datetime.ts';
+import { isoDateTimeUnsafe } from '@ask-marcel/office-core/domain/iso-datetime.ts';
 import { isoDateTimeField } from './iso-datetime-schema.ts';
 
 describe('isoDateTimeField — Zod fragment for calendar windows', () => {

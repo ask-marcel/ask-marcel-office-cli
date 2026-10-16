@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { err, ok, type Result } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
-import type { WriteCommand, WriteCommandMeta } from './command-types.ts';
+import { err, ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { WriteCommand, WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { boundaryMarkerRefusal, commentCarriesQuoteBoundary, insertCommentAboveQuote } from './draft-comment-splicer.ts';
 import { slimDraftResult } from './draft-response.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { parseRecipients } from './parse-recipients.ts';
 
 const schema = z.object({

@@ -3,11 +3,11 @@
 // with their text unchanged (package split, step 16), so the auth package takes this file
 // whole; the helpers are copies of that file's.
 import { describe, expect, it } from 'bun:test';
-import { commandRole } from './command-directory.ts';
-import type { CommandPackage } from './command-package.ts';
-import type { Command } from './command-types.ts';
-import { buildManifest, buildTerseManifest, renderSingleCommand } from './docs-builders.ts';
-import type { CommandManifestEntry } from './docs-render.ts';
+import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
+import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
+import type { Command } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { buildManifest, buildTerseManifest, renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
+import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({

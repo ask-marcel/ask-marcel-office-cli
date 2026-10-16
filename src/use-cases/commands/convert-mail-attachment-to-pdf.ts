@@ -1,13 +1,13 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
-import type { WriteCommandMeta } from './command-types.ts';
-import { base64ToBytes, inlineBasicBinary, tagPdfPassthrough } from './fetch-raw-bytes.ts';
-import { buildShareToken } from './share-token.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { isPdfSource, isPlainTextFilename } from './text-passthrough.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { base64ToBytes, inlineBasicBinary, tagPdfPassthrough } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { isPdfSource, isPlainTextFilename } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 
 const schema = z.object({
   messageId: z.string().min(1),

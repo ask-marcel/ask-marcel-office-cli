@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { inlineBinary } from './fetch-raw-bytes.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { inlineBinary } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 const schema = z.object({ messageId: z.string().min(1) });
 

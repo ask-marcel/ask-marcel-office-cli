@@ -1,11 +1,11 @@
-import type { AccessToken } from '../../domain/access-token.ts';
-import { decodeJwtPayload } from '../../domain/jwt-utils.ts';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
-import type { TeamsRegion } from '../../domain/teams-region.ts';
-import { teamsRegion } from '../../domain/teams-region.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { decodeJwtPayload } from '@ask-marcel/office-core/domain/jwt-utils.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import { teamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
 import type { TokenIssuer, TokenTier } from '../ports/token-issuer.ts';
-import type { TokenError } from '../ports/token-source.ts';
+import type { TokenError } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { TokenArgs, TokenFailureLine } from './token-args.ts';
 
 // The one line the helper prints when it hands out a token. `expiresOn` is the

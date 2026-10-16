@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildSelectableCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { buildSelectableCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectExpandOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // the full `/me` resource carries 20+ fields most LLM
 // callers don't need (preferredLanguage, surname, accountEnabled, etc.). Ship a

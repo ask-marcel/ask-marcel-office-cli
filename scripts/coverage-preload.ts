@@ -25,38 +25,38 @@
  * See skills/atelier/references/workflow.md for the full rationale.
  */
 
-import '../src/domain/jwt-utils.ts';
-import '../src/infra/logger.ts';
+import '@ask-marcel/office-core/domain/jwt-utils.ts';
+import '@ask-marcel/office-core/infra/logger.ts';
 import '../src/infra/auth-paths.ts';
 import '../src/infra/auth.ts';
 import '../src/infra/auth-token-source.ts';
 import '../src/infra/auth-browser.ts';
 import '../src/infra/browser-auth.ts';
-import '../src/infra/filesystem-bun.ts';
-import '../src/infra/filesystem-node.ts';
+import '@ask-marcel/office-core/infra/filesystem-bun.ts';
+import '@ask-marcel/office-core/infra/filesystem-node.ts';
 import '../src/infra/graph-client.ts';
-import '../src/infra/graph-request.ts';
-import '../src/infra/graph-substrate.ts';
-import '../src/infra/read-graph.ts';
-import '../src/infra/write-graph.ts';
-import '../src/infra/network-error.ts';
-import '../src/infra/child-process-watch.ts';
-import '../src/infra/process-runner-bun.ts';
-import '../src/infra/rename-with-retry.ts';
+import '@ask-marcel/office-core/infra/graph-request.ts';
+import '@ask-marcel/office-core/infra/graph-substrate.ts';
+import '@ask-marcel/office-core/infra/read-graph.ts';
+import '@ask-marcel/office-core/infra/write-graph.ts';
+import '@ask-marcel/office-core/infra/network-error.ts';
+import '@ask-marcel/office-core/infra/child-process-watch.ts';
+import '@ask-marcel/office-core/infra/process-runner-bun.ts';
+import '@ask-marcel/office-core/infra/rename-with-retry.ts';
 import '../src/infra/token-cache-lock.ts';
-import '../src/infra/process-runner-node.ts';
-import '../src/infra/env-token-source.ts';
-import '../src/infra/helper-token-source.ts';
-import '../src/infra/token-source-needed-by.ts';
-import '../src/infra/token-helper-answer.ts';
-import '../src/infra/token-helper-locator.ts';
-import '../src/infra/token-helper-run.ts';
+import '@ask-marcel/office-core/infra/process-runner-node.ts';
+import '@ask-marcel/office-core/infra/env-token-source.ts';
+import '@ask-marcel/office-core/infra/helper-token-source.ts';
+import '@ask-marcel/office-core/infra/token-source-needed-by.ts';
+import '@ask-marcel/office-core/infra/token-helper-answer.ts';
+import '@ask-marcel/office-core/infra/token-helper-locator.ts';
+import '@ask-marcel/office-core/infra/token-helper-run.ts';
 
 import '../src/index.ts';
 
 import '../src/composition/build-deps.ts';
 import '../src/composition/cli.ts';
-import '../src/composition/cli-shell.ts';
+import '@ask-marcel/office-core/composition/cli-shell.ts';
 import '../src/composition/auth-cli.ts';
 import '../src/composition/single-package.ts';
 import '../src/composition/single-package-names.ts';
@@ -64,13 +64,13 @@ import '../src/composition/single-package-names.ts';
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively
 // imported by anything already listed here.
 import '../src/composition/mcp.ts';
-import '../src/composition/mcp-shell.ts';
+import '@ask-marcel/office-core/composition/mcp-shell.ts';
 import '../src/composition/auth-mcp.ts';
 // The token helper is reached from main.ts and src/token.ts, which no test loads.
 import '../src/composition/token-helper.ts';
 import '../src/composition/token-source.ts';
 
-import '../src/presenter/output.ts';
+import '@ask-marcel/office-core/presenter/output.ts';
 
 import '../src/use-cases/commands/get-sharepoint-site.ts';
 import '../src/use-cases/commands/list-sharepoint-site-drives.ts';
@@ -123,7 +123,7 @@ import '../src/infra/ooxml-media-extractor.ts';
 import '../src/infra/zip-reader.ts';
 import '../src/use-cases/commands/inline-image-embedder.ts';
 import '../src/use-cases/commands/markdown-pipeline.ts';
-import '../src/use-cases/commands/text-passthrough.ts';
+import '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import '../src/use-cases/commands/sharepoint-link-extractor.ts';
 import '../src/use-cases/commands/extract-sharepoint-links-in-mail.ts';
 import '../src/use-cases/commands/convert-mail-to-markdown.ts';

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
-import type { TeamsRegion } from '../domain/teams-region.ts';
-import type { TokenSource } from '../use-cases/ports/token-source.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { FetchFn } from './graph-client.ts';
 import { createTokenSourceGraphClient } from './graph-client.ts';
 

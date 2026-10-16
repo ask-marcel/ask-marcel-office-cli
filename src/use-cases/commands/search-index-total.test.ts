@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { searchIndexTotal } from './search-index-total.ts';
 
 const graphWith = (onPost: (body: unknown) => Result<unknown, GraphError>): GraphClient => fakeGraphClient({ post: async (_path, body) => onPost(body) });

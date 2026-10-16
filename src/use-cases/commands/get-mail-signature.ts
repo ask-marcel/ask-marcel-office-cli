@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { err, ok, type Result } from '../../domain/result.ts';
+import { err, ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { ATTACHMENT_METADATA_SELECT, attachmentsListSchema, fetchInlineImageBytes, formatBytes, isInlineImage } from './convert-mail-to-markdown.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { embedInlineImages } from './inline-image-embedder.ts';
 import { extractSignatureBlock } from './signature-extractor.ts';
 

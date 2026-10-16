@@ -37,8 +37,8 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import type { CommandPackage } from '../src/use-cases/commands/command-package.ts';
-import { buildManifest } from '../src/use-cases/commands/docs-builders.ts';
+import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
+import { buildManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 
 const USAGE =
   'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> [--selftest]';

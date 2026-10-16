@@ -1,13 +1,13 @@
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { FetchOptions } from './fetch-raw-bytes.ts';
-import { fetchRawBytes } from './fetch-raw-bytes.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { FetchOptions } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
+import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { bytesToMarkdown } from './markdown-dispatch.ts';
 import type { ConversionHints } from './markdown-dispatch.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
-import { extensionOf } from './text-passthrough.ts';
+import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { refuseSheet } from './xlsx-to-markdown.ts';
 
 /**

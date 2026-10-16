@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { map } from '../../domain/result.ts';
-import { buildCommand } from './build-command.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
+import { map } from '@ask-marcel/office-core/domain/result.ts';
+import { buildCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withTaskLinks } from './todo-web-url.ts';
 
 const schema = z.object({ todoTaskListId: z.string().min(1) });

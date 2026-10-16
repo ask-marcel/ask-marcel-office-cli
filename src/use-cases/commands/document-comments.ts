@@ -1,10 +1,10 @@
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { extractDocxMetadata } from './docx-metadata.ts';
-import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
+import { DOCX_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from '@ask-marcel/office-core/use-cases/commands/office-extensions.ts';
 import { extractPptxMetadata } from './pptx-metadata.ts';
-import { extensionOf } from './text-passthrough.ts';
+import { extensionOf } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { extractXlsxMetadata } from './xlsx-metadata.ts';
 
 /**

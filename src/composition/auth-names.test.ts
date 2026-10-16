@@ -3,14 +3,14 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import type { AuthLadder } from '../infra/auth.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { fakeCommandPackage } from '../test-helpers/command-package-fake.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { fakeCommandPackage } from '@ask-marcel/office-core/test-helpers/command-package-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { addAuthCommands } from './auth-cli.ts';
 import { addAuthTools } from './auth-mcp.ts';
-import { buildCliShell } from './cli-shell.ts';
-import { buildMcpShell } from './mcp-shell.ts';
+import { buildCliShell } from '@ask-marcel/office-core/composition/cli-shell.ts';
+import { buildMcpShell } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 
 // The auth package of a split (widget-auth; read is widget-cli, write is
 // widget-write). Every text its login and status print names the auth bin, never

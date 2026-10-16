@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { pickODataOptions } from './odata-query.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // Token: BASIC. `/chats/{id}/members` needs `ChatMember.Read`. Round-8 testing
 // found the basic Teams token lacked it (403 `Missing scope permissions`) and

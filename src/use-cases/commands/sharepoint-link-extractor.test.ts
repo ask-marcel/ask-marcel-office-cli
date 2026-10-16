@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildShareToken } from './share-token.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 import { extractSharepointUrls } from './sharepoint-link-extractor.ts';
 
 describe('extractSharepointUrls — surface every *.sharepoint.com link in an email body', () => {

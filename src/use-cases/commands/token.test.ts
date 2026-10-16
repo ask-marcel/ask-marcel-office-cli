@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import type { AccessToken } from '../../domain/access-token.ts';
-import { accessTokenUnsafe } from '../../domain/access-token.ts';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
-import { tenantIdUnsafe } from '../../domain/tenant-id.ts';
-import type { TokenFingerprint } from '../../domain/token-fingerprint.ts';
-import { tokenFingerprint } from '../../domain/token-fingerprint.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
+import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { TokenIssuer, TokenRequest } from '../ports/token-issuer.ts';
-import type { TokenError } from '../ports/token-source.ts';
+import type { TokenError } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import { execute } from './token.ts';
 import { parseTokenArgs } from './token-args.ts';
 

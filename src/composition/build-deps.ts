@@ -3,17 +3,17 @@ import type { AuthLadder, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth-browser.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
-import type { CommandMeta } from '../use-cases/commands/command-types.ts';
-import { createBunFileSystem } from '../infra/filesystem-bun.ts';
-import { createNodeFileSystem } from '../infra/filesystem-node.ts';
+import type { CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
+import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { createGraphClient, createTokenSourceGraphClient } from '../infra/graph-client.ts';
-import { createWinstonLogger } from '../infra/logger.ts';
-import { createBunProcessRunner } from '../infra/process-runner-bun.ts';
-import { createNodeProcessRunner } from '../infra/process-runner-node.ts';
-import type { AtomicFileWrites, FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { Logger } from '../use-cases/ports/logger.ts';
-import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
+import { createWinstonLogger } from '@ask-marcel/office-core/infra/logger.ts';
+import { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
+import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';
+import type { AtomicFileWrites, FileExistence, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
+import type { ProcessRunner } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
 import { createEnvThenHelperTokenSource } from './token-source.ts';
 
 export type BuildDepsConfig = {

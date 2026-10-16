@@ -1,4 +1,4 @@
-import type { CommandOptionMeta } from './command-types.ts';
+import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 
 /**
