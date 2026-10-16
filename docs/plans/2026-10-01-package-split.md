@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3".** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -883,6 +883,90 @@ As built in phase 2 (2026-10-15; nothing moved out of the root `src/`):
 
 **Phase 3: core.** Mass-move procedure. Exit: core at 100% coverage on every tier, mutation at or
 above threshold.
+
+As built in phase 3 (2026-10-15):
+
+- The seams of step 15 are closed before the move. The CLI builder, the MCP gateway and
+  `run-registry-command` take the full client as `ReadGraph & WriteGraph` (the type that
+  `command-types.ts` already names), not as `GraphClient` from `graph-client.ts`.
+  `reject-unknown-params` and `tenant-option` take `GraphError` from `graph-request.ts`.
+  `TokenTier` is in the core port `token-source.ts`; `token-issuer.ts` (auth) re-exports it.
+  `format-error`, `tenant-option` and `odata-query` joined the core lists, because core modules
+  import them (the four process and file system adapters, `build-command`). `fakeGraphClient`
+  is typed `ReadGraph & WriteGraph` and is a core fake: the suites `cli-shell`, `cli-shell-names`,
+  `mcp-shell`, `mcp-shell-names`, `run-registry-command`, `tenant-option` and `graph-fakes`
+  thus became core by the test map, with no edit. `skeleton-cli` (phase 2) joined `CORE_FILES`.
+- `eslint.ownership.js` holds the ownership lists and the import and stdout bans as data. The
+  root `eslint.config.js` and `core/eslint.config.js` apply the same bans; the lists name
+  `src/...`, so the globs match the root's files from the root and core's files from `core/`.
+  A folder config cannot import the root config: two configs that call `baseConfig` give
+  typescript-eslint two tsconfig roots, and it stops with a parsing error.
+- Checks that accept both places: `check-package-imports` reads `core/src/` too, reads
+  `@ask-marcel/office-core/<path>` as `core/src/<path>`, and adds three rules with a fixture
+  each: a core module reaches only core modules, a test under `core/` imports only core
+  modules, and (after the move) no test outside `core/` falls to core. `SINGLE_PACKAGE_TESTS`
+  names the one root test that reads every package's source, `bin-placeholders.test.ts`; the
+  map gives it `single`. `check-coverage` skips `core/src/` rows at the root (core gates them in
+  its own run). `check-lint-fixtures` lints a guarded file that it finds under `core/` from
+  `core/`, with core's config, except a type-aware fixture: the root's `lint:strict` fixtures
+  name `src/composition/single-package.ts`, which stays at the root, so the root's type-aware
+  block keeps its own red path. `check-read-bundle` finds the two graphs in `core/src/`. The
+  root declares `@ask-marcel/office-core` (`workspace:*`) in `devDependencies`.
+- The shared test fakes in `core/src/test-helpers` have the dev-only `./test-helpers/*` export.
+  `eslint.base.js` bans an import of `test-helpers/` (by the package name or a relative path) in
+  every non-test file of every folder, with a lint fixture for each form and a test-file
+  control. The builds (phase 2's `build-package` and `build-types`) bundle only the closure of
+  their entries, so no fake reaches a build or a `.d.ts`.
+- The root imports core by its workspace name, `@ask-marcel/office-core/<tier>/<file>.ts`, not by
+  a relative path. Reasons: auth, read and write already use this form (phase 2); phases 4 to 6
+  move root files into a package folder with no edit of their core imports; the root Stryker
+  sandbox leaves `/core/` out, and the name resolves through `node_modules` to the real folder.
+- New core tests (24 files, 244 cases) for what only the real-registry suites covered:
+  `graph-request-answers`, `graph-request-bytes`, `read-graph-substrate`, `write-graph-sessions`,
+  `token-source-needed-by`, `jwt-utils-claims`, `cli-shell-flags`, `mcp-shell-tools`,
+  `run-registry-command-paths`, `build-command-builders`, `command-directory-shape`,
+  `command-effect`, `command-graph-own`, `date-zone-setting`, `docs-builders-entries`,
+  `fetch-raw-bytes-envelopes`, `format-zod-error-issues`, `odata-query-options`,
+  `reject-unknown-params-commands`, `resolve-command-names`, `tenant-option-flag`,
+  `text-passthrough-names`, and copies of the finder cases (`quote-boundary`) and the
+  `buildShareToken` cases (`share-token`), which the read suites also keep. `quote-boundary`
+  also pins what only the read suites pinned: the attributes and spaces each marker tolerates
+  and which marker wins when two appear (20 cases; in `core/` alone the file scores 95.77%, and
+  its 8 survivors are equivalent mutants). With core's half of the placeholder sweep (below),
+  that is 25 files and 268 cases.
+  `command-directory-shape` holds the directory to its shape (kebab case, sorted per package,
+  4 / 204 / 7) without a registry; read's `command-directory.test.ts` keeps it true to the
+  registry.
+- The move (`--no-verify`): the 82 core modules (the shared test fakes included) and the 83
+  core test files (the test map's core files, the new tests among them) moved with `git mv`; 450 root files
+  (sources, tests and scripts) changed only their import specifiers, and the formatter
+  reflowed the imports that grew past the print width. The phase 2 copies of `result.ts` and
+  `result.test.ts` were byte-identical, so the originals took their place: git shows the move
+  of these two as a deletion of the root files. A token-level scan (comments included,
+  specifiers masked) found no other change.
+- `bin-placeholders.test.ts` stays at the root, unchanged: it reads the root `src/` (the source
+  of the three packages while the single package holds them). Core's text (the hints, the
+  remedies, the docs builders) moved out of its glob, so the move commit adds core's half,
+  `core/src/use-cases/commands/bin-placeholders.test.ts`: the same three checks over
+  `core/src/`, a floor of 4,000 lines and a check that `error-hints.ts` is read. It lands in
+  the move commit so that no commit has the sweep blind to core. Each check was seen red on a
+  planted violation (a wrong-package placeholder, an odd form, a bin typed by hand).
+- User-visible output is unchanged: 445 CLI invocations (the top-level and lifecycle paths,
+  error paths, and `docs <command>` and `<command> --help` for every registry command) and an
+  MCP session gave the same bytes before and after (`mcp --help` starts the server, which
+  waits on stdin; it was compared with stdin closed).
+- Checks on the moved tree: root `typecheck`, `lint`, `lint:strict`, the lint fixtures,
+  `check:docs`, `check:read-bundle`, `check:package-imports`, `docs:gen` (no diff), `bun test`
+  and `coverage`; in `core/`: `typecheck`, `lint`, `lint:strict`, `bun test`, `coverage` (100%
+  on every tier) and the full Stryker run (94.72%, threshold 90; 124 survivors, most in
+  `quote-boundary.ts` regexes and in domain modules that the root suites also test).
+- Not in phase 3: the core build into the published packages (auth, read and write are still
+  skeletons); the root `dist/*.d.ts` now name `@ask-marcel/office-core` (the root is private
+  since phase 2 and is never published, and phase 6 deletes it); the root lint globs that name
+  moved files (the stdout writers, the three read-only graph files) match nothing now and stay
+  until a cleanup; the Architecture paragraph of `docs/USAGE.md` still shows one `src/` tree, and
+  phase 7 (per-package README, USAGE and COMMANDS) rewrites it. Two root comments that named
+  moved files now name `core/src/...`.
 
 **Phase 4: auth.** Mass-move procedure; bin `ask-marcel-office-auth`. Live: `login --force`,
 `status`, `token` per tier, the MCP `login` tool, two parallel `token` calls on an expired access
