@@ -2,10 +2,7 @@ import type { AccessToken } from '../../domain/access-token.ts';
 import type { Result } from '../../domain/result.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
 import type { TokenFingerprint } from '../../domain/token-fingerprint.ts';
-import type { TokenError } from './token-source.ts';
-
-// The five kinds of bearer the `token` helper hands out.
-type TokenTier = 'basic' | 'elevated' | 'chatsvcagg' | 'ic3' | 'guest';
+import type { TokenError, TokenTier } from './token-source.ts';
 
 // A guest token is issued by a partner tenant's authority, so it names one.
 type TokenRequest = { readonly tier: Exclude<TokenTier, 'guest'> } | { readonly tier: 'guest'; readonly tenant: TenantId };

@@ -21,7 +21,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import type { GraphClient } from '../infra/graph-client.ts';
+import type { ReadGraph } from '../infra/read-graph.ts';
+import type { WriteGraph } from '../infra/write-graph.ts';
 import { renderErrorToString, renderToString } from '../presenter/render-to-string.ts';
 import type { NameSource } from '../use-cases/commands/bin-names.ts';
 import { fillNames } from '../use-cases/commands/bin-names.ts';
@@ -45,7 +46,7 @@ const MCP_REMEDY = 'Call list-commands to see every command.';
  */
 type McpShellDeps = {
   readonly commandPackage: CommandPackage;
-  readonly graph: GraphClient;
+  readonly graph: ReadGraph & WriteGraph;
   readonly fs: FileSystem;
   readonly version?: string;
   /** Registers the package's own tools (`login`, `status`…) after the four gateway tools. */

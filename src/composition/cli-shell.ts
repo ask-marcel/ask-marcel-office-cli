@@ -1,7 +1,8 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { CommanderError } from 'commander';
 import { didYouMean } from '../domain/closest-names.ts';
-import type { GraphClient } from '../infra/graph-client.ts';
+import type { ReadGraph } from '../infra/read-graph.ts';
+import type { WriteGraph } from '../infra/write-graph.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { OutputFormat } from '../presenter/output.ts';
 import { render, renderError } from '../presenter/output.ts';
@@ -38,7 +39,7 @@ type CliOutput = {
  */
 type CliShellDeps = {
   readonly commandPackage: CommandPackage;
-  readonly graph: GraphClient;
+  readonly graph: ReadGraph & WriteGraph;
   readonly logger: Logger;
   readonly fs: FileSystem;
   readonly version?: string;
