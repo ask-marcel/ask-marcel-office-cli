@@ -2,8 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
 
 // The quote-boundary finders that read and write both use (core, package split
-// phase 3). The cases are copies of the finder cases in
-// mail-quote-stripper.test.ts, which read keeps with its strippers.
+// phase 3). Most cases are copies of the finder cases in
+// mail-quote-stripper.test.ts, which read keeps with its strippers; the last
+// group pins what only read's strippers pinned before core ran its tests alone:
+// the attributes and spaces each marker tolerates, and which marker wins when two
+// appear.
 
 describe('locating where a reply body stops being the author’s new text and starts quoting the thread', () => {
   it('points at the divider Outlook writes above the quote, not at the From/Sent header further down, in a real reply carrying both', () => {
@@ -275,5 +278,90 @@ describe('locating where a reply body stops being the author’s new text and st
 
   it.each(unanchoredMentions)('reports no boundary for $label', ({ text }) => {
     expect(findPlainTextQuoteBoundary(text)).toBe(-1);
+  });
+  // Real clients write more attributes and spaces than the plain shapes above:
+  // Gmail adds a second class, Outlook puts `dir` or `style` before the id, and
+  // new Outlook spaces its CSS values. Each marker must still be found.
+  const attributedMarkers = [
+    { label: 'the Outlook reply header block with a dir attribute before its id', quote: '<div dir="ltr" id="divRplyFwdMsg"><p>the quoted original</p></div>' },
+    { label: 'the Outlook "type above this line" marker with a style before its id', quote: '<div style="display:none" id="appendonsend"></div><p>the quoted original</p>' },
+    { label: 'the Outlook classic separator with a size before its id', quote: '<hr size="2" id="stopSpelling"><p>the quoted original</p>' },
+    { label: 'the Gmail quote div with a dir attribute and a second class', quote: '<div dir="ltr" class="gmail_extra gmail_quote"><p>the quoted original</p></div>' },
+    {
+      label: 'the Gmail quote blockquote with a style attribute and a second class',
+      quote: '<blockquote style="margin:0" class="gmail_extra gmail_quote"><p>the quoted original</p></blockquote>',
+    },
+    { label: 'the #E1E1E1 top-border rule with a space after the colon', quote: '<div style="border:none; border-top: solid #E1E1E1 1.0pt"><p>the quoted original</p></div>' },
+    {
+      label: 'the #B5C4DF rule in rgb() longhand with spaces',
+      quote: '<div style="border-style:solid none none; border-color: rgb(181, 196, 223) currentcolor"><p>the quoted original</p></div>',
+    },
+    {
+      label: 'the #E1E1E1 rule in rgb() longhand with spaces',
+      quote: '<div style="border-style:solid none none; border-color: rgb(225, 225, 225) currentcolor"><p>the quoted original</p></div>',
+    },
+  ];
+
+  it.each(attributedMarkers)('cuts at $label', ({ quote }) => {
+    const authorText = '<p>Confirmed.</p>';
+
+    expect(findQuoteBoundary(`${authorText}${quote}`)).toBe(authorText.length);
+  });
+
+  it('cuts at the Outlook mobile container, not at the header below it, when a line of text sits between them and the tag carries attributes on both sides of its id', () => {
+    const authorText = '<p>Confirmed.</p>';
+    const tag = '<div data-x="y" id="mail-editor-reference-message-container" dir="ltr">';
+
+    expect(findQuoteBoundary(`${authorText}${tag}<p>Forwarded below.</p><p>${MOBILE_HEADER}</p><p>the quoted original</p></div>`)).toBe(authorText.length);
+  });
+
+  it('reports no boundary when the Sent label sits further than the confirmation window after a bold From label', () => {
+    expect(findQuoteBoundary(`<p><b>From:</b> the spec${' all requests need auth.'.repeat(20)}</p><p><b>Sent:</b> Monday</p>`)).toBe(-1);
+  });
+
+  it('reports no boundary for a body that quotes nothing and ends inside an open paragraph', () => {
+    expect(findQuoteBoundary('<p>Agreed.</p><p>X')).toBe(-1);
+  });
+
+  it('cuts at a From/Sent header that sits above a Gmail quote further down', () => {
+    const authorText = '<p>Confirmed.</p>';
+    const html = `${authorText}<p><b>From:</b> Robin Chen<br><b>Sent:</b> Monday, May 5, 2026</p><div class="gmail_quote">older history</div>`;
+
+    expect(findQuoteBoundary(html)).toBe(authorText.length);
+  });
+
+  it('cuts at an Outlook marker that sits above a confirmed mobile container further down', () => {
+    const authorText = '<p>Confirmed.</p>';
+
+    expect(findQuoteBoundary(`${authorText}<div id="appendonsend"></div>${MOBILE_CONTAINER_TAG}<p>${MOBILE_HEADER}</p></div>`)).toBe(authorText.length);
+  });
+
+  const spacedPlainTextBoundaries = [
+    { label: 'an Original Message banner with spaces inside and after it', boundary: '----- Original Message -----  \nFrom: Robin Chen' },
+    { label: 'an underscore rule with trailing spaces', boundary: '______________  \nFrom: Robin Chen' },
+    { label: 'an attribution line with a trailing space', boundary: 'On Monday Robin Chen wrote: \nthe original' },
+    { label: 'a line quoted with >', boundary: '> the original\n> continues' },
+  ];
+
+  it.each(spacedPlainTextBoundaries)('points at $label in a plain-text reply', ({ boundary }) => {
+    const authorText = 'Reply.\n';
+
+    expect(findPlainTextQuoteBoundary(`${authorText}${boundary}`)).toBe(authorText.length);
+  });
+
+  it('reports no boundary for a plain-text note that uses > inside a sentence', () => {
+    expect(findPlainTextQuoteBoundary('Reply.\nThe flow is draft -> review -> send.')).toBe(-1);
+  });
+
+  it('points at the first >-quoted line when an Original Message banner comes later in the plain-text body', () => {
+    const authorText = 'Reply.\n';
+
+    expect(findPlainTextQuoteBoundary(`${authorText}> an older line\n-----Original Message-----\nFrom: Robin Chen`)).toBe(authorText.length);
+  });
+
+  it('points at a From/Sent header that sits above an underscore rule further down a plain-text reply', () => {
+    const authorText = 'Reply.\n';
+
+    expect(findPlainTextQuoteBoundary(`${authorText}From: Robin Chen\nSent: Monday\n\nold body\n_______________\nolder`)).toBe(authorText.length);
   });
 });
