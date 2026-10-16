@@ -75,7 +75,7 @@ const WRITE_FILES = [
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
 const CORE_FILES = [
-  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone}.ts',
+  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,skeleton-cli}.ts',
   'src/use-cases/commands/{command-types,command-graph}.ts',
   'src/presenter/*.ts',
   'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
@@ -83,15 +83,15 @@ const CORE_FILES = [
   'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator,token-source-needed-by}.ts',
   'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
   'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
-  'src/domain/utilities/{base64,spo-tenant}.ts',
+  'src/domain/utilities/{base64,format-error,spo-tenant}.ts',
   // The shared test fakes (the plan's core/src/test-helpers).
   'src/test-helpers/{atomic-file-writes-contract,command-package-fake,fetch-mock,file-exists-contract,filesystem-fake,format-error,jwt,logger-fake}.ts',
-  'src/test-helpers/{process-runner-contract,process-runner-fake,read-graph-fake,write-graph-fake}.ts',
+  'src/test-helpers/{process-runner-contract,process-runner-fake,read-graph-fake,write-graph-fake,graph-client-fake}.ts',
 ];
 
 // CORE_READ_ONLY_FILES: the core modules that the read-only ban also guards.
 const CORE_READ_ONLY_FILES = [
-  'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command}.ts',
+  'src/use-cases/commands/{command-package,command-effect,read-only-post,build-command,format-zod-error,reject-unknown-params,resolve-command,tenant-option,odata-query}.ts',
   'src/use-cases/commands/{command-directory,bin-names,unknown-command}.ts',
   'src/use-cases/commands/{docs-builders,docs-render,first-sentence,output-path,office-extensions,date-zone}.ts',
   'src/use-cases/commands/{fetch-raw-bytes,quote-boundary,share-token,text-passthrough}.ts',
@@ -119,7 +119,7 @@ const SINGLE_PACKAGE_FILES = [
   'src/composition/{cli,mcp,single-package,single-package-names,build-deps}.ts',
   'src/use-cases/commands/{index,lifecycle-entries}.ts',
   'src/infra/{graph-client,auth-token-source}.ts',
-  'src/test-helpers/{graph-client-fake,auth-manager-fake}.ts',
+  'src/test-helpers/auth-manager-fake.ts',
 ];
 
 // The option of the stdout ban, which the root eslint.config.js and core/eslint.config.js apply to
