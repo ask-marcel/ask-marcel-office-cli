@@ -27,7 +27,10 @@
  * module it is named after, else the one package its imports name, else read
  * when it imports the single package's wiring (the real-registry suites go with
  * read, step 13), else core. AUTH_FILES lists auth; a module in no list is read's.
- * A test under core/ imports core modules only: core runs its tests alone.
+ * A test under core/ imports core modules only: core runs its tests alone. A
+ * test outside core/ never falls to core (phase 3 moved every core test into
+ * core/): one the rules give core is reported, so it moves to core/src/ or is
+ * named in SINGLE_PACKAGE_TESTS.
  * Only imports are read: a case that runs another package's command through the
  * registry by name is not seen, so such a case goes in a test file named for its
  * side. `--test-map` prints each test file's package.
@@ -63,6 +66,12 @@ const specifierTo = (from: string, to: string): string => {
 const CORE_FIXTURE = located(`${COMMANDS}/format-zod-error.ts`);
 const CORE_READER_FIXTURE = located(`${COMMANDS}/quote-boundary.ts`);
 const CORE_TEST_FIXTURE = 'core/src/use-cases/commands/fixture-core.test.ts';
+
+// Tests of the single package as a whole: they read the whole root src/, every
+// package's commands included, so no one package takes them. Phases 4 to 6
+// split them with the commands they read. (Core's own half of the placeholder
+// sweep is core/src/use-cases/commands/bin-placeholders.test.ts.)
+const SINGLE_PACKAGE_TESTS: ReadonlySet<string> = new Set(['src/use-cases/commands/bin-placeholders.test.ts']);
 
 type Sources = ReadonlyMap<string, string>;
 type Graph = ReadonlyMap<string, ReadonlyArray<string>>;
@@ -118,6 +127,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     path: CORE_TEST_FIXTURE,
     source: `import { commands } from '${specifierTo(CORE_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
     reported: `${CORE_TEST_FIXTURE} (core) imports ${COMMANDS}/index.ts (single)`,
+  },
+  {
+    name: 'a test outside core/ that imports core modules only',
+    path: `${COMMANDS}/fixture-core-outside.test.ts`,
+    source: "import { ok } from '@ask-marcel/office-core/domain/result.ts';\nexport const f = ok;\n",
+    reported: `${COMMANDS}/fixture-core-outside.test.ts (core) sits outside core/`,
   },
   {
     name: 'a test named after a write command that imports an auth module',
@@ -228,6 +243,7 @@ const importedPackages = (imports: ReadonlyArray<string>, owner: OwnerOf): Reado
 // A test file's package, or undefined when its imports name two packages and nothing else decides.
 const testPackage = (path: string, imports: ReadonlyArray<string>, owner: OwnerOf): Owner | undefined => {
   if (path.startsWith('core/')) return 'core';
+  if (SINGLE_PACKAGE_TESTS.has(path)) return 'single';
   const side = /-(write|auth)\.test\.ts$/.exec(path)?.[1];
   if (side === 'write' || side === 'auth') return side;
   const namesake = path.replace(/\.test\.ts$/, '.ts');
@@ -241,6 +257,7 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
   [...tests].flatMap(([path, imports]) => {
     const own = testPackage(path, imports, owner);
     if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
+    if (own === 'core' && !path.startsWith('core/')) return [`${path} (core) sits outside core/: move it to core/src/, or name it in SINGLE_PACKAGE_TESTS`];
     // A test under core/ runs with core alone: the single wiring is not open to it.
     const foreign = imports.filter((target) => (PACKAGES.includes(owner(target)) || path.startsWith('core/')) && owner(target) !== own);
     return [...new Set(foreign)].map((target) => `${path} (${own}) imports ${target} (${owner(target)})`);
@@ -295,7 +312,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; no test file imports a module of another package; every fixture is reported.');
+  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; no test file imports a module of another package; every core test sits in core/; every fixture is reported.');
   return 0;
 };
 
