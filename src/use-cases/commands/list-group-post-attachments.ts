@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectExpandOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({ groupId: z.string().min(1), threadId: z.string().min(1), postId: z.string().min(1) });
 

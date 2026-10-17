@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { pickODataOptions } from './odata-query.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // Live probe 2026-07-23: `--filter name eq '<no match>'` and `--orderby name
 // asc` each returned the SAME first item as an unfiltered call, so Graph drops

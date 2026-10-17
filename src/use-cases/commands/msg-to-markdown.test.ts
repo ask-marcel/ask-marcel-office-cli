@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
-import type { Result } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ParsedMsg } from '../../infra/msg-reader-adapter.ts';
 import { buildSampleMsg } from '../../test-helpers/office-fixtures.ts';

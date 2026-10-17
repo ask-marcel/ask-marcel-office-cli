@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import type { FileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import type { TokenCacheLockDeps } from './token-cache-lock.ts';
 import { hostname } from 'node:os';
 import { createSystemTokenCacheLock, createTokenCacheLock, processIsAlive } from './token-cache-lock.ts';

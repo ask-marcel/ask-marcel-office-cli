@@ -4,8 +4,7 @@ import { parseJson } from '../domain/json.ts';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { ProcessRunResult } from '../use-cases/ports/process-runner.ts';
-import type { TokenTier } from '../use-cases/ports/token-issuer.ts';
-import type { TokenError } from '../use-cases/ports/token-source.ts';
+import type { TokenError, TokenTier } from '../use-cases/ports/token-source.ts';
 
 /*
  * Reads the token helper's one line (docs/plans/2026-10-01-package-split.md,

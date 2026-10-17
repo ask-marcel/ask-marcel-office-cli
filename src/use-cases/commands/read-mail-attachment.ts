@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { convertFetchedAttachment, MAIL_HINTS } from './convert-mail-attachment-to-markdown.ts';
-import { base64ToBytes } from './fetch-raw-bytes.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { base64ToBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { MAX_CELLS_OPTION, maxCellsField, refuseSheet, SHEET_OPTION } from './xlsx-to-markdown.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';

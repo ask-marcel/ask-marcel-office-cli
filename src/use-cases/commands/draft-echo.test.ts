@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute as createForwardDraft } from './create-forward-draft.ts';
 import { execute as createMailDraft } from './create-mail-draft.ts';
 import { execute as createReplyDraft } from './create-reply-draft.ts';

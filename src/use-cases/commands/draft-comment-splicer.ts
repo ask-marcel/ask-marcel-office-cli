@@ -1,4 +1,4 @@
-import { findPlainTextQuoteBoundary, findQuoteBoundary } from './quote-boundary.ts';
+import { findPlainTextQuoteBoundary, findQuoteBoundary } from '@ask-marcel/office-core/use-cases/commands/quote-boundary.ts';
 
 /**
  * Places an author's reply text into a draft body Graph already minted, without

@@ -13,6 +13,10 @@
  * must exist: when it moves, the fixture fails until both the fixture path and
  * the rule's glob in eslint.config.js move with it. (A virtual path alone would
  * keep matching the old glob and stay green while the moved file lost the rule.)
+ * One move is followed: a root file found under core/ instead (package split,
+ * phase 3) is linted from core/ with core's config, which must hold the rule.
+ * A type-aware fixture with no cwd never follows a move: it proves the root's
+ * own lint:strict, so it names a file that stays at the root.
  *
  * The strict fixtures run through `bun run lint:strict`, the command CI runs,
  * so they prove that script still turns the type-aware block on, not only that
@@ -59,6 +63,11 @@ const SIBLING_DIRECTORY_IMPORT = "import * as registry from '.';\nexport const f
 const SELF_PACKAGE_IMPORT = "import { commands } from 'ask-marcel-office-cli';\nexport const f = (): unknown => commands;\n";
 const DYNAMIC_REGISTRY_IMPORT = "export const f = async (): Promise<unknown> => import('../use-cases/commands/index.ts');\n";
 const DYNAMIC_SIBLING_IMPORT = "export const f = async (): Promise<unknown> => import('./filesystem-node.ts');\n";
+const CORE_FAKE_IMPORT = "import { fakeLogger } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';\nexport const f = (): unknown => fakeLogger;\n";
+const SIBLING_FAKE_IMPORT = "import { fakeLogger } from '../test-helpers/logger-fake.ts';\nexport const f = (): unknown => fakeLogger;\n";
+
+// The rules of the type-aware block: a fixture of one of them guards the root's lint:strict.
+const TYPE_AWARE_RULES: ReadonlySet<string> = new Set(['@typescript-eslint/no-unnecessary-type-assertion', '@typescript-eslint/prefer-promise-reject-errors']);
 
 // One real source file per workspace folder, relative to the folder.
 const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
@@ -101,9 +110,12 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'a read helper never builds the full client', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: FULL_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the read graph never imports the write graph', path: 'src/infra/read-graph.ts', source: SIBLING_WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: a write command takes the write graph', path: 'src/use-cases/commands/create-mail-draft.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
-  { name: 'strict lint rejects a needless assertion', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true },
-  { name: 'strict lint rejects a string rejection', path: 'src/domain/result.ts', source: STRING_REJECTION, rule: '@typescript-eslint/prefer-promise-reject-errors', fires: true, strict: true },
-  { name: 'control: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false },
+  { name: 'production code never imports a shared test fake through the core package', path: 'src/composition/single-package.ts', source: CORE_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
+  { name: 'production code never imports a shared test fake by a relative path', path: 'src/composition/cli-shell.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
+  { name: 'control: a test imports the shared test fakes', path: 'src/composition/cli-shell.test.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: false, strict: false },
+  { name: 'strict lint rejects a needless assertion', path: 'src/composition/single-package.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true },
+  { name: 'strict lint rejects a string rejection', path: 'src/composition/single-package.ts', source: STRING_REJECTION, rule: '@typescript-eslint/prefer-promise-reject-errors', fires: true, strict: true },
+  { name: 'control: plain lint leaves type-aware rules off', path: 'src/composition/single-package.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false },
   // Each workspace folder spreads the root's eslint.base.js; its type-aware block
   // names `src/**`, which must resolve inside the folder.
   ...WORKSPACE_FILES.map(([cwd, path]): Fixture => ({ name: `${cwd}: strict lint rejects a needless assertion`, path, source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true, cwd })),
@@ -145,8 +157,15 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
   }
 };
 
-const check = async (fixture: Fixture): Promise<boolean> => {
-  const label = `${fixture.name}  (${fixture.path}, ${fixture.rule})`;
+// A guarded file of the root src/ that phase 3 moved to core/ (package split)
+// is linted from core/, with core's config: the rule must hold there too. A
+// type-aware fixture stays at the root, where it proves the root's lint:strict.
+const located = async (fixture: Fixture): Promise<Fixture> =>
+  fixture.cwd === undefined && !TYPE_AWARE_RULES.has(fixture.rule) && !(await Bun.file(fixture.path).exists()) && (await Bun.file(`core/${fixture.path}`).exists()) ? { ...fixture, cwd: 'core' } : fixture;
+
+const check = async (listed: Fixture): Promise<boolean> => {
+  const fixture = await located(listed);
+  const label = `${fixture.name}  (${fixture.cwd === undefined ? '' : `${fixture.cwd}/`}${fixture.path}, ${fixture.rule})`;
   if (!(await Bun.file(fixture.cwd === undefined ? fixture.path : `${fixture.cwd}/${fixture.path}`).exists())) {
     console.log(`  FAIL  ${label}\n        ${fixture.path} no longer exists: move this fixture and the rule's glob in eslint.config.js with it`);
     return false;

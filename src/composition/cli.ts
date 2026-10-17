@@ -7,8 +7,8 @@
 import type { Command } from 'commander';
 import type { AuthCliDeps } from './auth-cli.ts';
 import { addAuthCommands } from './auth-cli.ts';
-import type { CliShellDeps } from './cli-shell.ts';
-import { buildCliShell } from './cli-shell.ts';
+import type { CliShellDeps } from '@ask-marcel/office-core/composition/cli-shell.ts';
+import { buildCliShell } from '@ask-marcel/office-core/composition/cli-shell.ts';
 import { commandPackage } from './single-package.ts';
 
 type BuildCliDeps = Omit<CliShellDeps, 'commandPackage' | 'addLifecycleCommands'> & Omit<AuthCliDeps, 'names'>;

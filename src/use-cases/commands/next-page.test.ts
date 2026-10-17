@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute, meta } from './next-page.ts';
 
 const trackingGraph = (): { graph: GraphClient; readonly calls: { readonly via: 'basic' | 'elevated' | 'guest'; readonly path: string; readonly tenantId?: string }[] } => {

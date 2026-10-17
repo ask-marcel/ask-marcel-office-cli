@@ -22,7 +22,9 @@
  * shell remedy types come from the `CommandPackage` in the deps, never from a
  * registry import.
  */
-import type { GraphClient, GraphError } from '../infra/graph-client.ts';
+import type { GraphError } from '../infra/graph-request.ts';
+import type { ReadGraph } from '../infra/read-graph.ts';
+import type { WriteGraph } from '../infra/write-graph.ts';
 import type { ErrorSource } from '../presenter/error-hints.ts';
 import type { RenderContext, RenderSurface } from '../presenter/render-to-string.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
@@ -139,7 +141,7 @@ const formatOutputDirError = (error: OutputDirError, commandName: string, regist
 };
 
 export type RunRegistryCommandDeps = {
-  readonly graph: GraphClient;
+  readonly graph: ReadGraph & WriteGraph;
   readonly fs: FileSystem;
   /** The package the command belongs to: its errors name the package's commands and bin. */
   readonly commandPackage: ErrorWordingSource;

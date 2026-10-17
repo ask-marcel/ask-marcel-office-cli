@@ -12,6 +12,10 @@ export type TokenError = { readonly type: 'auth_failed'; readonly message: strin
 // not hand that one back from its cache, and never opens a browser to replace it.
 type TokenAsk = { readonly rejected?: AccessToken };
 
+// The five kinds of bearer the `token` helper hands out. Core names them, so the
+// helper source and the helper itself (auth) share one list.
+export type TokenTier = 'basic' | 'elevated' | 'chatsvcagg' | 'ic3' | 'guest';
+
 // Where every bearer the Graph and Teams calls send comes from. The in-process
 // AuthManager adapter (src/infra/auth-token-source.ts) is the default; the
 // environment source (src/infra/env-token-source.ts) in front of the token

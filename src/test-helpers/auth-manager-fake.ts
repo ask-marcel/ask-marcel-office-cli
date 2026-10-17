@@ -1,4 +1,4 @@
-import { accessTokenUnsafe } from '../domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import type { AuthLadder } from '../infra/auth.ts';
 
 /**

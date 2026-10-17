@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import type { CommandPackage } from './command-package.ts';
-import type { Command } from './command-types.ts';
-import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from './docs-builders.ts';
-import type { CommandManifestEntry } from './docs-render.ts';
+import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
+import type { Command } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
+import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { commands } from './index.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 

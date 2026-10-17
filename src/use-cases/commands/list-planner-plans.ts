@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectOnlyOptions } from './odata-query.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectOnlyOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // Graph's `/me/planner/plans` honors `$select` server-side; every other
 // OData passthrough is silently dropped (verified live — `--top 1` still

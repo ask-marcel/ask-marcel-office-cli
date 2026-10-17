@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema } from './odata-query.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { DUE_BEFORE_OPTION, dueBeforeClause, dueBeforeField } from './todo-due-before.ts';
 import { rewriteTodoTitleQuirk } from './todo-parse-uri-rewrite.ts';
 import { withTaskLinks } from './todo-web-url.ts';

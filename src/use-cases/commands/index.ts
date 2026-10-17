@@ -1,6 +1,6 @@
-import { withOwnGraph } from './command-graph.ts';
-import type { Command, RegisteredCommand } from './command-types.ts';
-import { withUnknownParamRejection } from './reject-unknown-params.ts';
+import { withOwnGraph } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
+import type { Command, RegisteredCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
 import * as diffDriveItemVersions from './diff-drive-item-versions.ts';
 import * as diffDriveItems from './diff-drive-items.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';

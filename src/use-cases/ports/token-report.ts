@@ -1,4 +1,4 @@
-import type { Result } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 
 /**
  * Decode-only status for one non-basic token tier: availability, remaining runway,

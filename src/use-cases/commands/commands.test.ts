@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../../domain/access-token.ts';
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { AuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
@@ -21,9 +21,9 @@ import {
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import type { CommandExecute } from './command-types.ts';
-import { renderSingleCommand } from './docs-builders.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
 import * as extractDriveItemImages from './extract-drive-item-images.ts';
@@ -114,7 +114,7 @@ import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-ev
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
 import * as extractSharepointLinksInDocuments from './extract-sharepoint-links-in-documents.ts';
-import { buildShareToken } from './share-token.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 import { resolveSharepointUrls } from './sharepoint-link-extractor.ts';
 import { stripQuotedPlainText, stripQuotedReplies } from './mail-quote-stripper.ts';
 import { embedOnenoteResources } from './onenote-resource-embedder.ts';

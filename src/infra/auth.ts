@@ -1,21 +1,21 @@
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '../domain/access-token.ts';
-import { decodeJwtPayload } from '../domain/jwt-utils.ts';
-import type { Result } from '../domain/result.ts';
-import { err, ok } from '../domain/result.ts';
-import type { TenantId } from '../domain/tenant-id.ts';
-import type { TokenFingerprint } from '../domain/token-fingerprint.ts';
-import { tokenFingerprint } from '../domain/token-fingerprint.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { Logger } from '../use-cases/ports/logger.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '@ask-marcel/office-core/domain/access-token.ts';
+import { decodeJwtPayload } from '@ask-marcel/office-core/domain/jwt-utils.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { TenantId } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
+import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
+import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../use-cases/ports/token-report.ts';
 import type { ElevatedFailureReason } from './browser-auth.ts';
-import { REQUEST_TIMEOUT_LABEL, REQUEST_TIMEOUT_MS } from './network-error.ts';
+import { REQUEST_TIMEOUT_LABEL, REQUEST_TIMEOUT_MS } from '@ask-marcel/office-core/infra/network-error.ts';
 import type { LockPurpose, TokenCacheLock } from './token-cache-lock.ts';
 import { createSystemTokenCacheLock } from './token-cache-lock.ts';
-import type { SecondaryTokenCommands } from './token-source-needed-by.ts';
-import { neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './token-source-needed-by.ts';
+import type { SecondaryTokenCommands } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
+import { neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
 
 type CachedToken = {
   access_token: string;

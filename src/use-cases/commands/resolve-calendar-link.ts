@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 // Deep-link parser for Microsoft Outlook calendar item URLs. Outlook
 // emits two shapes for a single event:

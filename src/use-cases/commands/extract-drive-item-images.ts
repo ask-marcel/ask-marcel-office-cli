@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { fetchRawBytes } from './fetch-raw-bytes.ts';
-import { formatZodError } from './format-zod-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from './tenant-option.ts';
+import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), pages: pagesField.optional(), ...tenantIdShape });
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildNoSkipListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { noSkipOptions, noSkipShape } from './odata-query.ts';
+import { buildNoSkipListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { noSkipOptions, noSkipShape } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { recentItemPath, WITH_ITEM_OPTION, withItemEnrichment } from './with-item.ts';
 
 const baseSchema = z.object({}).strict();

@@ -2,14 +2,14 @@
 // of `login`. Moved out of cli.test.ts with their text unchanged (package split, step 16),
 // so the auth package takes this file whole; the helpers are copies of that file's.
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import type { AuthError, AuthLadder } from '../infra/auth.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import type { TokenInfo } from '../use-cases/ports/token-report.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildCli } from './cli.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<unknown>): Promise<string> => {

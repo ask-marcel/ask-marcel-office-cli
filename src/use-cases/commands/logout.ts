@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { AuthManager } from '../../infra/auth.ts';
 
 const schema = z.object({}).strict();

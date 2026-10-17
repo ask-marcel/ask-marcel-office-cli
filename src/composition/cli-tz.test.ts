@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { fakeGraphClient } from '../test-helpers/graph-client-fake.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
-import { currentDateZone, setDateZone } from '../use-cases/commands/date-zone.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
+import { currentDateZone, setDateZone } from '@ask-marcel/office-core/use-cases/commands/date-zone.ts';
 import { buildCli } from './cli.ts';
-import { machineTimeZone } from './date-zone.ts';
+import { machineTimeZone } from '@ask-marcel/office-core/composition/date-zone.ts';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
   const original = process.stdout.write.bind(process.stdout);

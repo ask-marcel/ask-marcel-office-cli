@@ -1,4 +1,4 @@
-import { parseJson } from '../../domain/json.ts';
+import { parseJson } from '@ask-marcel/office-core/domain/json.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 
 /**

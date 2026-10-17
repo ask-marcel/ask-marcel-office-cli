@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
-import { ok } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { buildCommand, buildElevatedCommand, buildElevatedListCommand, buildElevatedPickODataListCommand, buildListCommand } from './build-command.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import {
+  buildCommand,
+  buildElevatedCommand,
+  buildElevatedListCommand,
+  buildElevatedPickODataListCommand,
+  buildListCommand,
+} from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
 
 const fakeGraph: GraphClient = fakeGraphClient();
 

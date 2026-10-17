@@ -43,7 +43,7 @@
  */
 
 import { join } from 'node:path';
-import { decodeJwtPayload } from '../src/domain/jwt-utils.ts';
+import { decodeJwtPayload } from '@ask-marcel/office-core/domain/jwt-utils.ts';
 
 const GRAPH_AUD = 'https://graph.microsoft.com';
 

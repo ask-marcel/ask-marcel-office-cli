@@ -7,14 +7,14 @@
  */
 import type { Command } from 'commander';
 import type { AuthLadder } from '../infra/auth.ts';
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
-import { fillNames, fillNamesIn } from '../use-cases/commands/bin-names.ts';
+import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
+import { fillNames, fillNamesIn } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import * as status from '../use-cases/commands/status.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
-import type { CliOutput } from './cli-shell.ts';
+import type { CliOutput } from '@ask-marcel/office-core/composition/cli-shell.ts';
 
 type AuthCliDeps = {
   readonly auth: AuthLadder;

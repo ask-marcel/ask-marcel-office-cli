@@ -1,4 +1,4 @@
-import { findQuoteBoundary } from './quote-boundary.ts';
+import { findQuoteBoundary } from '@ask-marcel/office-core/use-cases/commands/quote-boundary.ts';
 
 /**
  * Lifts the sender's own signature out of a message they sent, so a draft Graph

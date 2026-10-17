@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import { fetchRawBytes, inlineBinary } from './fetch-raw-bytes.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fetchRawBytes, inlineBinary } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 
 const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
 
@@ -177,21 +177,21 @@ describe('inlineBinary', () => {
 
 describe('tagPdfPassthrough', () => {
   it('passes through unchanged when the response IS application/pdf (the conversion succeeded — no warning needed)', async () => {
-    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const { tagPdfPassthrough } = await import('@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts');
     const inner = ok({ contentType: 'application/pdf', size: 100, base64: 'JVBERi0=' });
     const tagged = tagPdfPassthrough(inner, 'deck.pptx');
     expect(tagged).toEqual(inner);
   });
 
   it('passes through err results unchanged (no point tagging a failure)', async () => {
-    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const { tagPdfPassthrough } = await import('@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts');
     const inner = err({ type: 'api_error' as const, status: 500, message: 'boom' });
     const tagged = tagPdfPassthrough(inner, 'deck.pptx');
     expect(tagged).toEqual(inner);
   });
 
   it('attaches passthrough:true and a "save with source extension" note when the response is NOT application/pdf despite a format=pdf request (audit round-5 #2 — the silent raw-bytes fallback)', async () => {
-    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const { tagPdfPassthrough } = await import('@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts');
     const inner = ok({ contentType: 'application/octet-stream', size: 980167, base64: 'rawpptx' });
     const tagged = tagPdfPassthrough(inner, 'roadmap26.pptx');
     expect(tagged.ok).toBe(true);
@@ -206,7 +206,7 @@ describe('tagPdfPassthrough', () => {
   });
 
   it('also tags when the response carries a non-pdf MIME like vnd.openxmlformats-officedocument.presentationml.presentation', async () => {
-    const { tagPdfPassthrough } = await import('./fetch-raw-bytes.ts');
+    const { tagPdfPassthrough } = await import('@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts');
     const inner = ok({
       contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       size: 980167,

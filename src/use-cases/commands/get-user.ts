@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { withDefaultSelect } from './build-command.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataStringLiteral, selectExpandOptions, selectExpandSchema } from './odata-query.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { withDefaultSelect } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { appendOData, odataStringLiteral, selectExpandOptions, selectExpandSchema } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { kqlSearchClause } from './search-escape.ts';
 
 const schema = z.object({ userId: z.string().min(1) }).extend(selectExpandSchema.shape);

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // Hardcoded `$filter=conversationId eq '...'` in the path means a
 // user-supplied `--filter` would cause Graph to receive two `$filter` query

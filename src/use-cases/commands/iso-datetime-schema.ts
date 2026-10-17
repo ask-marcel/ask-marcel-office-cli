@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { parseIsoDateTime } from '../../domain/iso-datetime.ts';
-import { currentDateZone } from './date-zone.ts';
+import { parseIsoDateTime } from '@ask-marcel/office-core/domain/iso-datetime.ts';
+import { currentDateZone } from '@ask-marcel/office-core/use-cases/commands/date-zone.ts';
 
 /**
  * Reusable Zod field for an ISO-8601 UTC datetime parameter that ALSO accepts
- * the relative-date vocabulary defined in `src/domain/iso-datetime.ts`
+ * the relative-date vocabulary defined in `core/src/domain/iso-datetime.ts`
  * (`7d`, `1w`, `today`, `monday`, `start-of-month`, etc.). Calendar commands
  * compose this into their schemas in place of `z.string().min(1)`; the
  * URL-builder sees the already-resolved canonical ISO form.

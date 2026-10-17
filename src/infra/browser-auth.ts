@@ -1,12 +1,12 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '../domain/access-token.ts';
-import { decodeJwtPayload, isTokenFresh } from '../domain/jwt-utils.ts';
-import type { FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { Logger } from '../use-cases/ports/logger.ts';
-import { createBunFileSystem } from './filesystem-bun.ts';
-import { createNodeFileSystem } from './filesystem-node.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessToken, accessTokenUnsafe, SUBSTRATE_AUDIENCE } from '@ask-marcel/office-core/domain/access-token.ts';
+import { decodeJwtPayload, isTokenFresh } from '@ask-marcel/office-core/domain/jwt-utils.ts';
+import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
+import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
+import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import { resolveAuthPaths } from './auth-paths.ts';
 import { loadPlaywright } from './playwright-loader.ts';
 

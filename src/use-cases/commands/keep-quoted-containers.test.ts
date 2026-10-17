@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { ok } from '../../domain/result.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildQuotedSampleMsg } from '../../test-helpers/office-fixtures.ts';
 import { commands } from './index.ts';
 

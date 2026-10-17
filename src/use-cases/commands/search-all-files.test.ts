@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute, meta, schema } from './search-all-files.ts';
 
 // A graph fake whose POST handler is driven by the `from` offset of the search

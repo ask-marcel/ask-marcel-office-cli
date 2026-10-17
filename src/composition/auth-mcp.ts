@@ -9,14 +9,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import type { AuthLadder } from '../infra/auth.ts';
-import { renderToString } from '../presenter/render-to-string.ts';
-import type { NameSource } from '../use-cases/commands/bin-names.ts';
-import { fillNames, fillNamesIn } from '../use-cases/commands/bin-names.ts';
+import { renderToString } from '@ask-marcel/office-core/presenter/render-to-string.ts';
+import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
+import { fillNames, fillNamesIn } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import * as login from '../use-cases/commands/login.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as status from '../use-cases/commands/status.ts';
 import type { LoginAuthFactory } from './build-deps.ts';
-import { errText, okText } from './mcp-shell.ts';
+import { errText, okText } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 
 type AuthToolsDeps = {
   readonly auth: AuthLadder;

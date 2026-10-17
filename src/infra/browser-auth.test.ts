@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { jwtSegment } from '../test-helpers/jwt.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { jwtSegment } from '@ask-marcel/office-core/test-helpers/jwt.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import type { BrowserAuthApi, BrowserAuthConfig, ContextLike, PageLike, RequestLike, ResponseLike } from './browser-auth.ts';
 import { createBrowserAuth, createBrowserAuthFromApi, createPlaywrightApi } from './browser-auth.ts';
-import { createBunFileSystem } from './filesystem-bun.ts';
+import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 
 const makeJwt = (claims: Record<string, unknown>): string => {
   const header = jwtSegment({ alg: 'RS256' });

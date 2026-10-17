@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../../domain/access-token.ts';
-import { tenantIdUnsafe } from '../../domain/tenant-id.ts';
-import { tokenFingerprint } from '../../domain/token-fingerprint.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import { parseTokenArgs } from './token-args.ts';
 
 const GUID = '8f2c1a4e-3b6d-4c9a-9e1f-2a7b5c8d0e3f';

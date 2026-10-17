@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildElevatedSelectableCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectExpandOptions } from './odata-query.ts';
+import { buildElevatedSelectableCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectExpandOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // round-6 moved this off elevation on the hypothesis
 // that the basic Teams web client token would reach `/chats/{id}`. The

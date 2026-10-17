@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute } from './convert-mail-to-markdown.ts';
 
 // The command's own tests live in commands.test.ts; this file covers the

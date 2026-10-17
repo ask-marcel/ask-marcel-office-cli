@@ -1,13 +1,13 @@
-import { createEnvTokenSource } from '../infra/env-token-source.ts';
-import { createHelperTokenSource } from '../infra/helper-token-source.ts';
+import { createEnvTokenSource } from '@ask-marcel/office-core/infra/env-token-source.ts';
+import { createHelperTokenSource } from '@ask-marcel/office-core/infra/helper-token-source.ts';
 import { resolveAuthPaths } from '../infra/auth-paths.ts';
-import { locateTokenHelper } from '../infra/token-helper-locator.ts';
-import type { SecondaryTokenCommands } from '../infra/token-source-needed-by.ts';
-import { NO_SECONDARY_TOKEN_COMMANDS, withNeededBy } from '../infra/token-source-needed-by.ts';
-import { runTokenHelper } from '../infra/token-helper-run.ts';
-import type { FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
-import type { ProcessRunner } from '../use-cases/ports/process-runner.ts';
-import type { TokenSource } from '../use-cases/ports/token-source.ts';
+import { locateTokenHelper } from '@ask-marcel/office-core/infra/token-helper-locator.ts';
+import type { SecondaryTokenCommands } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
+import { NO_SECONDARY_TOKEN_COMMANDS, withNeededBy } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
+import { runTokenHelper } from '@ask-marcel/office-core/infra/token-helper-run.ts';
+import type { FileExistence, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
+import type { ProcessRunner } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
+import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import { tokenHelperLocatorPath } from './token-helper.ts';
 
 export type EnvThenHelperOptions = {

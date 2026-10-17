@@ -7,8 +7,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AuthToolsDeps } from './auth-mcp.ts';
 import { addAuthTools } from './auth-mcp.ts';
-import type { McpShellDeps } from './mcp-shell.ts';
-import { buildMcpShell } from './mcp-shell.ts';
+import type { McpShellDeps } from '@ask-marcel/office-core/composition/mcp-shell.ts';
+import { buildMcpShell } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 import { commandPackage } from './single-package.ts';
 
 type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'> & Omit<AuthToolsDeps, 'names'>;

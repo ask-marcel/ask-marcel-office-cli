@@ -1,6 +1,6 @@
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import { buildShareToken } from './share-token.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import { buildShareToken } from '@ask-marcel/office-core/use-cases/commands/share-token.ts';
 
 /**
  * Shared helpers for the SharePoint-link-extraction commands

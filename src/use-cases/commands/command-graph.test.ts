@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
-import { ok } from '../../domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import type { ReadGraph, ReadOnlyPostPath } from '../../infra/read-graph.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
-import type { Command, CommandMeta, ReadCommand, WriteCommand } from './command-types.ts';
+import type { ReadGraph, ReadOnlyPostPath } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import type { Command, CommandMeta, ReadCommand, WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { commands, registerCommands } from './index.ts';
 
 /*

@@ -1,8 +1,8 @@
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
-import { tenantId } from '../../domain/tenant-id.ts';
-import type { TokenFingerprint } from '../../domain/token-fingerprint.ts';
-import { parseTokenFingerprint } from '../../domain/token-fingerprint.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantId } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import type { TokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
+import { parseTokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { TokenRequest, TokenTier } from '../ports/token-issuer.ts';
 
 // The one line the helper prints when it hands out no token. `tier` is null when

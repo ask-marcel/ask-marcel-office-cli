@@ -1,5 +1,5 @@
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { TokenInfo, TokenReport, TokenReportError, TokenTierInfo } from '../ports/token-report.ts';
 import type { OptionalTier } from './token-tier-capability.ts';
 import { TIER_CAPABILITY } from './token-tier-capability.ts';

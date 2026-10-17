@@ -2,14 +2,14 @@
 // OneDrive file. Moved out of commands.test.ts with their text unchanged (package split,
 // step 16), so the write package takes this file whole; the helpers are copies of that file's.
 import { describe, expect, it } from 'bun:test';
-import { accessTokenUnsafe } from '../../domain/access-token.ts';
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { AuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
 import { createGraphClient } from '../../infra/graph-client.ts';
 import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
-import type { CommandExecute } from './command-types.ts';
+import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 

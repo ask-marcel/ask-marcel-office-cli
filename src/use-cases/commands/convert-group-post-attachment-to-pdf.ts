@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-request.ts';
-import type { WriteGraph } from '../../infra/write-graph.ts';
-import type { WriteCommandMeta } from './command-types.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { WriteCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { convertAttachmentToPdf } from './convert-mail-attachment-to-pdf.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 const schema = z.object({
   groupId: z.string().min(1),

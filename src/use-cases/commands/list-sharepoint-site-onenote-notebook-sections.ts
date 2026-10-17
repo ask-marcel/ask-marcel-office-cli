@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { odataQueryOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1), notebookId: z.string().min(1) });

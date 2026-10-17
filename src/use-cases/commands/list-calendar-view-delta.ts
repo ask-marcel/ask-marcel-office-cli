@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
-import { topOnlyOptions, topOnlyShape } from './odata-query.ts';
+import { topOnlyOptions, topOnlyShape } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({
   startDateTime: isoDateTimeField,

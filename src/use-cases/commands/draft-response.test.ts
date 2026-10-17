@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import { slimDraftResult } from './draft-response.ts';
 
 const fullDraft = {

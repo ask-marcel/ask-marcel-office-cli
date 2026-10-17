@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { tenantIdUnsafe } from '../domain/tenant-id.ts';
-import { createFileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import type { FileSystemFake } from '../test-helpers/filesystem-fake.ts';
-import { unsignedJwt } from '../test-helpers/jwt.ts';
-import { createLoggerFake } from '../test-helpers/logger-fake.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import type { FileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
+import { unsignedJwt } from '@ask-marcel/office-core/test-helpers/jwt.ts';
+import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import type { FetchFn } from './auth.ts';
 import { createAuthLadder } from './auth.ts';
 

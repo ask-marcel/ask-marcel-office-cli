@@ -50,7 +50,7 @@
  */
 
 import { join } from 'node:path';
-import { decodeJwtPayload } from '../src/domain/jwt-utils.ts';
+import { decodeJwtPayload } from '@ask-marcel/office-core/domain/jwt-utils.ts';
 
 const OUTLOOK_APP_ID = '9199bf20-a13f-4107-85dc-02114787ef48';
 const GRAPH_AUD = 'https://graph.microsoft.com';

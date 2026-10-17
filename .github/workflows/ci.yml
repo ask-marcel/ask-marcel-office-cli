@@ -26,7 +26,10 @@
 #      not BASE=HEAD~1: a push of several commits mutated only the last one's
 #      files, so on 2026-08-30 two of three commits were never mutated at all
 #      and the survivors they added surfaced a push later. Run the full
-#      `bun run mutate` as a periodic manual audit, not per push.
+#      `bun run mutate` as a periodic manual audit, not per push. The pushed
+#      range can still be large (241 commits on 2026-10-15 ran past the job
+#      limit), so the root mutation runs in its own `mutation` job, in 8
+#      parallel shards.
 #
 # Package split (docs/plans/2026-10-01-package-split.md, Checks and CI): `gates`
 # and `smoke` are the root src/ job and keep every gate until phase 6 deletes
@@ -109,11 +112,32 @@ jobs:
           bun run check:docs
       - name: mutation scope selftest (a pure move mutates nothing, a sub-folder run maps its paths)
         run: bash scripts/mutation-scope-selftest.sh
-      - name: mutation (changed files; see deviation 3 in the header)
+      - name: dependency CVEs (fails on high)
+        run: bun audit --audit-level=high
+  mutation:
+    # The root src/ mutation, divided over parallel shards. One job ran into the
+    # 6-hour job limit on 2026-10-15: a push of 241 commits gave 13888 mutants.
+    # Each shard mutates every SHARD_COUNT-th file of the same scope
+    # (scope_shard in scripts/mutation-scope.sh), so the shards together cover
+    # the whole scope once, and each shard must reach the break score alone.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for mutate:changed
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: mutation (changed files, shard ${{ matrix.shard }} of 8; see deviation 3 in the header)
         env:
           # The branch tip BEFORE this push. Read via env rather than inlined,
           # so the shell never interpolates a ref name into its own source.
           PUSHED_FROM: ${{ github.event.before }}
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_COUNT: 8
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             bun run mutate:changed
@@ -125,14 +149,12 @@ jobs:
             # First push to the branch, or a force-push whose old tip is gone.
             BASE=HEAD~1 bun run mutate:changed
           fi
-      - name: dependency CVEs (fails on high)
-        run: bun audit --audit-level=high
   smoke:
     # The shipped bundle, run the way users run it: from dist, and installed from
     # the packed tarball into an empty directory outside the repo. A separate job
     # with no `needs`: the packed install pulls dependencies fresh from the
     # registry, so an outage or a broken upstream release fails this job without
-    # blocking mutation and the audit in `gates` (a red push there would leave its
+    # blocking the `mutation` job or the audit in `gates` (a red push there would leave its
     # range unmutated). Node 20 is the floor `engines` promises. The smokes run as
     # `bun <file>`, not `bun run <file>`, so bun never puts its own `node` shim on
     # PATH and the node probes really run on node.

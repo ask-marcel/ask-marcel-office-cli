@@ -6,7 +6,7 @@
  * `bun run docs:gen` and `bun run check:docs` read it through `--package`.
  * After the package split each package has its own (plan step 13).
  */
-import type { CommandPackage } from '../use-cases/commands/command-package.ts';
+import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { LIFECYCLE_ENTRIES } from '../use-cases/commands/lifecycle-entries.ts';
 import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';

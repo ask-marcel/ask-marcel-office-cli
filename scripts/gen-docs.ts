@@ -28,11 +28,11 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { fillNames } from '../src/use-cases/commands/bin-names.ts';
-import type { CommandPackage } from '../src/use-cases/commands/command-package.ts';
-import type { CommandManifest, CommandManifestEntry } from '../src/use-cases/commands/docs-render.ts';
-import { renderReadmeTables } from '../src/use-cases/commands/docs-render.ts';
-import { buildManifest as buildHelpJsonManifest } from '../src/use-cases/commands/docs-builders.ts';
+import { fillNames } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
+import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
+import type { CommandManifest, CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
+import { renderReadmeTables } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
+import { buildManifest as buildHelpJsonManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 
 const USAGE = 'usage: bun run scripts/gen-docs.ts --package <module exporting commandPackage> --manifest <commands.json> --commands-doc <COMMANDS.md>';
 

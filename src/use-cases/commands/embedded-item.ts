@@ -1,8 +1,8 @@
-import type { Result } from '../../domain/result.ts';
-import { ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
-import { fetchRawBytes } from './fetch-raw-bytes.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 
 /**
  * An Outlook item attached to a mail, read the only way Graph allows. A plain

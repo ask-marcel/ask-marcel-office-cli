@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import type { Result } from '../../domain/result.ts';
-import { err, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { type ChannelMessage } from './channel-message-html.ts';
 import { fetchHostedImages, hostedImageSources } from './channel-message-images.ts';
 import { renderThread } from './channel-message-markdown.ts';
 import { markdownEnvelope, relativeGraphPath } from './channel-message-page.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 
 const schema = z.object({

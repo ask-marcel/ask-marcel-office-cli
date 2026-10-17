@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { commandRole } from './command-directory.ts';
-import type { Command, CommandMeta } from './command-types.ts';
+import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
+import type { Command, CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { commands } from './index.ts';
 
 const camelToKebab = (s: string): string => s.replaceAll(/([A-Z])/g, '-$1').toLowerCase();

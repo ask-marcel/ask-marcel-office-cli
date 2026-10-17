@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { didYouMean } from '../../domain/closest-names.ts';
 import type { Result } from '../../domain/result.ts';
 import { err } from '../../domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '../../infra/graph-request.ts';
 import type { Command } from './command-types.ts';
 
 /*

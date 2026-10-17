@@ -1,4 +1,4 @@
-import type { CommandManifestEntry } from './docs-render.ts';
+import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 
 /**
  * Lifecycle commands aren't backed by a Graph endpoint and aren't in the

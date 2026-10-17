@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
-import { formatZodError } from './format-zod-error.ts';
-import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from './odata-query.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
+import { appendOData, odataQueryOptions, odataQuerySchema, odataStringLiteral } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // The path already pins `?$filter=contains(title,...)` for the title match
 // Graph requires. A user-supplied --filter would land Graph in double-$filter

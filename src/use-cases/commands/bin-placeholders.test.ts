@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { commandRole } from './command-directory.ts';
+import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
 
 // Every command reference in the CLI's own text names its bin through a
 // placeholder (bin-names.ts): `{auth-bin}`, `{read-bin}` or `{write-bin}` before

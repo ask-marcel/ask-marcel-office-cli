@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildNoSkipListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { noSkipOptions, odataStringLiteral } from './odata-query.ts';
+import { buildNoSkipListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { noSkipOptions, odataStringLiteral } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({ query: z.string().min(1) });
 const { execute, schema } = buildNoSkipListCommand((p) => `/me/drive/search(q='${odataStringLiteral(p.query)}')`, baseSchema);

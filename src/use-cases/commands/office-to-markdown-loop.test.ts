@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { ok } from '../../domain/result.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
 const htmlGraph = (html: string): ReturnType<typeof fakeGraphClient> => fakeGraphClient({ getBinary: async () => ok({ contentType: 'text/html', size: html.length, text: html }) });

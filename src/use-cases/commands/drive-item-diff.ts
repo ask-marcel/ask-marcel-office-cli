@@ -1,9 +1,9 @@
-import type { Result } from '../../domain/result.ts';
-import { err, map, ok } from '../../domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, map, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '../../infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { lineDiff, MAX_EDITS } from '../../infra/line-diff-adapter.ts';
-import type { FetchOptions } from './fetch-raw-bytes.ts';
+import type { FetchOptions } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { OMITTED_TABLE_MARKER } from './xlsx-to-markdown.ts';
 

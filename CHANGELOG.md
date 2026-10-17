@@ -4,6 +4,24 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+### Fixed: PDF conversion on Node 20
+
+`unpdf` 1.9.0 (2026-10-15) needs Node 22. A new install of 2.8.0 on Node 20
+got it through the range `^1.6.2`, and PDF text and image extraction then
+failed with a "Serverless" error. The range is now `>=1.6.2 <1.8.0`. These
+versions do not ask for Node 22, so they match the Node 20 floor that
+`engines` promises.
+
+### Security: two dependency advisories
+
+`@modelcontextprotocol/sdk` goes from 1.29.0 to 1.32.1 (GHSA-6qxp-vccf-f47h,
+high: the OAuth client could send credentials to an authorization server that
+the MCP server chose). `proxy-addr` goes from 2.0.7 to 2.0.8 through an
+`overrides` entry (GHSA-jqcg-44mw-7w3h, critical: IP spoofing through an
+IPv4-mapped IPv6 trust subnet; it comes in through the SDK's `express`). This
+CLI uses the SDK's stdio transport only, and it does not use the OAuth client
+or the HTTP server.
+
 These changes come from phase 1 of the package split
 (`docs/plans/2026-10-01-package-split.md`).
 

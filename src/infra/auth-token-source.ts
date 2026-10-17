@@ -1,11 +1,11 @@
-import type { AccessToken } from '../domain/access-token.ts';
-import type { Result } from '../domain/result.ts';
-import { err } from '../domain/result.ts';
-import type { TeamsRegion } from '../domain/teams-region.ts';
-import { teamsRegion } from '../domain/teams-region.ts';
-import { tokenFingerprint } from '../domain/token-fingerprint.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import { teamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import type { TokenIssuer, TokenRequest } from '../use-cases/ports/token-issuer.ts';
-import type { TokenError, TokenSource } from '../use-cases/ports/token-source.ts';
+import type { TokenError, TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { AuthManager } from './auth.ts';
 
 // The cached region is pasted into every substrate URL; one that is not a region

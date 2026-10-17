@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import { buildRichDocx } from '../../test-helpers/office-fixtures.ts';
-import { fakeGraphClient } from '../../test-helpers/graph-client-fake.ts';
+import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from './index.ts';
 
 const command = commands['extract-group-post-attachment-images'];

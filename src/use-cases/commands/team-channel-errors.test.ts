@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok } from '../../domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
 

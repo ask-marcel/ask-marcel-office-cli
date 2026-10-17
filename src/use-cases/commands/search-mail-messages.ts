@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { err } from '../../domain/result.ts';
-import { buildListCommand } from './build-command.ts';
-import type { ReadCommand, ReadCommandMeta } from './command-types.ts';
+import { err } from '@ask-marcel/office-core/domain/result.ts';
+import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { MAIL_MESSAGE_DEFAULT_SELECT } from './mail-message-select.ts';
-import { odataQueryOptions } from './odata-query.ts';
+import { odataQueryOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { kqlSearchClause } from './search-escape.ts';
 
 const baseSchema = z.object({ query: z.string().min(1) });
@@ -20,7 +20,7 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
   if (typeof params['filter'] === 'string' && params['filter'].length > 0) {
     // short `error` headline, with the
     // actionable remedy carried by the matching `hint` rule in
-    // src/presenter/error-hints.ts (matched by `code`). Prior shape packed
+    // core/src/presenter/error-hints.ts (matched by `code`). Prior shape packed
     // both diagnosis AND remedy into `message`, leaving the generic
     // validation hint as boilerplate noise.
     return err({

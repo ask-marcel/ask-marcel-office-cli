@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'bun:test';
-import type { AccessToken } from '../domain/access-token.ts';
-import { accessTokenUnsafe } from '../domain/access-token.ts';
-import { ok } from '../domain/result.ts';
-import { tenantIdUnsafe } from '../domain/tenant-id.ts';
-import { tokenFingerprint } from '../domain/token-fingerprint.ts';
+import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts';
+import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
+import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerprint.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
 import { createGraphClient } from './graph-client.ts';
-import type { FetchFn } from './graph-request.ts';
+import type { FetchFn } from '@ask-marcel/office-core/infra/graph-request.ts';
 
 const TENANT = tenantIdUnsafe('11111111-2222-3333-4444-555555555555');
 const segment = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url');

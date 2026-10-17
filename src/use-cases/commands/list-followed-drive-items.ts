@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildNoSkipListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { noSkipOptions } from './odata-query.ts';
+import { buildNoSkipListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { noSkipOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 const baseSchema = z.object({}).strict();
 const { execute, schema } = buildNoSkipListCommand(() => '/me/drive/following', baseSchema);

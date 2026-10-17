@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { buildPickODataListCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
-import { selectOnlyOptions } from './odata-query.ts';
+import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import { selectOnlyOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 
 // A group's plans are the group's: belonging to the group is what grants them,
 // and `/me/planner/plans` need not list them. Verified live 2026-09-12 by a

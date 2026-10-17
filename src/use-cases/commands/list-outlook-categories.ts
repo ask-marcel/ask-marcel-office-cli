@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { buildCommand } from './build-command.ts';
-import type { ReadCommandMeta } from './command-types.ts';
+import { buildCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
+import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 // Graph's `/me/outlook/masterCategories` silently ignores every standard
 // OData passthrough (verified live — `--top 1` against a 14-category

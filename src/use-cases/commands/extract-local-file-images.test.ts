@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createFileSystemFake } from '../../test-helpers/filesystem-fake.ts';
+import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { buildMalformedDocx, buildMediaSamples, buildPdfNoImages, buildPdfWithImage } from '../../test-helpers/office-fixtures.ts';
 import { execute, executeLocal } from './extract-local-file-images.ts';
 

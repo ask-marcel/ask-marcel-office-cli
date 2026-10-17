@@ -13,9 +13,9 @@
  * it). Release removes the file only while it is still ours.
  */
 import { hostname } from 'node:os';
-import { err, ok } from '../domain/result.ts';
-import type { Result } from '../domain/result.ts';
-import type { AtomicFileWrites, FileSystem } from '../use-cases/ports/filesystem.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 
 export type LockPurpose = 'refresh' | 'browser' | 'logout';
 
