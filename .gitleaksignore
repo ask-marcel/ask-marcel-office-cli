@@ -33,3 +33,13 @@
 # pagination cursor is not a proportionate response.
 4a4769b69c514d54354c23c0d305a91990ecb7e9:src/use-cases/commands/commands.test.ts:generic-api-key:3400
 4a4769b69c514d54354c23c0d305a91990ecb7e9:src/use-cases/commands/commands.test.ts:generic-api-key:3401
+
+# 2026-10-18, commit 55c6765, auth/src/composition/crash-text.test.ts:9.
+#
+# `QUOTED_TOKEN` is a synthetic fixture: the standard JWT header
+# {"typ":"JWT","alg":"RS256"} in base64url, then the word `secret`. It has no
+# payload and no signature, so it cannot authenticate a request. The test puts
+# it in an error message to prove that the token helper's crash line never
+# repeats that message. The generic-api-key rule matches it on entropy alone
+# (4.47).
+55c676599db1457b839809f57b0240231a2abc64:auth/src/composition/crash-text.test.ts:generic-api-key:9
