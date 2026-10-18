@@ -1,9 +1,9 @@
 /*
  * The names of the single package `ask-marcel-office-cli`: one bin that holds
  * the auth, read and write commands, so every bin placeholder (bin-names.ts)
- * renders as that bin. Its own module, apart from `single-package.ts`, because
- * the token helper entry (src/token.ts) fills its remedies with these names and
- * must not load the registry.
+ * renders as that bin. Its own module, apart from `single-package.ts`. The token
+ * helper does not read it: it fills its remedies with the auth names
+ * (auth-package-names.ts).
  */
 import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 

@@ -76,13 +76,13 @@ describe('the token helper entry', () => {
 
   it('names the auth bin in the remedy of a token it could not issue, never a placeholder', async () => {
     const line = JSON.stringify(onlyLine(await run(['--tier', 'basic'], createFileSystemFake())));
-    expect(line).toContain('ask-marcel-office login');
+    expect(line).toContain('ask-marcel-office-auth login');
     expect(line).not.toMatch(/\{(?:(?:auth|read|write)-)?bin\}/);
   });
 
   it('names the auth bin in the remedy of arguments it refuses, never a placeholder', async () => {
     const line = JSON.stringify(onlyLine(await run(['--tier', 'admin'], createFileSystemFake())));
-    expect(line).toContain('ask-marcel-office token');
+    expect(line).toContain('ask-marcel-office-auth token');
     expect(line).not.toMatch(/\{(?:(?:auth|read|write)-)?bin\}/);
   });
 

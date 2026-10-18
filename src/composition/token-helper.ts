@@ -15,7 +15,7 @@ import { parseTokenArgs } from '../use-cases/commands/token-args.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
-import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';
+import { AUTH_PACKAGE_NAMES } from './auth-package-names.ts';
 
 /*
  * The `token` helper: `token --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`
@@ -124,8 +124,8 @@ export const runTokenHelper = async (deps: TokenHelperDeps): Promise<number> => 
   const paths = resolveAuthPaths(deps.home ?? homedir(), deps.env ?? process.env);
   await recordTokenHelperLocation(fs, tokenHelperLocatorPath(paths), deps.location);
   // A failure line's message and remedy name the auth bin through its
-  // placeholder (bin-names.ts); the helper is the single package's.
-  const failure = (line: unknown): string => `${fillNames(JSON.stringify(line), SINGLE_PACKAGE_NAMES)}\n`;
+  // placeholder (bin-names.ts); the helper is the auth package's.
+  const failure = (line: unknown): string => `${fillNames(JSON.stringify(line), AUTH_PACKAGE_NAMES)}\n`;
   const args = parseTokenArgs(deps.argv);
   if (!args.ok) {
     print(failure(args.error));
