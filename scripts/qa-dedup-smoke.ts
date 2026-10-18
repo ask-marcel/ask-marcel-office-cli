@@ -9,15 +9,23 @@
 //
 //   bun scripts/qa-dedup-smoke.ts --yes-create-drafts
 //
-// Overrides: SMOKE_BIN=<path to cli>. Output is status-only (ids + counts),
-// never body text.
+// Overrides: SMOKE_READ_BIN=<path to the read cli> (list-mail-folder-messages,
+// find-mail-drafts; default ask-marcel-office) and SMOKE_WRITE_BIN=<path to the
+// write cli> (create-reply-draft; default ask-marcel-office-write). Output is
+// status-only (ids + counts), never body text.
 
-const BIN = process.env.SMOKE_BIN ?? 'ask-marcel-office';
+import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
+
+// The write commands run on the write bin, every other command on the read bin
+// (package split, phase 5): the role comes from core's command directory.
+const READ_BIN = process.env.SMOKE_READ_BIN ?? 'ask-marcel-office';
+const WRITE_BIN = process.env.SMOKE_WRITE_BIN ?? 'ask-marcel-office-write';
+const binOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_BIN : READ_BIN);
 
 type Envelope = { ok: boolean; data?: unknown; error?: string };
 
 const run = (args: ReadonlyArray<string>): Envelope => {
-  const p = Bun.spawnSync([BIN, ...args, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
+  const p = Bun.spawnSync([binOf(args[0] ?? ''), ...args, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
   const out = p.stdout.toString();
   const parsed = ((): unknown => {
     try {
