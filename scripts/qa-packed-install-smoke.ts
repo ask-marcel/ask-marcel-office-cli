@@ -12,7 +12,7 @@
  *
  *   1. every package the bundle imports at run time (its external static and
  *      dynamic imports, read from the installed dist) loads under node and bun,
- *      including the ones no converter reaches, such as login's playwright; and
+ *      including the ones no converter reaches, such as the update notifier; and
  *      a repo devDependency the tarball never installs fails to load, which
  *      re-proves on every run that the install is isolated (rule 15.10);
  *   2. `--version` answers the manifest's version, through the bin path under
