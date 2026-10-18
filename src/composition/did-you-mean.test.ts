@@ -90,17 +90,17 @@ describe('a mistyped name over MCP and in the library', () => {
 
 describe('a removed command name', () => {
   it('tells the CLI caller that status replaced scopes-check', async () => {
-    expect(await runCli('scopes-check')).toContain("unknown command 'scopes-check'. `status` replaced `scopes-check`.");
+    expect(await runCli('scopes-check')).toContain("unknown command 'scopes-check'. `ask-marcel-office-auth status` replaced `scopes-check`.");
   });
 
   it('tells the reader of the docs page that status replaced scopes-check', async () => {
-    expect(await runCli('docs', 'scopes-check')).toContain('Unknown command "scopes-check". `status` replaced `scopes-check`.');
+    expect(await runCli('docs', 'scopes-check')).toContain('Unknown command "scopes-check". `ask-marcel-office-auth status` replaced `scopes-check`.');
   });
 
   it('tells the MCP caller of run-command that status replaced scopes-check', async () => {
     const client = await connect();
     expect(textOf(await client.callTool({ name: 'run-command', arguments: { command: 'scopes-check' } }))).toContain(
-      'Unknown command "scopes-check". `status` replaced `scopes-check`.'
+      'Unknown command "scopes-check". The `status` tool of the ask-marcel-office-auth server replaced `scopes-check`.'
     );
   });
 });
