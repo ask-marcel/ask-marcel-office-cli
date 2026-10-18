@@ -12,8 +12,9 @@
  * command, and reports harvest completeness so untestable-this-run commands are
  * explicit, never silently counted as healthy.
  *
- * Prereqs: clean `main`, `bun run build`, `npm i -g .`, a warm `ask-marcel-office
- * login`. Run: `bun scripts/qa-live-sweep.ts`. Ledger → /tmp/qa/live-ledger.json.
+ * Prereqs: clean `main`, `bun run build`, `npm i -g .`, a warm `ask-marcel-office-auth
+ * login` (since phase 4 of the split, the root signs through the auth token
+ * helper). Run: `bun scripts/qa-live-sweep.ts`. Ledger → /tmp/qa/live-ledger.json.
  *
  * Replaces the ad-hoc drivers that used to rot in .claude/qa-reports/ (they
  * invoked the pre-rename binary and depended on stale temp files).
