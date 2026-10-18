@@ -3,12 +3,12 @@
 // (package split, step 16), so the write package takes this file whole; the helpers are
 // copies of that file's.
 import { describe, expect, it } from 'bun:test';
-import type { GraphClient } from '../infra/graph-client.ts';
+import type { WriteGraph as GraphClient } from '@ask-marcel/office-core/infra/write-graph.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from '../use-cases/commands/index.ts';
-import { buildCli } from './cli.ts';
+import { commands } from '../use-cases/commands/write-commands.ts';
+import { buildWriteCli as buildCli } from './write-program.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<unknown>): Promise<string> => {
   const target = process[stream];
@@ -42,7 +42,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
     const description = cli.description();
     const writeCount = Object.values(commands).filter((c) => c.meta.effect !== 'read').length;
-    expect(description).toContain(`the ONLY writes are ${writeCount} commands.`);
+    expect(description).toContain(`All ${writeCount} commands write.`);
     expect(description).toContain(
       'convert-calendar-event-attachment-to-pdf, convert-group-post-attachment-to-pdf, convert-mail-attachment-to-pdf: upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)'
     );

@@ -6,11 +6,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphClient } from '../infra/graph-client.ts';
+import type { WriteGraph as GraphClient } from '@ask-marcel/office-core/infra/write-graph.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { buildMcpServer } from './mcp.ts';
-import type { BuildMcpServerDeps } from './mcp.ts';
+import { buildWriteMcpServer as buildMcpServer } from './write-server.ts';
+import type { BuildWriteMcpServerDeps as BuildMcpServerDeps } from './write-server.ts';
 
 /**
  * Drives the REAL MCP protocol: a real Client and a real McpServer joined by
