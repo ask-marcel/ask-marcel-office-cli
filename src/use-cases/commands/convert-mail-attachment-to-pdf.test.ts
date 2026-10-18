@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
+import type { WriteGraph as GraphClient } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute } from './convert-mail-attachment-to-pdf.ts';
 

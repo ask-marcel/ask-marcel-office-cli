@@ -7,13 +7,13 @@ import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
 import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
-import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
-import { createTokenSourceGraphClient as createGraphClient } from '../../infra/graph-client.ts';
-import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import type { FetchFn, GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
+import { createWriteGraph as createGraphClient } from '@ask-marcel/office-core/infra/write-graph.ts';
+import type { WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 
-const cmdMap: Record<string, { execute: CommandExecute }> = {
+const cmdMap: Record<string, { execute: WriteCommand['execute'] }> = {
   'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,
 };
@@ -424,7 +424,7 @@ describe('commands', () => {
   // --- mutation hardening: unconditional error assertions (the `if (error.type === ...)`
   // guards above let type/object/message mutants survive — LESSONS.md), the full
   // IMAGE_EXTENSIONS set, and safeExtension's temp-filename extension via the PUT path. ---
-  const pdfCmd = (): { execute: CommandExecute } => {
+  const pdfCmd = (): { execute: WriteCommand['execute'] } => {
     const c = cmdMap['convert-mail-attachment-to-pdf'];
     if (!c) throw new Error('convert-mail-attachment-to-pdf not registered');
     return c;
