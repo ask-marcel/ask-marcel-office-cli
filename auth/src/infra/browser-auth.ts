@@ -917,7 +917,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       // description so MCP and library callers hear it too, and so it can only
       // fire when a session is actually being destroyed.
       onProgress(
-        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office login` refreshes the elevated token without clearing it.'
+        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office-auth login` refreshes the elevated token without clearing it.'
       );
       await context.clearCookies();
       try {
