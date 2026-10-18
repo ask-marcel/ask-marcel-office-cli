@@ -74,6 +74,10 @@
       "bin": {
         "ask-marcel-office-write": "./dist/cli.js",
       },
+      "dependencies": {
+        "update-notifier": "^7.3.1",
+        "zod": "^4.3.6",
+      },
       "devDependencies": {
         "@ask-marcel/office-core": "workspace:*",
       },
