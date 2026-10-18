@@ -209,6 +209,16 @@ type AuthLadder = AuthManager & TokenReport;
  */
 type TokenLadder = AuthLadder & TokenIssuer;
 
+/**
+ * Builds an AuthManager configured for an interactive `login` run — unlike
+ * the command-path manager it may recapture the secondary (elevated /
+ * chatsvcagg / ic3) tokens via the browser. The composition root hands the
+ * CLI a factory rather than a single pre-built manager — keeping the concrete
+ * `createAuthManager` wiring (cache path, env) out of `cli.ts` and the action
+ * testable with an injected fake.
+ */
+type LoginAuthFactory = () => AuthLadder;
+
 const CLIENT_ID = '5e3ce6c0-2b1f-4285-8d4b-75ee78787346';
 const SCOPES = 'https://graph.microsoft.com/.default openid profile offline_access';
 const SPA_ORIGIN = 'https://teams.microsoft.com';
@@ -1105,4 +1115,4 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
 };
 
 export { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS };
-export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder };
+export type { AuthError, AuthLadder, AuthManager, BrowserRungs, CachedTierInfo, ElevatedOutcome, FetchFn, LoginAuthFactory, SecondaryTokenCommands, TokenCacheAccess, TokenLadder };

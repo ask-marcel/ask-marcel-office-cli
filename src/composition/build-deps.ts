@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import type { AuthLadder, SecondaryTokenCommands } from '../infra/auth.ts';
+import type { AuthLadder, LoginAuthFactory, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth-browser.ts';
 import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
@@ -33,16 +33,6 @@ export type BuildDepsConfig = {
    */
   readonly interactive?: boolean;
 };
-
-/**
- * Builds an AuthManager configured for an interactive `login` run — unlike
- * the command-path manager it may recapture the secondary (elevated /
- * chatsvcagg / ic3) tokens via the browser. The composition root hands the
- * CLI a factory rather than a single pre-built manager — keeping the concrete
- * `createAuthManager` wiring (cache path, env) out of `cli.ts` and the action
- * testable with an injected fake.
- */
-export type LoginAuthFactory = () => AuthLadder;
 
 export type BuiltDeps = Readonly<{
   logger: Logger;
