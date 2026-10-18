@@ -54,7 +54,7 @@ const MCP_TYPES_IMPORT = "import { CallToolResultSchema } from '@modelcontextpro
 const ZOD_IMPORT = "import { z } from 'zod';\nexport const f = (): unknown => z;\n";
 const WRITE_GRAPH_IMPORT = "import { createWriteGraph } from '../../infra/write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 const WRITE_GRAPH_TYPE_IMPORT = "import type { WriteGraph } from '../../infra/write-graph.ts';\nexport type F = WriteGraph;\n";
-const FULL_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
+const ROOT_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
 const SIBLING_WRITE_GRAPH_IMPORT = "import { createWriteGraph } from './write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 const REGISTRY_IMPORT = "import { commands } from '../use-cases/commands/index.ts';\nexport const f = (): unknown => commands;\n";
 const SIBLING_REGISTRY_IMPORT = "import { commands } from './index.ts';\nexport const f = (): unknown => commands;\n";
@@ -120,9 +120,8 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'control: an auth file outside the token helper loads winston', path: 'src/composition/auth-cli.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'a read command never imports the write graph', path: 'src/use-cases/commands/list-drives.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'a read command never takes the write graph type', path: 'src/use-cases/commands/get-schedule.ts', source: WRITE_GRAPH_TYPE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'a read helper never builds the full client', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: FULL_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'a read helper never builds the client of the composition root', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: ROOT_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the read graph never imports the write graph', path: 'src/infra/read-graph.ts', source: SIBLING_WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'control: a write command takes the write graph', path: 'src/use-cases/commands/create-mail-draft.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'production code never imports a shared test fake through the core package', path: 'src/composition/single-package.ts', source: CORE_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
   { name: 'production code never imports a shared test fake by a relative path', path: 'src/composition/cli-shell.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
   { name: 'control: a test imports the shared test fakes', path: 'src/composition/cli-shell.test.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: false, strict: false },

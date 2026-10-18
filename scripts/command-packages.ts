@@ -10,15 +10,8 @@
  * npm name come from the first package, so every entry is filled with its bins. A
  * command name in two packages must have the same meta (compared before the names
  * are filled), else the join fails.
- *
- * Transitional: the move of write into `write/` changes the path of the write package.
- * When `src/composition/write-package.ts` does not exist, the loader takes
- * `write/src/composition/write-package.ts`, so the move needs no edit of
- * `package.json`. Only this path has the fallback, so a typo in another path still
- * fails. Phase 5 removes it when the root names the new path.
  */
 
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
@@ -29,11 +22,6 @@ import type { Command } from '@ask-marcel/office-core/use-cases/commands/command
 /** A package as the docs scripts read it: only the meta of each command is used. */
 type DocumentedPackage = CommandPackage<Command<never>>;
 
-const WRITE_PACKAGE_BEFORE_MOVE = 'src/composition/write-package.ts';
-const WRITE_PACKAGE_AFTER_MOVE = 'write/src/composition/write-package.ts';
-
-const packagePath = (path: string): string => (path === WRITE_PACKAGE_BEFORE_MOVE && !existsSync(path) ? WRITE_PACKAGE_AFTER_MOVE : path);
-
 const isCommandPackage = (value: unknown): value is DocumentedPackage =>
   typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value && 'binName' in value && 'bins' in value;
 
@@ -41,7 +29,7 @@ const isCommandPackage = (value: unknown): value is DocumentedPackage =>
 export const loadPackages = async (paths: ReadonlyArray<string>): Promise<Result<ReadonlyArray<DocumentedPackage>, string>> => {
   const packages: DocumentedPackage[] = [];
   for (const path of paths) {
-    const loaded: unknown = (await import(pathToFileURL(resolve(packagePath(path))).href)).commandPackage;
+    const loaded: unknown = (await import(pathToFileURL(resolve(path)).href)).commandPackage;
     if (!isCommandPackage(loaded)) return err(`${path} exports no \`commandPackage\`.`);
     packages.push(loaded);
   }

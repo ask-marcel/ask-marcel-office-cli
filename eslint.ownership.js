@@ -20,7 +20,8 @@ const READ_ONLY_IMPORT_BANS = [
   {
     regex: '(^|/)graph-client(\\.[cm]?[jt]s)?$',
     allowTypeImports: true,
-    message: 'graph-client.ts builds the full client, write graph included: read code takes the read graph (read-graph.ts) instead.',
+    message:
+      'graph-client.ts builds the client of the composition root: a read command runs on the read graph that the registry gives it (read-graph.ts), and never builds a client.',
   },
 ];
 
@@ -88,28 +89,17 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
 /*
  * Who owns each module after the package split (docs/plans/2026-10-01-package-split.md,
  * "What goes where"). The lint blocks read these lists, and
- * scripts/check-package-imports.ts reads them too: a write module may import only
- * core and write modules, and no read command and no core module may reach a
- * write module. A file joins a list when it becomes core or write.
+ * scripts/check-package-imports.ts reads them too. A file joins a list when it
+ * becomes core.
  *
- * WRITE_FILES: the write commands and their write-only helpers. A new write
- * command joins the list (meta.test.ts pins the write set). Until the write
- * files move to write/ (package split, phase 5), the list also holds the write
- * package's own wiring under the root src/: its registry, its lifecycle entries
- * and its composition.
- *
- * A test file belongs to one package too (step 16): the check reads
- * SINGLE_PACKAGE_FILES for that, and no lint block reads it yet. A module in no
- * list is read's. A file under core/ or auth/ belongs to its folder's package
- * (phases 3 and 4): auth has no list.
+ * A file under core/, auth/ or write/ belongs to its folder's package (phases 3
+ * to 5): auth and write have no list, and the lists below apply to the root
+ * src/ only. A write module may import only core and write modules, and no
+ * module outside write/ may reach a write module (the check, not a list,
+ * guards this). A test file belongs to one package too (step 16): the check
+ * reads SINGLE_PACKAGE_FILES for that, and no lint block reads it yet. A module
+ * of the root src/ in no list is read's.
  */
-const WRITE_FILES = [
-  'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
-  'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
-  'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
-  'src/use-cases/commands/{write-commands,write-lifecycle-entries}.ts',
-  'src/composition/{write-package-names,write-package,write-program,write-server,write-token-source,write-client,build-write-deps}.ts',
-];
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
 const CORE_FILES = [
@@ -136,11 +126,11 @@ const CORE_READ_ONLY_FILES = [
   'src/infra/{graph-request,read-graph,graph-substrate}.ts',
 ];
 
-// SINGLE_PACKAGE_FILES: the wiring of the single package, which holds the three
-// packages in one bin: its registry and lifecycle entries, its CLI, MCP server
-// and composition root, its entries, and the full client over a token source.
-// No package of the split takes them; phases 4 to 6 replace them with each
-// package's own wiring.
+// SINGLE_PACKAGE_FILES: the wiring of the root package, which holds the read
+// commands only since phase 5 (auth and write have their own bins): its registry
+// and lifecycle entries, its CLI, MCP server and composition root, its entries,
+// and the client over a token source. No package of the split takes them; phase
+// 6 replaces them with read's own wiring.
 const SINGLE_PACKAGE_FILES = [
   'src/{index,main}.ts',
   'src/composition/{cli,mcp,single-package,single-package-names,build-deps}.ts',
@@ -168,5 +158,4 @@ export {
   SINGLE_PACKAGE_FILES,
   STDOUT_BAN,
   TOKEN_HELPER_IMPORT_BANS,
-  WRITE_FILES,
 };

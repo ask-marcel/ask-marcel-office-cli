@@ -28,13 +28,12 @@
  * hoisted workspace resolves it silently, and the check does not read that
  * package's folder.
  *
- * Ownership comes from eslint.config.js (WRITE_FILES, CORE_FILES,
- * CORE_READ_ONLY_FILES), the lists the core and read-only lint bans use, so a
- * file has one owner everywhere. Auth has no list: its folder decides. WRITE_FILES
- * names the write files of the root src/, and every file under write/ is
- * write's too. The read commands are the commands (of the root registry folder
+ * Ownership comes from eslint.config.js (CORE_FILES, CORE_READ_ONLY_FILES),
+ * the lists the core and read-only lint bans use, so a file has one owner
+ * everywhere. Auth and write have no list: their folders decide (LESSONS
+ * 2026-10-18). The read commands are the commands (of the root registry folder
  * and of write's) whose effect is `read`; every other command must be a write
- * module.
+ * module, so it must sit under write/.
  *
  * Test files (step 16): each belongs to one package, so a later phase moves it
  * whole. A test file imports no module of another package; core and the single
@@ -50,7 +49,9 @@
  * write and core modules only, for the same reason. A test outside core/ never falls to core (phase 3 moved every
  * core test into core/): one the rules give core is reported, so it moves to
  * core/src/ or is named in SINGLE_PACKAGE_TESTS. In the same way, a test
- * outside auth/ never falls to auth (phase 4 moved every auth test into auth/).
+ * outside auth/ never falls to auth (phase 4 moved every auth test into auth/),
+ * and a test outside write/ never falls to write (phase 5 moved every write test
+ * into write/).
  * Only imports are read: a case that runs another package's command through the
  * registry by name is not seen, so such a case goes in a test file named for its
  * side. `--test-map` prints each test file's package.
@@ -70,7 +71,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from '../eslint.config.js';
+import { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES } from '../eslint.config.js';
 
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
@@ -96,7 +97,7 @@ const WRITE_FOLDER_TEST_FIXTURE = 'write/src/composition/fixture-write-folder.te
 // Auth modules that the fixtures name, under auth/src/ since phase 4 moved them.
 const AUTH_LADDER = located('src/infra/auth.ts');
 const TOKEN_ARGS = located(`${COMMANDS}/token-args.ts`);
-// Write modules and tests that the fixtures name, in src/ until phase 5 moves them to write/src/.
+// Write modules and tests that the fixtures name, under write/src/ since phase 5 moved them.
 const MAIL_DRAFT = located(`${COMMANDS}/create-mail-draft.ts`);
 const MAIL_DRAFT_TEST = located(`${COMMANDS}/create-mail-draft.test.ts`);
 const DRAFT_RESPONSE = located(`${COMMANDS}/draft-response.ts`);
@@ -241,6 +242,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     path: `${COMMANDS}/fixture-auth-outside.test.ts`,
     source: "import { resolveAuthPaths } from '@ask-marcel/office-auth/index.ts';\nexport const f = resolveAuthPaths;\n",
     reported: `${COMMANDS}/fixture-auth-outside.test.ts (auth) sits outside auth/`,
+  },
+  {
+    name: 'a test outside write/ that imports write modules only',
+    path: `${COMMANDS}/fixture-write-outside.test.ts`,
+    source: "import { commands } from '@ask-marcel/office-write/index.ts';\nexport const f = commands;\n",
+    reported: `${COMMANDS}/fixture-write-outside.test.ts (write) sits outside write/`,
   },
   {
     name: 'a test named after a write command that imports an auth module',
@@ -399,6 +406,7 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
     if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
     if (own === 'core' && !path.startsWith('core/')) return [`${path} (core) sits outside core/: move it to core/src/, or name it in SINGLE_PACKAGE_TESTS`];
     if (own === 'auth' && !path.startsWith('auth/')) return [`${path} (auth) sits outside auth/: move it to auth/src/`];
+    if (own === 'write' && !path.startsWith('write/')) return [`${path} (write) sits outside write/: move it to write/src/`];
     // A test under core/ runs with core alone, and one under auth/ or write/ with
     // its package and core: the single wiring is not open to them.
     const closed = (target: string): boolean => PACKAGES.includes(owner(target)) || path.startsWith('core/') || (/^(auth|write)\//.test(path) && owner(target) !== 'core');
@@ -433,7 +441,7 @@ const registryCommands = async (): Promise<{ readonly reads: ReadonlyArray<strin
 
 const main = async (): Promise<number> => {
   const core = glob([...CORE_FILES, ...CORE_READ_ONLY_FILES], 'core');
-  const write = glob(WRITE_FILES, 'write');
+  const write = glob([], 'write');
   const lists: Lists = { core, auth: glob([], 'auth'), write, single: glob(SINGLE_PACKAGE_FILES) };
   const owner: OwnerOf = (path) => ownerOf(lists, path);
   const tests = await readSources(true);
@@ -446,7 +454,7 @@ const main = async (): Promise<number> => {
   const misplaced = [...write].filter((path) => reads.includes(path) || core.has(path));
   const doubled = overlaps(lists);
   if (unlisted.length > 0 || misplaced.length > 0 || doubled.length > 0 || reads.length === 0) {
-    console.error(`check-package-imports: the ownership lists disagree with the registry or with each other. Write commands outside WRITE_FILES: ${unlisted.join(', ') || 'none'}. WRITE_FILES that are read commands or core: ${misplaced.join(', ') || 'none'}. Files in two lists: ${doubled.join(', ') || 'none'}. Read commands found: ${reads.length}.`);
+    console.error(`check-package-imports: the ownership lists disagree with the registry or with each other. Write commands outside write/: ${unlisted.join(', ') || 'none'}. Files under write/ that are read commands or core: ${misplaced.join(', ') || 'none'}. Files in two lists: ${doubled.join(', ') || 'none'}. Read commands found: ${reads.length}.`);
     return 1;
   }
   const owners: Owners = { core, auth: lists.auth, write };
@@ -463,7 +471,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/ and every auth test in auth/; every fixture is reported.');
+  console.log('check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/, every auth test in auth/ and every write test in write/; every fixture is reported.');
   return 0;
 };
 

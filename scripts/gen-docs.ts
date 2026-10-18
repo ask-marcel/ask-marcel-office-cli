@@ -12,7 +12,7 @@
  * together until the docs split (see command-packages.ts):
  *
  *   bun run scripts/gen-docs.ts --package src/composition/single-package.ts \
- *     --package src/composition/write-package.ts \
+ *     --package write/src/composition/write-package.ts \
  *     --manifest docs/commands.json --commands-doc docs/COMMANDS.md
  *
  * `--package` names a module that exports `commandPackage` (a CommandPackage).

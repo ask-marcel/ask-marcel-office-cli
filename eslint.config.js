@@ -1,5 +1,5 @@
 import { baseConfig } from './eslint.base.js';
-import { CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_FILES, READ_ONLY_IMPORT_BANS, STDOUT_BAN, WRITE_FILES } from './eslint.ownership.js';
+import { CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_FILES, READ_ONLY_IMPORT_BANS, STDOUT_BAN } from './eslint.ownership.js';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -29,13 +29,15 @@ export default [
     // Read-only code never holds the write graph (package split, D9): the read
     // commands, their helpers and the read graph's own modules import neither
     // write-graph.ts (its type included, so no read command can be typed against
-    // it) nor a value from graph-client.ts, which builds the full client. Type
-    // imports from graph-client.ts (`GraphError`) are erased at build time.
-    // The write commands and their write-only helpers (WRITE_FILES), and the
-    // registry and command framework that hold both kinds are the exceptions.
+    // it) nor a value from graph-client.ts, which builds the client of the
+    // composition root: a read command runs on the graph that the registry
+    // gives it. Type imports from graph-client.ts (`GraphError`) are erased at
+    // build time.
+    // The registry (index.ts) is the exception. The write commands and their
+    // write-only helpers are in write/ since phase 5, outside this block.
     // scripts/check-read-bundle.ts checks the same boundary on the built code.
     files: ['src/use-cases/commands/**/*.ts', 'src/infra/read-graph.ts', 'src/infra/graph-request.ts', 'src/infra/graph-substrate.ts'],
-    ignores: ['**/*.test.ts', ...WRITE_FILES, 'src/use-cases/commands/{index,command-graph,command-types}.ts'],
+    ignores: ['**/*.test.ts', 'src/use-cases/commands/{index,command-graph,command-types}.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -82,4 +84,4 @@ export default [
 ];
 
 // The ownership lists stay importable from here, where the checks have read them since step 15.
-export { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from './eslint.ownership.js';
+export { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES } from './eslint.ownership.js';
