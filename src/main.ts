@@ -71,11 +71,9 @@ const main = async (): Promise<void> => {
   const deps = buildDeps();
   await recordTokenHelper(deps);
   const cli = buildCli({
-    auth: deps.auth,
     graph: deps.graph,
     logger: deps.logger,
     fs: deps.fs,
-    makeLoginAuth: deps.makeLoginAuth,
     version: pkg.version,
     onCommandError: () => {
       process.exitCode = 1;

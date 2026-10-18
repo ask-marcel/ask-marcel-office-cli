@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
@@ -26,7 +25,7 @@ const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
 
 const cliWith = (): { cli: ReturnType<typeof buildCli>; logger: ReturnType<typeof createLoggerFake> } => {
   const logger = createLoggerFake();
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger, fs: createFileSystemFake() });
+  const cli = buildCli({ graph: fakeGraphClient(), logger, fs: createFileSystemFake() });
   return { cli, logger };
 };
 

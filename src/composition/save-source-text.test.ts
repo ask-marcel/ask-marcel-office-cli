@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
@@ -32,7 +31,7 @@ const exportOnDrive = fakeGraphClient({
 
 const save = async (command: string, outputPath: string): Promise<{ readonly out: Record<string, unknown>; readonly saved: string | undefined }> => {
   const fs = createFileSystemFake();
-  const cli = buildCli({ auth: fakeAuthManager(), graph: exportOnDrive, logger: createLoggerFake(), fs });
+  const cli = buildCli({ graph: exportOnDrive, logger: createLoggerFake(), fs });
   const out = await captureStdout(() =>
     cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', outputPath, command, '--drive-id', 'd1', '--item-id', 'i1'])
   );

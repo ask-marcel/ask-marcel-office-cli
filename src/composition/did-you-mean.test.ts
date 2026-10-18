@@ -1,7 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
@@ -27,7 +26,7 @@ const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
 };
 
 const runCli = (...args: ReadonlyArray<string>): Promise<string> => {
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
+  const cli = buildCli({ graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
   return captureStdout(() => cli.parseAsync(['node', 'ask-marcel-office', ...args]));
 };
 
