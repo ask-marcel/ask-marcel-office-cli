@@ -62,6 +62,12 @@ const MISUSES: Readonly<Record<string, Misuse>> = {
     misuse: "{ ok: true, value: 'one' }",
     code: 2322,
   },
+  AuthPaths: {
+    use: 'AuthPaths',
+    fits: "{ tokenCache: '/h/.ask-marcel/token-cache.json', browserProfile: '/h/.ask-marcel/browser-profile' }",
+    misuse: "{ tokenCache: '/h/.ask-marcel/token-cache.json' }",
+    code: 2741,
+  },
 };
 
 const CORE = '@ask-marcel/office-core';
