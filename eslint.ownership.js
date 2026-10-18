@@ -45,9 +45,11 @@ const CORE_IMPORT_BANS = [
   },
 ];
 
-// The auth ladder (src/infra/auth.ts) never loads the browser: the root
-// eslint.config.js holds the reason, and auth/eslint.config.js applies the
-// same ban to the file once it moves there (phase 4).
+// The auth ladder (auth/src/infra/auth.ts; auth/eslint.config.js applies the
+// ban) never loads the browser. An unattended session runs on it alone, and the
+// auth `token` entry stands on it and must start fast. Browser rungs reach it
+// only through the BrowserRungs port that auth-browser.ts supplies. Type
+// imports are erased at build time, so they stay allowed.
 const AUTH_LADDER_IMPORT_BANS = [
   {
     regex: '(^|/)(auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$|^playwright(-core)?(/.*)?$',
@@ -56,9 +58,15 @@ const AUTH_LADDER_IMPORT_BANS = [
   },
 ];
 
-// The token helper (src/token.ts, src/composition/token-helper.ts) stays near
-// bare Node startup: the root eslint.config.js holds the reason, and
-// auth/eslint.config.js applies the same ban once the files move there.
+// The token helper (auth/src/token.ts, auth/src/composition/token-helper.ts;
+// auth/eslint.config.js applies the ban) stays near bare Node startup: read and
+// write spawn it for every bearer they lack. It never loads the CLI or the MCP
+// server (the root's builders, auth's builders, the MCP SDK, zod), winston, the
+// update notifier, the renderer or, statically, the browser; the browser
+// ladder comes in by a dynamic import only for a person at a terminal. Type
+// imports are erased, so they stay allowed. src/token.ts is a bundle entry, so
+// it owns the one crash catch of its bundle (rule 17), and that catch prints
+// only the error's type: a message can quote a token (LESSONS, 2026-10-04).
 const TOKEN_HELPER_IMPORT_BANS = [
   {
     regex:
@@ -87,9 +95,10 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
  * WRITE_FILES: the write commands and their write-only helpers. A new write
  * command joins the list (meta.test.ts pins the write set).
  *
- * A test file belongs to one package too (step 16): the check reads AUTH_FILES
- * and SINGLE_PACKAGE_FILES for that, and no lint block reads them yet. A module
- * in no list is read's.
+ * A test file belongs to one package too (step 16): the check reads
+ * SINGLE_PACKAGE_FILES for that, and no lint block reads it yet. A module in no
+ * list is read's. A file under core/ or auth/ belongs to its folder's package
+ * (phases 3 and 4): auth has no list.
  */
 const WRITE_FILES = [
   'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
@@ -122,19 +131,6 @@ const CORE_READ_ONLY_FILES = [
   'src/infra/{graph-request,read-graph,graph-substrate}.ts',
 ];
 
-// AUTH_FILES: the auth commands of the command directory (login, logout, status,
-// token) with their helpers, the auth ladder, the browser sign-in, the token
-// helper's entry, and the in-process token source over the ladder with the fake
-// of that ladder.
-const AUTH_FILES = [
-  'src/use-cases/commands/{login,logout,status,login-status,token,token-args,token-tier-capability,auth-lifecycle-entries}.ts',
-  'src/use-cases/ports/{token-issuer,token-report}.ts',
-  'src/composition/{auth-cli,auth-mcp,token-helper,auth-package-names,auth-package,auth-program,auth-server,build-auth-deps}.ts',
-  'src/infra/{auth,auth-browser,browser-auth,playwright-loader,token-cache-lock,auth-token-source}.ts',
-  'src/token.ts',
-  'src/test-helpers/auth-manager-fake.ts',
-];
-
 // SINGLE_PACKAGE_FILES: the wiring of the single package, which holds the three
 // packages in one bin: its registry and lifecycle entries, its CLI, MCP server
 // and composition root, its entries, and the full client over a token source.
@@ -157,7 +153,6 @@ const STDOUT_BAN = {
 };
 
 export {
-  AUTH_FILES,
   AUTH_LADDER_IMPORT_BANS,
   CORE_DYNAMIC_IMPORT_BANS,
   CORE_FILES,

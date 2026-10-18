@@ -26,7 +26,7 @@
  *
  * Ownership comes from eslint.config.js (WRITE_FILES, CORE_FILES,
  * CORE_READ_ONLY_FILES), the lists the core and read-only lint bans use, so a
- * file has one owner everywhere. The read commands are the registry's commands
+ * file has one owner everywhere. Auth has no list: its folder decides. The read commands are the registry's commands
  * whose effect is `read`; every other registry command must be a write module.
  *
  * Test files (step 16): each belongs to one package, so a later phase moves it
@@ -36,18 +36,19 @@
  * its name gives (`-write.test.ts`, `-auth.test.ts`), else the owner of the
  * module it is named after, else the one package its imports name, else read
  * when it imports the single package's wiring (the real-registry suites go with
- * read, step 13), else core. AUTH_FILES lists auth; a module in no list is read's.
- * A test under core/ imports core modules only: core runs its tests alone. A
- * test under auth/ imports auth and core modules only, for the same reason. A
- * test outside core/ never falls to core (phase 3 moved every core test into
- * core/): one the rules give core is reported, so it moves to core/src/ or is
- * named in SINGLE_PACKAGE_TESTS.
+ * read, step 13), else core. A module under auth/ is auth's; a module in no
+ * list is read's. A test under core/ imports core modules only: core runs its
+ * tests alone. A test under auth/ imports auth and core modules only, for the
+ * same reason. A test outside core/ never falls to core (phase 3 moved every
+ * core test into core/): one the rules give core is reported, so it moves to
+ * core/src/ or is named in SINGLE_PACKAGE_TESTS. In the same way, a test
+ * outside auth/ never falls to auth (phase 4 moved every auth test into auth/).
  * Only imports are read: a case that runs another package's command through the
  * registry by name is not seen, so such a case goes in a test file named for its
  * side. `--test-map` prints each test file's package.
  *
  * Fixtures: each run also checks the tree with one file's source replaced by a
- * violating import, and the ownership lists with one auth file put in a second
+ * violating import, and the ownership lists with one core file put in a second
  * list. Each must be reported, so a check that can no longer see an import or a
  * doubled file fails instead of passing (rule 15.10: a gate only ever seen
  * green is a hypothesis).
@@ -61,7 +62,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { AUTH_FILES, CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from '../eslint.config.js';
+import { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from '../eslint.config.js';
 
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
@@ -83,10 +84,9 @@ const CORE_FIXTURE = located(`${COMMANDS}/format-zod-error.ts`);
 const CORE_READER_FIXTURE = located(`${COMMANDS}/quote-boundary.ts`);
 const CORE_TEST_FIXTURE = 'core/src/use-cases/commands/fixture-core.test.ts';
 const AUTH_TEST_FIXTURE = 'auth/src/composition/fixture-auth.test.ts';
-// Auth modules that the fixtures name, in src/ until phase 4 moves them to auth/src/.
+// Auth modules that the fixtures name, under auth/src/ since phase 4 moved them.
 const AUTH_LADDER = located('src/infra/auth.ts');
 const TOKEN_ARGS = located(`${COMMANDS}/token-args.ts`);
-const TOKEN_ENTRY = located('src/token.ts');
 
 // Tests of the single package as a whole: they read the whole root src/, every
 // package's commands included, so no one package takes them. Phases 4 to 6
@@ -180,6 +180,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     reported: `${COMMANDS}/fixture-core-outside.test.ts (core) sits outside core/`,
   },
   {
+    name: 'a test outside auth/ that imports auth modules only',
+    path: `${COMMANDS}/fixture-auth-outside.test.ts`,
+    source: "import { resolveAuthPaths } from '@ask-marcel/office-auth/index.ts';\nexport const f = resolveAuthPaths;\n",
+    reported: `${COMMANDS}/fixture-auth-outside.test.ts (auth) sits outside auth/`,
+  },
+  {
     name: 'a test named after a write command that imports an auth module',
     path: `${COMMANDS}/create-mail-draft.test.ts`,
     source: `import { parseTokenArgs } from '${specifierTo(`${COMMANDS}/create-mail-draft.test.ts`, TOKEN_ARGS)}';\nexport const f = parseTokenArgs;\n`,
@@ -187,8 +193,8 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
   },
 ];
 
-// Must be reported by the rule that refuses a file in two ownership lists.
-const OVERLAP_FIXTURE = { name: 'a file in two ownership lists', path: TOKEN_ENTRY, reported: `${TOKEN_ENTRY} (auth, single)` } as const;
+// Must be reported by the rule that refuses a file in two ownership lists: a core file put in SINGLE_PACKAGE_FILES.
+const OVERLAP_FIXTURE = { name: 'a file in two ownership lists', path: CORE_FIXTURE, reported: `${CORE_FIXTURE} (core, single)` } as const;
 
 // Must be refused: the hoisted workspace would resolve it, and the check would not see its module.
 const SPECIFIER_FIXTURE = {
@@ -333,6 +339,7 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
     const own = testPackage(path, imports, owner);
     if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
     if (own === 'core' && !path.startsWith('core/')) return [`${path} (core) sits outside core/: move it to core/src/, or name it in SINGLE_PACKAGE_TESTS`];
+    if (own === 'auth' && !path.startsWith('auth/')) return [`${path} (auth) sits outside auth/: move it to auth/src/`];
     // A test under core/ runs with core alone, and one under auth/ with auth and
     // core: the single wiring is not open to them.
     const closed = (target: string): boolean => PACKAGES.includes(owner(target)) || path.startsWith('core/') || (path.startsWith('auth/') && owner(target) !== 'core');
@@ -361,7 +368,7 @@ const registryCommands = async (): Promise<{ readonly reads: ReadonlyArray<strin
 const main = async (): Promise<number> => {
   const core = glob([...CORE_FILES, ...CORE_READ_ONLY_FILES], 'core');
   const write = glob(WRITE_FILES);
-  const lists: Lists = { core, auth: glob(AUTH_FILES, 'auth'), write, single: glob(SINGLE_PACKAGE_FILES) };
+  const lists: Lists = { core, auth: glob([], 'auth'), write, single: glob(SINGLE_PACKAGE_FILES) };
   const owner: OwnerOf = (path) => ownerOf(lists, path);
   const tests = await readSources(true);
   if (process.argv.includes('--test-map')) {
@@ -390,7 +397,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/; every fixture is reported.');
+  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/ and every auth test in auth/; every fixture is reported.');
   return 0;
 };
 

@@ -59,7 +59,6 @@ import '../src/composition/single-package-names.ts';
 // imported by anything already listed here.
 import '../src/composition/mcp.ts';
 import '@ask-marcel/office-core/composition/mcp-shell.ts';
-// The token helper is reached from main.ts and src/token.ts, which no test loads.
 import '@ask-marcel/office-core/composition/token-source.ts';
 
 import '@ask-marcel/office-core/presenter/output.ts';
