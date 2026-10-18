@@ -11,7 +11,9 @@
  * this packs the package with `bun pm pack` and checks the tarball itself:
  *
  *   1. the files: package.json, README.md, LICENSE, CHANGELOG.md, each file
- *      that `bin` and `exports` name, and declarations under dist/; no other;
+ *      that `bin` and `exports` name, each bundle that the build makes
+ *      (scripts/package-targets.ts: dist/token.js in auth), and declarations
+ *      under dist/; no other;
  *   2. the manifest: `@ask-marcel/office-core` only in devDependencies (bun
  *      publish rewrites `workspace:*` to core's version, and an install would
  *      then 404 on the never-published core);
@@ -40,6 +42,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
+import { bundleTargets } from './package-targets.ts';
 
 type Manifest = {
   readonly name: string;
@@ -73,8 +76,8 @@ const namedFiles = (manifest: Manifest): ReadonlyArray<string> => {
   return [...Object.values(manifest.bin ?? {}), ...fromExports].map(withoutDot);
 };
 
-const fileProblems = (files: ReadonlyArray<string>, manifest: Manifest): ReadonlyArray<string> => {
-  const required = [...TOP_FILES, ...namedFiles(manifest)];
+const fileProblems = (files: ReadonlyArray<string>, manifest: Manifest, bundles: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const required = [...new Set([...TOP_FILES, ...namedFiles(manifest), ...bundles])];
   const missing = required.filter((path) => !files.includes(path)).map((path) => `missing from the tarball: ${path}`);
   const stray = files.filter((path) => !required.includes(path) && !/^dist\/.+\.d\.ts$/.test(path)).map((path) => `not expected in the tarball: ${path}`);
   return [...missing, ...stray];
@@ -222,7 +225,8 @@ const tarballProblems = async (tarball: string, dir: string): Promise<{ readonly
   const declarations = Object.fromEntries(
     await Promise.all(files.filter((f) => f.endsWith('.d.ts')).map(async (f) => [f, await Bun.file(join(dir, 'package', f)).text()] as const))
   );
-  return { problems: [...fileProblems(files, manifest), ...manifestProblems(manifest), ...declarationProblems(declarations)], manifest };
+  const bundles = bundleTargets(manifest, existsSync);
+  return { problems: [...fileProblems(files, manifest, bundles), ...manifestProblems(manifest), ...declarationProblems(declarations)], manifest };
 };
 
 const SELFTEST_MANIFEST: Manifest = {
@@ -231,25 +235,50 @@ const SELFTEST_MANIFEST: Manifest = {
   bin: { x: './dist/cli.js' },
   exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
 };
-const SELFTEST_FILES = [...TOP_FILES, 'dist/cli.js', 'dist/index.js', 'dist/index.d.ts', 'dist/shared/domain/result.d.ts'];
+// A package with a helper entry, as auth has: src/main.ts, src/index.ts and src/token.ts exist.
+const SELFTEST_BUNDLES = bundleTargets(SELFTEST_MANIFEST, (path) => ['src/main.ts', 'src/index.ts', 'src/token.ts'].includes(path));
+const SELFTEST_FILES = [...TOP_FILES, 'dist/cli.js', 'dist/index.js', 'dist/token.js', 'dist/index.d.ts', 'dist/shared/domain/result.d.ts'];
 
 const selftest = (): number => {
   const cases: ReadonlyArray<{ readonly name: string; readonly problems: number }> = [
     {
       name: 'a clean package',
       problems: [
-        ...fileProblems(SELFTEST_FILES, SELFTEST_MANIFEST),
+        ...fileProblems(SELFTEST_FILES, SELFTEST_MANIFEST, SELFTEST_BUNDLES),
         ...manifestProblems({ ...SELFTEST_MANIFEST, devDependencies: { [CORE]: '1.0.0' } }),
         ...declarationProblems({ 'dist/index.d.ts': "export type { Result } from './shared/domain/result.js';" }),
       ].length,
     },
-    { name: 'a stray source file', problems: fileProblems([...SELFTEST_FILES, 'src/index.ts'], SELFTEST_MANIFEST).length === 1 ? 0 : 1 },
+    { name: 'a stray source file', problems: fileProblems([...SELFTEST_FILES, 'src/index.ts'], SELFTEST_MANIFEST, SELFTEST_BUNDLES).length === 1 ? 0 : 1 },
     {
       name: 'a missing bin',
       problems:
         fileProblems(
           SELFTEST_FILES.filter((f) => f !== 'dist/cli.js'),
-          SELFTEST_MANIFEST
+          SELFTEST_MANIFEST,
+          SELFTEST_BUNDLES
+        ).length === 1
+          ? 0
+          : 1,
+    },
+    {
+      name: 'a missing helper entry',
+      problems:
+        fileProblems(
+          SELFTEST_FILES.filter((f) => f !== 'dist/token.js'),
+          SELFTEST_MANIFEST,
+          SELFTEST_BUNDLES
+        ).length === 1
+          ? 0
+          : 1,
+    },
+    {
+      name: 'a helper entry in a package with no src/token.ts',
+      problems:
+        fileProblems(
+          SELFTEST_FILES,
+          SELFTEST_MANIFEST,
+          bundleTargets(SELFTEST_MANIFEST, (path) => path !== 'src/token.ts')
         ).length === 1
           ? 0
           : 1,
@@ -267,7 +296,9 @@ const selftest = (): number => {
   const failed = cases.filter((c) => c.problems !== 0);
   for (const c of failed) process.stderr.write(`check-packed-package: SELFTEST FAILED, ${c.name} was judged wrongly\n`);
   if (failed.length === 0)
-    process.stdout.write('check-packed-package: selftest passed (a stray file, a missing bin, core in dependencies and a declaration naming core are rejected).\n');
+    process.stdout.write(
+      'check-packed-package: selftest passed (a stray file, a missing bin, a missing or stray helper entry, core in dependencies and a declaration naming core are rejected).\n'
+    );
   return failed.length === 0 ? 0 : 1;
 };
 
