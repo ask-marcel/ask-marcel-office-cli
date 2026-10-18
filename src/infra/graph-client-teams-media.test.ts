@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { FetchFn, GraphClient } from './graph-client.ts';
-import { createGraphClient } from './graph-client.ts';
+import { createTokenSourceGraphClient } from './graph-client.ts';
+
+// A token source with a Teams substrate token and no Graph token.
+const substrateOnly = (substrateToken: TokenSource['substrateToken']): TokenSource => ({
+  graphToken: async () => err({ type: 'auth_cancelled' }),
+  guestToken: async () => err({ type: 'auth_cancelled' }),
+  substrateToken,
+  substrateRegion: async () => ok('emea' as TeamsRegion),
+});
 
 const IMAGE = 'https://as-api.asm.skype.com/v1/objects/0-weu-d1-abc/views/imgo';
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -18,8 +28,8 @@ const clientWith = (answers: ReadonlyArray<Response>, seen: Seen[] = [], tokens:
     call += 1;
     return answer;
   };
-  const auth = fakeAuthManager({ getIc3AccessToken: async () => ({ ok: true, value: accessTokenUnsafe(tokens[Math.min(token++, tokens.length - 1)] ?? '') }) });
-  return createGraphClient(auth, fetchFn);
+  const tokenSource = substrateOnly(async () => ({ ok: true, value: accessTokenUnsafe(tokens[Math.min(token++, tokens.length - 1)] ?? '') }));
+  return createTokenSourceGraphClient(tokenSource, fetchFn);
 };
 
 describe('reading a pasted chat image from the Teams media service', () => {
@@ -57,7 +67,10 @@ describe('reading a pasted chat image from the Teams media service', () => {
     const failing: FetchFn = async () => {
       throw new TypeError('fetch failed');
     };
-    const down = await createGraphClient(fakeAuthManager({ getIc3AccessToken: async () => ({ ok: true, value: accessTokenUnsafe('t') }) }), failing).teamsChatMedia(IMAGE);
+    const down = await createTokenSourceGraphClient(
+      substrateOnly(async () => ({ ok: true, value: accessTokenUnsafe('t') })),
+      failing
+    ).teamsChatMedia(IMAGE);
     expect(down.ok).toBe(false);
     if (!down.ok) expect(down.error.type).toBe('network_error');
   });
