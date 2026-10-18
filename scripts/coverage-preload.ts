@@ -54,13 +54,6 @@ import '../src/composition/cli.ts';
 import '@ask-marcel/office-core/composition/cli-shell.ts';
 import '../src/composition/single-package.ts';
 import '../src/composition/single-package-names.ts';
-import '../src/composition/write-package.ts';
-import '../src/composition/write-package-names.ts';
-import '../src/composition/write-program.ts';
-import '../src/composition/write-server.ts';
-import '../src/composition/write-token-source.ts';
-import '../src/composition/write-client.ts';
-import '../src/composition/build-write-deps.ts';
 // Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively
 // imported by anything already listed here.
@@ -125,7 +118,6 @@ import '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import '../src/use-cases/commands/sharepoint-link-extractor.ts';
 import '../src/use-cases/commands/extract-sharepoint-links-in-mail.ts';
 import '../src/use-cases/commands/convert-mail-to-markdown.ts';
-import '../src/use-cases/commands/convert-mail-attachment-to-pdf.ts';
 import '../src/use-cases/commands/convert-mail-attachment-to-markdown.ts';
 import '../src/use-cases/commands/embedded-item-to-markdown.ts';
 import '../src/use-cases/commands/get-current-user.ts';
