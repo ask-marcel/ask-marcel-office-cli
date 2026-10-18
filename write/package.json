@@ -21,6 +21,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./commands.json": "./dist/commands.json",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -49,7 +50,7 @@
     "mutate": "stryker run",
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
-    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts",
+    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts && bun run ../scripts/gen-docs.ts --package src/composition/write-package.ts --manifest dist/commands.json",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
     "prepublishOnly": "bun run build && bun run lint:strict && bun run typecheck && bun run coverage && bun run check:packed"
   },
