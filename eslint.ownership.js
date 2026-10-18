@@ -93,7 +93,10 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
  * write module. A file joins a list when it becomes core or write.
  *
  * WRITE_FILES: the write commands and their write-only helpers. A new write
- * command joins the list (meta.test.ts pins the write set).
+ * command joins the list (meta.test.ts pins the write set). Until the write
+ * files move to write/ (package split, phase 5), the list also holds the write
+ * package's own wiring under the root src/: its registry, its lifecycle entries
+ * and its composition.
  *
  * A test file belongs to one package too (step 16): the check reads
  * SINGLE_PACKAGE_FILES for that, and no lint block reads it yet. A module in no
@@ -104,6 +107,7 @@ const WRITE_FILES = [
   'src/use-cases/commands/{create-mail-draft,create-reply-draft,create-forward-draft,update-mail-draft}.ts',
   'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
   'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
+  'src/use-cases/commands/{write-commands,write-lifecycle-entries}.ts',
 ];
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
