@@ -27,11 +27,7 @@
 
 import '@ask-marcel/office-core/domain/jwt-utils.ts';
 import '@ask-marcel/office-core/infra/logger.ts';
-import '../src/infra/auth-paths.ts';
-import '../src/infra/auth.ts';
-import '../src/infra/auth-token-source.ts';
-import '../src/infra/auth-browser.ts';
-import '../src/infra/browser-auth.ts';
+import '@ask-marcel/office-core/infra/auth-paths.ts';
 import '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import '@ask-marcel/office-core/infra/filesystem-node.ts';
 import '../src/infra/graph-client.ts';
@@ -43,7 +39,6 @@ import '@ask-marcel/office-core/infra/network-error.ts';
 import '@ask-marcel/office-core/infra/child-process-watch.ts';
 import '@ask-marcel/office-core/infra/process-runner-bun.ts';
 import '@ask-marcel/office-core/infra/rename-with-retry.ts';
-import '../src/infra/token-cache-lock.ts';
 import '@ask-marcel/office-core/infra/process-runner-node.ts';
 import '@ask-marcel/office-core/infra/env-token-source.ts';
 import '@ask-marcel/office-core/infra/helper-token-source.ts';
@@ -57,7 +52,6 @@ import '../src/index.ts';
 import '../src/composition/build-deps.ts';
 import '../src/composition/cli.ts';
 import '@ask-marcel/office-core/composition/cli-shell.ts';
-import '../src/composition/auth-cli.ts';
 import '../src/composition/single-package.ts';
 import '../src/composition/single-package-names.ts';
 // Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
@@ -65,10 +59,7 @@ import '../src/composition/single-package-names.ts';
 // imported by anything already listed here.
 import '../src/composition/mcp.ts';
 import '@ask-marcel/office-core/composition/mcp-shell.ts';
-import '../src/composition/auth-mcp.ts';
-// The token helper is reached from main.ts and src/token.ts, which no test loads.
-import '../src/composition/token-helper.ts';
-import '../src/composition/token-source.ts';
+import '@ask-marcel/office-core/composition/token-source.ts';
 
 import '@ask-marcel/office-core/presenter/output.ts';
 

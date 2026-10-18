@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { AuthLadder } from '../test-helpers/auth-manager-fake.ts';
 import type { GraphClient, GraphError } from '../infra/graph-client.ts';
 import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
@@ -26,8 +24,6 @@ const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Prom
   }
   return captured;
 };
-
-const okAuth = (): AuthLadder => fakeAuthManager();
 
 const okGraph = (value: unknown): GraphClient =>
   fakeGraphClient({
@@ -52,7 +48,7 @@ const errGraph = (error: GraphError): GraphClient =>
 describe('buildCli command surface', () => {
   it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
     const mutating = Object.entries(commands)
       .filter(([, c]) => c.meta.effect !== 'read')
@@ -75,7 +71,6 @@ describe('buildCli command surface', () => {
   it('renders a Graph error in text format with `error:` + `source: graph` (envelope-symmetry fix — round 2 — stamps the source even when the hint table did not match)', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
-      auth: okAuth(),
       graph: errGraph({ type: 'api_error', status: 404, message: 'not found' }),
       logger,
       fs: createFileSystemFake(),
@@ -91,7 +86,6 @@ describe('buildCli command surface', () => {
   it('threads the Retry-After interval from a throttled Graph 429 into the JSON error envelope so a crawler can honor the backoff', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
-      auth: okAuth(),
       graph: errGraph({ type: 'api_error', status: 429, message: 'TooManyRequests: Too many requests', code: 'TooManyRequests', retryAfterSeconds: 120 }),
       logger,
       fs: createFileSystemFake(),
@@ -104,7 +98,7 @@ describe('buildCli command surface', () => {
 
   it('runs a generic Graph command and renders the value as JSON', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({ displayName: 'Jordan' }), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'get-current-user']));
     expect(out).toContain('Jordan');
   });
@@ -120,7 +114,7 @@ describe('buildCli command surface', () => {
       },
     });
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: captureGraph, logger, fs: createFileSystemFake() });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--todo-task-list-id', 'AAMkABC']));
     expect(capturedPath).toBe('/me/todo/lists/AAMkABC/tasks');
   });
@@ -135,7 +129,7 @@ describe('buildCli command surface', () => {
     });
     const fs = createFileSystemFake();
     fs.seed('/work/data.csv', 'name,age\nAlice,30');
-    const cli = buildCli({ auth: okAuth(), graph: tripwireGraph, logger: createLoggerFake(), fs });
+    const cli = buildCli({ graph: tripwireGraph, logger: createLoggerFake(), fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file-to-markdown', '--path', '/work/data.csv'])
     );
@@ -147,7 +141,7 @@ describe('buildCli command surface', () => {
 
   it('stamps a failed local-only command with source `cli`, not `graph` — it never touched Graph (F-02)', async () => {
     const fs = createFileSystemFake(); // nothing seeded → readBytes returns a not-found error
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), fs });
+    const cli = buildCli({ graph: okGraph({}), logger: createLoggerFake(), fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'convert-local-file-to-markdown', '--path', '/work/missing.csv'])
     );
@@ -164,7 +158,7 @@ describe('buildCli command surface', () => {
         return { ok: true, value: { value: [] } };
       },
     });
-    const cli = buildCli({ auth: okAuth(), graph, logger: createLoggerFake(), fs: createFileSystemFake() });
+    const cli = buildCli({ graph, logger: createLoggerFake(), fs: createFileSystemFake() });
     await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', 'list-calendar-view', '--start-date-time', '2026-04-01T00:00:00Z', '--end-date-time', '2026-05-01T00:00:00Z'])
     );
@@ -173,7 +167,7 @@ describe('buildCli command surface', () => {
 
   it('help-json rejects an explicit --output text (manifest is JSON by contract — audit )', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'text', 'help-json']);
@@ -187,7 +181,7 @@ describe('buildCli command surface', () => {
 
   it('help-json still works when --output is left at its default text value (no explicit flag)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', 'help-json']);
@@ -215,7 +209,7 @@ describe('buildCli command surface', () => {
   // is exercised by the bare-args test at the bottom of this file.
   it('compact default help listing truncates each subcommand description to its first sentence', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
     // get-mail-message has a multi-sentence summary post-§A; the compact
     // help should carry only the first sentence. The post-first-sentence
@@ -228,7 +222,7 @@ describe('buildCli command surface', () => {
 
   it('compact help listing stays under the 20 KB token-budget ceiling (byte-count regression guard — replaces the dropped --verbose opt-out)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const compact = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
     // First-sentence truncation keeps the listing compact. The pre-compaction
     // full-summary form ran ~60 KB; if compaction silently regresses (e.g.
@@ -261,7 +255,7 @@ describe('buildCli command surface', () => {
       process.stdout.isTTY = true;
       for (const columns of [80, 100, 140, 200]) {
         process.stdout.columns = columns;
-        const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+        const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
         sizes.push((await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']))).length);
       }
     } finally {
@@ -273,7 +267,7 @@ describe('buildCli command surface', () => {
 
   it('--verbose is no longer a recognised top-level option (v1.4.0 surface-consolidation drop)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     let unknown = false;
     try {
       await cli.parseAsync(['node', 'ask-marcel-office', '--verbose', 'help']);
@@ -287,7 +281,7 @@ describe('buildCli command surface', () => {
 
   it('help-json --terse strips per-command heavy fields (no options/example/graphPathTemplate/responseShape)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--terse']);
@@ -303,7 +297,7 @@ describe('buildCli command surface', () => {
 
   it('help-json --category mail filters the manifest down to the mail category', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'mail']);
@@ -318,7 +312,7 @@ describe('buildCli command surface', () => {
 
   it('help-json --terse --category mail composes: terse projection within a single category', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--terse', '--category', 'mail']);
@@ -333,7 +327,7 @@ describe('buildCli command surface', () => {
 
   it('help-json --category with an unknown name surfaces a structured `ok:false` envelope listing the valid categories', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
@@ -350,7 +344,7 @@ describe('buildCli command surface', () => {
 
   it('stamps a machine-readable errorCode on an unknown --category rejection so an agent routes on the code, not the message', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help-json', '--category', 'notarealcategory']);
@@ -366,7 +360,6 @@ describe('buildCli command surface', () => {
   it('stamps a no_inlined_bytes errorCode when --output-path is used on a plain-JSON command with no body to write', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
-      auth: okAuth(),
       graph: okGraph({ id: '1', displayName: 'Jordan Avery' }),
       logger,
       fs: createFileSystemFake(),
@@ -380,7 +373,7 @@ describe('buildCli command surface', () => {
 
   it('rejects a duplicate --output flag', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ id: 'u1' }), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({ id: 'u1' }), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output', 'text', 'get-current-user']);
@@ -393,7 +386,7 @@ describe('buildCli command surface', () => {
 
   it('rejects a single-value flag passed more than once', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ value: [] }), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({ value: [] }), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', 'list-folder-files', '--drive-id', 'd1', '--item-id', 'i1', '--filter', 'A', '--filter', 'B']);
@@ -415,7 +408,7 @@ describe('buildCli command surface', () => {
       },
     });
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: captureGraph, logger, fs: createFileSystemFake() });
     await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'list-todo-tasks', '--todo-task-list-id', 'AAMkXYZ']));
     expect(capturedPath).toBe('/me/todo/lists/AAMkXYZ/tasks');
   });
@@ -423,7 +416,6 @@ describe('buildCli command surface', () => {
   it('renders the Graph error message when a generic Graph command fails', async () => {
     const logger = createLoggerFake();
     const cli = buildCli({
-      auth: okAuth(),
       graph: errGraph({ type: 'api_error', status: 404, message: 'not found' }),
       logger,
       fs: createFileSystemFake(),
@@ -434,7 +426,7 @@ describe('buildCli command surface', () => {
 
   it('prints Markdown for a single command when the user runs `docs <cmd>`', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'get-current-user']));
     expect(out).toContain('# `get-current-user`');
     expect(out).toContain('## Example');
@@ -442,7 +434,7 @@ describe('buildCli command surface', () => {
 
   it('renders an unknown-command message when the user runs `docs` with a name that does not exist', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'this-is-not-a-real-command']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('this-is-not-a-real-command');
@@ -450,7 +442,7 @@ describe('buildCli command surface', () => {
 
   it('falls back to the unknown-command error when `docs help` is invoked (commander does not register `help` as a regular subcommand)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'docs', 'help']));
     expect(out).toContain('Unknown command');
     expect(out).toContain('help');
@@ -458,7 +450,7 @@ describe('buildCli command surface', () => {
 
   it("'help-json' subcommand prints the full machine-readable manifest (same shape as docs/commands.json) to stdout", async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, version: '1.0.0', fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, version: '1.0.0', fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help-json']));
     const parsed = JSON.parse(out.trim()) as { package: string; version: string; commands: ReadonlyArray<{ name: string }> };
     expect(parsed.package).toBe('ask-marcel-office-cli');
@@ -475,7 +467,7 @@ describe('buildCli command surface', () => {
   it("'help-json' and 'docs' honour --output-path: write to disk + emit savedTo envelope; surface is_directory on a directory path", async () => {
     const logger = createLoggerFake();
     const fs = createFileSystemFake();
-    const make = (): ReturnType<typeof buildCli> => buildCli({ auth: okAuth(), graph: okGraph({}), logger, version: '1.0.0', fs });
+    const make = (): ReturnType<typeof buildCli> => buildCli({ graph: okGraph({}), logger, version: '1.0.0', fs });
     const helpOut = await captureStream('stdout', () =>
       make().parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/manifest.json', 'help-json'])
     );
@@ -511,7 +503,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync([
@@ -550,7 +542,7 @@ describe('buildCli command surface', () => {
         value: { contentType: 'application/octet-stream', size: 12, base64: 'JVBERi0=' },
       }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: passthroughGraph, logger, fs });
+    const cli = buildCli({ graph: passthroughGraph, logger, fs });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync([
@@ -600,7 +592,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
@@ -624,7 +616,7 @@ describe('buildCli command surface', () => {
 
   it("renders a commander 'required option not specified' error for `search-mail-messages` without --query (asserts meta.options.required: true survives manifest → Commander wiring)", async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'search-mail-messages']);
@@ -640,7 +632,7 @@ describe('buildCli command surface', () => {
 
   it('routes commander parser errors (unknown option) to the JSON envelope on stdout, not stderr plain text (under --output json)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const stderrOut = await captureStream('stderr', async () => {
       const stdoutOut = await captureStream('stdout', async () => {
         try {
@@ -659,7 +651,7 @@ describe('buildCli command surface', () => {
 
   it('routes commander parser errors as plain "error: ..." lines on stdout by default (text mode), nothing on stderr', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const stderrOut = await captureStream('stderr', async () => {
       const stdoutOut = await captureStream('stdout', async () => {
         try {
@@ -677,7 +669,7 @@ describe('buildCli command surface', () => {
 
   it('routes commander parser errors (unknown subcommand) to the JSON envelope on stdout (under --output json)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'this-command-does-not-exist']);
@@ -692,7 +684,7 @@ describe('buildCli command surface', () => {
 
   it('routes commander parser errors (missing required option) to the JSON envelope on stdout (under --output json)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     // get-mail-attachment keeps commander `requiredOption` (its flags carry no
     // aliases). get-mail-message can't be used here any more — its `--id` alias
     // moves required-ness to schema validation (commander no longer throws).
@@ -710,7 +702,7 @@ describe('buildCli command surface', () => {
 
   it('rejects an invalid --output value with a plain "error: ..." line (text mode is the default for the error too)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'bogus', 'get-current-user']);
@@ -730,7 +722,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
@@ -763,7 +755,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'notes.md' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'text/plain', size: 5, text: 'hello' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: textGraph, logger, fs });
+    const cli = buildCli({ graph: textGraph, logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync([
         'node',
@@ -789,7 +781,7 @@ describe('buildCli command surface', () => {
   it('global --output-path is a no-op when the command returns plain JSON (no base64 / no text) — surfaces a clear error rather than silently no-op-ing (under --output json)', async () => {
     const logger = createLoggerFake();
     const fs = createFileSystemFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, fs });
+    const cli = buildCli({ graph: okGraph({ displayName: 'Jordan' }), logger, fs });
     const out = await captureStream('stdout', async () => {
       try {
         await cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/work/test-output/profile.json', 'get-current-user']);
@@ -820,7 +812,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', '--output-path', '/root/forbidden.pdf', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
     );
@@ -832,16 +824,16 @@ describe('buildCli command surface', () => {
 
   it('`ask-marcel-office` with NO subcommand prints --help to stdout instead of silently exiting 1', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office']));
     expect(out).toContain('Usage: ask-marcel-office');
-    expect(out).toContain('login');
+    expect(out).toContain('help-json');
     expect(out).toContain('list-drives');
   });
 
   it('`help <unknown>` returns a JSON-envelope error rather than silently exiting (under --output json; )', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'help', 'no-such-command']));
     const parsed = JSON.parse(out.trim()) as { ok: false; error: string };
     expect(parsed.ok).toBe(false);
@@ -850,14 +842,14 @@ describe('buildCli command surface', () => {
 
   it('`help <known>` prints the markdown docs (alias of `docs <known>`)', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help', 'list-drives']));
     expect(out).toContain('list-drives');
   });
 
   it('`help` with no argument prints the global --help text', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
     expect(out).toContain('Usage: ask-marcel-office');
   });
@@ -870,7 +862,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 5, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1'])
     );
@@ -888,7 +880,7 @@ describe('buildCli command surface', () => {
       get: async () => ({ ok: true, value: { name: 'q3.docx' } }),
       getBinary: async () => ({ ok: true, value: { contentType: 'application/pdf', size: 12345, base64: 'JVBERi0=' } }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: inlinedPdf, logger, fs });
+    const cli = buildCli({ graph: inlinedPdf, logger, fs });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'download-drive-item-as-pdf', '--drive-id', 'd1', '--item-id', 'i1']));
     expect(out).toBe('binary: application/pdf, 12345 bytes — use --output-path to save\n');
   });
@@ -907,7 +899,7 @@ describe('buildCli command surface', () => {
   it('extract-drive-item-images --output-dir writes every image to the directory and replaces base64 with savedTo', async () => {
     const logger = createLoggerFake();
     const fs = createFileSystemFake();
-    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, fs });
+    const cli = buildCli({ graph: await mediaGraph(), logger, fs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
     );
@@ -919,7 +911,7 @@ describe('buildCli command surface', () => {
 
   it('--output-dir on a command that returns no media array emits a clear error pointing at the image-extraction commands', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({ displayName: 'Jordan' }), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({ displayName: 'Jordan' }), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'get-current-user', '--output-dir', '/work/imgs']));
     expect(out).toContain('did not return a media array');
     expect(out).toContain('extract-drive-item-images');
@@ -928,7 +920,7 @@ describe('buildCli command surface', () => {
 
   it('rejects an empty --output-dir explicitly', async () => {
     const logger = createLoggerFake();
-    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, fs: createFileSystemFake() });
+    const cli = buildCli({ graph: await mediaGraph(), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', ''])
     );
@@ -946,7 +938,7 @@ describe('buildCli command surface', () => {
       deleteIfExists: async () => ({ ok: true, value: undefined }),
       deleteDirIfExists: async () => ({ ok: true, value: undefined }),
     };
-    const cli = buildCli({ auth: okAuth(), graph: await mediaGraph(), logger, fs: failingFs });
+    const cli = buildCli({ graph: await mediaGraph(), logger, fs: failingFs });
     const out = await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', '--output', 'json', 'extract-drive-item-images', '--drive-id', 'd1', '--item-id', 'i1', '--output-dir', '/work/imgs'])
     );

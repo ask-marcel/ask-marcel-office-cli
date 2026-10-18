@@ -4,7 +4,7 @@
 //
 // It creates 4 drafts in the signed-in mailbox, reads each body back, asserts it,
 // and prints the draft IDs for YOU to delete (the CLI has no delete command, by
-// design). It NEVER sends. Run against a warm login:
+// design). It NEVER sends. Run after a warm `ask-marcel-office-auth login`:
 //
 //   bun scripts/qa-write-smoke.ts --yes-create-drafts
 //
@@ -138,7 +138,7 @@ const main = async (): Promise<void> => {
   process.stdout.write(`\n${allPass ? 'ALL WRITE COMMANDS OK' : 'SOME CHECKS FAILED — inspect above'}\n`);
   process.stdout.write(`\nDELETE these ${createdDraftIds.length} drafts in Outlook (Drafts folder) — the CLI cannot delete:\n`);
   for (const id of createdDraftIds) process.stdout.write(`  ${id}\n`);
-  process.stdout.write('\nSeparately, verify login --force interactively: run `ask-marcel-office login --force`, confirm the browser opens, then `ask-marcel-office login` should show elevated/ic3 as available.\n');
+  process.stdout.write('\nSeparately, verify login --force interactively: run `ask-marcel-office-auth login --force`, confirm the browser opens, then `ask-marcel-office-auth login` should show elevated/ic3 as available.\n');
   process.exit(allPass ? 0 : 1);
 };
 

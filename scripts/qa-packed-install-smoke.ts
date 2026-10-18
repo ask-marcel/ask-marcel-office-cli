@@ -12,7 +12,7 @@
  *
  *   1. every package the bundle imports at run time (its external static and
  *      dynamic imports, read from the installed dist) loads under node and bun,
- *      including the ones no converter reaches, such as login's playwright; and
+ *      including the ones no converter reaches, such as the update notifier; and
  *      a repo devDependency the tarball never installs fails to load, which
  *      re-proves on every run that the install is isolated (rule 15.10);
  *   2. `--version` answers the manifest's version, through the bin path under
@@ -63,7 +63,7 @@ const evaluate = (rt: (typeof RUNTIMES)[number], code: string, cwd: string): str
 // dynamic imports only (the bundle also carries generated code with
 // `require("...")` inside strings, which is not an import).
 const bundleExternals = async (root: string): Promise<ReadonlyArray<string>> => {
-  const texts = await Promise.all(['dist/cli.js', 'dist/index.js', 'dist/token.js'].map((f) => Bun.file(join(root, f)).text()));
+  const texts = await Promise.all(['dist/cli.js', 'dist/index.js'].map((f) => Bun.file(join(root, f)).text()));
   const found = texts.flatMap((t) => [...t.matchAll(/^import [^;]* from "([^"]+)";$|^import "([^"]+)";$|import\("([^"]+)"\)/gm)].map((m) => m[1] ?? m[2] ?? m[3] ?? ''));
   return [...new Set(found)].filter((s) => s !== '' && !s.startsWith('.') && !s.startsWith('node:') && !builtinModules.includes(s)).toSorted();
 };
@@ -121,8 +121,7 @@ try {
   }
   console.log(`  ✓ ${undeclared}, which the tarball does not install, fails to load under node and bun (the consumer is isolated)`);
 
-  // Every CLI run records where its token helper lives under HOME, so the bin
-  // runs on a scratch home and never repoints the user's.
+  // The bin runs on a scratch home, so a run never reads or writes the user's.
   const scratchHome = join(work, 'home');
   const binEnv = { ...process.env, HOME: scratchHome, USERPROFILE: scratchHome };
   const [binName, binPath] = Object.entries(installed.bin ?? {})[0] ?? fail('the packed manifest declares no bin');

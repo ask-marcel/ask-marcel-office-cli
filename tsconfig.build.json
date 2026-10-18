@@ -12,7 +12,5 @@
     "outDir": "./dist"
   },
   "include": ["src/**/*.ts"],
-  // src/token.ts is the token helper's entry, not library API, and its named
-  // import of the package version is one nodenext declarations refuse.
-  "exclude": ["**/*.test.ts", "src/test-helpers/**", "src/token.ts"]
+  "exclude": ["**/*.test.ts", "src/test-helpers/**"]
 }

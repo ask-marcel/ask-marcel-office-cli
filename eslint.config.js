@@ -16,61 +16,13 @@ export default [
     // So this rule is the enforcement. Render via `renderToString` /
     // `renderErrorToString` (pure) and return the string; never write it.
     // An allowlist since package-split step 13: stdout is banned everywhere
-    // except the CLI writers (the CLI builder, the presenter's `output.ts`, and
-    // the token helper's one JSON line), so a new MCP file is covered the day it
-    // lands, whatever its name.
+    // except the CLI writers (the CLI builder and the presenter's `output.ts`),
+    // so a new MCP file is covered the day it lands, whatever its name. The
+    // token helper's one JSON line moved to auth/ with its allowance (phase 4).
     files: ['src/**/*.ts'],
-    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/cli-shell.ts', 'src/presenter/output.ts', 'src/composition/token-helper.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/cli-shell.ts', 'src/presenter/output.ts'],
     rules: {
       'no-restricted-properties': ['error', STDOUT_BAN],
-    },
-  },
-  {
-    // The auth ladder (token cache, refresh, status) never loads the browser.
-    // An unattended session runs on it alone, and the auth package's `token`
-    // entry will stand on it and must start fast. Browser rungs reach it only
-    // through the BrowserRungs port that auth-browser.ts supplies. Type imports
-    // are erased at build time, so they stay allowed.
-    files: ['src/infra/auth.ts'],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              regex: '(^|/)(auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$|^playwright(-core)?(/.*)?$',
-              allowTypeImports: true,
-              message: 'auth.ts is the browser-free half of auth: take a browser rung through the BrowserRungs port that auth-browser.ts supplies, never import the browser.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    // The `token` helper starts on its own entry (dist/token.js) and must stay
-    // near bare Node startup: read and write spawn it for every bearer they lack.
-    // It never loads the CLI, winston, the update notifier, the renderer or,
-    // statically, the browser; the browser ladder comes in by a dynamic import
-    // only for a person at a terminal. Type imports are erased, so they stay
-    // allowed. src/token.ts is a bundle entry like src/main.ts, so it owns the
-    // one crash catch of its bundle (rule 17), and that catch prints only the
-    // error's type: a message can quote a token (LESSONS, 2026-10-04).
-    files: ['src/token.ts', 'src/composition/token-helper.ts'],
-    rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              regex:
-                '^(commander|winston|update-notifier|playwright(-core)?)(/.*)?$|(^|/)(cli|cli-shell|build-deps|mcp|mcp-shell|run-registry-command)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
-              allowTypeImports: true,
-              message: 'The token helper loads only the auth ladder, the file system and the token endpoint call; bring the browser in with a dynamic import, never the CLI.',
-            },
-          ],
-        },
-      ],
     },
   },
   {
@@ -130,4 +82,4 @@ export default [
 ];
 
 // The ownership lists stay importable from here, where the checks have read them since step 15.
-export { AUTH_FILES, CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from './eslint.ownership.js';
+export { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES, WRITE_FILES } from './eslint.ownership.js';

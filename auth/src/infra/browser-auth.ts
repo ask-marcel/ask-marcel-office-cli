@@ -7,7 +7,7 @@ import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesys
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
-import { resolveAuthPaths } from './auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { loadPlaywright } from './playwright-loader.ts';
 
 type BrowserTokenResult = { accessToken: AccessToken; refreshToken: string | null };
@@ -917,7 +917,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       // description so MCP and library callers hear it too, and so it can only
       // fire when a session is actually being destroyed.
       onProgress(
-        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office login` refreshes the elevated token without clearing it.'
+        'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office-auth login` refreshes the elevated token without clearing it.'
       );
       await context.clearCookies();
       try {

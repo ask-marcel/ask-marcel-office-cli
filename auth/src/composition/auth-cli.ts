@@ -1,19 +1,18 @@
 /*
- * The auth lifecycle commands of the single package's CLI: `login`, `status`
- * and `logout`. The CLI builder (`cli-shell.ts`) is core and knows no auth;
- * `cli.ts` hands it these through `addLifecycleCommands`, so they land under
- * the Lifecycle group and print through the same output as every command. After
- * the package split they are the auth package's (docs/plans/2026-10-01-package-split.md).
+ * The sign-in commands of the auth package's CLI: `login`, `status` and
+ * `logout` (docs/plans/2026-10-01-package-split.md). The CLI builder
+ * (`cli-shell.ts`) is core and knows no auth; `auth-program.ts` adds these
+ * commands to it, so they land under the Lifecycle group and print through the
+ * same output as every command.
  */
 import type { Command } from 'commander';
-import type { AuthLadder } from '../infra/auth.ts';
+import type { AuthLadder, LoginAuthFactory } from '../infra/auth.ts';
 import type { NameSource } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import { fillNames, fillNamesIn } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import { buildLoginSummary } from '../use-cases/commands/login-status.ts';
 import * as login from '../use-cases/commands/login.ts';
 import * as logout from '../use-cases/commands/logout.ts';
 import * as status from '../use-cases/commands/status.ts';
-import type { LoginAuthFactory } from './build-deps.ts';
 import type { CliOutput } from '@ask-marcel/office-core/composition/cli-shell.ts';
 
 type AuthCliDeps = {
@@ -21,7 +20,7 @@ type AuthCliDeps = {
   /**
    * Builds the AuthManager for an interactive `login` run (it may recapture
    * secondary tokens via the browser, unlike the command-path `auth`).
-   * Supplied by the composition root (`build-deps.ts`); when omitted (tests),
+   * Built by `build-auth-deps.ts` for the auth bin; when omitted (tests),
    * the login action falls back to the injected `auth`, so a single fake
    * drives both `login.execute` and `getLastElevatedOutcome`.
    */
@@ -41,7 +40,7 @@ type AuthCliDeps = {
  * 2026-09-07, against a SentinelOne policy).
  */
 const AUTH_CANCELLED_MESSAGE =
-  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g ask-marcel-office-cli`, then `{auth-bin} login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
+  'Authentication cancelled. If you closed the sign-in window, run `login` again. If a browser opened but stayed on about:blank with no sign-in page, it launched but could not be driven: endpoint-security / EDR software blocking the local DevTools (CDP) connection is the usual cause. If you are running under Bun, try the Node install instead (`npm i -g @ask-marcel/office-auth`, then `{auth-bin} login`) — some EDR policies block Bun from driving the browser but trust Node; otherwise add a security exclusion for the browser Playwright launches. Re-run with ASKMARCEL_TRACE=1 to see which browser failed and why.';
 
 const addAuthCommands = (program: Command, output: CliOutput, deps: AuthCliDeps): void => {
   const { auth, names } = deps;

@@ -5,10 +5,10 @@ import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { AuthManager } from '../../test-helpers/auth-manager-fake.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
-import { createGraphClient } from '../../infra/graph-client.ts';
-import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
+import { createTokenSourceGraphClient as createGraphClient } from '../../infra/graph-client.ts';
 import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
@@ -18,14 +18,12 @@ const cmdMap: Record<string, { execute: CommandExecute }> = {
   'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,
 };
 
-const fakeAuth = (): AuthManager =>
-  fakeAuthManager({
-    getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
-    getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
-    getGuestAccessToken: async () => ok(accessTokenUnsafe('test-guest-token')),
-    getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
-    getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
-  });
+const fakeAuth = (): TokenSource => ({
+  graphToken: async (tier) => ok(accessTokenUnsafe(tier === 'elevated' ? 'test-elevated-token' : 'test-token')),
+  guestToken: async () => ok(accessTokenUnsafe('test-guest-token')),
+  substrateToken: async (tier) => ok(accessTokenUnsafe(`test-${tier}-token`)),
+  substrateRegion: async () => ok('emea' as TeamsRegion),
+});
 
 type FakeFetch = ((url: string, init?: RequestInit) => Promise<Response>) & { lastUrl: string | null; lastBody: string | null };
 

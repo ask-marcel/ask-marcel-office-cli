@@ -4,13 +4,12 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
-import { buildCli } from './cli.ts';
+import { buildAuthCli } from './auth-program.ts';
 
 // The error line an agent reads after a mistyped name or flag.
 const errorFor = async (args: ReadonlyArray<string>): Promise<string> => {
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
+  const cli = buildAuthCli({ auth: fakeAuthManager(), logger: createLoggerFake(), fs: createFileSystemFake() });
   const original = process.stdout.write.bind(process.stdout);
   let out = '';
   process.stdout.write = (chunk: string | Uint8Array): boolean => {

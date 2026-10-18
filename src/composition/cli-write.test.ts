@@ -3,11 +3,9 @@
 // (package split, step 16), so the write package takes this file whole; the helpers are
 // copies of that file's.
 import { describe, expect, it } from 'bun:test';
-import type { AuthLadder } from '../test-helpers/auth-manager-fake.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import { buildCli } from './cli.ts';
@@ -29,8 +27,6 @@ const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Prom
   return captured;
 };
 
-const okAuth = (): AuthLadder => fakeAuthManager();
-
 const okGraph = (value: unknown): GraphClient =>
   fakeGraphClient({
     get: async () => ({ ok: true, value }),
@@ -43,7 +39,7 @@ const okGraph = (value: unknown): GraphClient =>
 
 describe('buildCli command surface', () => {
   it('top-level description says what each write leaves behind, so the PDF conversions are not hidden behind a drafts-only promise', () => {
-    const cli = buildCli({ auth: okAuth(), graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
+    const cli = buildCli({ graph: okGraph({}), logger: createLoggerFake(), fs: createFileSystemFake() });
     const description = cli.description();
     const writeCount = Object.values(commands).filter((c) => c.meta.effect !== 'read').length;
     expect(description).toContain(`the ONLY writes are ${writeCount} commands.`);
@@ -63,7 +59,7 @@ describe('buildCli command surface', () => {
         return { ok: true, value: { id: 'AAMkAGI2', isDraft: true } };
       },
     });
-    const cli = buildCli({ auth: okAuth(), graph: captureGraph, logger: createLoggerFake(), fs: createFileSystemFake() });
+    const cli = buildCli({ graph: captureGraph, logger: createLoggerFake(), fs: createFileSystemFake() });
     await captureStream('stdout', () =>
       cli.parseAsync(['node', 'ask-marcel-office', 'create-reply-draft', '--reply-to-message-id', 'AAMkAGI2', '--comment', 'Confirmed for Contoso.'])
     );

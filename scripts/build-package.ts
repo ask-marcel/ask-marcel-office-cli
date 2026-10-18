@@ -9,8 +9,10 @@
  * drift (docs/plans/2026-10-01-package-split.md, Target layout):
  *
  *   - the bundles are the files that `bin` and the `exports` import targets
- *     name: dist/cli.js from src/main.ts, dist/index.js from src/index.ts,
- *     dist/token.js from src/token.ts. A target with no known entry fails.
+ *     name, plus each known entry whose source exists in the folder
+ *     (scripts/package-targets.ts): dist/cli.js from src/main.ts,
+ *     dist/index.js from src/index.ts, dist/token.js from src/token.ts. A
+ *     target with no known entry fails.
  *   - the modules left `external` are exactly the keys of `dependencies`. Every
  *     other import, core first of all, is inlined. A module that the bundle
  *     imports but `dependencies` does not name is inlined too, so a missing
@@ -19,25 +21,11 @@
  * The declarations come after, from scripts/build-types.ts.
  */
 
-type Manifest = {
-  readonly bin?: Readonly<Record<string, string>>;
-  readonly exports?: Readonly<Record<string, string | { readonly import?: string }>>;
-  readonly dependencies?: Readonly<Record<string, string>>;
-};
+import { existsSync } from 'node:fs';
+import type { TargetManifest } from './package-targets.ts';
+import { ENTRIES, bundleTargets } from './package-targets.ts';
 
-const ENTRIES: Readonly<Record<string, string>> = {
-  'dist/cli.js': 'src/main.ts',
-  'dist/index.js': 'src/index.ts',
-  'dist/token.js': 'src/token.ts',
-};
-
-const withoutDot = (path: string): string => (path.startsWith('./') ? path.slice(2) : path);
-
-const bundleTargets = (manifest: Manifest): ReadonlyArray<string> => {
-  const fromBin = Object.values(manifest.bin ?? {});
-  const fromExports = Object.values(manifest.exports ?? {}).map((target) => (typeof target === 'string' ? target : (target.import ?? '')));
-  return [...new Set([...fromBin, ...fromExports].map(withoutDot).filter((path) => path.endsWith('.js')))];
-};
+type Manifest = TargetManifest & { readonly dependencies?: Readonly<Record<string, string>> };
 
 const build = async (target: string, external: ReadonlyArray<string>): Promise<boolean> => {
   const entry = ENTRIES[target];
@@ -53,5 +41,5 @@ const build = async (target: string, external: ReadonlyArray<string>): Promise<b
 
 const manifest = (await Bun.file('package.json').json()) as Manifest;
 const external = Object.keys(manifest.dependencies ?? {});
-const built = await Promise.all(bundleTargets(manifest).map((target) => build(target, external)));
+const built = await Promise.all(bundleTargets(manifest, existsSync).map((target) => build(target, external)));
 process.exit(built.every(Boolean) ? 0 : 1);

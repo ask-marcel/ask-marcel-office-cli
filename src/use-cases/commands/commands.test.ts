@@ -2,9 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { AuthManager } from '../../test-helpers/auth-manager-fake.ts';
+import type { TeamsRegion } from '@ask-marcel/office-core/domain/teams-region.ts';
+import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 import type { FetchFn, GraphError } from '../../infra/graph-client.ts';
-import { createGraphClient } from '../../infra/graph-client.ts';
+import { createTokenSourceGraphClient as createGraphClient } from '../../infra/graph-client.ts';
 import {
   buildDocxWithSharepointLinks,
   buildMalformedDocx,
@@ -20,7 +21,6 @@ import {
   buildSampleXlsx,
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
-import { fakeAuthManager } from '../../test-helpers/auth-manager-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
@@ -376,14 +376,12 @@ const cmdMap: Record<string, { execute: CommandExecute }> = {
   'next-page': nextPage,
 };
 
-const fakeAuth = (): AuthManager =>
-  fakeAuthManager({
-    getAccessToken: async () => ok(accessTokenUnsafe('test-token')),
-    getElevatedAccessToken: async () => ok(accessTokenUnsafe('test-elevated-token')),
-    getGuestAccessToken: async () => ok(accessTokenUnsafe('test-guest-token')),
-    getChatsvcaggAccessToken: async () => ok(accessTokenUnsafe('test-chatsvcagg-token')),
-    getIc3AccessToken: async () => ok(accessTokenUnsafe('test-ic3-token')),
-  });
+const fakeAuth = (): TokenSource => ({
+  graphToken: async (tier) => ok(accessTokenUnsafe(tier === 'elevated' ? 'test-elevated-token' : 'test-token')),
+  guestToken: async () => ok(accessTokenUnsafe('test-guest-token')),
+  substrateToken: async (tier) => ok(accessTokenUnsafe(`test-${tier}-token`)),
+  substrateRegion: async () => ok('emea' as TeamsRegion),
+});
 
 type FakeFetch = ((url: string, init?: RequestInit) => Promise<Response>) & { lastUrl: string | null; lastBody: string | null };
 

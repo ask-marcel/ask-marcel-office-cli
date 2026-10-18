@@ -13,8 +13,9 @@
  * must exist: when it moves, the fixture fails until both the fixture path and
  * the rule's glob in eslint.config.js move with it. (A virtual path alone would
  * keep matching the old glob and stay green while the moved file lost the rule.)
- * One move is followed: a root file found under core/ instead (package split,
- * phase 3) is linted from core/ with core's config, which must hold the rule.
+ * One move is followed: a root file found under core/ or auth/ instead (package
+ * split, phases 3 and 4) is linted from that folder with its config, which must
+ * hold the rule.
  * A type-aware fixture with no cwd never follows a move: it proves the root's
  * own lint:strict, so it names a file that stays at the root.
  *
@@ -47,6 +48,10 @@ const NEEDLESS_ASSERTION = 'const n = 1;\nexport const f = (): number => n as nu
 const STRING_REJECTION = "export const f = (): Promise<never> => Promise.reject('nope');\n";
 const BROWSER_IMPORT = "import { createBrowserAuth } from './browser-auth.ts';\nexport const f = (): unknown => createBrowserAuth;\n";
 const WINSTON_IMPORT = "import winston from 'winston';\nexport const f = (): unknown => winston;\n";
+const AUTH_SERVER_IMPORT = "import { buildAuthMcpServer } from './auth-server.ts';\nexport const f = (): unknown => buildAuthMcpServer;\n";
+const AUTH_PROGRAM_IMPORT = "import { buildAuthCli } from './auth-program.ts';\nexport const f = (): unknown => buildAuthCli;\n";
+const MCP_TYPES_IMPORT = "import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';\nexport const f = (): unknown => CallToolResultSchema;\n";
+const ZOD_IMPORT = "import { z } from 'zod';\nexport const f = (): unknown => z;\n";
 const WRITE_GRAPH_IMPORT = "import { createWriteGraph } from '../../infra/write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 const WRITE_GRAPH_TYPE_IMPORT = "import type { WriteGraph } from '../../infra/write-graph.ts';\nexport type F = WriteGraph;\n";
 const FULL_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
@@ -72,7 +77,7 @@ const TYPE_AWARE_RULES: ReadonlySet<string> = new Set(['@typescript-eslint/no-un
 // One real source file per workspace folder, relative to the folder.
 const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['core', 'src/domain/result.ts'],
-  ['auth', 'src/composition/bin.ts'],
+  ['auth', 'src/composition/auth-program.ts'],
   ['read', 'src/composition/bin.ts'],
   ['write', 'src/composition/bin.ts'],
 ];
@@ -80,6 +85,7 @@ const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'the MCP gateway never writes stdout', path: 'src/composition/mcp-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
+  { name: 'auth: the auth bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'auth' },
   { name: 'the auth MCP tools never write stdout', path: 'src/composition/auth-mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'stdout is banned by default, not only in MCP files', path: 'src/composition/run-registry-command.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'control: the CLI builder owns stdout', path: 'src/composition/cli-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
@@ -100,11 +106,15 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'a core docs builder never loads the registry with a dynamic import', path: 'src/use-cases/commands/docs-builders.ts', source: DYNAMIC_REGISTRY_IMPORT.replace('../use-cases/commands/index.ts', './index.ts'), rule: 'no-restricted-syntax', fires: true, strict: false },
   { name: 'control: the core file system loads its Node half dynamically', path: 'src/infra/filesystem-bun.ts', source: DYNAMIC_SIBLING_IMPORT, rule: 'no-restricted-syntax', fires: false, strict: false },
   { name: 'control: the composition root wires the registry', path: 'src/composition/single-package.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
-  { name: 'control: the auth CLI commands import login', path: 'src/composition/auth-cli.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
+  { name: 'control: a login import outside the core ban', path: 'src/composition/single-package.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the auth ladder never loads the browser', path: 'src/infra/auth.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: the browser half of auth loads it', path: 'src/infra/auth-browser.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the token helper never loads winston', path: 'src/composition/token-helper.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'control: the logger adapter wraps winston', path: 'src/infra/logger.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
+  { name: "the token helper never loads auth's MCP server builder", path: 'src/composition/token-helper.ts', source: AUTH_SERVER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: "the token helper never loads auth's CLI builder", path: 'src/composition/token-helper.ts', source: AUTH_PROGRAM_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the token helper never loads the MCP SDK', path: 'src/composition/token-helper.ts', source: MCP_TYPES_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'the token helper never loads zod', path: 'src/composition/token-helper.ts', source: ZOD_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'control: an auth file outside the token helper loads winston', path: 'src/composition/auth-cli.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'a read command never imports the write graph', path: 'src/use-cases/commands/list-drives.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'a read command never takes the write graph type', path: 'src/use-cases/commands/get-schedule.ts', source: WRITE_GRAPH_TYPE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'a read helper never builds the full client', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: FULL_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
@@ -157,11 +167,18 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
   }
 };
 
-// A guarded file of the root src/ that phase 3 moved to core/ (package split)
-// is linted from core/, with core's config: the rule must hold there too. A
-// type-aware fixture stays at the root, where it proves the root's lint:strict.
-const located = async (fixture: Fixture): Promise<Fixture> =>
-  fixture.cwd === undefined && !TYPE_AWARE_RULES.has(fixture.rule) && !(await Bun.file(fixture.path).exists()) && (await Bun.file(`core/${fixture.path}`).exists()) ? { ...fixture, cwd: 'core' } : fixture;
+// The folders that a guarded file of the root src/ moves to (package split, phases 3 and 4).
+const MOVED_TO: ReadonlyArray<string> = ['core', 'auth'];
+
+// A guarded file that moved is linted from its folder, with that folder's
+// config: the rule must hold there too. A type-aware fixture stays at the
+// root, where it proves the root's lint:strict.
+const located = async (fixture: Fixture): Promise<Fixture> => {
+  if (fixture.cwd !== undefined || TYPE_AWARE_RULES.has(fixture.rule) || (await Bun.file(fixture.path).exists())) return fixture;
+  const found = await Promise.all(MOVED_TO.map(async (cwd) => ((await Bun.file(`${cwd}/${fixture.path}`).exists()) ? cwd : undefined)));
+  const cwd = found.find((folder) => folder !== undefined);
+  return cwd === undefined ? fixture : { ...fixture, cwd };
+};
 
 const check = async (listed: Fixture): Promise<boolean> => {
   const fixture = await located(listed);

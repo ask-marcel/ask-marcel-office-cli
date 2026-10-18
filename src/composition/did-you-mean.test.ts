@@ -1,7 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
@@ -27,12 +26,12 @@ const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
 };
 
 const runCli = (...args: ReadonlyArray<string>): Promise<string> => {
-  const cli = buildCli({ auth: fakeAuthManager(), graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
+  const cli = buildCli({ graph: fakeGraphClient(), logger: createLoggerFake(), fs: createFileSystemFake() });
   return captureStdout(() => cli.parseAsync(['node', 'ask-marcel-office', ...args]));
 };
 
 const connect = async (): Promise<Client> => {
-  const server = buildMcpServer({ auth: fakeAuthManager(), graph: fakeGraphClient(), fs: createFileSystemFake(), version: '9.9.9' });
+  const server = buildMcpServer({ graph: fakeGraphClient(), fs: createFileSystemFake(), version: '9.9.9' });
   const client = new Client({ name: 'test client', version: '1.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(clientTransport), server.server.connect(serverTransport)]);
@@ -90,17 +89,17 @@ describe('a mistyped name over MCP and in the library', () => {
 
 describe('a removed command name', () => {
   it('tells the CLI caller that status replaced scopes-check', async () => {
-    expect(await runCli('scopes-check')).toContain("unknown command 'scopes-check'. `status` replaced `scopes-check`.");
+    expect(await runCli('scopes-check')).toContain("unknown command 'scopes-check'. `ask-marcel-office-auth status` replaced `scopes-check`.");
   });
 
   it('tells the reader of the docs page that status replaced scopes-check', async () => {
-    expect(await runCli('docs', 'scopes-check')).toContain('Unknown command "scopes-check". `status` replaced `scopes-check`.');
+    expect(await runCli('docs', 'scopes-check')).toContain('Unknown command "scopes-check". `ask-marcel-office-auth status` replaced `scopes-check`.');
   });
 
   it('tells the MCP caller of run-command that status replaced scopes-check', async () => {
     const client = await connect();
     expect(textOf(await client.callTool({ name: 'run-command', arguments: { command: 'scopes-check' } }))).toContain(
-      'Unknown command "scopes-check". `status` replaced `scopes-check`.'
+      'Unknown command "scopes-check". The `status` tool of the ask-marcel-office-auth server replaced `scopes-check`.'
     );
   });
 });

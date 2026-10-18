@@ -4,7 +4,10 @@
  * Checks and CI: the windows-latest job). Offline: a fixture token cache, no
  * browser, no network.
  *
- *   1. Builds the helper's entry (src/token.ts) to a temporary dist/token.js.
+ *   1. Builds the helper's entry, auth/src/token.ts, to a temporary
+ *      dist/token.js. The modules that auth/package.json names in
+ *      `dependencies` stay external, as in the auth build
+ *      (scripts/build-package.ts).
  *   2. Writes a token cache with a fresh basic token under a temporary HOME
  *      (and USERPROFILE, which Windows reads first).
  *   3. Runs `node dist/token.js --tier basic` with stdin ignored, as auth runs
@@ -12,7 +15,7 @@
  *      writes the locator file (~/.ask-marcel/token-helper.json) on the way.
  *   4. Asks the package split's token source for the basic token, through the
  *      locator file, the way read and write do: the env-then-helper source
- *      (src/composition/token-source.ts) spawns `execPath entry --tier basic`
+ *      (core/src/composition/token-source.ts) spawns `execPath entry --tier basic`
  *      with no shell. Once with the Node process runner (an npm install run by
  *      node) and once with the Bun one. The helper inherits the caller's
  *      environment, so this part runs in a child of this script whose HOME is
@@ -32,7 +35,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createEnvThenHelperTokenSource } from '../src/composition/token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
 import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';
@@ -52,14 +55,18 @@ const home = join(work, 'home');
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('ASKMARCEL_')));
 const env = { ...cleanEnv, HOME: home, USERPROFILE: home };
 
+const AUTH = resolve(import.meta.dir, '../auth');
+const HELPER_ENTRY = join(AUTH, 'src/token.ts');
+
 const buildHelper = async (): Promise<string> => {
+  const manifest = (await Bun.file(join(AUTH, 'package.json')).json()) as { readonly dependencies?: Readonly<Record<string, string>> };
   const built = await Bun.build({
-    entrypoints: [resolve(import.meta.dir, '../src/token.ts')],
+    entrypoints: [HELPER_ENTRY],
     outdir: join(work, 'dist'),
     naming: 'token.js',
     target: 'node',
     format: 'esm',
-    external: ['playwright'],
+    external: Object.keys(manifest.dependencies ?? {}),
   });
   if (!built.success) fail(`the helper does not build: ${built.logs.map((log) => String(log.message)).join('; ')}`);
   return join(work, 'dist', 'token.js');

@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3".** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -972,6 +972,216 @@ As built in phase 3 (2026-10-15):
 `status`, `token` per tier, the MCP `login` tool, two parallel `token` calls on an expired access
 token (one redemption, no `invalid_grant`), and a helper killed mid-refresh followed by a successful
 `token` (stale lock recovered, cache intact).
+
+As built in phase 4 (2026-10-18). The numbers in this note count the 38 commits of the phase,
+oldest first. Commit 25, the move, is the only commit with `--no-verify`.
+
+- Decisions. D1: the root signs only through the `ASKMARCEL_TOKEN_*` variables and auth's token
+  helper. It lost `login`, `logout`, `status`, `token`, the MCP `login` and `status` tools,
+  `dist/token.js` and the record of the locator. D2: `resolveAuthPaths`,
+  `tokenHelperLocatorPath` and `createEnvThenHelperTokenSource` went to core in three commits
+  (2 to 4), because one commit needs 14 files and the size gate allows 10. D3: the auth bin runs
+  `login`, `logout`, `status`, `token`, `docs`, `help-json` and `mcp`. Its MCP server has the
+  tools `login` and `status` only. Its library exports `type Result`, `resolveAuthPaths` and
+  `type AuthPaths`. The other types of the library table come with the token functions. D4: the
+  move is a pure `git mv` commit. Auth's half of the placeholder sweep is commit 26.
+- Seams (1 to 11). Core: `PACKAGE_BINS` next to `PACKAGE_NAMES` in `command-directory.ts`, and
+  `buildLifecycleCli` in `cli-shell.ts`, a CLI with no registry and no graph that takes its
+  description from the caller (`buildCliShell` is that CLI plus the registry commands, with the
+  same API). Auth, in this order:
+  - `LoginAuthFactory` in `auth.ts`, so `auth-cli.ts` and `auth-mcp.ts` no longer import
+    `build-deps.ts`.
+  - `auth-package-names.ts`: the token helper fills its remedies with the auth bin.
+  - `auth-lifecycle-entries.ts`, with six entries.
+  - `buildAuthCli` (`auth-program.ts`).
+  - `buildAuthMcpServer` (`auth-server.ts`): its own `McpServer` plus `addAuthTools`, with no
+    file system, no graph and no gateway. A test makes sure that no tool result holds a token.
+  - `buildAuthDeps` (`build-auth-deps.ts`), with no graph, no process runner and no
+    `secondaryTokenCommands`.
+- Suites (12 to 14, rule 24). The four auth suites use the auth builders. The command suites
+  build their client with `createTokenSourceGraphClient` over a `TokenSource` that each file
+  writes itself.
+  `graph-client.test.ts` and `auth-token-source.test.ts` build theirs from the core graphs over
+  `createAuthManagerTokenSource`.
+- Root cut (15 to 20). The root's remedies name `ask-marcel-office-auth`. The root MCP server
+  has the four gateway tools. The root lifecycle is `docs`, `help-json` and `mcp`, so the
+  manifest has 214 entries (217 before). `buildDeps` always uses the env-then-helper source.
+  `graph-client.ts` keeps only `createTokenSourceGraphClient`. `src/index.ts` no longer exports
+  `createAuthManager`, `AuthError`, `AuthManager` and `createGraphClient`. `main.ts` has no
+  `token` path and records no locator, and the root build makes no `dist/token.js`.
+- Root output from B0 (the base, `e128724`) to B1 (commit 20, and commit 24 gives the same
+  bytes): 237 calls or items differ, and a script puts each one in an approved rule. Three
+  results were not on the list:
+  - `login --help` (and `logout`, `status`) prints the root help. Commander does this for any
+    unknown name before `--help`.
+  - `docs token` and `run-command login` (and `status`, `logout`) add a note that names the
+    auth package.
+  - `list-drives` on a new HOME fails with `token_helper_unavailable`, which names the auth bin.
+  - One fact of the design was wrong: an MCP call of the `login` or `status` tool gets "MCP
+    error -32602: Tool <name> not found" from the SDK itself, so no root code can name the auth
+    server there. `get-command-docs` and `run-command` name it.
+- Checks (21 to 24, 35). Under `core/` and `auth/` the folder gives the owner. The lists of
+  `eslint.ownership.js` apply to the root `src/` only, and `AUTH_FILES` is deleted (35).
+  `check-package-imports` reads `auth/src/` and `@ask-marcel/office-auth/<path>`, and refuses
+  any other `@ask-marcel/` specifier except `office-core/<path>`. New rules, each with a
+  fixture:
+  - No module outside auth reaches auth.
+  - An auth module reaches only core and auth. Its own `package.json` is allowed.
+  - A test under `auth/` imports only auth and core.
+  - No test outside `auth/` falls to auth (35).
+- Lint (23, 30, 35). `auth/eslint.config.js` has the stdout allowlist, the browser-free block of
+  `src/infra/auth.ts` and the import block of `src/token.ts` and `token-helper.ts`. The bans are
+  data in `eslint.ownership.js` (`AUTH_LADDER_IMPORT_BANS`, `TOKEN_HELPER_IMPORT_BANS`). The
+  token ban also names auth's builders (`auth-cli`, `auth-mcp`, `auth-program`, `auth-server`,
+  `build-auth-deps`), the MCP SDK and zod. `check-lint-fixtures` lints a guarded file that it
+  finds under `auth/` from `auth/`.
+- The move (25): 49 renames at 100% (26 sources, 23 tests) and one edit, the deletion of 13
+  side-effect imports of moved files in `scripts/coverage-preload.ts`. No file was added or
+  deleted. A token-level scan, adapted from phase 3, accepts only the deletion of a whole
+  side-effect import whose target the same change moves. The root CLI (461 calls) and an MCP
+  session gave the same bytes before and after. Root `bun test` went from 5298 to 4792 tests:
+  506 moved to auth. Auth's full Stryker run: 8 files, 301 mutants, 100% (threshold 90).
+- Auth wiring (26 to 34). Auth's placeholder sweep over `auth/src/`. `check:packed` runs the
+  packed bin and the library with a temporary HOME and no `ASKMARCEL_*` variable (before
+  commit 30, which records the locator). `auth/package.json` declares `playwright` and
+  `update-notifier`, both external, because the bundle reaches playwright through dynamic
+  imports. The root drops playwright. `scripts/package-targets.ts` gives `build-package.ts` and
+  `check-packed-package.ts` one target list: `bin`, `exports`, and each known entry whose
+  source exists, so auth builds `dist/cli.js`, `dist/index.js` and `dist/token.js`.
+  `auth/src/main.ts` replaces the skeleton, and `bin.ts` and its test are deleted. It has three
+  paths. `token` is the helper, with no commander, winston or update notifier. `mcp` records
+  the locator and serves stdio. Any other first argument shows the update notice of
+  `@ask-marcel/office-auth`, records the locator and runs the CLI. Its crash catch takes its
+  text from `crash-text.ts`, which a unit test pins: on the `token` path the message is
+  withheld, because a message can quote a token.
+  `scripts/qa-auth-bundle-smoke.ts` (`bun run smoke` in `auth/`, a CI step of the workspace job
+  for auth only) checks the built bundle under node and bun (24 checks). `dist/token.js` must
+  not hold commander, winston, the update notifier, the MCP SDK or zod. The Windows round trip
+  builds `auth/src/token.ts` only. The cancelled sign-in, the elevated `launch_timeout` text and
+  the browser session wipe name the auth package and bin.
+- Auth bin against the old root (after commit 30, the B0 side normalised to the auth bin and
+  version). These calls are equal: `docs` and `--help` for `login`, `logout` and `status`. The
+  answers and errors of `login`, `logout`, `status` and `token` are equal. The helper entry and
+  the MCP `login` and `status` tools are equal too. These differences are expected:
+  - auth's description, and a help and a `help-json` with six commands
+  - auth's text for `docs`, `help-json` and `mcp`
+  - the auth bin in the `{bin}` places
+  - narrower option columns, which commander wraps at 80 columns
+  - the server name, with two tools
+  - `list-drives`, which names `@ask-marcel/office-read`
+- Counts at the end of the phase: root `bun test` 4792 (5271 at B0), core 1014 (996), auth 518
+  (2). Coverage meets every tier gate in each folder (100% in core and auth). The test map
+  (`--test-map`, 304 files): core 90, auth 26, write 16, read 171, single 1. Auth's 26:
+  - `composition/` (11): `auth-names`, `auth-package-names`, `auth-program`, `auth-server`,
+    `build-auth-deps`, `cli-auth`, `crash-text`, `did-you-mean-quality-auth`, `mcp-auth`,
+    `sign-in-texts`, `token-helper`
+  - `infra/` (7): `auth`, `auth-issue-token`, `auth-token-endpoint`, `auth-token-source`,
+    `browser-auth`, `graph-client`, `token-cache-lock`
+  - `use-cases/commands/` (8): `auth-lifecycle-entries`, `bin-placeholders`, `docs-auth`,
+    `login-logout`, `login-status`, `status`, `token`, `token-args`
+- Differences from the phase 4 design, and why:
+  - Commit 1 pins the three bins as literals. A case that read each `package.json` failed in
+    the Stryker sandbox, where the path to the repository root does not resolve.
+  - Commit 4 also corrects the header comment of `qa-token-helper-roundtrip.ts`, which named
+    the old path of `token-source.ts`.
+  - Commit 7 also exports `AUTH_SIGN_IN_ENTRIES` (`login`, `logout`, `status`), so the root
+    list kept those three until commit 18. Commit 18 makes it local again, because no other
+    module imports it then. Auth's `docs` example is `{bin} docs login`.
+  - Commit 8's test calls the bare command, not `--help`. With `--help`, commander ends the
+    process, and the test runner stops with no report. The bare command prints the same help.
+  - Commit 9: auth's description names `@ask-marcel/office-read` and `@ask-marcel/office-write`.
+    The placeholder sweep refuses a hand-typed `ask-marcel-office ` before a word.
+  - Commit 11 has no case for a home-derived cache path, because auth has no `cachePath`
+    option. Two other cases cover the defaults (9 tests).
+  - Commit 13 makes the region with `ok('emea' as TeamsRegion)`, as the core tests do. The
+    error type of `teamsRegion` is not `TokenError`, so typecheck refuses it there. Each of the
+    two `graph-client-*` tests has one local source (`basicOnly`, `substrateOnly`) in place of
+    a literal at each call.
+  - Commit 16 changes 7 files: the header of `auth-mcp.ts` said that the root `mcp.ts` hands
+    its tools to the gateway.
+  - Commit 18 adds `lifecycle-entries.test.ts` (a new test). Without it, 26 of the 36 mutants
+    of the root list survived after commit 12 took `docs-auth.test.ts` to auth's list. It
+    changes 5 files (see commit 7).
+  - Commit 19 takes the `SecondaryTokenCommands` type from core's
+    `token-source-needed-by.ts`, so `build-deps.ts` imports no auth module. It changes 9
+    files: three comments still described the in-process default (core's `token-source.ts`,
+    composition and port) and the root wiring of `auth-cli.ts`.
+  - Commit 20 removes the two defaults of `add-shebang.ts` (the root's `dist/cli.js` and
+    `dist/token.js`): every build names its entries, and with no argument the script exits 1.
+  - Commit 21 has a fixture for the refusal of other package names: a refusal that stopped
+    working can let `@ask-marcel/office-read/...` pass with no report.
+  - Commit 23 changes 4 files, not 3: the two auth import bans became data, which the root
+    config also used until commit 35, so the patterns are not kept twice. Its control for the
+    core ban is a root file (`single-package.ts`): `auth/`'s config has no core ban to prove.
+    Its token ban also names auth's builders, the MCP SDK and zod. At the root, the names
+    `cli`, `build-deps` and `mcp` kept the CLI and the MCP server out of the helper, but the
+    auth builders have other names. Four fixtures prove the new parts.
+  - Commit 25 moves 23 tests, not 24: commits 6, 7, 9, 10 and 11 add 5 test files, not 6. The
+    scan of phase 3 counts a deleted side-effect import as a change, so the phase 4 scan
+    accepts that deletion only. The `.gitkeep` files of `auth/src/` stay, as core's did.
+  - Commit 28 changes 4 files: the header of `qa-packed-install-smoke.ts` named login's
+    playwright as its example.
+  - Commit 29's `bundleTargets(manifest, hasSource)` takes a predicate, so its selftest needs no
+    real folder (2 new selftest cases).
+  - Commit 30 adds a lint fixture that proves the stdout ban on `auth/src/main.ts`. On the
+    `token` path its crash catch prints only the error type, as `dist/token.js` does, because a
+    message can quote a token. Coverage skips `main.ts` as an entry point, so the crash text is
+    in a new `crash-text.ts` with its own test (8 files). The comment of `src/token.ts` names
+    `ask-marcel-office-auth token`.
+  - Commit 32's MCP probe calls `status` only: a `login` call can open a browser or reach the
+    network. Its check of `dist/token.js` also looks for `modelcontextprotocol` and `zod`.
+  - Commit 34's test of the wipe line drives `createBrowserAuthFromApi` with a small fake of a
+    profile that is still signed in, and reads the line that `onProgress` gets.
+  - Commit 35 changes 6 files: it also deletes a comment of `coverage-preload.ts` that the move
+    left stale, and the header of `auth/eslint.config.js` no longer points at the deleted root
+    blocks.
+  - Commit 37 also corrects the A7b row of the QA playbook (the packed smoke no longer loads
+    playwright at the root), and adds an A7c row for the auth bundle smoke. It also changes L7
+    of `qa-write-smoke.ts`, next to the L141 text.
+  - Commit 38 records six lessons, not four. The two more: bun as `nobody` cannot read the CA
+    bundle under `/root`, and the MCP SDK answers the call of a tool that is not registered.
+- Not in phase 4:
+  - The live checks below. Do not run them from an agent session.
+  - Root docs and core shell texts that still describe the single package (risk 24 of the
+    design): the README library example and sign-in steps, `docs/USAGE.md`, and the lifecycle
+    lines of `cli-shell.ts` and `mcp-shell.ts`. Phase 5 gives the shells per-package text, and
+    phase 7 writes the docs again. Auth's help also shows core's Graph wording (the global flags,
+    the `--category mail` hint).
+  - QA playbook sections E3 and E3b still run `ask-marcel-office status`. Phase 7 moves the
+    playbook to the new bins.
+  - After commit 34, the `browser-auth.ts` allowance of auth's sweep and the root
+    `UNRENDERED_LINES` entry match nothing. Both tests pass. Their removal is an edit of an
+    existing test (rule 24), so it waits for the maintainer.
+  - `check-packed-package.ts` reads the tarball path from stdout and stderr together, so a
+    runtime warning on stderr breaks it (seen as `nobody` without a readable CA bundle).
+  - No smoke probe checks the exit code of the auth bin on a commander parse error or on a
+    failing command. The root had the same gap at B0.
+  - The header and the `describe` names of `mcp-auth.test.ts` still say "the MCP gateway". The
+    change is an edit of an existing test (rule 24).
+  - Comments that name `createGraphClient` (`scripts/no-network-preload.ts`, `auth.ts`), the
+    name of `graph-client.test.ts` in `auth/`, and the `probe-*` scripts.
+
+Live checks of phase 4, for the maintainer (back up `~/.ask-marcel/` first):
+
+1. `cd auth && bun run build`. Use `node auth/dist/cli.js` below, and once with `bun`.
+2. `login --force`. A browser opens. The slim summary names `ask-marcel-office-auth status`.
+3. `status` shows four tiers with the time left.
+4. `node auth/dist/token.js --tier basic`, then `elevated`, `chatsvcagg`, `ic3`, and `guest
+   --tenant <partner guid>`. Each prints one JSON line and exits 0; `chatsvcagg` and `ic3` also
+   give `region`. `node auth/dist/cli.js token --tier basic` gives the same line.
+5. Register `node auth/dist/cli.js mcp` in an MCP client (`MCP_TOOL_TIMEOUT` near 300000). It
+   has the tools `login` and `status` only. Call `login`. No tool text holds a token.
+6. Parallel refresh: set the basic `expires_on` in the cache to the past and keep the refresh
+   token. Start two `node auth/dist/token.js --tier basic` at the same time. Both exit 0 with
+   the same token, the cache changes one time, and no `invalid_grant` occurs.
+7. Kill during refresh: set the access token to expired again. Start `token --tier basic`.
+   When `~/.ask-marcel/token-cache.lock` appears, `kill -9` the process. Run `token --tier
+   basic` again. It exits 0, the cache parses as JSON, and the refresh token is kept.
+8. The root through the helper: `bun run start list-drives` with no `ASKMARCEL_*` variable
+   finds `auth/dist/token.js` through the locator of step 2. After `logout`, the root command
+   fails with `not_authenticated` and a remedy that names `ask-marcel-office-auth login`.
+9. Windows: the `windows-helper` CI job is green on the push that points the round trip at the
+   auth helper.
 
 **Phase 5: write.** Mass-move procedure; bin and MCP server. Live: `qa-write-smoke.ts`, one PDF
 conversion.

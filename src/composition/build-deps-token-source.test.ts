@@ -9,7 +9,7 @@ import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/files
 import type { ProcessRunnerCall } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { buildDeps } from './build-deps.ts';
-import { createEnvThenHelperTokenSource } from './token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 
 const HOME = '/virtual/home';
 const CACHE = '/virtual/home/.ask-marcel/token-cache.json';
@@ -65,7 +65,7 @@ describe('the token source the CLI and the MCP server sign with', () => {
     expect(runner.calls).toEqual([]);
   });
 
-  it('keeps the in-process token cache as the default: without ASKMARCEL_TOKEN_COMMAND neither a tier variable nor a helper is used', async () => {
+  it('takes a tier variable also without ASKMARCEL_TOKEN_COMMAND, and never reads the token cache', async () => {
     mock = graphAnswers();
     const runner = helperRunner();
     const cached = jwt({ exp: inAnHour(), aud: 'https://graph.microsoft.com', from: 'cache' });
@@ -76,7 +76,7 @@ describe('the token source the CLI and the MCP server sign with', () => {
     const own = jwt({ exp: inAnHour(), aud: 'https://graph.microsoft.com', from: 'env' });
     const deps = buildDeps({ home: HOME, env: { ASKMARCEL_TOKEN_BASIC: own }, fs, processRunner: runner, interactive: false });
     await deps.graph.get('/me');
-    expect(authorizationOf(mock, 0)).toBe(`Bearer ${cached}`);
+    expect(authorizationOf(mock, 0)).toBe(`Bearer ${own}`);
     expect(runner.calls).toEqual([]);
   });
 

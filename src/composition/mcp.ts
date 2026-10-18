@@ -1,20 +1,17 @@
 /*
  * The single package's MCP server: the core gateway (`mcp-shell.ts`) given the
- * single package (`single-package.ts`) and the auth tools (`auth-mcp.ts`). Its
- * deps are the ones `main.ts` and the real-registry suites have always passed.
+ * single package (`single-package.ts`). It has no sign-in tools: `login` and
+ * `status` are tools of the auth package's own server (`auth-server.ts`).
  * main.ts imports this module dynamically, so a plain command never loads the SDK.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { AuthToolsDeps } from './auth-mcp.ts';
-import { addAuthTools } from './auth-mcp.ts';
 import type { McpShellDeps } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 import { buildMcpShell } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 import { commandPackage } from './single-package.ts';
 
-type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'> & Omit<AuthToolsDeps, 'names'>;
+type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'>;
 
-const buildMcpServer = (deps: BuildMcpServerDeps): McpServer =>
-  buildMcpShell({ ...deps, commandPackage, addTools: (server) => addAuthTools(server, { ...deps, names: commandPackage }) });
+const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => buildMcpShell({ ...deps, commandPackage });
 
 export { buildMcpServer };
 export type { BuildMcpServerDeps };

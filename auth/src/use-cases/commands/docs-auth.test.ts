@@ -8,7 +8,7 @@ import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/
 import type { Command } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { buildManifest, buildTerseManifest, renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
-import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
+import { AUTH_LIFECYCLE_ENTRIES as LIFECYCLE_ENTRIES } from './auth-lifecycle-entries.ts';
 
 const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   schema: { _: 'fake' } as never,

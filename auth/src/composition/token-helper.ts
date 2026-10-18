@@ -1,13 +1,13 @@
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
 import type { FetchFn, TokenLadder } from '../infra/auth.ts';
 import { createAuthLadder } from '../infra/auth.ts';
-import type { AuthPaths } from '../infra/auth-paths.ts';
+import type { AuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import type { createBrowserAuth } from '../infra/browser-auth.ts';
 import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
-import { resolveAuthPaths } from '../infra/auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
+import { tokenHelperLocatorPath } from '@ask-marcel/office-core/infra/token-helper-locator.ts';
 import { fillNames } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import * as token from '../use-cases/commands/token.ts';
 import type { TokenArgs } from '../use-cases/commands/token-args.ts';
@@ -15,7 +15,7 @@ import { parseTokenArgs } from '../use-cases/commands/token-args.ts';
 import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
-import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';
+import { AUTH_PACKAGE_NAMES } from './auth-package-names.ts';
 
 /*
  * The `token` helper: `token --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`
@@ -89,9 +89,6 @@ export const recordTokenHelperLocation = async (fs: FileSystem & AtomicFileWrite
   await fs.writeTextAtomic(path, JSON.stringify(location), 0o600);
 };
 
-// Next to the token cache, wherever the home puts it.
-export const tokenHelperLocatorPath = (paths: AuthPaths): string => join(dirname(paths.tokenCache), 'token-helper.json');
-
 const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLadder> => {
   const { createAuthManager } = await import('../infra/auth-browser.ts');
   const { cachePath, browserProfileDir, logger, fs, tier, interactive, lock, createBrowser } = options;
@@ -127,8 +124,8 @@ export const runTokenHelper = async (deps: TokenHelperDeps): Promise<number> => 
   const paths = resolveAuthPaths(deps.home ?? homedir(), deps.env ?? process.env);
   await recordTokenHelperLocation(fs, tokenHelperLocatorPath(paths), deps.location);
   // A failure line's message and remedy name the auth bin through its
-  // placeholder (bin-names.ts); the helper is the single package's.
-  const failure = (line: unknown): string => `${fillNames(JSON.stringify(line), SINGLE_PACKAGE_NAMES)}\n`;
+  // placeholder (bin-names.ts); the helper is the auth package's.
+  const failure = (line: unknown): string => `${fillNames(JSON.stringify(line), AUTH_PACKAGE_NAMES)}\n`;
   const args = parseTokenArgs(deps.argv);
   if (!args.ok) {
     print(failure(args.error));

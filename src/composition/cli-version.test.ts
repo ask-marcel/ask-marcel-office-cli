@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
@@ -13,7 +12,7 @@ const run = async (args: ReadonlyArray<string>): Promise<{ readonly out: string;
       return { ok: true, value: {} };
     },
   });
-  const cli = buildCli({ auth: fakeAuthManager(), graph, logger: createLoggerFake(), fs: createFileSystemFake(), version: '9.8.7' });
+  const cli = buildCli({ graph, logger: createLoggerFake(), fs: createFileSystemFake(), version: '9.8.7' });
   const original = process.stdout.write.bind(process.stdout);
   let out = '';
   process.stdout.write = (chunk: string | Uint8Array): boolean => {

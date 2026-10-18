@@ -7,14 +7,18 @@
  *
  * Bun build does not insert shebangs, so this runs after `bun build`.
  *
- * A workspace folder names its own bins: `bun run ../scripts/add-shebang.ts
- * dist/cli.js`. With no argument, the root's two targets.
+ * Each build names its own entries: `bun run scripts/add-shebang.ts
+ * dist/cli.js` at the root, `bun run ../scripts/add-shebang.ts dist/cli.js` in
+ * a workspace folder. With no argument, it stops with exit 1.
  */
 
 import { chmodSync } from 'node:fs';
 
-const named = process.argv.slice(2);
-const TARGETS = named.length > 0 ? named : ['dist/cli.js', 'dist/token.js'];
+const TARGETS = process.argv.slice(2);
+if (TARGETS.length === 0) {
+  process.stderr.write('add-shebang: name the built entries, for example dist/cli.js\n');
+  process.exit(1);
+}
 const SHEBANG = '#!/usr/bin/env node\n';
 
 for (const target of TARGETS) {
