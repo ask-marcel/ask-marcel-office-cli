@@ -7,8 +7,8 @@ import { tokenFingerprint } from '@ask-marcel/office-core/domain/token-fingerpri
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
 import { createAuthManagerTokenSource } from './auth-token-source.ts';
-import { createGraphClient } from './graph-client.ts';
 import type { FetchFn } from '@ask-marcel/office-core/infra/graph-request.ts';
+import { createReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 
 const TENANT = tenantIdUnsafe('11111111-2222-3333-4444-555555555555');
 const segment = (value: unknown): string => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -67,7 +67,7 @@ describe('a Graph token that Graph refused, replayed through the in-process ladd
       seen.push(bearer);
       return Response.json({ error: { code: 'InvalidAuthenticationToken', message: 'expired' } }, { status: 401 });
     };
-    const result = await createGraphClient(auth, fetchFn).get('/me');
+    const result = await createReadGraph(createAuthManagerTokenSource(auth), fetchFn).get('/me');
     expect(result.ok).toBe(false);
     expect(seen).toEqual([`Bearer ${jwt('first')}`, `Bearer ${jwt('second')}`]);
   });

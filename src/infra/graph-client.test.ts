@@ -3,9 +3,20 @@ import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.t
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
+import type { TokenIssuer } from '../use-cases/ports/token-issuer.ts';
 import type { AuthManager } from './auth.ts';
-import type { FetchFn } from './graph-client.ts';
-import { createGraphClient } from './graph-client.ts';
+import { createAuthManagerTokenSource } from './auth-token-source.ts';
+import type { FetchFn } from '@ask-marcel/office-core/infra/graph-request.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import { createReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+import { createWriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
+
+// The full client over the in-process ladder, built from the core graphs.
+const createGraphClient = (auth: AuthManager & Partial<Pick<TokenIssuer, 'issueToken'>>, fetchFn: FetchFn = globalThis.fetch): ReadGraph & WriteGraph => {
+  const tokens = createAuthManagerTokenSource(auth);
+  return { ...createReadGraph(tokens, fetchFn), ...createWriteGraph(tokens, fetchFn) };
+};
 
 const fakeAuth = (): AuthManager =>
   fakeAuthManager({
