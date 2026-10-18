@@ -1,6 +1,6 @@
 # Command reference
 
-All 211 commands across 11 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint. The six lifecycle commands (`login`, `status`, `logout`, `docs`, `help-json`, `mcp`) are listed separately in the **Authentication & lifecycle** section below — `help-json` counts them in its manifest total (217), so a 211-vs-217 gap is those six, not a drift.
+All 211 commands across 11 categories, grouped by category. Each row shows the command name, a one-line summary, the required parameters, and the underlying Microsoft Graph endpoint. The three lifecycle commands (`docs`, `help-json`, `mcp`) are listed separately in the **Lifecycle** section below — `help-json` counts them in its manifest total (214), so a 211-vs-214 gap is those three, not a drift. Sign-in (`login`, `status`, `logout`) is in the `ask-marcel-office-auth` bin of `@ask-marcel/office-auth`.
 
 The auto-generated tables below are rebuilt from the live command registry on every `bun run docs:gen` / `bun run build` — they cannot drift from the actual surface.
 
@@ -11,16 +11,13 @@ For everything else:
 - **Machine-readable manifest** — [`docs/commands.json`](commands.json) (full metadata: options, schema, examples, response shape, Graph docs URL)
 - **Output format, pagination, library API, configuration** — [`docs/USAGE.md`](USAGE.md)
 
-## Authentication & lifecycle
+## Lifecycle
 
 | Command | Description |
 |---------|-------------|
-| `login` | Authenticate (cached → refresh → browser fallback) |
-| `status` | Show the four cached tokens: available or not, time left, scopes, refresh method |
-| `logout` | Clear cached tokens and the browser profile |
 | `docs <cmd>` | Print Markdown docs for a single command |
 | `help-json [--terse] [--category <name>]` | Machine-readable manifest, full or filtered |
-| `mcp` | Serve the command registry to an MCP client over stdio (six gateway tools) |
+| `mcp` | Serve the command registry to an MCP client over stdio (four gateway tools) |
 | `next-page --url <link>` | Walk a paginated response by feeding the previous `nextLink` |
 
 <!-- AUTO-GENERATED-COMMANDS:BEGIN -->

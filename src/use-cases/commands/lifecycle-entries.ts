@@ -1,25 +1,23 @@
 import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
-import { AUTH_SIGN_IN_ENTRIES } from './auth-lifecycle-entries.ts';
 
 /**
  * Lifecycle commands aren't backed by a Graph endpoint and aren't in the
- * `commands` registry — `docs` and `help-json` live in `cli-shell.ts`, `login`,
- * `status` and `logout` in `auth-cli.ts`, and `mcp` in `main.ts`. But an LLM that consumes
- * `help-json` (the recommended token-efficient surface) needs to see them too,
- * otherwise it can't authenticate, log out, or fetch per-command docs. These
- * stub entries surface them under category 'lifecycle' with no graphMethod /
- * options (the path template is a `(meta) ...` description so the JSON shape
- * stays uniform with regular commands). The single package hands them to the
- * shells as its `CommandPackage.lifecycle` (`composition/single-package.ts`).
- * The entries of `login`, `logout` and `status` are the auth package's
- * (`auth-lifecycle-entries.ts`); the single package lists them too.
+ * `commands` registry — `docs` and `help-json` live in `cli-shell.ts`, and
+ * `mcp` in `main.ts`. But an LLM that consumes `help-json` (the recommended
+ * token-efficient surface) needs to see them too, otherwise it can't fetch
+ * per-command docs. These stub entries surface them under category
+ * 'lifecycle' with no graphMethod / options (the path template is a
+ * `(meta) ...` description so the JSON shape stays uniform with regular
+ * commands). The single package hands them to the shells as its
+ * `CommandPackage.lifecycle` (`composition/single-package.ts`). `login`,
+ * `logout` and `status` are the auth package's (`auth-lifecycle-entries.ts`),
+ * and the single package does not list them.
  */
 export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
-  ...AUTH_SIGN_IN_ENTRIES,
   {
     name: 'docs',
     summary:
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (login/status/logout/docs) prints the same --help that command would.',
+      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (docs/help-json/mcp) prints the same --help that command would.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',
@@ -51,7 +49,7 @@ export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'mcp',
     summary:
-      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as six gateway tools (list-commands, get-command-docs, run-command, run-write-command, login, status). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See docs/USAGE.md (MCP server).',
+      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as four gateway tools (list-commands, get-command-docs, run-command, run-write-command). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See docs/USAGE.md (MCP server).',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) serves the command registry over MCP stdio; not a Graph endpoint',

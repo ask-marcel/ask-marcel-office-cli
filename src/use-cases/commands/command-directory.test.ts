@@ -17,8 +17,8 @@ describe('the command-to-package directory', () => {
     expect(['login', 'logout', 'status', 'token'].map((name) => commandRole(name))).toEqual(['auth', 'auth', 'auth', 'auth']);
   });
 
-  it('names no command that the registry, the lifecycle entries and the token helper do not hold', () => {
-    const shipped = new Set([...Object.keys(commands), ...LIFECYCLE_ENTRIES.map((entry) => entry.name), 'token']);
+  it('names no command that the registry, the lifecycle entries and the auth package do not hold', () => {
+    const shipped = new Set([...Object.keys(commands), ...LIFECYCLE_ENTRIES.map((entry) => entry.name), 'login', 'logout', 'status', 'token']);
     expect([...COMMAND_DIRECTORY.keys()].filter((name) => !shipped.has(name))).toEqual([]);
   });
 

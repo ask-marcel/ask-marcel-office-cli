@@ -9,7 +9,7 @@ import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/com
  */
 
 /** The sign-in commands: `login`, `logout` and `status`. */
-export const AUTH_SIGN_IN_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
+const AUTH_SIGN_IN_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'login',
     summary:
