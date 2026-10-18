@@ -13,13 +13,18 @@
  * eslint.config.js keeps read code from importing write-graph.ts; this proves
  * that nothing reaches it through another path either.
  *
- * Control: the same entry plus `createWriteGraph` must show all four markers,
- * so a check that can no longer see them fails instead of passing (rule 15.10:
- * a gate only ever seen green is a hypothesis).
+ * The real root entries are read bundles too since the root cut (package
+ * split, phase 5): src/main.ts (the bin) and src/index.ts (the library),
+ * built the same way, must hold no marker either.
+ *
+ * Controls: the synthetic entry plus `createWriteGraph`, and the real entry of
+ * the write bin (write/src/main.ts), must each show all four markers, so a
+ * check that can no longer see them fails instead of passing (rule 15.10: a
+ * gate only ever seen green is a hypothesis).
  *
  * Exit codes:
- *   0  the read bundle has no marker, and the control shows every one
- *   1  the read bundle has a marker, the control misses one, or a build failed
+ *   0  no read bundle has a marker, and each control shows every one
+ *   1  a read bundle has a marker, a control misses one, or a build failed
  */
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -33,6 +38,9 @@ const COMMANDS = join(ROOT, 'src/use-cases/commands');
 const coreModule = (path: string): string => (existsSync(join(ROOT, 'core', path)) ? join(ROOT, 'core', path) : join(ROOT, path));
 const READ_GRAPH = coreModule('src/infra/read-graph.ts');
 const WRITE_GRAPH = coreModule('src/infra/write-graph.ts');
+// The real entries: the root's (read only) and the write bin (a control).
+const READ_ENTRIES: ReadonlyArray<string> = ['src/main.ts', 'src/index.ts'];
+const WRITE_ENTRY = 'write/src/main.ts';
 
 type Marker = { readonly name: string; readonly pattern: RegExp };
 
@@ -68,9 +76,7 @@ const entrySource = (files: ReadonlyArray<string>, withWriteGraph: boolean): str
     ...(withWriteGraph ? [`export { createWriteGraph } from ${JSON.stringify(WRITE_GRAPH)};`] : []),
   ].join('\n');
 
-const bundle = async (dir: string, name: string, source: string, external: ReadonlyArray<string>): Promise<string | undefined> => {
-  const entry = join(dir, `${name}.ts`);
-  await Bun.write(entry, source);
+const build = async (name: string, entry: string, external: ReadonlyArray<string>): Promise<string | undefined> => {
   const built = await Bun.build({ entrypoints: [entry], target: 'node', format: 'esm', external: [...external] });
   if (!built.success) {
     console.error(`check-read-bundle: the ${name} build failed:\n${built.logs.map(String).join('\n')}`);
@@ -78,6 +84,12 @@ const bundle = async (dir: string, name: string, source: string, external: Reado
   }
   const outputs = await Promise.all(built.outputs.map((output) => output.text()));
   return outputs.join('\n');
+};
+
+const bundle = async (dir: string, name: string, source: string, external: ReadonlyArray<string>): Promise<string | undefined> => {
+  const entry = join(dir, `${name}.ts`);
+  await Bun.write(entry, source);
+  return build(name, entry, external);
 };
 
 const found = (code: string): ReadonlyArray<string> => MARKERS.filter((marker) => marker.pattern.test(code)).map((marker) => marker.name);
@@ -89,20 +101,26 @@ const main = async (): Promise<number> => {
   try {
     const read = await bundle(dir, 'read', entrySource(files, false), external);
     const control = await bundle(dir, 'control', entrySource(files, true), external);
-    if (read === undefined || control === undefined) return 1;
-    const leaked = found(read);
-    const seen = found(control);
-    console.log(`check-read-bundle: the read graph and ${files.length} read commands, ${read.length} bytes built.`);
-    if (leaked.length > 0) {
-      console.error(`check-read-bundle: the read bundle holds write code: ${leaked.join(', ')}. A read module reaches the write graph; follow its imports.`);
-      return 1;
-    }
-    if (seen.length !== MARKERS.length) {
-      const missed = MARKERS.map((marker) => marker.name).filter((name) => !seen.includes(name));
-      console.error(`check-read-bundle: the control bundle (with the write graph) misses ${missed.join(', ')}, so this check could no longer see write code.`);
-      return 1;
-    }
-    console.log('check-read-bundle: no write method and no upload session in the read bundle; the control with the write graph shows all four.');
+    const entries = await Promise.all(READ_ENTRIES.map(async (entry) => [entry, await build(entry, join(ROOT, entry), external)] as const));
+    const writeControl = await build(WRITE_ENTRY, join(ROOT, WRITE_ENTRY), external);
+    if (read === undefined || control === undefined || writeControl === undefined || entries.some(([, code]) => code === undefined)) return 1;
+    console.log(`check-read-bundle: the read graph and ${files.length} read commands, ${read.length} bytes built; ${READ_ENTRIES.join(' and ')} built as read bundles.`);
+    const leaks = [['the read bundle', read] as const, ...entries.map(([entry, code]) => [`the bundle of ${entry}`, code ?? ''] as const)].flatMap(([name, code]) => {
+      const leaked = found(code);
+      return leaked.length === 0 ? [] : [`check-read-bundle: ${name} holds write code: ${leaked.join(', ')}. A read module reaches the write graph; follow its imports.`];
+    });
+    const blind = [['the control bundle (with the write graph)', control] as const, [`the control bundle of ${WRITE_ENTRY} (the write bin)`, writeControl] as const].flatMap(
+      ([name, code]) => {
+        const seen = found(code);
+        const missed = MARKERS.map((marker) => marker.name).filter((marker) => !seen.includes(marker));
+        return missed.length === 0 ? [] : [`check-read-bundle: ${name} misses ${missed.join(', ')}, so this check could no longer see write code.`];
+      }
+    );
+    for (const problem of [...leaks, ...blind]) console.error(problem);
+    if (leaks.length + blind.length > 0) return 1;
+    console.log(
+      `check-read-bundle: no write method and no upload session in the read bundle, ${READ_ENTRIES.join(' or ')}; the control with the write graph and ${WRITE_ENTRY} show all four.`
+    );
     return 0;
   } finally {
     rmSync(dir, { recursive: true, force: true });
