@@ -179,7 +179,8 @@ jobs:
     # its own configs. scripts/check-ci-matrix.ts (in `gates`) fails when a
     # folder of the root package.json has no entry here. `published` folders
     # also build, pack, and install the tarball into a clean consumer (node 20 is
-    # the floor that `engines` promises). auth also runs its bundle smoke.
+    # the floor that `engines` promises). auth and write also run their bundle
+    # smoke.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -234,8 +235,8 @@ jobs:
         if: matrix.published
         timeout-minutes: 10
         run: bun run check:packed
-      - name: auth bundle smoke (the token helper and the auth MCP server, from dist, under node and bun, on temporary homes)
-        if: matrix.folder == 'auth'
+      - name: bundle smoke (auth - the token helper and the auth MCP server; write - the write bin, its MCP server and its library; from dist, under node and bun, on temporary homes)
+        if: matrix.folder == 'auth' || matrix.folder == 'write'
         timeout-minutes: 10
         run: bun run smoke
   windows-helper:
