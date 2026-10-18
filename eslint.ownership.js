@@ -3,7 +3,7 @@
  * owns each module, and the import and stdout bans on those files. Pure data,
  * so a folder's eslint.config.js can import it without loading the root config
  * (two configs that each call baseConfig leave typescript-eslint with two
- * tsconfig roots). The root eslint.config.js and core/eslint.config.js apply
+ * tsconfig roots). The root eslint.config.js and the folder configs apply
  * the bans; scripts/check-package-imports.ts reads the lists.
  */
 
@@ -42,6 +42,30 @@ const CORE_IMPORT_BANS = [
   {
     regex: '^\\.\\.?/(.*/)?(single-package|single-package-names|build-deps|cli|mcp|auth-cli|auth-mcp)(\\.[cm]?[jt]s)?$',
     message: 'Core never reaches the composition root that wires the single package: take what you need as a parameter (CommandPackage, a hook) instead.',
+  },
+];
+
+// The auth ladder (src/infra/auth.ts) never loads the browser: the root
+// eslint.config.js holds the reason, and auth/eslint.config.js applies the
+// same ban to the file once it moves there (phase 4).
+const AUTH_LADDER_IMPORT_BANS = [
+  {
+    regex: '(^|/)(auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$|^playwright(-core)?(/.*)?$',
+    allowTypeImports: true,
+    message: 'auth.ts is the browser-free half of auth: take a browser rung through the BrowserRungs port that auth-browser.ts supplies, never import the browser.',
+  },
+];
+
+// The token helper (src/token.ts, src/composition/token-helper.ts) stays near
+// bare Node startup: the root eslint.config.js holds the reason, and
+// auth/eslint.config.js applies the same ban once the files move there.
+const TOKEN_HELPER_IMPORT_BANS = [
+  {
+    regex:
+      '^(commander|winston|update-notifier|zod|@modelcontextprotocol/[^/]+|playwright(-core)?)(/.*)?$|(^|/)(cli|cli-shell|build-deps|mcp|mcp-shell|run-registry-command|auth-cli|auth-mcp|auth-program|auth-server|build-auth-deps)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
+    allowTypeImports: true,
+    message:
+      'The token helper loads only the auth ladder, the file system and the token endpoint call; bring the browser in with a dynamic import, never the CLI or the MCP server.',
   },
 ];
 
@@ -123,8 +147,8 @@ const SINGLE_PACKAGE_FILES = [
   'src/infra/graph-client.ts',
 ];
 
-// The option of the stdout ban, which the root eslint.config.js and core/eslint.config.js apply to
-// core's files too (the MCP gateway moved there in phase 3).
+// The option of the stdout ban, which the root eslint.config.js and the core and auth configs apply
+// to their files too (the MCP gateway moved to core in phase 3; the auth MCP tools move to auth in phase 4).
 const STDOUT_BAN = {
   object: 'process',
   property: 'stdout',
@@ -132,4 +156,16 @@ const STDOUT_BAN = {
     'stdout is the MCP JSON-RPC frame channel — writing to it corrupts the protocol and no test can see it. Return text from the tool handler (renderToString / renderErrorToString) instead. Use the stderr-backed Logger port if you need diagnostics. Only the CLI writers (cli-shell.ts, presenter/output.ts, token-helper.ts) own stdout.',
 };
 
-export { AUTH_FILES, CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_FILES, READ_ONLY_IMPORT_BANS, SINGLE_PACKAGE_FILES, STDOUT_BAN, WRITE_FILES };
+export {
+  AUTH_FILES,
+  AUTH_LADDER_IMPORT_BANS,
+  CORE_DYNAMIC_IMPORT_BANS,
+  CORE_FILES,
+  CORE_IMPORT_BANS,
+  CORE_READ_ONLY_FILES,
+  READ_ONLY_IMPORT_BANS,
+  SINGLE_PACKAGE_FILES,
+  STDOUT_BAN,
+  TOKEN_HELPER_IMPORT_BANS,
+  WRITE_FILES,
+};

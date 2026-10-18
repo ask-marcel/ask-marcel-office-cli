@@ -1,5 +1,15 @@
 import { baseConfig } from './eslint.base.js';
-import { CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_FILES, READ_ONLY_IMPORT_BANS, STDOUT_BAN, WRITE_FILES } from './eslint.ownership.js';
+import {
+  AUTH_LADDER_IMPORT_BANS,
+  CORE_DYNAMIC_IMPORT_BANS,
+  CORE_FILES,
+  CORE_IMPORT_BANS,
+  CORE_READ_ONLY_FILES,
+  READ_ONLY_IMPORT_BANS,
+  STDOUT_BAN,
+  TOKEN_HELPER_IMPORT_BANS,
+  WRITE_FILES,
+} from './eslint.ownership.js';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -33,44 +43,22 @@ export default [
     // are erased at build time, so they stay allowed.
     files: ['src/infra/auth.ts'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              regex: '(^|/)(auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$|^playwright(-core)?(/.*)?$',
-              allowTypeImports: true,
-              message: 'auth.ts is the browser-free half of auth: take a browser rung through the BrowserRungs port that auth-browser.ts supplies, never import the browser.',
-            },
-          ],
-        },
-      ],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: AUTH_LADDER_IMPORT_BANS }],
     },
   },
   {
     // The `token` helper starts on its own entry (dist/token.js) and must stay
     // near bare Node startup: read and write spawn it for every bearer they lack.
-    // It never loads the CLI, winston, the update notifier, the renderer or,
-    // statically, the browser; the browser ladder comes in by a dynamic import
+    // It never loads the CLI or the MCP server (the root's builders, auth's
+    // builders, the MCP SDK, zod), winston, the update notifier, the renderer
+    // or, statically, the browser; the browser ladder comes in by a dynamic import
     // only for a person at a terminal. Type imports are erased, so they stay
     // allowed. src/token.ts is a bundle entry like src/main.ts, so it owns the
     // one crash catch of its bundle (rule 17), and that catch prints only the
     // error's type: a message can quote a token (LESSONS, 2026-10-04).
     files: ['src/token.ts', 'src/composition/token-helper.ts'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              regex:
-                '^(commander|winston|update-notifier|playwright(-core)?)(/.*)?$|(^|/)(cli|cli-shell|build-deps|mcp|mcp-shell|run-registry-command)(\\.[cm]?[jt]s)?$|(^|/)presenter/|(^|/)infra/(logger|auth-browser|browser-auth|playwright-loader)(\\.[cm]?[jt]s)?$',
-              allowTypeImports: true,
-              message: 'The token helper loads only the auth ladder, the file system and the token endpoint call; bring the browser in with a dynamic import, never the CLI.',
-            },
-          ],
-        },
-      ],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: TOKEN_HELPER_IMPORT_BANS }],
     },
   },
   {
