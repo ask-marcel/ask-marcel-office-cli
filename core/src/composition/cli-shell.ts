@@ -36,10 +36,18 @@ type CliOutput = {
  * The CLI builder is core (package split, step 13): it builds the CLI of the
  * package it is given and imports no registry and no lifecycle command. The
  * composition root hands it the package (`cli.ts` for the single package).
+ *
+ * `buildLifecycleCli` (package split, phase 4) builds the CLI of a package with
+ * no Graph command, such as auth: the global flags, `help`, `help-json`, `docs`,
+ * `--version`, the did-you-mean and unknown-command answers, and the package's
+ * own lifecycle commands. It takes no graph, and the caller gives the top-level
+ * description. `buildCliShell` adds the Graph description and the registry
+ * commands to it.
  */
-type CliShellDeps = {
+type LifecycleCliDeps = {
   readonly commandPackage: CommandPackage;
-  readonly graph: ReadGraph & WriteGraph;
+  /** The top-level description of `--help`. */
+  readonly description: string;
   readonly logger: Logger;
   readonly fs: FileSystem;
   readonly version?: string;
@@ -48,8 +56,20 @@ type CliShellDeps = {
   readonly addLifecycleCommands?: (program: Command, output: CliOutput) => void;
 };
 
-const buildCliShell = (deps: CliShellDeps): Command => {
-  const { commandPackage, graph, logger, fs, version } = deps;
+type CliShellDeps = Omit<LifecycleCliDeps, 'description'> & { readonly graph: ReadGraph & WriteGraph };
+
+// What the registry commands share with the CLI that holds them.
+type ShellParts = {
+  readonly program: Command;
+  readonly fill: (text: string) => string;
+  readonly renderOut: (data: unknown, sizeHintContext?: RenderContext) => void;
+  readonly fail: (message: string, code?: string, source?: ErrorSource, retryAfterSeconds?: number) => void;
+  readonly onCommanderError: (err: CommanderError, optionFlags: ReadonlyArray<string>, typed?: ReadonlyArray<string>) => void;
+  readonly globalFlags: () => ReadonlyArray<string>;
+};
+
+const buildShell = (deps: LifecycleCliDeps, addPackageCommands?: (parts: ShellParts) => void): Command => {
+  const { commandPackage, logger, fs, version } = deps;
   const { registry, binName } = commandPackage;
   const cliRemedy = `Run \`${binName} --help\` to list every command.`;
   const program = new Command();
@@ -152,30 +172,9 @@ const buildCliShell = (deps: CliShellDeps): Command => {
   // Compact a subcommand's description to its first sentence — shared with the
   // `help-json --terse` projection via `firstSentence` so both stay consistent.
 
-  // QA fix: derive the advertised endpoint counts from the registry so the
-  // top-level description can never drift from the manifest again. The
-  // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
-  // POST) when search-all-accessible-sites was added without updating it.
-  // GET reads only: the PDF conversions are declared GET, but they are writes.
-  const getEndpointCount = Object.values(registry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
-  // 2026-06-15 (F-03), extended 2026-07-04 and at package-split step 11: everything
-  // whose `effect` is not `read` is a write (the mail drafts, and the PDF
-  // conversions that upload a temporary file); everything else is a read or a
-  // search. Derive BOTH lists, and the wording of each write, from the effect so
-  // the read-only narrative can never drift from the registry. The previous code
-  // took every POST command and labelled it "— searches, not mutations", which
-  // silently mislabelled create-mail-draft as a search the moment it shipped (and
-  // omitted the PATCH update-mail-draft entirely).
-  const writeCount = Object.values(registry).filter((c) => c.meta.effect !== 'read').length;
-  const searchPostNames = Object.entries(registry)
-    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
-    .map(([n]) => n)
-    .toSorted((a, b) => a.localeCompare(b));
-  const surfaceDescription = `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(registry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
-
   program
     .name(binName)
-    .description(surfaceDescription)
+    .description(deps.description)
     // override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
     // sentence in the TOP-LEVEL `ask-marcel-office --help` listing. Per-subcommand
@@ -394,6 +393,47 @@ const buildCliShell = (deps: CliShellDeps): Command => {
     ].join('\n  ')
   );
 
+  addPackageCommands?.({ program, fill, renderOut, fail, onCommanderError, globalFlags });
+
+  // The lifecycle commands (help-json, login, docs…) suggest from their own flags too.
+  for (const sub of program.commands) {
+    if (sub.name() in registry) continue;
+    const own = sub.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
+    sub.exitOverride((err) => onCommanderError(err, [...own, ...globalFlags()], sub.args));
+  }
+
+  return program;
+};
+
+// The top-level description of a package with Graph commands: its reads and its writes.
+const graphDescription = (registry: CommandPackage['registry']): string => {
+  // QA fix: derive the advertised endpoint counts from the registry so the
+  // top-level description can never drift from the manifest again. The
+  // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
+  // POST) when search-all-accessible-sites was added without updating it.
+  // GET reads only: the PDF conversions are declared GET, but they are writes.
+  const getEndpointCount = Object.values(registry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
+  // 2026-06-15 (F-03), extended 2026-07-04 and at package-split step 11: everything
+  // whose `effect` is not `read` is a write (the mail drafts, and the PDF
+  // conversions that upload a temporary file); everything else is a read or a
+  // search. Derive BOTH lists, and the wording of each write, from the effect so
+  // the read-only narrative can never drift from the registry. The previous code
+  // took every POST command and labelled it "— searches, not mutations", which
+  // silently mislabelled create-mail-draft as a search the moment it shipped (and
+  // omitted the PATCH update-mail-draft entirely).
+  const writeCount = Object.values(registry).filter((c) => c.meta.effect !== 'read').length;
+  const searchPostNames = Object.entries(registry)
+    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+  return `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(registry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
+};
+
+// The Graph commands of the registry, one group per category.
+const addRegistryCommands = (parts: ShellParts, deps: CliShellDeps): void => {
+  const { program, fill, renderOut, fail, onCommanderError, globalFlags } = parts;
+  const { commandPackage, graph, fs } = deps;
+  const { registry } = commandPackage;
   for (const category of CATEGORY_ORDER) {
     const entries = Object.entries(registry).filter(([, c]) => c.meta.category === category);
     if (entries.length === 0) continue;
@@ -451,16 +491,12 @@ const buildCliShell = (deps: CliShellDeps): Command => {
       });
     }
   }
-
-  // The lifecycle commands (help-json, login, docs…) suggest from their own flags too.
-  for (const sub of program.commands) {
-    if (sub.name() in registry) continue;
-    const own = sub.options.flatMap((o) => (o.long === undefined ? [] : [o.long]));
-    sub.exitOverride((err) => onCommanderError(err, [...own, ...globalFlags()], sub.args));
-  }
-
-  return program;
 };
 
-export { buildCliShell };
-export type { CliOutput, CliShellDeps };
+const buildLifecycleCli = (deps: LifecycleCliDeps): Command => buildShell(deps);
+
+const buildCliShell = (deps: CliShellDeps): Command =>
+  buildShell({ ...deps, description: graphDescription(deps.commandPackage.registry) }, (parts) => addRegistryCommands(parts, deps));
+
+export { buildCliShell, buildLifecycleCli };
+export type { CliOutput, CliShellDeps, LifecycleCliDeps };
