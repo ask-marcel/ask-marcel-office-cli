@@ -6,9 +6,10 @@ import pkg from '../package.json' with { type: 'json' };
 import { buildDeps } from './composition/build-deps.ts';
 import type { BuiltDeps } from './composition/build-deps.ts';
 import { buildCli } from './composition/cli.ts';
-import { recordTokenHelperLocation, runTokenHelper, tokenHelperLocatorPath } from './composition/token-helper.ts';
+import { recordTokenHelperLocation, runTokenHelper } from './composition/token-helper.ts';
 import { formatError } from '@ask-marcel/office-core/domain/utilities/format-error.ts';
 import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
+import { tokenHelperLocatorPath } from '@ask-marcel/office-core/infra/token-helper-locator.ts';
 
 const ONE_WEEK_MS = 1000 * 60 * 60 * 24 * 7;
 

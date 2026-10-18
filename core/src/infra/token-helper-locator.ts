@@ -1,7 +1,8 @@
-import { posix, win32 } from 'node:path';
+import { dirname, join, posix, win32 } from 'node:path';
 import type { Result } from '../domain/result.ts';
 import { err, ok } from '../domain/result.ts';
 import type { FileExistence, FileSystem } from '../use-cases/ports/filesystem.ts';
+import type { AuthPaths } from './auth-paths.ts';
 
 /*
  * Where the token helper is, in the order the package split fixes
@@ -41,6 +42,10 @@ const DEFAULT_PATHEXT = '.COM;.EXE;.BAT;.CMD';
 // The script a cmd-shim starts: the quoted `%dp0%\...` (or older `%~dp0\...`)
 // path just before `%*`.
 const SHIM_SCRIPT = /"%(?:~dp0|dp0%)\\([^"]+)"\s+%\*/;
+
+// The locator file: next to the token cache, wherever the home puts it. Auth
+// writes it and the packages that spawn the helper read it.
+export const tokenHelperLocatorPath = (paths: AuthPaths): string => join(dirname(paths.tokenCache), 'token-helper.json');
 
 type Located = Result<TokenHelperCommand, TokenHelperLocateError> | undefined;
 

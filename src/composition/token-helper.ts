@@ -1,5 +1,4 @@
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
 import type { FetchFn, TokenLadder } from '../infra/auth.ts';
 import { createAuthLadder } from '../infra/auth.ts';
 import type { AuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
@@ -8,6 +7,7 @@ import type { TokenCacheLock } from '../infra/token-cache-lock.ts';
 import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
+import { tokenHelperLocatorPath } from '@ask-marcel/office-core/infra/token-helper-locator.ts';
 import { fillNames } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
 import * as token from '../use-cases/commands/token.ts';
 import type { TokenArgs } from '../use-cases/commands/token-args.ts';
@@ -88,9 +88,6 @@ export const recordTokenHelperLocation = async (fs: FileSystem & AtomicFileWrite
   if (current.ok && sameLocation(current.value, location)) return;
   await fs.writeTextAtomic(path, JSON.stringify(location), 0o600);
 };
-
-// Next to the token cache, wherever the home puts it.
-export const tokenHelperLocatorPath = (paths: AuthPaths): string => join(dirname(paths.tokenCache), 'token-helper.json');
 
 const loadBrowserLadder = async (options: BrowserLadderOptions): Promise<TokenLadder> => {
   const { createAuthManager } = await import('../infra/auth-browser.ts');
