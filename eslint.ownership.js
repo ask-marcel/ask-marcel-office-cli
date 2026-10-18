@@ -108,7 +108,7 @@ const WRITE_FILES = [
   'src/use-cases/commands/convert-{mail,calendar-event,group-post}-attachment-to-pdf.ts',
   'src/use-cases/commands/{draft-comment-splicer,draft-response,parse-recipients}.ts',
   'src/use-cases/commands/{write-commands,write-lifecycle-entries}.ts',
-  'src/composition/{write-package-names,write-package,write-program,write-server}.ts',
+  'src/composition/{write-package-names,write-package,write-program,write-server,write-token-source,write-client}.ts',
 ];
 
 // CORE_FILES: the core modules that the read-only ban does not reach.

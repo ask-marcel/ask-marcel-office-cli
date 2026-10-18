@@ -58,6 +58,8 @@ import '../src/composition/write-package.ts';
 import '../src/composition/write-package-names.ts';
 import '../src/composition/write-program.ts';
 import '../src/composition/write-server.ts';
+import '../src/composition/write-token-source.ts';
+import '../src/composition/write-client.ts';
 // Only `main.ts` (dynamically) and its own test reach mcp.ts, so unlike
 // run-registry-command.ts (pulled in via cli.ts) it is not transitively
 // imported by anything already listed here.
