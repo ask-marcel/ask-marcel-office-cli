@@ -13,10 +13,9 @@ export default [
   ...baseConfig(import.meta.dirname),
   {
     // stdout is the MCP frame channel: banned everywhere but the token
-    // helper's one JSON line and the bin (src/main.ts, the skeleton until the
-    // auth bin replaces it in commit 30 of phase 4).
+    // helper's one JSON line. The bin (src/main.ts) writes only stderr.
     files: ['src/**/*.ts'],
-    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/token-helper.ts', 'src/main.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/token-helper.ts'],
     rules: {
       'no-restricted-properties': ['error', STDOUT_BAN],
     },

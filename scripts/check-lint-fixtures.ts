@@ -77,7 +77,7 @@ const TYPE_AWARE_RULES: ReadonlySet<string> = new Set(['@typescript-eslint/no-un
 // One real source file per workspace folder, relative to the folder.
 const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['core', 'src/domain/result.ts'],
-  ['auth', 'src/composition/bin.ts'],
+  ['auth', 'src/composition/auth-program.ts'],
   ['read', 'src/composition/bin.ts'],
   ['write', 'src/composition/bin.ts'],
 ];
@@ -85,6 +85,7 @@ const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
 const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP server never writes stdout', path: 'src/composition/mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'the MCP gateway never writes stdout', path: 'src/composition/mcp-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
+  { name: 'auth: the auth bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'auth' },
   { name: 'the auth MCP tools never write stdout', path: 'src/composition/auth-mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'stdout is banned by default, not only in MCP files', path: 'src/composition/run-registry-command.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'control: the CLI builder owns stdout', path: 'src/composition/cli-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
