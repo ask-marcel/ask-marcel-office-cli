@@ -6,10 +6,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
-import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { buildMcpServer } from './mcp.ts';
-import type { BuildMcpServerDeps } from './mcp.ts';
+import { buildAuthMcpServer } from './auth-server.ts';
+import type { BuildAuthMcpServerDeps } from './auth-server.ts';
 
 /**
  * Drives the REAL MCP protocol: a real Client and a real McpServer joined by
@@ -18,11 +16,9 @@ import type { BuildMcpServerDeps } from './mcp.ts';
  * actual JSON-Schema input validation, and actual call dispatch — not our
  * assumption of them.
  */
-const connect = async (overrides: Partial<BuildMcpServerDeps> = {}): Promise<Client> => {
-  const server = buildMcpServer({
+const connect = async (overrides: Partial<BuildAuthMcpServerDeps> = {}): Promise<Client> => {
+  const server = buildAuthMcpServer({
     auth: fakeAuthManager(),
-    graph: fakeGraphClient(),
-    fs: createFileSystemFake(),
     version: '9.9.9',
     ...overrides,
   });
@@ -45,14 +41,6 @@ describe('the MCP gateway an agent connects to', () => {
     const annotations = tools.find((t) => t.name === 'status')?.annotations ?? {};
     expect(annotations['readOnlyHint']).toBe(true);
     expect(annotations['idempotentHint']).toBe(true);
-  });
-});
-
-describe('discovering what the CLI can do over MCP', () => {
-  it('returns docs for a lifecycle command, which lives outside the registry', async () => {
-    const client = await connect();
-    const text = textOf(await client.callTool({ name: 'get-command-docs', arguments: { command: 'login' } }));
-    expect(text).toContain('login');
   });
 });
 
@@ -114,7 +102,7 @@ describe('authenticating from an MCP client', () => {
     const result = await client.callTool({ name: 'status', arguments: {} });
     expect(isError(result)).toBe(false);
     for (const token of ['basic', 'elevated', 'chatsvcagg', 'ic3']) expect(textOf(result)).toContain(token);
-    expect(textOf(result)).toContain('ask-marcel-office login');
+    expect(textOf(result)).toContain('ask-marcel-office-auth login');
   });
 
   // The text envelope has no error code line, so the message and the source are what the client sees.
