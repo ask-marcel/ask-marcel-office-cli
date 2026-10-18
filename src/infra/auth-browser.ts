@@ -7,7 +7,7 @@ import type { AtomicFileWrites, FileSystem } from '@ask-marcel/office-core/use-c
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { AuthError, BrowserRungs, ElevatedOutcome, FetchFn, SecondaryTokenCommands, TokenCacheAccess, TokenLadder } from './auth.ts';
 import { createAuthLadder, neededByNote, NO_SECONDARY_TOKEN_COMMANDS } from './auth.ts';
-import { resolveAuthPaths } from './auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import type { BrowserAuth, ChatsvcaggTokenResult, ElevatedFailureReason, Ic3TokenResult } from './browser-auth.ts';
 import { createBrowserAuth } from './browser-auth.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';

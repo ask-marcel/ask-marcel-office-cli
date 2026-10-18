@@ -7,7 +7,7 @@ import type { FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesys
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
-import { resolveAuthPaths } from './auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { loadPlaywright } from './playwright-loader.ts';
 
 type BrowserTokenResult = { accessToken: AccessToken; refreshToken: string | null };

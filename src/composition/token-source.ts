@@ -1,6 +1,6 @@
 import { createEnvTokenSource } from '@ask-marcel/office-core/infra/env-token-source.ts';
 import { createHelperTokenSource } from '@ask-marcel/office-core/infra/helper-token-source.ts';
-import { resolveAuthPaths } from '../infra/auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { locateTokenHelper } from '@ask-marcel/office-core/infra/token-helper-locator.ts';
 import type { SecondaryTokenCommands } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
 import { NO_SECONDARY_TOKEN_COMMANDS, withNeededBy } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';

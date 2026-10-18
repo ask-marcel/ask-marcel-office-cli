@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import type { AuthLadder, SecondaryTokenCommands } from '../infra/auth.ts';
 import { createAuthManager } from '../infra/auth-browser.ts';
-import { resolveAuthPaths } from '../infra/auth-paths.ts';
+import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import type { CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';

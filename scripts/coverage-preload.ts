@@ -27,7 +27,7 @@
 
 import '@ask-marcel/office-core/domain/jwt-utils.ts';
 import '@ask-marcel/office-core/infra/logger.ts';
-import '../src/infra/auth-paths.ts';
+import '@ask-marcel/office-core/infra/auth-paths.ts';
 import '../src/infra/auth.ts';
 import '../src/infra/auth-token-source.ts';
 import '../src/infra/auth-browser.ts';

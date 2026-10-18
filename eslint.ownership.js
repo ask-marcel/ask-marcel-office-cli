@@ -79,7 +79,7 @@ const CORE_FILES = [
   'src/use-cases/commands/{command-types,command-graph}.ts',
   'src/presenter/*.ts',
   'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
-  'src/infra/{write-graph,network-error,logger}.ts',
+  'src/infra/{write-graph,network-error,logger,auth-paths}.ts',
   'src/infra/{env-token-source,helper-token-source,token-helper-run,token-helper-answer,token-helper-locator,token-source-needed-by}.ts',
   'src/infra/{filesystem-bun,filesystem-node,process-runner-bun,process-runner-node,child-process-watch,rename-with-retry}.ts',
   'src/domain/{result,access-token,tenant-id,env-var,iso-datetime,json,page-range,jwt-utils,closest-names,token-fingerprint,teams-region}.ts',
@@ -105,7 +105,7 @@ const AUTH_FILES = [
   'src/use-cases/commands/{login,logout,status,login-status,token,token-args,token-tier-capability}.ts',
   'src/use-cases/ports/{token-issuer,token-report}.ts',
   'src/composition/{auth-cli,auth-mcp,token-helper}.ts',
-  'src/infra/{auth,auth-browser,auth-paths,browser-auth,playwright-loader,token-cache-lock}.ts',
+  'src/infra/{auth,auth-browser,browser-auth,playwright-loader,token-cache-lock}.ts',
   'src/token.ts',
 ];
 
