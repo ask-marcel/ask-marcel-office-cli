@@ -8,14 +8,18 @@
  *
  * The package and the two paths are arguments, not imports, so one script serves
  * every package of the split (plan "Scripts ownership"); `bun run docs:gen`
- * passes the single package's:
+ * passes the root package and the write package, which the root documents
+ * together until the docs split (see command-packages.ts):
  *
  *   bun run scripts/gen-docs.ts --package src/composition/single-package.ts \
+ *     --package src/composition/write-package.ts \
  *     --manifest docs/commands.json --commands-doc docs/COMMANDS.md
  *
  * `--package` names a module that exports `commandPackage` (a CommandPackage).
- * Paths are relative to the working directory, and the manifest version is the
- * one in its package.json.
+ * It can come more than once: the registries are joined, and the names come from
+ * the first package. `--commands-doc` is optional: without it, only the manifest
+ * is written. Paths are relative to the working directory, and the manifest
+ * version is the one in its package.json.
  *
  * Pre-1.4.0 the auto-generated block lived inside README.md; the marketing
  * pass split docs out (README is the landing page, the deep tables moved
@@ -26,31 +30,27 @@
  */
 
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { fillNames } from '@ask-marcel/office-core/use-cases/commands/bin-names.ts';
-import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
 import type { CommandManifest, CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { renderReadmeTables } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { buildManifest as buildHelpJsonManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
+import { loadDocumentedPackage } from './command-packages.ts';
 
-const USAGE = 'usage: bun run scripts/gen-docs.ts --package <module exporting commandPackage> --manifest <commands.json> --commands-doc <COMMANDS.md>';
+const USAGE = 'usage: bun run scripts/gen-docs.ts --package <module exporting commandPackage> [--package <another>] --manifest <commands.json> [--commands-doc <COMMANDS.md>]';
 
-const { values: args } = parseArgs({ options: { package: { type: 'string' }, manifest: { type: 'string' }, 'commands-doc': { type: 'string' } } });
-if (args.package === undefined || args.manifest === undefined || args['commands-doc'] === undefined) {
+const { values: args } = parseArgs({ options: { package: { type: 'string', multiple: true }, manifest: { type: 'string' }, 'commands-doc': { type: 'string' } } });
+if (args.package === undefined || args.manifest === undefined) {
   process.stderr.write(`gen-docs: ${USAGE}\n`);
   process.exit(2);
 }
 
-const isCommandPackage = (value: unknown): value is CommandPackage =>
-  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value && 'binName' in value && 'bins' in value;
-
-const loaded: unknown = (await import(pathToFileURL(resolve(args.package)).href)).commandPackage;
-if (!isCommandPackage(loaded)) {
-  process.stderr.write(`gen-docs: ${args.package} exports no \`commandPackage\`. ${USAGE}\n`);
+const loaded = await loadDocumentedPackage(args.package);
+if (!loaded.ok) {
+  process.stderr.write(`gen-docs: ${loaded.error} ${USAGE}\n`);
   process.exit(2);
 }
-const commandPackage = loaded;
+const commandPackage = loaded.value;
 const commands = commandPackage.registry;
 const { version } = (await Bun.file(resolve('package.json')).json()) as { readonly version: string };
 
@@ -108,6 +108,7 @@ const writeManifest = async (manifest: CommandManifest): Promise<void> => {
 };
 
 const rewriteCommandsDoc = async (manifest: CommandManifest): Promise<void> => {
+  if (COMMANDS_DOC_PATH === undefined) return;
   const file = Bun.file(COMMANDS_DOC_PATH);
   if (!(await file.exists())) {
     process.stderr.write(`gen-docs: ${COMMANDS_DOC_PATH} not found — skipping rewrite\n`);
