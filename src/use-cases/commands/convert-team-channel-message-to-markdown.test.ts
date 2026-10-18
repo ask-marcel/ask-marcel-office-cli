@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { commands } from './index.ts';
 
 const command = commands['convert-team-channel-message-to-markdown'];
@@ -34,7 +34,7 @@ const render = async (
   graphOverrides: Partial<GraphClient> = {}
 ): Promise<{ result: Awaited<ReturnType<typeof command.execute>>; gets: string[] }> => {
   const gets: string[] = [];
-  const graph = fakeGraphClient({
+  const graph = fakeReadGraph({
     get: async (path) => {
       gets.push(path);
       return byPath[path] ?? err({ type: 'api_error', status: 404, message: `unexpected path ${path}` });

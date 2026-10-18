@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { fetchRawBytes, inlineBinary } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeReadGraph(overrides);
 
 const PDF_HEADER = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-
 const PDF_HEADER_B64 = 'JVBERi0=';

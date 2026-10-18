@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeReadGraph(overrides);
 
 describe('convertToMarkdown — orchestrate getBinary + optional 302 follow + image embedding + turndown', () => {
   it('converts inline HTML returned by getBinary directly', async () => {
