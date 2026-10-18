@@ -148,8 +148,9 @@ const SINGLE_PACKAGE_FILES = [
   'src/infra/graph-client.ts',
 ];
 
-// The option of the stdout ban, which the root eslint.config.js and the core and auth configs apply
-// to their files too (the MCP gateway moved to core in phase 3; the auth MCP tools move to auth in phase 4).
+// The option of the stdout ban, which the root eslint.config.js and the core, auth and write configs
+// apply to their files too (the MCP gateway moved to core in phase 3, the auth MCP tools to auth in
+// phase 4, and the write MCP server moves to write in phase 5).
 const STDOUT_BAN = {
   object: 'process',
   property: 'stdout',
