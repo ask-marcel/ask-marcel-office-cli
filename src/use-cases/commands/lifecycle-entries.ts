@@ -49,7 +49,7 @@ export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'mcp',
     summary:
-      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as four gateway tools (list-commands, get-command-docs, run-command, run-write-command). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See docs/USAGE.md (MCP server).',
+      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as three gateway tools (list-commands, get-command-docs, run-command). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See docs/USAGE.md (MCP server).',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) serves the command registry over MCP stdio; not a Graph endpoint',

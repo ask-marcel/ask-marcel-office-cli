@@ -43,9 +43,9 @@ describe('the lifecycle entries of the single package', () => {
     expect(docs.positionalArguments?.[0]?.description.trim().length ?? 0).toBeGreaterThan(0);
   });
 
-  it('describes an MCP server with the four gateway tools, and no sign-in tool', () => {
+  it('describes an MCP server with the three gateway tools, and no sign-in tool', () => {
     const mcp = entry('mcp');
-    expect(mcp.summary).toContain('four gateway tools (list-commands, get-command-docs, run-command, run-write-command)');
+    expect(mcp.summary).toContain('three gateway tools (list-commands, get-command-docs, run-command)');
     expect(mcp.summary).not.toMatch(/login|status/);
   });
 });
