@@ -138,8 +138,9 @@ const MCP_INIT = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protoc
 const MCP_LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
 // A tool call that needs no login: an unknown command answers a tool error naming the right one.
 const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'run-command', arguments: { command: 'lsit-drives', params: {} } } };
-// The root server is the gateway only: `login` and `status` are tools of the auth server.
-const GATEWAY_TOOLS = ['get-command-docs', 'list-commands', 'run-command', 'run-write-command'];
+// The root server is the read gateway only: `login` and `status` are tools of the auth server,
+// and `run-write-command` is a tool of the write server.
+const GATEWAY_TOOLS = ['get-command-docs', 'list-commands', 'run-command'];
 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const p = spawnSync(rt, ['dist/cli.js', 'mcp'], {
@@ -166,7 +167,7 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   const listReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { tools?: ReadonlyArray<{ name: string }> } }).find((m) => m.id === 2);
   const tools = listReply?.result?.tools ?? [];
   const names = tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b));
-  if (names.join(',') !== GATEWAY_TOOLS.join(',')) return { ok: false, note: `expected the 4 gateway tools ${GATEWAY_TOOLS.join(', ')}, got ${names.join(', ')}` };
+  if (names.join(',') !== GATEWAY_TOOLS.join(',')) return { ok: false, note: `expected the ${GATEWAY_TOOLS.length} gateway tools ${GATEWAY_TOOLS.join(', ')}, got ${names.join(', ')}` };
   const callReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { isError?: boolean; content?: ReadonlyArray<{ text?: string }> } }).find((m) => m.id === 3);
   if (callReply?.result?.isError !== true || !(callReply.result.content?.[0]?.text ?? '').includes('Did you mean')) return { ok: false, note: 'tools/call on a mistyped command did not answer a did-you-mean tool error' };
   return { ok: true, note: `${tools.length} tools, ${lines.length} clean JSON-RPC line(s)` };

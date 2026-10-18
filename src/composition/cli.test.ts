@@ -46,13 +46,10 @@ const errGraph = (error: GraphError): GraphClient =>
   });
 
 describe('buildCli command surface', () => {
-  it('top-level description derives endpoint counts from the registry and labels mail-draft writes as mutations, never as searches (F-03)', () => {
+  it('top-level description derives endpoint counts from the registry, and never labels a search POST as a mutation (F-03)', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const getCount = Object.values(commands).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
-    const mutating = Object.entries(commands)
-      .filter(([, c]) => c.meta.effect !== 'read')
-      .map(([n]) => n);
     const searchPosts = Object.entries(commands)
       .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
       .map(([n]) => n);
@@ -60,9 +57,6 @@ describe('buildCli command surface', () => {
     expect(description).toContain(`${getCount} GET endpoints`);
     // every search POST is listed in the "search POST" clause
     for (const name of searchPosts) expect(description).toContain(name);
-    // every write command is named as a mutation, and there IS at least one
-    expect(mutating.length).toBeGreaterThan(0);
-    for (const name of mutating) expect(description).toContain(name);
     // the old bug: every POST was labelled "searches, not mutations", which
     // mislabelled create-mail-draft. That phrasing must be gone.
     expect(description).not.toContain('searches, not mutations');

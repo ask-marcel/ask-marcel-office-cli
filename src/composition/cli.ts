@@ -5,11 +5,12 @@
  * Its deps are the ones `main.ts` and the real-registry suites pass.
  */
 import type { Command } from 'commander';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { CliShellDeps } from '@ask-marcel/office-core/composition/cli-shell.ts';
 import { buildCliShell } from '@ask-marcel/office-core/composition/cli-shell.ts';
 import { commandPackage } from './single-package.ts';
 
-type BuildCliDeps = Omit<CliShellDeps, 'commandPackage' | 'addLifecycleCommands'>;
+type BuildCliDeps = Omit<CliShellDeps<ReadGraph>, 'commandPackage' | 'addLifecycleCommands'>;
 
 const buildCli = (deps: BuildCliDeps): Command => buildCliShell({ ...deps, commandPackage });
 

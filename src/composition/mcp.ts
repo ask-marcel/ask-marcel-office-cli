@@ -5,11 +5,12 @@
  * main.ts imports this module dynamically, so a plain command never loads the SDK.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { McpShellDeps } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 import { buildMcpShell } from '@ask-marcel/office-core/composition/mcp-shell.ts';
 import { commandPackage } from './single-package.ts';
 
-type BuildMcpServerDeps = Omit<McpShellDeps, 'commandPackage' | 'addTools'>;
+type BuildMcpServerDeps = Omit<McpShellDeps<ReadGraph>, 'commandPackage' | 'addTools'>;
 
 const buildMcpServer = (deps: BuildMcpServerDeps): McpServer => buildMcpShell({ ...deps, commandPackage });
 

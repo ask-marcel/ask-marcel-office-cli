@@ -36,27 +36,21 @@ const textOf = (result: unknown): string => {
 const isError = (result: unknown): boolean => (result as { isError?: boolean }).isError === true;
 
 const readCommandCount = Object.values(commands).filter((c) => c.meta.effect === 'read').length;
-const writeCommandNames = Object.entries(commands)
-  .filter(([, c]) => c.meta.effect !== 'read')
-  .map(([n]) => n);
 
 describe('the MCP gateway an agent connects to', () => {
-  it('offers exactly the four gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
+  it('offers exactly the three gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'run-command', 'run-write-command']);
+    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'run-command']);
   });
 
-  it('marks the read tools read-only so a client can auto-approve them, and does not mark the write tool read-only', async () => {
+  it('marks the read tools read-only so a client can auto-approve them', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     const annotationOf = (name: string): Record<string, unknown> => tools.find((t) => t.name === name)?.annotations ?? {};
     expect(annotationOf('list-commands')['readOnlyHint']).toBe(true);
     expect(annotationOf('get-command-docs')['readOnlyHint']).toBe(true);
     expect(annotationOf('run-command')['readOnlyHint']).toBe(true);
-    expect(annotationOf('run-write-command')['readOnlyHint']).toBe(false);
-    // A draft is unsent and a temporary upload is a copy the command tries to delete: neither overwrites anything.
-    expect(annotationOf('run-write-command')['destructiveHint']).toBe(false);
   });
 });
 
@@ -202,21 +196,22 @@ describe('running a read command over MCP', () => {
 });
 
 describe('the read/write boundary the readOnlyHint promises', () => {
-  it.each(writeCommandNames)('refuses to run the write command `%s` through the read-only run-command tool', async (writeName) => {
+  it.each([
+    'convert-calendar-event-attachment-to-pdf',
+    'convert-group-post-attachment-to-pdf',
+    'convert-mail-attachment-to-pdf',
+    'create-forward-draft',
+    'create-mail-draft',
+    'create-reply-draft',
+    'update-mail-draft',
+  ])('refuses to run the write command `%s` through the read-only run-command tool', async (writeName) => {
     // The whole point of splitting the tools: a client may auto-approve
     // run-command on the strength of readOnlyHint: true. A write slipping
     // through here would mutate under that promise.
     const client = await connect();
     const result = await client.callTool({ name: 'run-command', arguments: { command: writeName } });
     expect(isError(result)).toBe(true);
-    expect(textOf(result)).toContain('run-write-command');
-  });
-
-  it('refuses to run a read command through run-write-command, keeping each tool`s advertised set honest', async () => {
-    const client = await connect();
-    const result = await client.callTool({ name: 'run-write-command', arguments: { command: 'get-current-user' } });
-    expect(isError(result)).toBe(true);
-    expect(textOf(result)).toContain('run-command');
+    expect(textOf(result)).toContain('ask-marcel-office-write mcp');
   });
 
   it('rejects the write command BEFORE executing it, so a refusal can never leave a draft behind', async () => {
@@ -246,28 +241,13 @@ describe('the read/write boundary the readOnlyHint promises', () => {
     const client = await connect({ graph });
     const result = await client.callTool({ name: 'run-command', arguments: { command: 'convert-mail-attachment-to-pdf', params: { messageId: 'm1', attachmentId: 'a1' } } });
     expect(isError(result)).toBe(true);
-    expect(textOf(result)).toContain('run-write-command');
+    expect(textOf(result)).toContain('ask-marcel-office-write mcp');
     expect(graphWasCalled).toBe(false);
   });
 
-  it('tells the agent what each write leaves behind: an unsent draft, or a temporary OneDrive file that the command deletes', async () => {
+  it('advertises the read count derived from the registry', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    const description = tools.find((t) => t.name === 'run-write-command')?.description ?? '';
-    expect(description).toContain('create-forward-draft, create-mail-draft, create-reply-draft, update-mail-draft: create or update an UNSENT mail draft');
-    expect(description).toContain(
-      'convert-calendar-event-attachment-to-pdf, convert-group-post-attachment-to-pdf, convert-mail-attachment-to-pdf: upload the attachment to a temporary file in the `.ask-marcel-temp` folder of your OneDrive to convert it, then try to delete that file (a failed cleanup can leave it there)'
-    );
-    // One sentence per write class, so the agent can tell which promise belongs to which command.
-    expect(description).toContain('(this CLI cannot send mail). convert-calendar-event-attachment-to-pdf, ');
-    expect(tools.find((t) => t.name === 'run-command')?.description).toContain(`the ${writeCommandNames.length} write commands are rejected here`);
-  });
-
-  it('advertises the write set derived from the registry, so a newly-flagged write command is covered without touching this file', async () => {
-    const client = await connect();
-    const { tools } = await client.listTools();
-    const description = tools.find((t) => t.name === 'run-write-command')?.description ?? '';
-    for (const name of writeCommandNames) expect(description).toContain(name);
     expect(tools.find((t) => t.name === 'run-command')?.description).toContain(String(readCommandCount));
   });
 });

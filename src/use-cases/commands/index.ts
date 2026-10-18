@@ -1,5 +1,6 @@
-import { withOwnGraph } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
-import type { Command, RegisteredCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import { readCommandOf } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
+import type { Command, ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
 import * as diffDriveItemVersions from './diff-drive-item-versions.ts';
 import * as diffDriveItems from './diff-drive-items.ts';
@@ -105,15 +106,9 @@ import * as convertMailAttachmentToMarkdown from './convert-mail-attachment-to-m
 import * as readMailAttachment from './read-mail-attachment.ts';
 import * as extractGroupPostAttachmentImages from './extract-group-post-attachment-images.ts';
 import * as extractMailAttachmentImages from './extract-mail-attachment-images.ts';
-import * as convertMailAttachmentToPdf from './convert-mail-attachment-to-pdf.ts';
 import * as listCalendarEventAttachments from './list-calendar-event-attachments.ts';
 import * as convertCalendarEventAttachmentToMarkdown from './convert-calendar-event-attachment-to-markdown.ts';
-import * as convertCalendarEventAttachmentToPdf from './convert-calendar-event-attachment-to-pdf.ts';
 import * as convertMailToMarkdown from './convert-mail-to-markdown.ts';
-import * as createForwardDraft from './create-forward-draft.ts';
-import * as createMailDraft from './create-mail-draft.ts';
-import * as createReplyDraft from './create-reply-draft.ts';
-import * as updateMailDraft from './update-mail-draft.ts';
 import * as convertDriveItemZip from './convert-drive-item-zip-to-markdown.ts';
 import * as convertLocalFile from './convert-local-file-to-markdown.ts';
 import * as extractLocalFileImages from './extract-local-file-images.ts';
@@ -188,7 +183,6 @@ import * as convertGroupPostToMarkdown from './convert-group-post-to-markdown.ts
 import * as listGroupPostAttachments from './list-group-post-attachments.ts';
 import * as getGroupPostAttachment from './get-group-post-attachment.ts';
 import * as convertGroupPostAttachmentToMarkdown from './convert-group-post-attachment-to-markdown.ts';
-import * as convertGroupPostAttachmentToPdf from './convert-group-post-attachment-to-pdf.ts';
 import * as getMailMessageMime from './get-mail-message-mime.ts';
 import * as listMailFolderMessagesDelta from './list-mail-folder-messages-delta.ts';
 import * as listSharedMailboxMessages from './list-shared-mailbox-messages.ts';
@@ -213,7 +207,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const modules: Record<string, RegisteredCommand> = {
+const modules: Record<string, ReadCommand> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
@@ -283,20 +277,14 @@ const modules: Record<string, RegisteredCommand> = {
   'extract-sharepoint-links-in-mail': extractSharepointLinksInMail,
   'extract-sharepoint-links-in-documents': extractSharepointLinksInDocuments,
   'convert-mail-to-markdown': convertMailToMarkdown,
-  'create-forward-draft': createForwardDraft,
-  'create-mail-draft': createMailDraft,
-  'create-reply-draft': createReplyDraft,
-  'update-mail-draft': updateMailDraft,
   'convert-drive-item-zip-to-markdown': convertDriveItemZip,
   'convert-local-file-to-markdown': convertLocalFile,
   'extract-local-file-images': extractLocalFileImages,
   'convert-mail-attachment-zip-to-markdown': convertMailAttachmentZip,
-  'convert-mail-attachment-to-pdf': convertMailAttachmentToPdf,
   'convert-mail-attachment-to-markdown': convertMailAttachmentToMarkdown,
   'read-mail-attachment': readMailAttachment,
   'list-calendar-event-attachments': listCalendarEventAttachments,
   'convert-calendar-event-attachment-to-markdown': convertCalendarEventAttachmentToMarkdown,
-  'convert-calendar-event-attachment-to-pdf': convertCalendarEventAttachmentToPdf,
   'extract-group-post-attachment-images': extractGroupPostAttachmentImages,
   'extract-mail-attachment-images': extractMailAttachmentImages,
   'list-onenote-notebooks': listOnenoteNotebooks,
@@ -366,7 +354,6 @@ const modules: Record<string, RegisteredCommand> = {
   'list-group-post-attachments': listGroupPostAttachments,
   'get-group-post-attachment': getGroupPostAttachment,
   'convert-group-post-attachment-to-markdown': convertGroupPostAttachmentToMarkdown,
-  'convert-group-post-attachment-to-pdf': convertGroupPostAttachmentToPdf,
   'get-mail-message-mime': getMailMessageMime,
   'list-mail-folder-messages-delta': listMailFolderMessagesDelta,
   'list-shared-mailbox-messages': listSharedMailboxMessages,
@@ -429,14 +416,15 @@ const modules: Record<string, RegisteredCommand> = {
 
 /*
  * Every command is wrapped so an undeclared parameter is refused before it runs
- * (2026-07-24), and so it runs on the graph its effect allows (package split,
- * D9). The wraps live HERE rather than in composition because a library
- * consumer reaches `commands[x].execute(...)` directly, never passing through
- * the CLI or the MCP gateway — wrapping at assembly is the only point all
- * three surfaces share.
+ * (2026-07-24), and so it runs on the read view of the graph (package split,
+ * D9): the root holds read commands only, and the write commands are in
+ * @ask-marcel/office-write. The wraps live HERE rather than in composition
+ * because a library consumer reaches `commands[x].execute(...)` directly, never
+ * passing through the CLI or the MCP gateway — wrapping at assembly is the only
+ * point all three surfaces share.
  */
-const registerCommands = (registered: Readonly<Record<string, RegisteredCommand>>): Record<string, Command> =>
-  Object.fromEntries(Object.entries(registered).map(([name, command]) => [name, withUnknownParamRejection(withOwnGraph(command))]));
+const registerCommands = (registered: Readonly<Record<string, ReadCommand>>): Record<string, Command<ReadGraph>> =>
+  Object.fromEntries(Object.entries(registered).map(([name, command]) => [name, withUnknownParamRejection(readCommandOf(command))]));
 
 const commands = registerCommands(modules);
 
