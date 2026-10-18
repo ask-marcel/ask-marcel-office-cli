@@ -99,27 +99,28 @@ const CORE_READ_ONLY_FILES = [
 ];
 
 // AUTH_FILES: the auth commands of the command directory (login, logout, status,
-// token) with their helpers, the auth ladder, the browser sign-in and the token
-// helper's entry.
+// token) with their helpers, the auth ladder, the browser sign-in, the token
+// helper's entry, and the in-process token source over the ladder with the fake
+// of that ladder.
 const AUTH_FILES = [
   'src/use-cases/commands/{login,logout,status,login-status,token,token-args,token-tier-capability,auth-lifecycle-entries}.ts',
   'src/use-cases/ports/{token-issuer,token-report}.ts',
   'src/composition/{auth-cli,auth-mcp,token-helper,auth-package-names,auth-package,auth-program,auth-server,build-auth-deps}.ts',
-  'src/infra/{auth,auth-browser,browser-auth,playwright-loader,token-cache-lock}.ts',
+  'src/infra/{auth,auth-browser,browser-auth,playwright-loader,token-cache-lock,auth-token-source}.ts',
   'src/token.ts',
+  'src/test-helpers/auth-manager-fake.ts',
 ];
 
 // SINGLE_PACKAGE_FILES: the wiring of the single package, which holds the three
 // packages in one bin: its registry and lifecycle entries, its CLI, MCP server
-// and composition root, its entries, the full client over the in-process ladder,
-// and the fakes of that client and that ladder. No package of the split takes
-// them; phases 4 to 6 replace them with each package's own wiring.
+// and composition root, its entries, and the full client over a token source.
+// No package of the split takes them; phases 4 to 6 replace them with each
+// package's own wiring.
 const SINGLE_PACKAGE_FILES = [
   'src/{index,main}.ts',
   'src/composition/{cli,mcp,single-package,single-package-names,build-deps}.ts',
   'src/use-cases/commands/{index,lifecycle-entries}.ts',
-  'src/infra/{graph-client,auth-token-source}.ts',
-  'src/test-helpers/auth-manager-fake.ts',
+  'src/infra/graph-client.ts',
 ];
 
 // The option of the stdout ban, which the root eslint.config.js and core/eslint.config.js apply to

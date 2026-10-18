@@ -1,9 +1,9 @@
 /*
- * The auth lifecycle commands of the single package's CLI: `login`, `status`
- * and `logout`. The CLI builder (`cli-shell.ts`) is core and knows no auth;
- * `cli.ts` hands it these through `addLifecycleCommands`, so they land under
- * the Lifecycle group and print through the same output as every command. After
- * the package split they are the auth package's (docs/plans/2026-10-01-package-split.md).
+ * The sign-in commands of the auth package's CLI: `login`, `status` and
+ * `logout` (docs/plans/2026-10-01-package-split.md). The CLI builder
+ * (`cli-shell.ts`) is core and knows no auth; `auth-program.ts` adds these
+ * commands to it, so they land under the Lifecycle group and print through the
+ * same output as every command.
  */
 import type { Command } from 'commander';
 import type { AuthLadder, LoginAuthFactory } from '../infra/auth.ts';
@@ -20,7 +20,7 @@ type AuthCliDeps = {
   /**
    * Builds the AuthManager for an interactive `login` run (it may recapture
    * secondary tokens via the browser, unlike the command-path `auth`).
-   * Supplied by the composition root (`build-deps.ts`); when omitted (tests),
+   * Built by `build-auth-deps.ts` for the auth bin; when omitted (tests),
    * the login action falls back to the injected `auth`, so a single fake
    * drives both `login.execute` and `getLastElevatedOutcome`.
    */

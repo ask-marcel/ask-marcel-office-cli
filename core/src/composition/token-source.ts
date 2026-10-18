@@ -25,7 +25,7 @@ export type EnvThenHelperOptions = {
 
 // The package split's token source for read and write: a tier's environment
 // variable when it is set, otherwise the token helper wherever it is found.
-// The single package uses it only when ASKMARCEL_TOKEN_COMMAND is set.
+// The single package uses it for every bearer too (D1 of phase 4).
 export const createEnvThenHelperTokenSource = (options: EnvThenHelperOptions): TokenSource => {
   const { env, fs, runner, interactive } = options;
   const locatorPath = tokenHelperLocatorPath(resolveAuthPaths(options.home, env));

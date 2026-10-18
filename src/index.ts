@@ -6,7 +6,7 @@
  * (presenter, individual command files, format-error, ports, fakes).
  *
  * Consumers:
- *   import { commands, createGraphClient, buildDeps } from 'ask-marcel-office-cli';
+ *   import { commands, buildDeps } from 'ask-marcel-office-cli';
  */
 
 export { accessToken, accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
@@ -17,11 +17,8 @@ export { decodeJwtPayload, isGraphToken, isTokenFresh } from '@ask-marcel/office
 export { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 export type { Result } from '@ask-marcel/office-core/domain/result.ts';
 
-export { createAuthManager } from './infra/auth-browser.ts';
-export type { AuthError, AuthManager } from './infra/auth.ts';
 export { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 export { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
-export { createGraphClient } from './infra/graph-client.ts';
 export type { FetchFn, GraphClient, GraphError } from './infra/graph-client.ts';
 export { createWinstonLogger } from '@ask-marcel/office-core/infra/logger.ts';
 export type { WinstonLoggerConfig } from '@ask-marcel/office-core/infra/logger.ts';

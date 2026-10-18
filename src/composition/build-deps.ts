@@ -1,16 +1,14 @@
 import { homedir } from 'node:os';
-import type { AuthLadder, LoginAuthFactory, SecondaryTokenCommands } from '../infra/auth.ts';
-import { createAuthManager } from '../infra/auth-browser.ts';
-import { resolveAuthPaths } from '@ask-marcel/office-core/infra/auth-paths.ts';
 import { commands } from '../use-cases/commands/index.ts';
 import type { CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
-import { createGraphClient, createTokenSourceGraphClient } from '../infra/graph-client.ts';
+import { createTokenSourceGraphClient } from '../infra/graph-client.ts';
 import { createWinstonLogger } from '@ask-marcel/office-core/infra/logger.ts';
 import { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
 import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';
+import type { SecondaryTokenCommands } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
 import type { AtomicFileWrites, FileExistence, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { ProcessRunner } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
@@ -18,36 +16,31 @@ import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composit
 
 export type BuildDepsConfig = {
   readonly logLevel?: string;
-  readonly cachePath?: string;
   readonly home?: string;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly fs?: FileSystem & AtomicFileWrites & FileExistence;
   readonly processRunner?: ProcessRunner;
-  readonly createAuth?: typeof createAuthManager;
   /**
    * Whether this is an interactive session (a real TTY with a human present).
-   * Defaults to `process.stdin.isTTY`. When true, the command-path auth keeps
-   * the first-run auto-launched sign-in browser for the basic token; when false
-   * (a headless / piped agent run) that rung fails fast instead of hanging on
-   * the interactive-login poll. Injectable so tests pin the behavior.
+   * Defaults to `process.stdin.isTTY`. When true, the token helper gets this
+   * terminal's stdin; when false (a headless / piped agent run) it gets none,
+   * so it fails fast instead of waiting on a sign-in that nobody can complete.
+   * Injectable so tests pin the behavior.
    */
   readonly interactive?: boolean;
 };
 
 export type BuiltDeps = Readonly<{
   logger: Logger;
-  auth: AuthLadder;
   graph: GraphClient;
   processRunner: ProcessRunner;
   fs: FileSystem & AtomicFileWrites;
-  makeLoginAuth: LoginAuthFactory;
 }>;
 
 // The secondary-token error messages name the commands that need each token.
-// Deriving the lists from the registry flags here (instead of hardcoding them
-// inside infra/auth.ts, which cannot import the registry) keeps the messages
-// truthful as commands gain or lose a flag — the old hardcoded elevated list
-// omitted `get-user`.
+// Deriving the lists from the registry flags here keeps the messages truthful
+// as commands gain or lose a flag. The token source adds them after the
+// remedy of the auth package.
 const commandNamesWhere = (matches: (meta: CommandMeta) => boolean): ReadonlyArray<string> =>
   Object.entries(commands)
     .filter(([, cmd]) => matches(cmd.meta))
@@ -64,51 +57,17 @@ const defaultFileSystem = (): FileSystem & AtomicFileWrites & FileExistence => (
 
 const defaultProcessRunner = (): ProcessRunner => (typeof globalThis.Bun !== 'undefined' ? createBunProcessRunner() : createNodeProcessRunner());
 
+// The root signs only through the package split's source (D1 of phase 4): a
+// tier's environment variable when it is set, otherwise the token helper of
+// the auth package. The root holds no token cache and opens no browser.
 export const buildDeps = (config: BuildDepsConfig = {}): BuiltDeps => {
   const home = config.home ?? homedir();
   const env = config.env ?? process.env;
-  const paths = resolveAuthPaths(home, env);
-  const cachePath = config.cachePath ?? paths.tokenCache;
-  const browserProfileDir = paths.browserProfile;
   const logLevel = config.logLevel ?? process.env.ASKMARCEL_LOG_LEVEL ?? 'error';
   const fs = config.fs ?? defaultFileSystem();
   const processRunner = config.processRunner ?? defaultProcessRunner();
   const logger = createWinstonLogger({ logLevel });
-  const makeAuth = config.createAuth ?? createAuthManager;
-  // Secondary tokens (elevated / chatsvcagg / ic3) NEVER pop a per-command
-  // browser: `recaptureSecondaryViaBrowser: false` fails them fast ("run
-  // `ask-marcel-office login`") whether or not the session is interactive.
-  //
-  // The BASIC token is gated on the SESSION instead. A real terminal keeps the
-  // first-run convenience of an auto-launched sign-in browser; a headless / piped
-  // run (an agent, CI) has no TTY and no human to complete that sign-in, so its
-  // basic-token browser rung fails fast rather than blocking on the 5-minute
-  // interactive-login poll that hung a headless agent. Full browser capture stays
-  // available through the explicit `login` command (`makeLoginAuth` leaves
-  // `acquireBasicViaBrowser` at its `true` default).
   const interactive = config.interactive ?? process.stdin.isTTY === true;
-  // Elevated rides the SESSION gate too, but on its own flag: silent SSO against the
-  // persistent profile refreshes it in ~17s with no prompt, so a TTY user gets the
-  // command they asked for instead of "run login". An agent / MCP run keeps the
-  // instant, self-explaining error rather than waiting on a browser it cannot see.
-  // The same session sets how long a held token-cache lock is waited on.
-  const auth = makeAuth({
-    cachePath,
-    browserProfileDir,
-    logger,
-    fs,
-    interactive,
-    recaptureSecondaryViaBrowser: false,
-    recaptureElevatedViaBrowser: interactive,
-    acquireBasicViaBrowser: interactive,
-    secondaryTokenCommands,
-  });
-  // The in-process ladder signs by default. Naming a token helper in
-  // ASKMARCEL_TOKEN_COMMAND switches to the package split's source (tier
-  // variables, then that helper), the way read and write will get tokens.
-  const graph = env['ASKMARCEL_TOKEN_COMMAND']
-    ? createTokenSourceGraphClient(createEnvThenHelperTokenSource({ env, home, fs, runner: processRunner, interactive, neededBy: secondaryTokenCommands }))
-    : createGraphClient(auth);
-  const makeLoginAuth: LoginAuthFactory = () => makeAuth({ cachePath, browserProfileDir, logger, fs, secondaryTokenCommands });
-  return { logger, auth, graph, processRunner, fs, makeLoginAuth };
+  const tokens = createEnvThenHelperTokenSource({ env, home, fs, runner: processRunner, interactive, neededBy: secondaryTokenCommands });
+  return { logger, graph: createTokenSourceGraphClient(tokens), processRunner, fs };
 };
