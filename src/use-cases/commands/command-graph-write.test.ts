@@ -4,10 +4,11 @@
 // that file's.
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphClient } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import type { Command, CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { commands } from './index.ts';
+import { commands } from './write-commands.ts';
+
+type GraphClient = ReturnType<typeof fakeGraphClient>;
 
 const READ_MEMBERS = [
   'discoverTenantId',
