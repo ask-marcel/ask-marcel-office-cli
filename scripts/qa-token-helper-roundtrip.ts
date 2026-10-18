@@ -4,7 +4,9 @@
  * Checks and CI: the windows-latest job). Offline: a fixture token cache, no
  * browser, no network.
  *
- *   1. Builds the helper's entry (src/token.ts) to a temporary dist/token.js.
+ *   1. Builds the helper's entry to a temporary dist/token.js: auth/src/token.ts
+ *      when it exists, else src/token.ts (package split, phase 4: the move of
+ *      auth needs no edit here; a later commit drops src/token.ts).
  *   2. Writes a token cache with a fresh basic token under a temporary HOME
  *      (and USERPROFILE, which Windows reads first).
  *   3. Runs `node dist/token.js --tier basic` with stdin ignored, as auth runs
@@ -29,7 +31,7 @@
  * Exit non-zero on any failure.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
@@ -52,9 +54,12 @@ const home = join(work, 'home');
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('ASKMARCEL_')));
 const env = { ...cleanEnv, HOME: home, USERPROFILE: home };
 
+const AUTH_ENTRY = resolve(import.meta.dir, '../auth/src/token.ts');
+const HELPER_ENTRY = existsSync(AUTH_ENTRY) ? AUTH_ENTRY : resolve(import.meta.dir, '../src/token.ts');
+
 const buildHelper = async (): Promise<string> => {
   const built = await Bun.build({
-    entrypoints: [resolve(import.meta.dir, '../src/token.ts')],
+    entrypoints: [HELPER_ENTRY],
     outdir: join(work, 'dist'),
     naming: 'token.js',
     target: 'node',
