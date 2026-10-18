@@ -13,11 +13,10 @@ import { STDOUT_BAN } from '../eslint.ownership.js';
 export default [
   ...baseConfig(import.meta.dirname),
   {
-    // stdout is the MCP frame channel: banned in every write file. The
-    // skeleton bin (src/main.ts) writes stdout until the real write bin
-    // replaces it; then it leaves this allowlist.
+    // stdout is the MCP frame channel: banned in every write file. The bin
+    // (src/main.ts) writes only stderr; the CLI builder of core owns stdout.
     files: ['src/**/*.ts'],
-    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/main.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**'],
     rules: {
       'no-restricted-properties': ['error', STDOUT_BAN],
     },
