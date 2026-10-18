@@ -32,7 +32,7 @@ const runCli = (...args: ReadonlyArray<string>): Promise<string> => {
 };
 
 const connect = async (): Promise<Client> => {
-  const server = buildMcpServer({ auth: fakeAuthManager(), graph: fakeGraphClient(), fs: createFileSystemFake(), version: '9.9.9' });
+  const server = buildMcpServer({ graph: fakeGraphClient(), fs: createFileSystemFake(), version: '9.9.9' });
   const client = new Client({ name: 'test client', version: '1.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(clientTransport), server.server.connect(serverTransport)]);

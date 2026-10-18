@@ -49,11 +49,9 @@ const serveMcp = async (): Promise<void> => {
   const deps = buildDeps();
   await recordTokenHelper(deps);
   const server = buildMcpServer({
-    auth: deps.auth,
     graph: deps.graph,
     fs: deps.fs,
     version: pkg.version,
-    makeLoginAuth: deps.makeLoginAuth,
   });
   await server.connect(new StdioServerTransport());
   // Deliberately no resolve: the transport owns the process lifetime now and

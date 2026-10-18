@@ -150,6 +150,8 @@ const MCP_INIT = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protoc
 const MCP_LIST = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
 // A tool call that needs no login: an unknown command answers a tool error naming the right one.
 const MCP_CALL = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'run-command', arguments: { command: 'lsit-drives', params: {} } } };
+// The root server is the gateway only: `login` and `status` are tools of the auth server.
+const GATEWAY_TOOLS = ['get-command-docs', 'list-commands', 'run-command', 'run-write-command'];
 
 const probeMcp = (rt: string): { ok: boolean; note: string } => {
   // A home of its own, so the locator check proves this server wrote it.
@@ -177,7 +179,8 @@ const probeMcp = (rt: string): { ok: boolean; note: string } => {
   if (polluted.length > 0) return { ok: false, note: `STDOUT POLLUTED by ${polluted.length} non-JSON-RPC line(s): ${JSON.stringify(polluted[0]?.slice(0, 40))}` };
   const listReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { tools?: ReadonlyArray<{ name: string }> } }).find((m) => m.id === 2);
   const tools = listReply?.result?.tools ?? [];
-  if (tools.length !== 6) return { ok: false, note: `expected 6 gateway tools, got ${tools.length}` };
+  const names = tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b));
+  if (names.join(',') !== GATEWAY_TOOLS.join(',')) return { ok: false, note: `expected the 4 gateway tools ${GATEWAY_TOOLS.join(', ')}, got ${names.join(', ')}` };
   const callReply = lines.map((l) => JSON.parse(l) as { id?: number; result?: { isError?: boolean; content?: ReadonlyArray<{ text?: string }> } }).find((m) => m.id === 3);
   if (callReply?.result?.isError !== true || !(callReply.result.content?.[0]?.text ?? '').includes('Did you mean')) return { ok: false, note: 'tools/call on a mistyped command did not answer a did-you-mean tool error' };
   if (!recordsTokenHelper(home)) return { ok: false, note: 'the server did not record dist/token.js as the token helper' };

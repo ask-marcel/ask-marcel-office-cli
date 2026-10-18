@@ -3,7 +3,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { commands } from '../use-cases/commands/index.ts';
@@ -19,7 +18,6 @@ import type { BuildMcpServerDeps } from './mcp.ts';
  */
 const connect = async (overrides: Partial<BuildMcpServerDeps> = {}): Promise<Client> => {
   const server = buildMcpServer({
-    auth: fakeAuthManager(),
     graph: fakeGraphClient(),
     fs: createFileSystemFake(),
     version: '9.9.9',
@@ -43,10 +41,10 @@ const writeCommandNames = Object.entries(commands)
   .map(([n]) => n);
 
 describe('the MCP gateway an agent connects to', () => {
-  it('offers exactly the six gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
+  it('offers exactly the four gateway tools, not one tool per command, so a session is not flooded with schema', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'login', 'run-command', 'run-write-command', 'status']);
+    expect(tools.map((t) => t.name).toSorted((a, b) => a.localeCompare(b))).toEqual(['get-command-docs', 'list-commands', 'run-command', 'run-write-command']);
   });
 
   it('marks the read tools read-only so a client can auto-approve them, and does not mark the write tool read-only', async () => {

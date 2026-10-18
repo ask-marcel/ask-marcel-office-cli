@@ -1,9 +1,9 @@
 /*
- * The auth tools of the single package's MCP server: `login` and `status`. The
- * gateway (`mcp-shell.ts`) is core and knows no auth; `mcp.ts` hands it these
- * through `addTools`. After the package split they are the auth package's
- * (docs/plans/2026-10-01-package-split.md). Like every MCP module, nothing here
- * writes to stdout: a tool returns its text.
+ * The tools of the auth package's MCP server: `login` and `status`
+ * (docs/plans/2026-10-01-package-split.md). `auth-server.ts` gives them to its
+ * own `McpServer`; the root's gateway (`mcp.ts`, on core's `mcp-shell.ts`)
+ * does not have them. Like every MCP module, nothing here writes to stdout: a
+ * tool returns its text.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';

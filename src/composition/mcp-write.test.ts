@@ -7,7 +7,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../infra/graph-client.ts';
-import { fakeAuthManager } from '../test-helpers/auth-manager-fake.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildMcpServer } from './mcp.ts';
@@ -22,7 +21,6 @@ import type { BuildMcpServerDeps } from './mcp.ts';
  */
 const connect = async (overrides: Partial<BuildMcpServerDeps> = {}): Promise<Client> => {
   const server = buildMcpServer({
-    auth: fakeAuthManager(),
     graph: fakeGraphClient(),
     fs: createFileSystemFake(),
     version: '9.9.9',
