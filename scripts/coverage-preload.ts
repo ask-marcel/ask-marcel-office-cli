@@ -69,6 +69,8 @@ import '../src/composition/auth-mcp.ts';
 // The token helper is reached from main.ts and src/token.ts, which no test loads.
 import '../src/composition/token-helper.ts';
 import '../src/composition/auth-package-names.ts';
+import '../src/composition/auth-package.ts';
+import '../src/composition/auth-program.ts';
 import '@ask-marcel/office-core/composition/token-source.ts';
 
 import '@ask-marcel/office-core/presenter/output.ts';
