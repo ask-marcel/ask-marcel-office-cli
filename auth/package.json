@@ -51,6 +51,7 @@
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
     "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js dist/token.js && bun run ../scripts/build-types.ts",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
+    "smoke": "bun ../scripts/qa-auth-bundle-smoke.ts",
     "prepublishOnly": "bun run build && bun run lint:strict && bun run typecheck && bun run coverage && bun run check:packed"
   },
   "dependencies": {
