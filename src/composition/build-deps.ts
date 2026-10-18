@@ -14,7 +14,7 @@ import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-r
 import type { AtomicFileWrites, FileExistence, FileSystem } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
 import type { Logger } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
 import type { ProcessRunner } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
-import { createEnvThenHelperTokenSource } from './token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 
 export type BuildDepsConfig = {
   readonly logLevel?: string;

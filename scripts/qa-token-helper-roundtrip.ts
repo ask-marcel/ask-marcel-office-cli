@@ -12,7 +12,7 @@
  *      writes the locator file (~/.ask-marcel/token-helper.json) on the way.
  *   4. Asks the package split's token source for the basic token, through the
  *      locator file, the way read and write do: the env-then-helper source
- *      (src/composition/token-source.ts) spawns `execPath entry --tier basic`
+ *      (core/src/composition/token-source.ts) spawns `execPath entry --tier basic`
  *      with no shell. Once with the Node process runner (an npm install run by
  *      node) and once with the Bun one. The helper inherits the caller's
  *      environment, so this part runs in a child of this script whose HOME is
@@ -32,7 +32,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createEnvThenHelperTokenSource } from '../src/composition/token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 import { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
 import { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
 import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';

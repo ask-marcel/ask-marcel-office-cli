@@ -9,7 +9,7 @@ import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/files
 import type { ProcessRunnerCall } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { buildDeps } from './build-deps.ts';
-import { createEnvThenHelperTokenSource } from './token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 
 const HOME = '/virtual/home';
 const CACHE = '/virtual/home/.ask-marcel/token-cache.json';

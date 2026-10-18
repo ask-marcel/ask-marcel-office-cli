@@ -75,7 +75,7 @@ const WRITE_FILES = [
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
 const CORE_FILES = [
-  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,skeleton-cli}.ts',
+  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,skeleton-cli,token-source}.ts',
   'src/use-cases/commands/{command-types,command-graph}.ts',
   'src/presenter/*.ts',
   'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',

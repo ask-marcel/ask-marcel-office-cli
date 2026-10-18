@@ -4,7 +4,7 @@ import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { buildDeps } from './build-deps.ts';
-import { createEnvThenHelperTokenSource } from './token-source.ts';
+import { createEnvThenHelperTokenSource } from '@ask-marcel/office-core/composition/token-source.ts';
 
 // Auth owns the remedy of a token failure; the package that asked for the token
 // adds the commands of its own that need that token (plan, "Token protocol").
