@@ -20,6 +20,13 @@ export const PACKAGE_NAMES: Readonly<Record<PackageRole, string>> = {
   write: '@ask-marcel/office-write',
 };
 
+/** The bin of each package of the split: what `{auth-bin}`, `{read-bin}` and `{write-bin}` name once the packages are apart. */
+export const PACKAGE_BINS: Readonly<Record<PackageRole, string>> = {
+  auth: 'ask-marcel-office-auth',
+  read: 'ask-marcel-office-read',
+  write: 'ask-marcel-office-write',
+};
+
 const AUTH_COMMANDS: ReadonlyArray<string> = ['login', 'logout', 'status', 'token'];
 
 // Every command whose effect is not `read` (command-effect.ts).
