@@ -18,7 +18,8 @@
  *   3. the declarations: none mentions `office-core` or `../core`;
  *   4. a clean consumer (an empty folder under the OS temp dir, no node_modules
  *      above it) installs the tarball. The bin answers --version and the library
- *      loads by name, under node and bun. Then `tsc --noEmit --skipLibCheck
+ *      loads by name, under node and bun, with a temporary HOME and
+ *      USERPROFILE and no ASKMARCEL_* variable. Then `tsc --noEmit --skipLibCheck
  *      false` (module nodenext) runs on a file that uses each exported type once
  *      as it should and once wrongly: it must report exactly the expected error
  *      on each wrong line, so a missing declaration (TS2307) or a type that
@@ -87,10 +88,20 @@ const declarationProblems = (declarations: Readonly<Record<string, string>>): Re
     .filter(([, text]) => text.includes('office-core') || text.includes('../core'))
     .map(([path]) => `${path} names the private core (office-core or ../core)`);
 
-const run = (cmd: ReadonlyArray<string>, cwd: string): { readonly ok: boolean; readonly out: string } => {
-  const proc = Bun.spawnSync([...cmd], { cwd, stdout: 'pipe', stderr: 'pipe' });
+const run = (cmd: ReadonlyArray<string>, cwd: string, env?: Readonly<Record<string, string>>): { readonly ok: boolean; readonly out: string } => {
+  const proc = Bun.spawnSync([...cmd], { cwd, stdout: 'pipe', stderr: 'pipe', ...(env === undefined ? {} : { env: { ...env } }) });
   return { ok: proc.exitCode === 0, out: `${proc.stdout.toString()}${proc.stderr.toString()}` };
 };
+
+// The environment of the packed bin and library: the caller's, with a temporary
+// home and no ASKMARCEL_* variable. A bin that records the token helper locator
+// must not write the real ~/.ask-marcel/, and a token variable of the person who
+// runs the check must not change what the bin answers.
+const isolatedEnv = (home: string): Readonly<Record<string, string>> => ({
+  ...Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) => (value === undefined || key.startsWith('ASKMARCEL_') ? [] : [[key, value] as const]))),
+  HOME: home,
+  USERPROFILE: home,
+});
 
 const hasNodeModulesAbove = (dir: string): boolean => {
   const parent = dirname(dir);
@@ -140,9 +151,14 @@ const typeProblems = (consumer: string, expected: ReadonlyArray<string>): Readon
 
 const runtimeProblems = (consumer: string, manifest: Manifest): ReadonlyArray<string> => {
   const bin = join(consumer, 'node_modules', manifest.name, withoutDot(Object.values(manifest.bin ?? {})[0] ?? ''));
+  const env = isolatedEnv(mkdtempSync(join(consumer, 'home-')));
   return ['node', 'bun'].flatMap((runtime) => {
-    const version = run([runtime, bin, '--version'], consumer);
-    const load = run(runtime === 'node' ? ['node', '--input-type=module', '-e', `await import('${manifest.name}')`] : ['bun', '-e', `await import('${manifest.name}')`], consumer);
+    const version = run([runtime, bin, '--version'], consumer, env);
+    const load = run(
+      runtime === 'node' ? ['node', '--input-type=module', '-e', `await import('${manifest.name}')`] : ['bun', '-e', `await import('${manifest.name}')`],
+      consumer,
+      env
+    );
     return [
       ...(version.ok && version.out.trim() === manifest.version ? [] : [`${runtime}: the bin did not answer --version with ${manifest.version}: ${version.out.slice(0, 300)}`]),
       ...(load.ok ? [] : [`${runtime}: the library does not load by name: ${load.out.slice(0, 300)}`]),
