@@ -72,6 +72,7 @@ import '../src/composition/auth-package-names.ts';
 import '../src/composition/auth-package.ts';
 import '../src/composition/auth-program.ts';
 import '../src/composition/auth-server.ts';
+import '../src/composition/build-auth-deps.ts';
 import '@ask-marcel/office-core/composition/token-source.ts';
 
 import '@ask-marcel/office-core/presenter/output.ts';
