@@ -8,7 +8,11 @@
  *   - a write module (a write command or a write-only helper) reaches only core
  *     and write modules;
  *   - a read command and a core module never reach a write module;
- *   - a core module reaches only core modules (phase 3: core builds alone).
+ *   - a core module reaches only core modules (phase 3: core builds alone);
+ *   - no module outside auth reaches an auth module, by a relative path or by
+ *     the package name (phase 4: read and write get tokens from the helper);
+ *   - an auth module reaches only core and auth modules, and the package.json
+ *     of its own package (phase 4: auth builds alone).
  *
  * Phase 3 moved core from src/ to core/src/, and phase 4 moves auth to
  * auth/src/. A file under core/ or auth/ gets its owner from its folder; the
@@ -34,6 +38,7 @@
  * when it imports the single package's wiring (the real-registry suites go with
  * read, step 13), else core. AUTH_FILES lists auth; a module in no list is read's.
  * A test under core/ imports core modules only: core runs its tests alone. A
+ * test under auth/ imports auth and core modules only, for the same reason. A
  * test outside core/ never falls to core (phase 3 moved every core test into
  * core/): one the rules give core is reported, so it moves to core/src/ or is
  * named in SINGLE_PACKAGE_TESTS.
@@ -77,6 +82,7 @@ const specifierTo = (from: string, to: string): string => {
 const CORE_FIXTURE = located(`${COMMANDS}/format-zod-error.ts`);
 const CORE_READER_FIXTURE = located(`${COMMANDS}/quote-boundary.ts`);
 const CORE_TEST_FIXTURE = 'core/src/use-cases/commands/fixture-core.test.ts';
+const AUTH_TEST_FIXTURE = 'auth/src/composition/fixture-auth.test.ts';
 // Auth modules that the fixtures name, in src/ until phase 4 moves them to auth/src/.
 const AUTH_LADDER = located('src/infra/auth.ts');
 const TOKEN_ARGS = located(`${COMMANDS}/token-args.ts`);
@@ -90,7 +96,7 @@ const SINGLE_PACKAGE_TESTS: ReadonlySet<string> = new Set(['src/use-cases/comman
 
 type Sources = ReadonlyMap<string, string>;
 type Graph = ReadonlyMap<string, ReadonlyArray<string>>;
-type Owners = { readonly core: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly reads: ReadonlyArray<string> };
+type Owners = { readonly core: ReadonlySet<string>; readonly auth: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly reads: ReadonlyArray<string> };
 type Fixture = { readonly name: string; readonly path: string; readonly source: string; readonly reported: string };
 type Owner = 'core' | 'auth' | 'read' | 'write' | 'single';
 type OwnerOf = (path: string) => Owner;
@@ -120,6 +126,24 @@ const FIXTURES: ReadonlyArray<Fixture> = [
     source: `import { extractSharepointUrls } from '${specifierTo(CORE_READER_FIXTURE, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
     reported: `${CORE_READER_FIXTURE} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
   },
+  {
+    name: 'a read command that imports an auth module by the package name',
+    path: `${COMMANDS}/list-drives.ts`,
+    source: "import type { Result } from '@ask-marcel/office-auth/index.ts';\nexport type F = Result<1, 2>;\n",
+    reported: `${COMMANDS}/list-drives.ts reaches auth/src/index.ts`,
+  },
+  {
+    name: 'a read helper that imports an auth module by a relative path',
+    path: `${COMMANDS}/sharepoint-link-extractor.ts`,
+    source: `import { parseTokenArgs } from '${specifierTo(`${COMMANDS}/sharepoint-link-extractor.ts`, TOKEN_ARGS)}';\nexport const f = parseTokenArgs;\n`,
+    reported: `${COMMANDS}/sharepoint-link-extractor.ts reaches ${TOKEN_ARGS}`,
+  },
+  {
+    name: 'an auth module that imports a read helper',
+    path: TOKEN_ARGS,
+    source: `import { extractSharepointUrls } from '${specifierTo(TOKEN_ARGS, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${TOKEN_ARGS} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
+  },
 ];
 
 // Each must be reported by the test-file rule. The first two are new files, the
@@ -142,6 +166,12 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
     path: CORE_TEST_FIXTURE,
     source: `import { commands } from '${specifierTo(CORE_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
     reported: `${CORE_TEST_FIXTURE} (core) imports ${COMMANDS}/index.ts (single)`,
+  },
+  {
+    name: 'a test under auth/ that imports the single package wiring',
+    path: AUTH_TEST_FIXTURE,
+    source: `import { commands } from '${specifierTo(AUTH_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
+    reported: `${AUTH_TEST_FIXTURE} (auth) imports ${COMMANDS}/index.ts (single)`,
   },
   {
     name: 'a test outside core/ that imports core modules only',
@@ -240,11 +270,20 @@ const reach = (graph: Graph, start: string): ReadonlyMap<string, string> => {
 const crossing = (graph: Graph, start: string, allowed: (path: string) => boolean): ReadonlyArray<string> =>
   [...reach(graph, start)].filter(([target]) => !allowed(target)).map(([target, importer]) => `${start} reaches ${target} (imported by ${importer})`);
 
+// The package.json of a file's own package: its folder's, or the root's.
+const packageJsonOf = (path: string): string => {
+  const folder = FOLDERS.find((name) => path.startsWith(`${name}/`));
+  return folder === undefined ? 'package.json' : `${folder}/package.json`;
+};
+
 const violations = (graph: Graph, owners: Owners): ReadonlyArray<string> => {
   const writeReach = [...owners.write].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.write.has(path)));
   const readReach = [...owners.reads, ...owners.core].flatMap((start) => crossing(graph, start, (path) => !owners.write.has(path)));
   const coreReach = [...owners.core].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path)));
-  return [...new Set([...writeReach, ...readReach, ...coreReach])];
+  const outsideAuth = [...graph.keys()].filter((start) => !owners.auth.has(start));
+  const authReached = outsideAuth.flatMap((start) => crossing(graph, start, (path) => !owners.auth.has(path)));
+  const authReach = [...owners.auth].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.auth.has(path) || path === packageJsonOf(start)));
+  return [...new Set([...writeReach, ...readReach, ...coreReach, ...authReached, ...authReach])];
 };
 
 type Lists = { readonly core: ReadonlySet<string>; readonly auth: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly single: ReadonlySet<string> };
@@ -294,8 +333,10 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
     const own = testPackage(path, imports, owner);
     if (own === undefined) return [`${path} imports modules of ${[...importedPackages(imports, owner)].sort().join(' and ')}`];
     if (own === 'core' && !path.startsWith('core/')) return [`${path} (core) sits outside core/: move it to core/src/, or name it in SINGLE_PACKAGE_TESTS`];
-    // A test under core/ runs with core alone: the single wiring is not open to it.
-    const foreign = imports.filter((target) => (PACKAGES.includes(owner(target)) || path.startsWith('core/')) && owner(target) !== own);
+    // A test under core/ runs with core alone, and one under auth/ with auth and
+    // core: the single wiring is not open to them.
+    const closed = (target: string): boolean => PACKAGES.includes(owner(target)) || path.startsWith('core/') || (path.startsWith('auth/') && owner(target) !== 'core');
+    const foreign = imports.filter((target) => closed(target) && owner(target) !== own);
     return [...new Set(foreign)].map((target) => `${path} (${own}) imports ${target} (${owner(target)})`);
   });
 
@@ -335,7 +376,7 @@ const main = async (): Promise<number> => {
     console.error(`check-package-imports: the ownership lists disagree with the registry or with each other. Write commands outside WRITE_FILES: ${unlisted.join(', ') || 'none'}. WRITE_FILES that are read commands or core: ${misplaced.join(', ') || 'none'}. Files in two lists: ${doubled.join(', ') || 'none'}. Read commands found: ${reads.length}.`);
     return 1;
   }
-  const owners: Owners = { core, write, reads };
+  const owners: Owners = { core, auth: lists.auth, write, reads };
   const sources = await readSources(false);
   const found = [...violations(buildGraph(sources), owners), ...testViolations(buildTestGraph(tests), owner)];
   const doubledFixture = overlaps({ ...lists, single: new Set([...lists.single, OVERLAP_FIXTURE.path]) });
@@ -349,7 +390,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; no test file imports a module of another package; every core test sits in core/; every fixture is reported.');
+  console.log('check-package-imports: write reaches only core and write; no read command and no core module reaches write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/; every fixture is reported.');
   return 0;
 };
 
