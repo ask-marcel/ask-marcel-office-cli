@@ -104,7 +104,7 @@ const CORE_READ_ONLY_FILES = [
 const AUTH_FILES = [
   'src/use-cases/commands/{login,logout,status,login-status,token,token-args,token-tier-capability,auth-lifecycle-entries}.ts',
   'src/use-cases/ports/{token-issuer,token-report}.ts',
-  'src/composition/{auth-cli,auth-mcp,token-helper,auth-package-names,auth-package,auth-program}.ts',
+  'src/composition/{auth-cli,auth-mcp,token-helper,auth-package-names,auth-package,auth-program,auth-server}.ts',
   'src/infra/{auth,auth-browser,browser-auth,playwright-loader,token-cache-lock}.ts',
   'src/token.ts',
 ];
