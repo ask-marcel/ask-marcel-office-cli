@@ -53,6 +53,8 @@ export const fakeCommandPackage = (overrides: Partial<CommandPackage> = {}): Com
     'save-widget-draft': fakeCommand({ summary: 'Save a widget draft.', category: 'mail', graphMethod: 'POST', effect: 'draft' }),
   },
   lifecycle: [SIGN_IN_ENTRY],
+  description: 'Widget CLI.',
+  exampleCommand: 'list-widgets',
   binName: 'widget-cli',
   packageName: '@widgets/cli',
   // One bin for the three packages, as the single package has: no command lives elsewhere.

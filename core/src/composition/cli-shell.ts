@@ -41,14 +41,12 @@ type CliOutput = {
  * `buildLifecycleCli` (package split, phase 4) builds the CLI of a package with
  * no Graph command, such as auth: the global flags, `help`, `help-json`, `docs`,
  * `--version`, the did-you-mean and unknown-command answers, and the package's
- * own lifecycle commands. It takes no graph, and the caller gives the top-level
- * description. `buildCliShell` adds the Graph description and the registry
- * commands to it.
+ * own lifecycle commands. It takes no graph. The top-level description is the
+ * package's own `description`. `buildCliShell` adds the registry facts to that
+ * description, and the registry commands to the CLI.
  */
 type LifecycleCliDeps<C extends RegistryCommand<never> = RegistryCommand> = {
   readonly commandPackage: CommandPackage<C>;
-  /** The top-level description of `--help`. */
-  readonly description: string;
   readonly logger: Logger;
   readonly fs: FileSystem;
   readonly version?: string;
@@ -58,7 +56,7 @@ type LifecycleCliDeps<C extends RegistryCommand<never> = RegistryCommand> = {
 };
 
 /** `G` is the graph the package's commands run on: by default the full client. */
-type CliShellDeps<G = ReadGraph & WriteGraph> = Omit<LifecycleCliDeps<RegistryCommand<G>>, 'description'> & { readonly graph: G };
+type CliShellDeps<G = ReadGraph & WriteGraph> = LifecycleCliDeps<RegistryCommand<G>> & { readonly graph: G };
 
 // What the registry commands share with the CLI that holds them.
 type ShellParts = {
@@ -70,10 +68,14 @@ type ShellParts = {
   readonly globalFlags: () => ReadonlyArray<string>;
 };
 
-const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>, addPackageCommands?: (parts: ShellParts) => void): Command => {
+const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>, description: string, addPackageCommands?: (parts: ShellParts) => void): Command => {
   const { commandPackage, logger, fs, version } = deps;
   const { registry, binName } = commandPackage;
   const cliRemedy = `Run \`${binName} --help\` to list every command.`;
+  // The docs help names the package's own lifecycle commands, and `docs` last,
+  // so no package prints `docs docs`.
+  const lifecycleNames = commandPackage.lifecycle.map((entry) => entry.name);
+  const [firstLifecycle, ...otherLifecycle] = lifecycleNames.filter((name) => name !== 'docs');
   const program = new Command();
 
   const getFormat = (): OutputFormat => {
@@ -176,7 +178,7 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
 
   program
     .name(binName)
-    .description(deps.description)
+    .description(description)
     // override the help-formatter's subcommand
     // description renderer to compact long summaries down to their first
     // sentence in the TOP-LEVEL `ask-marcel-office --help` listing. Per-subcommand
@@ -365,14 +367,14 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
 
   program.commandsGroup('Lifecycle:');
 
-  // The lifecycle commands that act (login, status, logout in the single package)
+  // The lifecycle commands that act (login, status, logout in the auth package)
   // come from the package, so this builder knows no auth and no registry.
   deps.addLifecycleCommands?.(program, { print: (data) => renderOut(data), fail });
 
   const docsCmd = program
     .command('docs')
     .description(
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Lifecycle commands (login/status/logout/docs/help-json) are also covered — they ship as manifest entries under category `lifecycle`.'
+      `Print Markdown docs for a single command (the same per-command page that ships in \`docs/commands.json\`). Lifecycle commands (${lifecycleNames.join('/')}) are also covered — they ship as manifest entries under category \`lifecycle\`.`
     )
     .argument('<command>', `Command name to show docs for (run \`${binName} --help\` to list every command).`)
     .action(async (commandName: string) => {
@@ -390,8 +392,8 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
     'after',
     [
       '',
-      `Example:       ${binName} docs list-mail-messages`,
-      `Lifecycle:     \`${binName} docs login\` (or logout / docs) prints the same --help that command would, so you can introspect lifecycle commands the same way.`,
+      `Example:       ${binName} docs ${commandPackage.exampleCommand}`,
+      `Lifecycle:     \`${binName} docs ${firstLifecycle ?? 'docs'}\` (or ${[...otherLifecycle, 'docs'].join(' / ')}) prints the same --help that command would, so you can introspect lifecycle commands the same way.`,
     ].join('\n  ')
   );
 
@@ -407,14 +409,26 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
   return program;
 };
 
-// The top-level description of a package with Graph commands: its reads and its writes.
-const graphDescription = (registry: CommandPackage<RegistryCommand<never>>['registry']): string => {
-  // QA fix: derive the advertised endpoint counts from the registry so the
-  // top-level description can never drift from the manifest again. The
-  // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
-  // POST) when search-all-accessible-sites was added without updating it.
-  // GET reads only: the PDF conversions are declared GET, but they are writes.
+// QA fix: derive the advertised endpoint counts from the registry so the
+// top-level description can never drift from the manifest again. The
+// hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
+// POST) when search-all-accessible-sites was added without updating it.
+// GET reads only: the PDF conversions are declared GET, but they are writes.
+const readCounts = (registry: CommandPackage<RegistryCommand<never>>['registry']): string => {
   const getEndpointCount = Object.values(registry).filter((c) => c.meta.graphMethod === 'GET' && c.meta.effect === 'read').length;
+  const searchPostNames = Object.entries(registry)
+    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
+    .map(([n]) => n)
+    .toSorted((a, b) => a.localeCompare(b));
+  return `${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}).`;
+};
+
+// What the top-level description adds to the package's own words: the facts its
+// registry gives. The writes sentence comes only when the registry has writes,
+// and the GET and search POST sentence only when it has reads, so a package of
+// one kind never claims the other kind.
+const registryFacts = (registry: CommandPackage<RegistryCommand<never>>['registry']): string => {
+  const commands = Object.values(registry);
   // 2026-06-15 (F-03), extended 2026-07-04 and at package-split step 11: everything
   // whose `effect` is not `read` is a write (the mail drafts, and the PDF
   // conversions that upload a temporary file); everything else is a read or a
@@ -423,12 +437,11 @@ const graphDescription = (registry: CommandPackage<RegistryCommand<never>>['regi
   // took every POST command and labelled it "— searches, not mutations", which
   // silently mislabelled create-mail-draft as a search the moment it shipped (and
   // omitted the PATCH update-mail-draft entirely).
-  const writeCount = Object.values(registry).filter((c) => c.meta.effect !== 'read').length;
-  const searchPostNames = Object.entries(registry)
-    .filter(([, c]) => c.meta.graphMethod === 'POST' && c.meta.effect === 'read')
-    .map(([n]) => n)
-    .toSorted((a, b) => a.localeCompare(b));
-  return `Microsoft Graph CLI. Read-mostly by design — the ONLY writes are ${writeCount} commands. ${describeWrites(registry)}. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). ${getEndpointCount} GET endpoints + ${searchPostNames.length} search POST (${searchPostNames.join(', ')}). Safe default for LLM autonomy.`;
+  const writeCount = commands.filter((c) => c.meta.effect !== 'read').length;
+  const readCount = commands.length - writeCount;
+  const writeLead = readCount === 0 ? `All ${writeCount} commands write.` : `Read-mostly by design — the ONLY writes are ${writeCount} commands.`;
+  const writes = writeCount === 0 ? [] : [`${writeLead} ${describeWrites(registry)}.`];
+  return [...writes, ...(readCount === 0 ? [] : [readCounts(registry)])].join(' ');
 };
 
 // The Graph commands of the registry, one group per category.
@@ -495,10 +508,10 @@ const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void 
   }
 };
 
-const buildLifecycleCli = (deps: LifecycleCliDeps): Command => buildShell(deps);
+const buildLifecycleCli = (deps: LifecycleCliDeps): Command => buildShell(deps, deps.commandPackage.description);
 
 const buildCliShell = <G>(deps: CliShellDeps<G>): Command =>
-  buildShell({ ...deps, description: graphDescription(deps.commandPackage.registry) }, (parts) => addRegistryCommands(parts, deps));
+  buildShell(deps, `${deps.commandPackage.description} ${registryFacts(deps.commandPackage.registry)}`, (parts) => addRegistryCommands(parts, deps));
 
 export { buildCliShell, buildLifecycleCli };
 export type { CliOutput, CliShellDeps, LifecycleCliDeps };

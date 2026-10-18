@@ -10,15 +10,16 @@ import { buildLifecycleCli } from './cli-shell.ts';
 // (widget-auth; read is widget-cli, write is widget-write): its own lifecycle
 // commands, help-json, docs and --version, and no graph.
 
+const DESCRIPTION = 'Sign in to the widget service for the widget packages.';
+
 const AUTH_PACKAGE = fakeCommandPackage({
   registry: {},
+  description: DESCRIPTION,
   lifecycle: [{ ...SIGN_IN_ENTRY, example: '{auth-bin} sign-in' }],
   binName: 'widget-auth',
   packageName: '@widgets/auth',
   bins: { auth: 'widget-auth', read: 'widget-cli', write: 'widget-write' },
 });
-
-const DESCRIPTION = 'Sign in to the widget service for the widget packages.';
 
 const captureStdout = async (run: () => Promise<unknown>): Promise<string> => {
   const original = process.stdout.write.bind(process.stdout);
@@ -46,7 +47,6 @@ const run = (args: ReadonlyArray<string>): Promise<string> =>
   captureStdout(() =>
     buildLifecycleCli({
       commandPackage: AUTH_PACKAGE,
-      description: DESCRIPTION,
       logger: createLoggerFake(),
       fs: createFileSystemFake(),
       version: '1.0.0',

@@ -14,6 +14,10 @@ import { SINGLE_PACKAGE_NAMES } from './single-package-names.ts';
 export const commandPackage: CommandPackage = {
   registry: commands,
   lifecycle: LIFECYCLE_ENTRIES,
+  // The CLI adds the writes and the read counts that the registry gives.
+  description:
+    'Microsoft Graph CLI. The CLI cannot create or modify calendar items (there is no send-mail / send-draft / create-event / upload-file command). Safe default for LLM autonomy.',
+  exampleCommand: 'list-mail-messages',
   ...SINGLE_PACKAGE_NAMES,
   packageName: 'ask-marcel-office-cli',
 };

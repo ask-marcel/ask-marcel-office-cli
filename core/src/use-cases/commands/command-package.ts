@@ -16,6 +16,14 @@ export type CommandPackage<C extends Command<never> = Command> = {
    * `docs`, `help-json`, `mcp`…), so `help-json` and `docs` cover them too.
    */
   readonly lifecycle: ReadonlyArray<CommandManifestEntry>;
+  /**
+   * What the package is, in its own words: the lead of the top-level `--help`
+   * description. The CLI adds what the registry gives (the writes and what each
+   * leaves behind, the read counts), so this text names no count and no command list.
+   */
+  readonly description: string;
+  /** The command that the docs help gives as its example, e.g. `list-mail-messages`. */
+  readonly exampleCommand: string;
   /** The bin a user types, e.g. `ask-marcel-office`. */
   readonly binName: string;
   /** The npm name, e.g. `ask-marcel-office-cli`; the manifest carries it. */
