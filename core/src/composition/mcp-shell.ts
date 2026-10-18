@@ -28,6 +28,7 @@ import type { NameSource } from '../use-cases/commands/bin-names.ts';
 import { fillNames } from '../use-cases/commands/bin-names.ts';
 import { describeWrites, WRITE_EFFECTS, writeGroups } from '../use-cases/commands/command-effect.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
+import type { Command } from '../use-cases/commands/command-types.ts';
 import { setDateZone } from '../use-cases/commands/date-zone.ts';
 import { buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_ORDER } from '../use-cases/commands/docs-render.ts';
@@ -42,11 +43,12 @@ const MCP_REMEDY = 'Call list-commands to see every command.';
 /*
  * The gateway is core (package split, step 13): it serves the package it is
  * given and imports no registry and no lifecycle command. The composition root
- * hands it the package (`mcp.ts` for the single package).
+ * hands it the package (`mcp.ts` for the single package). `G` is the graph the
+ * package's commands run on: by default the full client.
  */
-type McpShellDeps = {
-  readonly commandPackage: CommandPackage;
-  readonly graph: ReadGraph & WriteGraph;
+type McpShellDeps<G = ReadGraph & WriteGraph> = {
+  readonly commandPackage: CommandPackage<Command<G>>;
+  readonly graph: G;
   readonly fs: FileSystem;
   readonly version?: string;
   /** Registers the package's own tools (`login`, `status`…) after the four gateway tools. */
@@ -81,7 +83,7 @@ const signInPointer = (code: string | undefined, names: NameSource): string =>
 // drift out of sync with what the category filter actually accepts (docs-render.test pins completeness).
 const CATEGORY_LIST = CATEGORY_ORDER.join(', ');
 
-const buildMcpShell = (deps: McpShellDeps): McpServer => {
+const buildMcpShell = <G>(deps: McpShellDeps<G>): McpServer => {
   // Same rule as the CLI: named days resolve in `ASKMARCEL_TZ`, else the machine's zone.
   setDateZone(resolveDateZone(undefined).zone);
   const { commandPackage, graph, fs } = deps;

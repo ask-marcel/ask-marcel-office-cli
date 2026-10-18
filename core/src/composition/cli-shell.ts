@@ -9,6 +9,7 @@ import { render, renderError } from '../presenter/output.ts';
 import type { RenderContext } from '../presenter/render-to-string.ts';
 import { fillNames } from '../use-cases/commands/bin-names.ts';
 import type { CommandPackage } from '../use-cases/commands/command-package.ts';
+import type { Command as RegistryCommand } from '../use-cases/commands/command-types.ts';
 import { buildManifest, buildTerseManifest, filterManifestByCategory, renderSingleCommand } from '../use-cases/commands/docs-builders.ts';
 import { CATEGORY_LABELS, CATEGORY_ORDER, paginationHintFor } from '../use-cases/commands/docs-render.ts';
 import { firstSentence } from '../use-cases/commands/first-sentence.ts';
@@ -44,8 +45,8 @@ type CliOutput = {
  * description. `buildCliShell` adds the Graph description and the registry
  * commands to it.
  */
-type LifecycleCliDeps = {
-  readonly commandPackage: CommandPackage;
+type LifecycleCliDeps<C extends RegistryCommand<never> = RegistryCommand> = {
+  readonly commandPackage: CommandPackage<C>;
   /** The top-level description of `--help`. */
   readonly description: string;
   readonly logger: Logger;
@@ -56,7 +57,8 @@ type LifecycleCliDeps = {
   readonly addLifecycleCommands?: (program: Command, output: CliOutput) => void;
 };
 
-type CliShellDeps = Omit<LifecycleCliDeps, 'description'> & { readonly graph: ReadGraph & WriteGraph };
+/** `G` is the graph the package's commands run on: by default the full client. */
+type CliShellDeps<G = ReadGraph & WriteGraph> = Omit<LifecycleCliDeps<RegistryCommand<G>>, 'description'> & { readonly graph: G };
 
 // What the registry commands share with the CLI that holds them.
 type ShellParts = {
@@ -68,7 +70,7 @@ type ShellParts = {
   readonly globalFlags: () => ReadonlyArray<string>;
 };
 
-const buildShell = (deps: LifecycleCliDeps, addPackageCommands?: (parts: ShellParts) => void): Command => {
+const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>, addPackageCommands?: (parts: ShellParts) => void): Command => {
   const { commandPackage, logger, fs, version } = deps;
   const { registry, binName } = commandPackage;
   const cliRemedy = `Run \`${binName} --help\` to list every command.`;
@@ -406,7 +408,7 @@ const buildShell = (deps: LifecycleCliDeps, addPackageCommands?: (parts: ShellPa
 };
 
 // The top-level description of a package with Graph commands: its reads and its writes.
-const graphDescription = (registry: CommandPackage['registry']): string => {
+const graphDescription = (registry: CommandPackage<RegistryCommand<never>>['registry']): string => {
   // QA fix: derive the advertised endpoint counts from the registry so the
   // top-level description can never drift from the manifest again. The
   // hardcoded "164 GET + 1 POST" literal had gone stale (real: 169 GET + 2
@@ -430,7 +432,7 @@ const graphDescription = (registry: CommandPackage['registry']): string => {
 };
 
 // The Graph commands of the registry, one group per category.
-const addRegistryCommands = (parts: ShellParts, deps: CliShellDeps): void => {
+const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void => {
   const { program, fill, renderOut, fail, onCommanderError, globalFlags } = parts;
   const { commandPackage, graph, fs } = deps;
   const { registry } = commandPackage;
@@ -495,7 +497,7 @@ const addRegistryCommands = (parts: ShellParts, deps: CliShellDeps): void => {
 
 const buildLifecycleCli = (deps: LifecycleCliDeps): Command => buildShell(deps);
 
-const buildCliShell = (deps: CliShellDeps): Command =>
+const buildCliShell = <G>(deps: CliShellDeps<G>): Command =>
   buildShell({ ...deps, description: graphDescription(deps.commandPackage.registry) }, (parts) => addRegistryCommands(parts, deps));
 
 export { buildCliShell, buildLifecycleCli };

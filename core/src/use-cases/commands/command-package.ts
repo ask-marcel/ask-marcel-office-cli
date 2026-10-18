@@ -8,9 +8,9 @@ import type { CommandManifestEntry } from './docs-render.ts';
  * The shells never import a registry, so the same code serves auth, read and
  * write after the package split (docs/plans/2026-10-01-package-split.md, step 13).
  */
-export type CommandPackage = {
-  /** The commands the package runs, by name. */
-  readonly registry: Readonly<Record<string, Command>>;
+export type CommandPackage<C extends Command<never> = Command> = {
+  /** The commands the package runs, by name. `C` names the graph they run on. */
+  readonly registry: Readonly<Record<string, C>>;
   /**
    * The manifest entries of the commands that are not in the registry (`login`,
    * `docs`, `help-json`, `mcp`…), so `help-json` and `docs` cover them too.

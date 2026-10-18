@@ -15,11 +15,11 @@ import type { Command } from './command-types.ts';
  */
 export type ResolveCommandError = { readonly type: 'unknown_command'; readonly name: string; readonly available: ReadonlyArray<string> };
 
-export type ResolvedCommand = { readonly name: string; readonly command: Command };
+export type ResolvedCommand<C extends Command<never> = Command> = { readonly name: string; readonly command: C };
 
-const availableNames = (registry: Readonly<Record<string, Command>>): ReadonlyArray<string> => Object.keys(registry).toSorted((a, b) => a.localeCompare(b));
+const availableNames = (registry: Readonly<Record<string, Command<never>>>): ReadonlyArray<string> => Object.keys(registry).toSorted((a, b) => a.localeCompare(b));
 
-export const resolveCommand = (registry: Readonly<Record<string, Command>>, name: string): Result<ResolvedCommand, ResolveCommandError> => {
+export const resolveCommand = <C extends Command<never> = Command>(registry: Readonly<Record<string, C>>, name: string): Result<ResolvedCommand<C>, ResolveCommandError> => {
   // `Object.hasOwn` rather than a truthy `registry[name]`: a name like
   // `constructor` or `toString` would otherwise resolve to a prototype member
   // and be handed downstream as if it were a command.

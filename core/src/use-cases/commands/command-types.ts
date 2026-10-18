@@ -229,12 +229,16 @@ type WriteCommand = {
 type RegisteredCommand = ReadCommand | WriteCommand;
 
 /**
- * Any command, read or write, run on the full client. The docs, the manifest
- * and the CLI and MCP shells take this type; every registered command is one.
+ * A command that runs on the graph `G`; by default the full client, so any
+ * command, read or write. The docs, the manifest and the CLI and MCP shells
+ * take this type; every registered command is one. A package that holds one
+ * kind of command names the graph of that kind (`Command<ReadGraph>` or
+ * `Command<WriteGraph>`), so it needs no full client. A reader of `meta` only
+ * takes `Command<never>`, which every command fits.
  */
-type Command = {
+type Command<G = ReadGraph & WriteGraph> = {
   readonly schema: CommandSchema;
-  readonly execute: CommandExecute;
+  readonly execute: GraphExecute<G>;
   readonly meta: CommandMeta;
   readonly executeLocal?: LocalExecute;
 };

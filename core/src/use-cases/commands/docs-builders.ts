@@ -39,7 +39,7 @@ export type TerseManifest = {
 
 export type ManifestFilterError = { readonly type: 'unknown_category'; readonly category: string; readonly available: ReadonlyArray<string> };
 
-const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
+const toEntry = (name: string, cmd: Command<never>): CommandManifestEntry => {
   // Default every `pagination: true` command to `nextLink` strategy when the
   // command file doesn't specify one — that's the standard $top + nextLink
   // shape, true of ~80% of paginated commands. Audit-makes
@@ -74,10 +74,10 @@ const toEntry = (name: string, cmd: Command): CommandManifestEntry => {
 };
 
 /** What a manifest is built from: the package's registry, its lifecycle entries and its npm name. */
-type ManifestSource = Pick<CommandPackage, 'registry' | 'lifecycle' | 'packageName'>;
+type ManifestSource = Pick<CommandPackage<Command<never>>, 'registry' | 'lifecycle' | 'packageName'>;
 
 /** What one docs page is looked up in. */
-type DocsSource = Pick<CommandPackage, 'registry' | 'lifecycle'>;
+type DocsSource = Pick<CommandPackage<Command<never>>, 'registry' | 'lifecycle'>;
 
 const buildEntries = ({ registry, lifecycle }: DocsSource): ReadonlyArray<CommandManifestEntry> =>
   [...Object.entries(registry).map(([name, cmd]) => toEntry(name, cmd)), ...lifecycle].toSorted((a, b) => a.name.localeCompare(b.name));
