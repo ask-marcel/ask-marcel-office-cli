@@ -66,7 +66,7 @@ const rejectUnknownParams = (schema: Command['schema'], params: Record<string, s
  * surface passes through — including a library caller that never touches
  * composition.
  */
-const withUnknownParamRejection = (command: Command): Command => {
+const withUnknownParamRejection = <G>(command: Command<G>): Command<G> => {
   const { executeLocal } = command;
   return {
     ...command,

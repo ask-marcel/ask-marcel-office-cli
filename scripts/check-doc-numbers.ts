@@ -18,48 +18,53 @@
  *   0  every claim matches, and every anchor was found
  *   1  a claim disagrees with the registry, or an anchor matched nothing
  *
- *   2  an argument is missing, or --package exports no `commandPackage`
+ *   2  an argument is missing, a --package exports no `commandPackage`, or
+ *      two packages hold one command name with different entries
  *
- *   --selftest  proves the matcher rejects a wrong number (see rule 15.10:
- *               a gate only ever seen green is a hypothesis)
+ *   --selftest  proves the matcher rejects a wrong number, and that the join
+ *               of the packages keeps every command and refuses a conflict
+ *               (see rule 15.10: a gate only ever seen green is a hypothesis)
  *
  * The package and the three documents are arguments, not imports, so one
  * script serves every package of the split (plan "Scripts ownership");
- * `bun run check:docs` passes the single package's:
+ * `bun run check:docs` passes the root package and the write package, which
+ * the root documents together until the docs split (see command-packages.ts):
  *
  *   bun run scripts/check-doc-numbers.ts --package src/composition/single-package.ts \
+ *     --package write/src/composition/write-package.ts \
  *     --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md
  *
- * `--package` names a module that exports `commandPackage` (a CommandPackage);
- * paths are relative to the working directory.
+ * `--package` names a module that exports `commandPackage` (a CommandPackage).
+ * It can come more than once: the registries are joined. Paths are relative to
+ * the working directory.
  */
 
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
 import { buildManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
+import { loadPackages, mergePackages } from './command-packages.ts';
 
 const USAGE =
-  'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> [--selftest]';
+  'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> [--package <another>] --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> [--selftest]';
 
 const { values: args } = parseArgs({
-  options: { package: { type: 'string' }, readme: { type: 'string' }, 'commands-doc': { type: 'string' }, usage: { type: 'string' }, selftest: { type: 'boolean' } },
+  options: { package: { type: 'string', multiple: true }, readme: { type: 'string' }, 'commands-doc': { type: 'string' }, usage: { type: 'string' }, selftest: { type: 'boolean' } },
 });
 if (args.package === undefined || args.readme === undefined || args['commands-doc'] === undefined || args.usage === undefined) {
   console.error(`check-doc-numbers: ${USAGE}`);
   process.exit(2);
 }
 
-const isCommandPackage = (value: unknown): value is CommandPackage =>
-  typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value;
-
-const loaded: unknown = (await import(pathToFileURL(resolve(args.package)).href)).commandPackage;
-if (!isCommandPackage(loaded)) {
-  console.error(`check-doc-numbers: ${args.package} exports no \`commandPackage\`. ${USAGE}`);
+const loaded = await loadPackages(args.package);
+if (!loaded.ok) {
+  console.error(`check-doc-numbers: ${loaded.error} ${USAGE}`);
   process.exit(2);
 }
-const commandPackage = loaded;
+const merged = mergePackages(loaded.value);
+if (!merged.ok) {
+  console.error(`check-doc-numbers: ${merged.error}`);
+  process.exit(2);
+}
+const commandPackage = merged.value;
 
 /** The documents the claims sit in, by role: their paths are arguments. */
 const DOCS = { readme: args.readme, commandsDoc: args['commands-doc'], usage: args.usage } as const;
@@ -154,6 +159,23 @@ const checkClaim = (text: string, claim: Claim): ReadonlyArray<string> => {
   return failures;
 };
 
+// The join: the registry split in two packages (the second with other bins) must
+// come back whole with the names of the first, and a name that the second holds
+// with another summary must be refused.
+const selftestJoin = (): string | undefined => {
+  const names = Object.keys(commandPackage.registry);
+  const half = Math.ceil(names.length / 2);
+  const part = (from: number, to: number): typeof commandPackage.registry => Object.fromEntries(Object.entries(commandPackage.registry).slice(from, to));
+  const other = { ...commandPackage, binName: 'other-bin', registry: part(half - 1, names.length) };
+  const joined = mergePackages([{ ...commandPackage, registry: part(0, half) }, other]);
+  if (!joined.ok || Object.keys(joined.value.registry).length !== names.length || joined.value.binName !== commandPackage.binName) return 'the join lost a command or took the names of the second package';
+  const [name, command] = Object.entries(commandPackage.registry)[0] ?? [];
+  if (name === undefined || command === undefined) return 'the join cannot be checked on an empty registry';
+  const conflict = { ...other, registry: { [name]: { ...command, meta: { ...command.meta, summary: `${command.meta.summary} (changed)` } } } };
+  if (mergePackages([commandPackage, conflict]).ok) return 'a command with two different entries was accepted';
+  return undefined;
+};
+
 const runSelftest = (): number => {
   const claim = CLAIMS[1];
   if (claim === undefined) {
@@ -172,7 +194,12 @@ const runSelftest = (): number => {
     console.error('check-doc-numbers: SELFTEST FAILED — a missing anchor was accepted');
     return 1;
   }
-  console.log(`check-doc-numbers: selftest passed (a wrong total and a lost anchor are both rejected).`);
+  const joinFailure = selftestJoin();
+  if (joinFailure !== undefined) {
+    console.error(`check-doc-numbers: SELFTEST FAILED — ${joinFailure}`);
+    return 1;
+  }
+  console.log(`check-doc-numbers: selftest passed (a wrong total and a lost anchor are both rejected; the join keeps every command and refuses a conflict).`);
   return 0;
 };
 

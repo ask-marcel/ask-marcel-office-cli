@@ -118,7 +118,6 @@ import '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import '../src/use-cases/commands/sharepoint-link-extractor.ts';
 import '../src/use-cases/commands/extract-sharepoint-links-in-mail.ts';
 import '../src/use-cases/commands/convert-mail-to-markdown.ts';
-import '../src/use-cases/commands/convert-mail-attachment-to-pdf.ts';
 import '../src/use-cases/commands/convert-mail-attachment-to-markdown.ts';
 import '../src/use-cases/commands/embedded-item-to-markdown.ts';
 import '../src/use-cases/commands/get-current-user.ts';

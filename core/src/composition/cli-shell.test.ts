@@ -90,8 +90,8 @@ describe('the CLI of a package', () => {
   it('gives the docs help the package bin in its argument, its example and its lifecycle line', async () => {
     const help = flat(await widgetCommandHelp('docs'));
     expect(help).toContain('Command name to show docs for (run `widget-cli --help` to list every command).');
-    expect(help).toContain('Example: widget-cli docs list-mail-messages');
-    expect(help).toContain('Lifecycle: `widget-cli docs login`');
+    expect(help).toContain('Example: widget-cli docs list-widgets');
+    expect(help).toContain('Lifecycle: `widget-cli docs sign-in`');
     expect(help).not.toContain('ask-marcel-office');
   });
 

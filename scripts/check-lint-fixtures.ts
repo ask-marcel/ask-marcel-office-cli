@@ -13,9 +13,9 @@
  * must exist: when it moves, the fixture fails until both the fixture path and
  * the rule's glob in eslint.config.js move with it. (A virtual path alone would
  * keep matching the old glob and stay green while the moved file lost the rule.)
- * One move is followed: a root file found under core/ or auth/ instead (package
- * split, phases 3 and 4) is linted from that folder with its config, which must
- * hold the rule.
+ * One move is followed: a root file found under core/, auth/ or write/ instead
+ * (package split, phases 3 to 5) is linted from that folder with its config,
+ * which must hold the rule.
  * A type-aware fixture with no cwd never follows a move: it proves the root's
  * own lint:strict, so it names a file that stays at the root.
  *
@@ -54,7 +54,7 @@ const MCP_TYPES_IMPORT = "import { CallToolResultSchema } from '@modelcontextpro
 const ZOD_IMPORT = "import { z } from 'zod';\nexport const f = (): unknown => z;\n";
 const WRITE_GRAPH_IMPORT = "import { createWriteGraph } from '../../infra/write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 const WRITE_GRAPH_TYPE_IMPORT = "import type { WriteGraph } from '../../infra/write-graph.ts';\nexport type F = WriteGraph;\n";
-const FULL_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
+const ROOT_CLIENT_IMPORT = "import { createGraphClient } from '../../infra/graph-client.ts';\nexport const f = (): unknown => createGraphClient;\n";
 const SIBLING_WRITE_GRAPH_IMPORT = "import { createWriteGraph } from './write-graph.ts';\nexport const f = (): unknown => createWriteGraph;\n";
 const REGISTRY_IMPORT = "import { commands } from '../use-cases/commands/index.ts';\nexport const f = (): unknown => commands;\n";
 const SIBLING_REGISTRY_IMPORT = "import { commands } from './index.ts';\nexport const f = (): unknown => commands;\n";
@@ -79,7 +79,7 @@ const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['core', 'src/domain/result.ts'],
   ['auth', 'src/composition/auth-program.ts'],
   ['read', 'src/composition/bin.ts'],
-  ['write', 'src/composition/bin.ts'],
+  ['write', 'src/composition/write-program.ts'],
 ];
 
 const FIXTURES: ReadonlyArray<Fixture> = [
@@ -87,6 +87,9 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the MCP gateway never writes stdout', path: 'src/composition/mcp-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'auth: the auth bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'auth' },
   { name: 'the auth MCP tools never write stdout', path: 'src/composition/auth-mcp.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
+  { name: 'write: the write bin never writes stdout', path: 'src/main.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false, cwd: 'write' },
+  { name: 'the write CLI builder never writes stdout', path: 'src/composition/write-program.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
+  { name: 'control: a write test may write stdout', path: 'src/composition/write-program.test.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
   { name: 'stdout is banned by default, not only in MCP files', path: 'src/composition/run-registry-command.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: true, strict: false },
   { name: 'control: the CLI builder owns stdout', path: 'src/composition/cli-shell.ts', source: STDOUT_WRITE, rule: 'no-restricted-properties', fires: false, strict: false },
   { name: 'the CLI builder never imports the registry', path: 'src/composition/cli-shell.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
@@ -117,9 +120,8 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'control: an auth file outside the token helper loads winston', path: 'src/composition/auth-cli.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'a read command never imports the write graph', path: 'src/use-cases/commands/list-drives.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'a read command never takes the write graph type', path: 'src/use-cases/commands/get-schedule.ts', source: WRITE_GRAPH_TYPE_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'a read helper never builds the full client', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: FULL_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
+  { name: 'a read helper never builds the client of the composition root', path: 'src/use-cases/commands/fetch-raw-bytes.ts', source: ROOT_CLIENT_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'the read graph never imports the write graph', path: 'src/infra/read-graph.ts', source: SIBLING_WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
-  { name: 'control: a write command takes the write graph', path: 'src/use-cases/commands/create-mail-draft.ts', source: WRITE_GRAPH_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'production code never imports a shared test fake through the core package', path: 'src/composition/single-package.ts', source: CORE_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
   { name: 'production code never imports a shared test fake by a relative path', path: 'src/composition/cli-shell.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false },
   { name: 'control: a test imports the shared test fakes', path: 'src/composition/cli-shell.test.ts', source: SIBLING_FAKE_IMPORT, rule: 'no-restricted-imports', fires: false, strict: false },
@@ -167,8 +169,8 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
   }
 };
 
-// The folders that a guarded file of the root src/ moves to (package split, phases 3 and 4).
-const MOVED_TO: ReadonlyArray<string> = ['core', 'auth'];
+// The folders that a guarded file of the root src/ moves to (package split, phases 3 to 5).
+const MOVED_TO: ReadonlyArray<string> = ['core', 'auth', 'write'];
 
 // A guarded file that moved is linted from its folder, with that folder's
 // config: the rule must hold there too. A type-aware fixture stays at the

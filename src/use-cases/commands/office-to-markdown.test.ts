@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import {
   buildLegacyXls,
   buildPdfNoImages,
@@ -14,7 +14,7 @@ import {
 } from '../../test-helpers/office-fixtures.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 
-const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeGraphClient(overrides);
+const noopGraph = (overrides: Partial<GraphClient>): GraphClient => fakeReadGraph(overrides);
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';

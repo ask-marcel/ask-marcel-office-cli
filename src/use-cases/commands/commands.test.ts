@@ -22,7 +22,7 @@ import {
   buildSampleZipArchive,
 } from '../../test-helpers/office-fixtures.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import type { CommandExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { renderSingleCommand } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
 import { commands as cmdRegistry } from './index.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -202,7 +202,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const cmdMap: Record<string, { execute: CommandExecute }> = {
+const cmdMap: Record<string, { execute: ReadCommand['execute'] }> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,

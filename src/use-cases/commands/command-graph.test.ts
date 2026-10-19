@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
 import type { ReadGraph, ReadOnlyPostPath } from '@ask-marcel/office-core/infra/read-graph.ts';
-import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import type { Command, CommandMeta, ReadCommand, WriteCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
+import type { Command, CommandMeta, ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { commands, registerCommands } from './index.ts';
 
 /*
@@ -81,7 +80,10 @@ const placeholderParams = (meta: CommandMeta): Record<string, string> =>
 // many of them reached Graph at all, and the names of those whose POST the read
 // view refused. The view refuses a write POST before the recording client sees
 // it, so only the refusals can show a read command that tried one.
-const runEach = async (registered: ReadonlyArray<readonly [string, Command]>, called: string[]): Promise<{ readonly reached: number; readonly refused: ReadonlyArray<string> }> => {
+const runEach = async (
+  registered: ReadonlyArray<readonly [string, Command<ReadGraph>]>,
+  called: string[]
+): Promise<{ readonly reached: number; readonly refused: ReadonlyArray<string> }> => {
   let reached = 0;
   const refused: string[] = [];
   for (const [name, command] of registered) {
@@ -117,21 +119,7 @@ describe('the graph the registry gives a command', () => {
     expect(posted).toEqual([]);
   });
 
-  it('gives a write command the write graph only: the basic tier and the four writes', async () => {
-    let seen: WriteGraph | undefined;
-    const probe: WriteCommand = {
-      schema: z.object({}),
-      meta: { ...META, graphMethod: 'POST', effect: 'draft' },
-      execute: async (graph) => {
-        seen = graph;
-        return ok({});
-      },
-    };
-    await registerCommands({ probe }).probe?.execute(fakeGraphClient(), {});
-    expect(Object.keys(seen ?? {}).toSorted((a, b) => a.localeCompare(b))).toEqual(WRITE_MEMBERS);
-  });
-
-  it("serves a library caller's graph whose members are methods that read `this`, for a read command and a write command alike", async () => {
+  it("serves a library caller's graph whose members are methods that read `this`, for a read command", async () => {
     const graph = {
       ...fakeGraphClient(),
       calls: [] as string[],
@@ -139,15 +127,10 @@ describe('the graph the registry gives a command', () => {
         this.calls.push(`get ${path}`);
         return ok({ value: [] });
       },
-      async post(path: string) {
-        this.calls.push(`post ${path}`);
-        return ok({ id: 'draft-1' });
-      },
     };
     const listed = await commands['list-drives']?.execute(graph, {});
-    const drafted = await commands['create-mail-draft']?.execute(graph, { subject: 'Hi', bodyContent: 'Hello', toRecipients: 'a@example.com' });
-    expect([listed?.ok, drafted?.ok]).toEqual([true, true]);
-    expect(graph.calls).toEqual(['get /me/drives', 'post /me/messages']);
+    expect(listed?.ok).toBe(true);
+    expect(graph.calls).toEqual(['get /me/drives']);
   });
 
   it('never lets a registered read command call a member that writes, or POST anywhere but the two queries', async () => {

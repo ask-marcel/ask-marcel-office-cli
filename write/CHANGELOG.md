@@ -6,6 +6,34 @@ before the package split is in the root `CHANGELOG.md` (`ask-marcel-office-cli`
 
 ## Unreleased
 
+### Added: the write commands, the bin, the MCP server and the library
+
+The write commands moved here from `ask-marcel-office-cli` 2.8.0 (phase 5 of the
+package split). Their answers, their errors and their Graph calls are the same
+as in 2.8.0, with the write bin and the write package in place of the old names.
+
+- The 7 write commands: `create-mail-draft`, `create-reply-draft`,
+  `create-forward-draft` and `update-mail-draft` (unsent drafts only), and
+  `convert-mail-attachment-to-pdf`, `convert-calendar-event-attachment-to-pdf`
+  and `convert-group-post-attachment-to-pdf` (a temporary OneDrive file that the
+  command deletes). Each command runs on the write graph alone.
+- The bin `ask-marcel-office-write` with the 7 commands, `docs`, `help-json` and
+  `mcp`. `help-json` lists these 10 entries. A read command answers with the
+  read package and its command line.
+- The sign-in: the `ASKMARCEL_TOKEN_<TIER>` variables, else the token helper of
+  `@ask-marcel/office-auth`. The bin keeps no token cache and writes no locator
+  file.
+- `mcp`, the MCP server `ask-marcel-office-write` with three tools:
+  `list-commands`, `get-command-docs` and `run-write-command`. A read command
+  gets a pointer to `ask-marcel-office-read mcp`.
+- The library exports `commands`, `createWriteGraph`,
+  `createEnvThenHelperTokenSource`, `createWriteClient` and the types `Command`,
+  `WriteGraph`, `TokenSource` and `Result`. `dist/index.js` loads no logger,
+  commander, MCP SDK or update notifier.
+- `./commands.json`: the command manifest of the 7 commands.
+- Runtime dependencies: `update-notifier` and `zod`. The bundle keeps both
+  external.
+
 ### Added: the package skeleton
 
 The workspace folder, its checks and its build. The bin answers `--version`;

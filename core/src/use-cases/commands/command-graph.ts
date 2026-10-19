@@ -1,6 +1,6 @@
 import type { ReadGraph } from '../../infra/read-graph.ts';
 import type { WriteGraph } from '../../infra/write-graph.ts';
-import type { Command, ReadCommand, RegisteredCommand } from './command-types.ts';
+import type { Command, ReadCommand, RegisteredCommand, WriteCommand } from './command-types.ts';
 import { postIfReadOnly } from './read-only-post.ts';
 
 /*
@@ -9,7 +9,9 @@ import { postIfReadOnly } from './read-only-post.ts';
  * whatever graph a caller passes (the single package's full client holds
  * both): a read command gets the read view, a write command the write view.
  * Applied at registry assembly, the one point the CLI, the MCP gateway and a
- * library caller all pass through.
+ * library caller all pass through. A package that holds one kind of command
+ * wraps each one with `readCommandOf` or `writeCommandOf`, so it runs on the
+ * graph of that kind and needs no full client (package split, phase 5).
  */
 
 /**
@@ -51,11 +53,14 @@ const writeGraphOf = (graph: WriteGraph): WriteGraph => ({
   delete: (path) => graph.delete(path),
 });
 
+/** A read command that runs on the read view of any read graph it is given. */
+const readCommandOf = (command: ReadCommand): Command<ReadGraph> => ({ ...command, execute: async (graph, params) => command.execute(readGraphOf(graph), params) });
+
+/** A write command that runs on the write view of any write graph it is given. */
+const writeCommandOf = (command: WriteCommand): Command<WriteGraph> => ({ ...command, execute: async (graph, params) => command.execute(writeGraphOf(graph), params) });
+
 const isReadCommand = (command: RegisteredCommand): command is ReadCommand => command.meta.effect === 'read';
 
-const withOwnGraph = (command: RegisteredCommand): Command => {
-  if (isReadCommand(command)) return { ...command, execute: async (graph, params) => command.execute(readGraphOf(graph), params) };
-  return { ...command, execute: async (graph, params) => command.execute(writeGraphOf(graph), params) };
-};
+const withOwnGraph = (command: RegisteredCommand): Command => (isReadCommand(command) ? readCommandOf(command) : writeCommandOf(command));
 
-export { readGraphOf, withOwnGraph, writeGraphOf };
+export { readCommandOf, readGraphOf, withOwnGraph, writeCommandOf, writeGraphOf };

@@ -20,7 +20,7 @@ const WRITE_EFFECTS: Readonly<Record<WriteEffect, { readonly destructive: boolea
 };
 
 /** The registry's write commands, one group per effect (in the order the registry first names it), names sorted. */
-const writeGroups = (registry: Readonly<Record<string, Command>>): ReadonlyArray<WriteGroup> => {
+const writeGroups = (registry: Readonly<Record<string, Command<never>>>): ReadonlyArray<WriteGroup> => {
   const groups = new Map<WriteEffect, ReadonlyArray<string>>();
   for (const [name, command] of Object.entries(registry)) {
     const effect = command.meta.effect;
@@ -30,7 +30,7 @@ const writeGroups = (registry: Readonly<Record<string, Command>>): ReadonlyArray
 };
 
 /** One sentence per write class, e.g. `create-mail-draft, update-mail-draft: create or update an UNSENT mail draft (...)`. */
-const describeWrites = (registry: Readonly<Record<string, Command>>): string =>
+const describeWrites = (registry: Readonly<Record<string, Command<never>>>): string =>
   writeGroups(registry)
     .map((group) => `${group.names.join(', ')}: ${WRITE_EFFECTS[group.effect].action}`)
     .join('. ');

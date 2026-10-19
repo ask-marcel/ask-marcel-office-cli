@@ -738,3 +738,38 @@ Rule for next time: before a run as `nobody` that installs or packs, copy the CA
 
 After phase 4 the root MCP server has no `login` and `status` tools. A call of either tool gets "MCP error -32602: Tool login not found", and the SDK sends that answer before any code of the server runs. So the root cannot tell an MCP caller to call `login` on the `ask-marcel-office-auth` server there, as the design expected. The `get-command-docs` and `run-command` tools still name the auth server for `login`, `status` and `logout`, because the root code answers them.
 Rule for next time: put the pointer to another server in the answers of the tools that exist, such as `get-command-docs` and `run-command`. The answer to a missing tool is the SDK's.
+
+## [decision] 2026-10-18 | A command names the graph it runs on, and each package gives its own CLI and MCP texts
+
+Package-split phase 5 made the core types generic. `Command<G>` runs on `G` (default `ReadGraph & WriteGraph`), and `CommandPackage`, `resolveCommand`, `withUnknownParamRejection` and the CLI and MCP shell deps take `G`. A one-kind package wraps its registry with `readCommandOf` or `writeCommandOf` (`command-graph.ts`), so write runs on `WriteGraph` alone and the root on `ReadGraph` alone. `CommandPackage` also holds `description` and `exampleCommand`. The CLI shell gives the description, then the registry facts. The MCP shell registers `run-command` only when the registry has a read command, and `run-write-command` only when it has a write command. Rejected: one text for every package, which made the write bin talk about read commands and `login`.
+Rule for next time: a deps type written as `Omit<CliShellDeps, …>` takes the default `G`. A caller that holds one graph must name it, for example `CliShellDeps<ReadGraph>`. A new package text goes in the package, never in the shell.
+
+## [decision] 2026-10-18 | Under write/ the folder decides too, and the root docs join the root and write packages until the docs split
+
+Phase 5 deleted `WRITE_FILES`. `check-package-imports` gives a file under `write/` to write, as it does for `core/` and `auth/` (see the 2026-10-18 entry on the folder). The root registry holds 204 read commands now, but README, USAGE and COMMANDS describe the product with 211. Root `docs:gen` and `check:docs` take `--package` two times (`single-package.ts` and `write/src/composition/write-package.ts`). `scripts/command-packages.ts` joins the registries and takes the rest from the first package. A name in two packages must have the same meta, else the script exits 2. Rejected: a rewrite of the root docs in the cut (above the size gate) and a second `--no-verify`.
+Rule for next time: in phase 6, point the doc-number gate at read's registry and remove the join only when the per-package docs (phase 7) or the read registry take over the 211-command claims.
+
+## [gotcha] 2026-10-18 | The pre-commit hook skips the secret scan when gitleaks is not on PATH, and says so only in its log
+
+The hook runs `gitleaks protect --staged` only when `gitleaks` is installed. In phase 4 it was not installed, every hook passed, and CI found a token-shaped fixture after the merge (`a296c26`). In phase 5 gitleaks was first on PATH for every commit, and each hook log showed "no leaks found". A token-shaped fixture must have a shape that gitleaks does not flag. Do not add it to `.gitleaksignore` on your own.
+Rule for next time: before the first commit of a session, run `command -v gitleaks`. After each commit, look for "no leaks found" in the hook output, and run `gitleaks detect --redact --no-banner` before a push.
+
+## [gotcha] 2026-10-18 | The pre-commit hook runs the plain staged lint, not `lint:strict`
+
+The hook runs `lint:staged` and `typecheck` in each staged folder. The type-aware rules run only in `lint:strict`, which CI runs. In phase 5 two new core tests passed the hook with an unnecessary type assertion each, and only the full `lint:strict` in `core/` found them. The 2026-06-16 entry calls `lint:strict` a pre-commit gate; it is not one now.
+Rule for next time: before you commit a new or changed TypeScript file, run `bun run lint:strict` in its folder. A green hook does not prove the type-aware rules.
+
+## [decision] 2026-10-18 | A package's placeholder sweep lands before its move, and finds its root from its own path
+
+Phase 4 left one pushed commit after the move with no placeholder sweep over `auth/src/`. In phase 5 the maintainer put write's sweep before the move, as `src/use-cases/commands/bin-placeholders-write.test.ts`. The `-write` name gives it to write, and it does not collide with the root sweep. It reads the folder above `import.meta.dir`: before the move that is the root `src/` (a superset of write), and after the move it is `write/src/` only. Thus the move stays a pure rename, and no commit leaves `write/src/` without a sweep.
+Rule for next time: for phase 6, add read's sweep (or any check that must follow the files) before the move, named for its package and with its root taken from `import.meta.dir`, so that the move carries it with no edit.
+
+## [gotcha] 2026-10-18 | bun writes its transpiler cache under HOME, so a "no file under HOME" probe must allow `.bun/install/cache/`
+
+The write bundle smoke checks that a run of the bin leaves no file under its temporary HOME except the update-notifier configstore. Under bun, each probe failed: bun itself writes `.bun/install/cache/` under HOME. The bin wrote no token cache and no locator.
+Rule for next time: a probe that looks for files under HOME allows bun's own cache folder, and names each other allowed path. Do the test under node and under bun.
+
+## [gotcha] 2026-10-18 | The write bin signs as the root does, so a dev checkout runs the auth bin once before a write command
+
+`write/src/main.ts` uses the env-then-helper token source of core, as the root does since phase 4. It writes no token cache and no locator. In a new checkout, `bun run write/src/main.ts create-mail-draft ...` thus fails with `token_helper_unavailable` until an auth run records the helper (the 2026-10-18 entry on the root sign-in). The write smokes use `ASKMARCEL_TOKEN_BASIC=bad` and never a helper search, because a stale `auth/dist` can be on PATH.
+Rule for next time: run the auth bin once before a write command in a dev checkout, and again after you change between the source and `dist/`.

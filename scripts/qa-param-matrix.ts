@@ -3,8 +3,11 @@
  * QA Phase C — offline parameter-validation matrix (docs/QA-PLAYBOOK.md §C).
  *
  * For EVERY command, exercises four validation cases that all fire BEFORE any
- * Graph call (strictly offline against the built `dist/cli.js` — the honest
- * bundle, not the source):
+ * Graph call (strictly offline against the built bundles — the honest bundle,
+ * not the source): a write command against `write/dist/cli.js`, every other
+ * command against the root `dist/cli.js`, by the role in core's command
+ * directory (the merged docs/commands.json still lists the 7 writes, which the
+ * root bin no longer runs; package split, phase 5). Build both first.
  *   - unknown-flag              → must reject (unknown option OR, on a command
  *                                 with required flags, the actionable
  *                                 missing-required message — both are correct)
@@ -16,7 +19,11 @@
  * real failure. Replaces .claude/qa-reports/phase-c-matrix.ts, whose unknown-flag
  * classifier false-flagged every command that also has a required option.
  */
-const CLI = 'dist/cli.js';
+import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
+
+const READ_CLI = 'dist/cli.js';
+const WRITE_CLI = 'write/dist/cli.js';
+const cliOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_CLI : READ_CLI);
 const manifest = JSON.parse(await Bun.file('docs/commands.json').text());
 
 type Case = { cmd: string; kind: string; argv: string[]; expectFlag?: string };
@@ -38,7 +45,7 @@ for (const c of manifest.commands) {
 // Async spawn so the worker pool genuinely parallelizes (spawnSync would block
 // each worker and serialize all 800+ cases — minutes instead of seconds).
 const run = async (argv: string[]): Promise<{ ok: boolean | null; msg: string }> => {
-  const p = Bun.spawn(['node', CLI, ...argv, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
+  const p = Bun.spawn(['node', cliOf(argv[0] ?? ''), ...argv, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
   const [out, errout] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
   await p.exited;
   try { const d = JSON.parse(out); return { ok: d.ok === true, msg: String(d.error || '') }; }

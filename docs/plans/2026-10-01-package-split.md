@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs. Phase 5 (write moved to `write/src/`, the root holds the read commands only) built on 2026-10-18, in review; see "As built in phase 5". Phase 5 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -767,7 +767,9 @@ on a machine with a browser and the real account. Do not run it from an agent se
       `$BIN list-teams-chat-history --chat-id <a chat id from the chatsvcagg read> --page-size 1`;
       guest `$BIN get-drive-item --tenant-id <partner tenant id> --drive-id <id> --item-id <id>` on
       an item that the partner tenant shares with you.
-   4. Writes: `SMOKE_BIN=$BIN bun scripts/qa-write-smoke.ts --yes-create-drafts`. It creates three
+   4. Writes: `SMOKE_READ_BIN=$BIN SMOKE_WRITE_BIN=$BIN bun scripts/qa-write-smoke.ts --yes-create-drafts`
+      (in phase 1 one bin holds the reads and the writes; until phase 5 the script took one
+      variable, `SMOKE_BIN`). It creates three
       unsent drafts (a reply, a forward and a new draft, which update-mail-draft then changes) and
       prints their ids. Delete the drafts in Outlook after.
 3. Pass B, through the helper: `export ASKMARCEL_TOKEN_COMMAND=$HELPER`, then do 2.1 to 2.4
@@ -1185,6 +1187,262 @@ Live checks of phase 4, for the maintainer (back up `~/.ask-marcel/` first):
 
 **Phase 5: write.** Mass-move procedure; bin and MCP server. Live: `qa-write-smoke.ts`, one PDF
 conversion.
+
+As built in phase 5 (2026-10-18). The numbers in this note count the 36 commits of the phase,
+oldest first. Commits 13 to 24 are the design's 12 to 23 (see the first difference below), and
+the other numbers are the same as in the design. Commit 24, the move, is the only commit with
+`--no-verify`. The hook of every other commit ran the gitleaks scan (gitleaks was on PATH).
+
+- Decisions. E1: the move is a pure `git mv` commit. E2: the root registry, the root MCP server
+  and the root client hold the read commands and the read graph only. E3: the write commands
+  run on the write graph alone, and the write bin signs through the `ASKMARCEL_TOKEN_*`
+  variables, else the token helper of auth. E4: the write library, with a misuse row in
+  `check:packed` for each exported type and value. E5: each package gives its own CLI
+  description, docs example and lifecycle line, and the MCP shell offers only the run tools that
+  the package can serve. E6: write has its own directory check, meta invariants and placeholder
+  sweep.
+- Core seams (1 to 4). `Command<G = ReadGraph & WriteGraph>` types a command by the graph it
+  runs on, and `CommandPackage`, `resolveCommand`, `withUnknownParamRejection`, the run-registry
+  deps and the CLI and MCP shell deps take `G`. The defaults keep every older call site.
+  `readCommandOf` and `writeCommandOf` give a one-kind package its commands on one graph, and
+  `withOwnGraph` uses them. `CommandPackage` has two new required fields, `description` and
+  `exampleCommand`. The CLI shell gives the package description first and the registry facts
+  after it: the writes sentence only when the registry has writes ("All N commands write." when
+  it has only writes), and the GET sentence only when it has reads. The docs help "Example:" line
+  shows `exampleCommand`. The "Lifecycle:" line shows the first lifecycle entry of the package
+  that is not `docs`, then "(or <the others> / docs)". The MCP shell registers `run-command`
+  only for a registry with a read command, and `run-write-command` only for one with a write
+  command. A one-kind package points at the server of the other kind
+  (`<bins.write> mcp`, `<bins.read> mcp`). Auth's docs help now gives `docs login` as its example
+  and names its own lifecycle entries.
+- Write seams under the root `src/` (5 to 12): `write-commands.ts` (the write registry, each
+  command on the write view, with the unknown-parameter refusal), `write-lifecycle-entries.ts`
+  (`docs`, `help-json`, `mcp`), `write-package-names.ts`, `write-package.ts` (exports
+  `commandPackage`, example `create-mail-draft`), `write-program.ts` (`buildWriteCli`),
+  `write-server.ts` (`buildWriteMcpServer`), `write-token-source.ts` and `write-client.ts`,
+  `build-write-deps.ts`. New tests: `command-directory-write`, `meta-invariants-write` and
+  `bin-placeholders-write`, and one test for each new module.
+- Suites (13 to 15, rule 24). The 16 write tests of the test map use the write builders and the
+  write registry, and take `WriteGraph`, `createWriteGraph`, `FetchFn` and `GraphError` from
+  core. After commit 15 they import only core and write modules.
+- Documented surface (16). `gen-docs.ts` and `check-doc-numbers.ts` take `--package` more than
+  once, through the new `scripts/command-packages.ts`. The registries are joined. The lifecycle,
+  the description and the names come from the first package. A name in two packages must have
+  the same meta before the names are filled, else the script exits 2. Root `docs:gen` and
+  `check:docs` name `single-package.ts` and `write-package.ts`, so the docs keep one surface of
+  211 commands (204 read, 7 write) until the docs split.
+- Root cut (17 to 20). The root remedies name `ask-marcel-office-write`. The root registry holds
+  204 read commands (`registerCommands` takes `ReadCommand`s), and the root lead says "read
+  commands only". The root MCP server has three tools (`list-commands`, `get-command-docs`,
+  `run-command`). The `mcp` lifecycle entry names three gateway tools. `GraphClient` is
+  `ReadGraph`, and `createTokenSourceGraphClient` is `createReadGraph`. The built `dist/cli.js`
+  and `dist/index.js` hold none of `"PUT"`, `"PATCH"`, `"DELETE"`, `createUploadSession` and
+  `createWriteGraph`. B0 held all of them. The root library exports `Command` and
+  `CommandExecute` on its `GraphClient` (the read graph), so a consumer can run a command of
+  `commands` on the client of the same library.
+- Root output from B0 (`3201007`) to B1 (commit 20; commit 23 gives the same bytes): 453 CLI
+  calls, 421 byte-identical, among them all 408 `docs <read>` and `<read> --help` calls. A
+  script puts each line of the diff in an approved rule. Three results were not on the list of
+  the design, and each is correct:
+  - The root description gives its own text first, so "Safe default for LLM autonomy." comes
+    before the GET sentence (commit 3).
+  - The `--output-path` hint no longer offers the 3 PDF conversions, because it comes from the
+    registry.
+  - `get-command-docs` of a write name answers with `isError: true`, as for any unknown name.
+- Checks (21 to 23, 31, 32). A file under `write/` belongs to write, and `WRITE_FILES` is
+  deleted (32): the folder decides. `check-package-imports` reads `write/src/` and
+  `@ask-marcel/office-write/<path>`. New rules, each with a fixture: no module outside write
+  reaches write; a write module reaches only core and write (its own `package.json` is allowed);
+  a test under `write/` imports only write and core; no test outside `write/` falls to write
+  (32). `write/eslint.config.js` has the stdout ban, with a fixture on `write/src/main.ts`.
+  `check-read-bundle` also bundles the real root entries (`src/main.ts`, `src/index.ts`), which
+  must show no marker, and the real write entry as a second control, which must show all four.
+- The move (24): 46 renames at 100% (19 sources and 27 tests) and one edit, the deletion of 8
+  side-effect imports of moved files in `scripts/coverage-preload.ts`. No file was added or
+  deleted. The token scan of phase 4 found no other change. The root CLI (453 calls) and an MCP
+  session gave the same bytes before and after. Root `bun test` went from 4859 to 4579 tests:
+  280 moved to write. Write's full Stryker run: 1107 mutants, 95.48% (threshold 90); the lowest
+  file is `update-mail-draft.ts` at 93.39%.
+- Write wiring (25 to 30, 33). `write/package.json` declares `update-notifier` and `zod`, both
+  external. `write/src/main.ts` replaces the skeleton, and `bin.ts` and its test are deleted
+  (rule 24). It has two paths: `mcp` serves stdio with no update notice; any other first
+  argument shows the update notice of `@ask-marcel/office-write` and runs the CLI. It writes no
+  locator. `check:packed` gives each exported value a misuse row, and reads the tarball path
+  from stdout only. `write/src/index.ts` exports `commands`, `createWriteGraph`,
+  `createEnvThenHelperTokenSource`, `createWriteClient` and the types `Command`, `WriteGraph`,
+  `TokenSource` and `Result`. `dist/index.js` holds no winston, commander, MCP SDK or update
+  notifier. The build writes `dist/commands.json` (the `./commands.json` export, 7 commands).
+  `scripts/qa-write-bundle-smoke.ts` (`bun run smoke` in `write/`, a CI step of the workspace job
+  for auth and write) checks the built bundle under node and bun (34 checks). The live smokes
+  take `SMOKE_READ_BIN` and `SMOKE_WRITE_BIN`, and `qa-param-matrix.ts` picks the bin of each
+  entry by its role.
+- Write bin against the old root (after commit 26, the B0 side normalised to the write bin and
+  version). These calls are equal: `--version`, and `docs <name>` and `<name> --help` for the 7
+  commands. A full call with a bad token gives `env_token_invalid` on both sides. In process,
+  the 7 commands make the same Graph calls and give the same answers and the same saved bytes,
+  through the CLI and through `run-write-command`. These differences are expected:
+  - write's description, "All 7 commands write." and no GET sentence
+  - a help with the 7 commands, `help-json` and `docs`, and a `help-json` with 10 entries
+  - write's text for `docs`, `help-json` and `mcp`, its docs example and lifecycle line
+  - the write bin in the `{bin}` places, also in the hint of a refused input
+  - the server name, with three tools
+  - `list-drives` and the other read names, which name `@ask-marcel/office-read`
+- Counts at the end of the phase: root `bun test` 4579 (4792 at B0), core 1032 (1014), auth 518
+  (518), write 280 (2), read 2 (2). Coverage meets every tier gate in each folder (100% in core,
+  auth and write). The test map (`--test-map`, 321 files): core 93, auth 26, write 27, read 174,
+  single 1. Write's 27:
+  - `composition/` (8): `build-write-deps`, `cli-write`, `mcp-write`, `write-client`,
+    `write-package`, `write-program`, `write-server`, `write-token-source`
+  - `use-cases/commands/` (19): `bin-placeholders-write`, `command-directory-write`,
+    `command-graph-write`, `commands-write`, `convert-group-post-attachment-to-pdf`,
+    `convert-mail-attachment-to-pdf`, `create-forward-draft`, `create-mail-draft`,
+    `create-reply-draft`, `draft-comment-splicer`, `draft-dedup-docs-write`, `draft-echo`,
+    `draft-response`, `meta-invariants-write`, `meta-write`, `parse-recipients`,
+    `update-mail-draft`, `write-commands`, `write-lifecycle-entries`
+- Differences from the phase 5 design, and why:
+  - Write's placeholder sweep is commit 12, before the move, as
+    `src/use-cases/commands/bin-placeholders-write.test.ts` (the maintainer's change to open
+    question 28). It finds its root from `import.meta.dir`: at B1 it reads the root `src/`, and
+    after the move only `write/src/`. So no commit leaves `write/src/` without a sweep. The
+    design's commit 24 (the sweep after the move) is dropped, and its commits 12 to 23 are 13 to
+    24 here. The sweep has no allowance, and it also requires `write-commands.ts` among the files
+    that it reads. The move holds 46 files, not 45, because this test moves too.
+  - Commit 1 imports the core command type as `RegistryCommand` in `cli-shell.ts`, and
+    `LifecycleCliDeps` gets the type parameter `<C extends Command<never> = Command>`, because
+    `CliShellDeps<G>` needs it.
+  - Commit 3 gives the root description in the order "description, then registry facts", as
+    the design's form says. No root test pins the order. A package whose only lifecycle entry
+    is `docs` would print `` `<bin> docs docs` ``; no package has this.
+  - Commit 4: with both kinds of command, `get-command-docs` says "before run-command or
+    run-write-command" (the root until commit 18). The comments of `mcp-shell.ts` say "tools the
+    package adds (`addTools`)", because auth's server does not use the shell.
+  - Commit 5 pins "runs on the write view" as a draft that runs on `fakeWriteGraph` alone, plus
+    the refusal of an unknown parameter by all 7 commands. The `help-json` summary names the
+    write categories (lifecycle, mail, calendar), and a test pins them against the registry.
+  - Commit 7, write's lead: "Microsoft Graph write commands for agents: mail drafts and the
+    conversion of attachments to PDF. It sends no mail and cannot create or modify calendar
+    items: a draft stays unsent until you send it. The read commands are in
+    @ask-marcel/office-read, and the sign-in is in @ask-marcel/office-auth." It does not say
+    "Drafts folder", because `--mail-folder-id` can put a draft in another folder.
+  - Commit 10: `buildWriteTokenSource(options?)` takes env, home, fs, runner and interactive;
+    core's defaults apply for platform and exec path. `WRITE_NEEDED_BY` keeps registry order
+    with no sort: its lists are empty, so a comparator would never run and function coverage
+    would drop below 100%. Commit 11's `buildWriteDeps(config?)` takes the log level, home,
+    env, file system, process runner and interactive flag, so the tests can give fakes; the deps
+    that it returns hold no process runner.
+  - Commit 16 changes 4 files: the join, the conflict check and the transitional fallback are
+    in the new `scripts/command-packages.ts`, so both scripts run one copy and the
+    `check:docs` selftest tests it. A conflict exits 2.
+  - Commit 18: the `mcp.test.ts` row deletes L269-270, not L268-270, because L271 needs the
+    `tools` of L268. The new name of the `meta.test.ts` case ends "Any new write command must be
+    added there deliberately." The root lead is "Microsoft Graph CLI, read commands only: the
+    write commands (mail drafts and PDF conversions) are in @ask-marcel/office-write." The
+    failure note of the bundle smoke takes the tool count, not a literal.
+  - Commit 21 allows write's own `package.json` (the design put it in commit 22): once
+    `write/src/composition/bin.ts` belongs to write, it reaches `write/package.json`, and the
+    check fails at commit 21 without it. The existing fixtures that name write files now find
+    them through `located()` and `specifierTo()`, so they hold before and after the move.
+  - Commit 22 has 7 fixtures, not 6: a write module that imports the `package.json` of another
+    package. It replaces `readReach` with the general rule, and deletes the `reads` field of
+    `Owners`, which lost its last user. The fixtures "a write module imports auth" and "auth
+    imports a write module" are also caught by the auth rules. Runs with each rule removed show
+    which fixtures belong to which rule.
+  - Commit 23 changes 3 files: the comment of `STDOUT_BAN` in `eslint.ownership.js` now names
+    write. Its control fixture is `src/composition/write-program.test.ts`, which exists before
+    and after the move.
+  - Commit 24: the preload line of `convert-mail-attachment-to-pdf.ts` was L128, not L121. The
+    `.gitkeep` files of `write/src/` stay.
+  - Commit 26: commander does not wrap the option texts at 80 columns on the write bin. The
+    longest write name keeps the term column wide, so only the padding changes. The commander
+    error check is inline in `write/src/main.ts`, as in the root `main.ts`; the bundle smoke
+    pins it (a parse error exits 1 with an empty stderr).
+  - Commit 27: the auth row is `resolveAuthPaths(1, {})` (TS2345). The design's
+    `resolveAuthPaths(1)` gives TS2554. A value row has `misuse` and `code`, and no `fits` line.
+    The "any" control also makes the values `any`.
+  - Commit 28: the `commands` row calls `execute(createWriteClient(), { subject: 1 })`
+    (TS2322), because the consumer file has no `graph` variable.
+  - Commit 30: the "no file under HOME" check also allows `.bun/install/cache/`, the transpiler
+    cache that bun writes under HOME. The probes for a missing flag and an unknown flag set
+    `ASKMARCEL_TOKEN_BASIC=bad`. The unknown-flag probe gives every required flag plus
+    `--subjet`, because commander reports a missing required flag first.
+  - Commit 32 changes 8 files: the fallback was in `scripts/command-packages.ts`, and the two
+    docs scripts get their usage comments. The root read-only ban is not widened to all of the
+    root `src/` (open question 19): lint then fails on `src/composition/build-deps.ts`, which
+    imports the client value from `graph-client.ts`.
+  - Commit 33 picks the bin with core's `commandRole`, not a fixed list. `SMOKE_BIN` is gone.
+  - Commit 34 also changes step 2.4 of the phase 1 runbook in this plan, which named `SMOKE_BIN`.
+  - Fixes of the review, each in the commit where it belongs. No fix edits a test that existed
+    before phase 5; each new case is in a test file that phase 5 adds.
+    - Commit 1 adds `src/index.test.ts`: it runs `get-current-user` on the `GraphClient` of the
+      root library through the `Command` and `CommandExecute` types of the library. Commit 20
+      then exports these two types on `GraphClient`; without that, the typecheck of the test
+      fails with two TS2345.
+    - Commit 3 adds `src/composition/single-package-texts.test.ts`: the root docs example is
+      `list-mail-messages`, and each of the 7 write commands of the core directory is in the
+      root list or named by the root lead (`@ask-marcel/office-write`). The second case holds
+      before and after the root cut, and fails when the lead loses that clause. Commits 3 and 4
+      also pin the texts of a core package with reads and writes: the space between the writes
+      sentence and the GET sentence, and the pointer of each run tool to the other.
+    - Commit 5: the header of `write-commands.ts` no longer says that the root registry holds
+      the same commands and that the file moves, so the root cut and the move leave it true.
+    - Commit 11: three new cases of `build-write-deps.test.ts` pin the home and the file system
+      that reach the token source (a helper found through the locator), the log level from the
+      given env, and the default level `error`.
+    - Commit 12: write's sweep refuses a hand-typed bin of the single package or of auth, read
+      or write before a space (`/ask-marcel-office(-(auth|read|write))?\s/`), not only
+      `ask-marcel-office `.
+    - Commit 17 adds `src/composition/single-package-names.test.ts`: the root docs page of
+      `list-drives`, `login` and `create-mail-draft` names `ask-marcel-office`,
+      `ask-marcel-office-auth` and `ask-marcel-office-write`. The write case failed before the
+      change.
+    - Commit 32 also gives the read-only ban a true reason: `graph-client.ts` builds the client
+      of the composition root (the read graph since commit 20), and a read command runs on the
+      graph that the registry gives it. The message, the comment in `eslint.config.js` and the
+      fixture name change. Between commits 20 and 31 the old reason stays, because commit 20 is
+      at the file limit.
+- Not in phase 5:
+  - The live checks below. Do not run them from an agent session.
+  - Core texts that still describe the single package (open question 16): the global flag
+    texts of `--help` (`get-current-user`, the `extract-*-images` family), the size hints of an
+    unknown-command answer, the no-body remedy, and the category list of `list-commands` (all
+    12 categories also on the write server). Phase 7.
+  - The root README and `docs/USAGE.md` still show `run-write-command` on the root MCP server
+    (open question 26). Phase 7 writes them again; the doc-number gate stays green through the
+    joined surface.
+  - The root `dist/commands.json` lists the 7 write commands, which the root bin does not run
+    (open question 25). Phase 6 deletes the root.
+  - Bare cross-package names in prose (open question 9) and `fakeGraphClient` in the write
+    tests (open question 8).
+  - The header comment of `src/use-cases/commands/command-graph.test.ts` (L10-18) still says
+    that a write command holds the write graph. After commit 18 the file pins only the read
+    half. The change is an edit of an existing test (rule 24), so it waits for the maintainer.
+  - The widening of the root read-only lint ban (see commit 32).
+  - The sweeps of auth and core look for a hand-typed `ask-marcel-office ` only, so they do not
+    see `ask-marcel-office-auth login` in `auth/src/infra/browser-auth.ts` and
+    `ask-marcel-office-auth is not on PATH` in `core/src/infra/token-helper-run.ts`. A wider
+    check is an edit of existing tests (rule 24), so it waits for the maintainer.
+
+Live checks of phase 5, for the maintainer (back up `~/.ask-marcel/` first, and unset every
+`ASKMARCEL_*` variable):
+
+1. `cd auth && bun run build`, then `node auth/dist/cli.js status` (or `login`). This records the
+   locator, so read and write find the helper.
+2. `bun run build` at the root (the read bin), and `cd write && bun run build`.
+3. `node write/dist/cli.js --version` gives `1.0.0`. `node write/dist/cli.js list-drives` names
+   `@ask-marcel/office-read`.
+4. `SMOKE_READ_BIN=dist/cli.js SMOKE_WRITE_BIN=write/dist/cli.js bun scripts/qa-write-smoke.ts --yes-create-drafts`.
+   Expect PASS for the 4 drafts (the reply and forward bodies hold the comment and the quoted
+   original). Nothing is sent. Delete the listed drafts in Outlook.
+5. One PDF conversion. Find a mail with a docx or xlsx attachment with the read bin
+   (`list-mail-messages`, then `list-mail-attachments --message-id <id>`). Run
+   `node write/dist/cli.js convert-mail-attachment-to-pdf --message-id <id> --attachment-id <aid> --output-path /tmp/p5.pdf`.
+   Expect exit 0, a file that starts with `%PDF`, and no file left in the `.ask-marcel-temp`
+   folder of OneDrive.
+6. Optional: `qa-dedup-smoke.ts` with the same two variables. Delete its drafts after.
+7. Optional: register `node write/dist/cli.js mcp` in an MCP client. It has the tools
+   `list-commands`, `get-command-docs` and `run-write-command` only. Call `run-write-command`
+   with `create-mail-draft`, then delete the draft.
+8. Make sure that no write run changed `~/.ask-marcel/token-helper.json` (only auth writes it).
 
 **Phase 6: read.** Mass-move procedure for the rest of `src/`, then delete the root `src/` and its CI
 job, and point the doc-number gate at read's registry in the same push. Live:

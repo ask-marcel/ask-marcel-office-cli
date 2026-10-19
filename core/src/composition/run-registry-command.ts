@@ -52,19 +52,19 @@ const sourceFromGraphError = (error: GraphError): ErrorSource => {
 
 // The package's own commands, not a module-level registry: this module is core
 // and serves whichever package hands it its registry.
-const commandNamesWhere = (registry: CommandPackage['registry'], matches: (command: Command) => boolean): ReadonlyArray<string> =>
+const commandNamesWhere = (registry: ErrorWordingSource['registry'], matches: (command: Command<never>) => boolean): ReadonlyArray<string> =>
   Object.entries(registry)
     .filter(([, c]) => matches(c))
     .map(([n]) => n)
     .toSorted((a, b) => a.localeCompare(b));
 
 // manifest-driven --output-path-supporting list.
-const bytesProducingCommands = (registry: CommandPackage['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesBytes === true);
+const bytesProducingCommands = (registry: ErrorWordingSource['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesBytes === true);
 
 // Parallel manifest-driven list for the --output-dir flag.
-const mediaProducingCommands = (registry: CommandPackage['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesMedia === true);
+const mediaProducingCommands = (registry: ErrorWordingSource['registry']): ReadonlyArray<string> => commandNamesWhere(registry, (c) => c.meta.producesMedia === true);
 
-const hasOption = (command: Command, name: string): boolean => command.meta.options.some((option) => option.name === name);
+const hasOption = (command: Command<never>, name: string): boolean => command.meta.options.some((option) => option.name === name);
 
 /**
  * The facts the oversized-response banner needs to name a remedy this caller
@@ -82,7 +82,7 @@ const hasOption = (command: Command, name: string): boolean => command.meta.opti
 // value only survives to a rendered success by already being a valid GUID.
 // Re-branding here would be unreachable code guarding an invariant the command
 // layer already holds; `mcp.test.ts` pins both halves of that.
-const buildRenderContext = (commandName: string, command: Command, surface: RenderSurface, params: Record<string, unknown>): RenderContext => {
+const buildRenderContext = (commandName: string, command: Command<never>, surface: RenderSurface, params: Record<string, unknown>): RenderContext => {
   const raw = params['tenantId'];
   return {
     commandName,
@@ -103,7 +103,7 @@ const noBodyRemedy = (commandName: string, surface: RenderSurface, binName: stri
     : `Plain JSON commands (list-*, get-*-user, get-organization, etc.) don't have a body to write — drop the flag and use a shell redirect instead: \`${binName} ${commandName} ... > out.json\`.`;
 
 /** What the error wording needs from the package: the commands it can name, and the bin a shell remedy types. */
-type ErrorWordingSource = Pick<CommandPackage, 'registry' | 'binName'>;
+type ErrorWordingSource = Pick<CommandPackage<Command<never>>, 'registry' | 'binName'>;
 
 /** The --output-path refusals that name nothing of the package: all of them but the no-body refusal. */
 type PackageFreeOutputPathError = Exclude<OutputPathError, { readonly type: 'no_inlined_bytes' }>;
@@ -133,24 +133,24 @@ const describeOutputPathError = (error: OutputPathError, commandName: string, su
     ? `--output-path: ${commandName} did not return inlined bytes — this flag works only with commands that produce a body to write. Supported: ${bytesProducingCommands(commandPackage.registry).join(', ')}. ${noBodyRemedy(commandName, surface, commandPackage.binName)}`
     : formatOutputPathError(error, commandName);
 
-const formatOutputDirError = (error: OutputDirError, commandName: string, registry: CommandPackage['registry']): string => {
+const formatOutputDirError = (error: OutputDirError, commandName: string, registry: ErrorWordingSource['registry']): string => {
   if (error.type === 'no_media')
     return `--output-dir: ${commandName} did not return a media array — this flag works only with the image-extraction commands. Supported: ${mediaProducingCommands(registry).join(', ')}.`;
   if (error.type === 'empty_path') return '--output-dir: directory argument is empty (likely a shell-quoting mistake — pass a real directory path)';
   return `--output-dir: write failed: ${error.message}`;
 };
 
-export type RunRegistryCommandDeps = {
-  readonly graph: ReadGraph & WriteGraph;
+export type RunRegistryCommandDeps<G = ReadGraph & WriteGraph> = {
+  readonly graph: G;
   readonly fs: FileSystem;
   /** The package the command belongs to: its errors name the package's commands and bin. */
   readonly commandPackage: ErrorWordingSource;
 };
 
-export type RunRegistryCommandRequest = {
+export type RunRegistryCommandRequest<G = ReadGraph & WriteGraph> = {
   /** Canonical registry name — drives the manifest-derived error messages. */
   readonly name: string;
-  readonly command: Command;
+  readonly command: Command<G>;
   /** Raw params, keyed by the canonical camelCase option keys. */
   readonly params: Record<string, string>;
   readonly outputPath?: string;
@@ -175,7 +175,7 @@ export type RunRegistryCommandFailure = {
 // (mapping alias keys onto canonical ones and rewriting error messages to the
 // spelling the caller typed) went with the alias system — params arrive keyed
 // by canonical names on every surface, or they are rejected.
-const toFailure = (command: Command, error: GraphError): RunRegistryCommandFailure => {
+const toFailure = (command: Command<never>, error: GraphError): RunRegistryCommandFailure => {
   // 2026-06-15 (F-02): a local-filesystem command (convert-local-file-to-markdown,
   // extract-local-file-images) never touches Graph, so its runtime
   // failures must not be stamped `source: graph` (misleading — an LLM
@@ -190,7 +190,7 @@ const toFailure = (command: Command, error: GraphError): RunRegistryCommandFailu
   };
 };
 
-export const runRegistryCommand = async (deps: RunRegistryCommandDeps, request: RunRegistryCommandRequest): Promise<Result<unknown, RunRegistryCommandFailure>> => {
+export const runRegistryCommand = async <G>(deps: RunRegistryCommandDeps<G>, request: RunRegistryCommandRequest<G>): Promise<Result<unknown, RunRegistryCommandFailure>> => {
   const { command, name } = request;
   // `convert-local-file-to-markdown` / `extract-local-file-images` are the commands whose
   // input is the local filesystem, not Graph — route them to executeLocal with the

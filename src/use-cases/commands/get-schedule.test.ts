@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { execute, meta, schema } from './get-schedule.ts';
 
-const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => fakeGraphClient(overrides);
+const fakeGraph = (overrides: Partial<GraphClient> = {}): GraphClient => fakeReadGraph(overrides);
 
 type ScheduleBody = {
   readonly schedules: ReadonlyArray<string>;

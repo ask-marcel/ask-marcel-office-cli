@@ -94,15 +94,15 @@ describe('command meta — invariants on every registered command', () => {
     expect(flagged).toEqual(expected);
   });
 
-  it('classifies EXACTLY the four mail-draft commands as `draft` writes and the three PDF converters as `transient-upload` writes; every other command is a `read` — the MCP routing and the --help narrative derive from this (F-03). Any new write command must be added here deliberately.', () => {
+  it('classifies every registered command as a `read`; the writes live in @ask-marcel/office-write (F-03). Any new write command must be added there deliberately.', () => {
     const byEffect = (effect: string): ReadonlyArray<string> =>
       Object.entries(commands)
         .filter(([, cmd]) => cmd.meta.effect === effect)
         .map(([name]) => name)
         .toSorted((a, b) => a.localeCompare(b));
-    expect(byEffect('draft')).toEqual(['create-forward-draft', 'create-mail-draft', 'create-reply-draft', 'update-mail-draft']);
-    expect(byEffect('transient-upload')).toEqual(['convert-calendar-event-attachment-to-pdf', 'convert-group-post-attachment-to-pdf', 'convert-mail-attachment-to-pdf']);
-    expect(byEffect('read')).toHaveLength(Object.keys(commands).length - 7);
+    expect(byEffect('draft')).toEqual([]);
+    expect(byEffect('transient-upload')).toEqual([]);
+    expect(byEffect('read')).toHaveLength(Object.keys(commands).length);
   });
 
   it('declares its Graph scopes inline on every command except the ones that call no fixed Graph endpoint, so `help-json` can predict a 403 before the call', () => {
@@ -320,7 +320,20 @@ describe('command meta — invariants on every registered command', () => {
     // does not exist (e.g. the plugin once taught `get-event` for `get-calendar-event`)
     // ships silently — meta.test previously validated only per-command FLAGS. Validate
     // every command-shaped reference against the registry + lifecycle names.
-    const valid = new Set<string>(['docs', 'help-json', 'login', 'logout', 'status']);
+    const valid = new Set<string>([
+      'docs',
+      'help-json',
+      'login',
+      'logout',
+      'status',
+      'convert-calendar-event-attachment-to-pdf',
+      'convert-group-post-attachment-to-pdf',
+      'convert-mail-attachment-to-pdf',
+      'create-forward-draft',
+      'create-mail-draft',
+      'create-reply-draft',
+      'update-mail-draft',
+    ]);
     for (const [name] of populated) valid.add(name);
     const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
     const phantom: string[] = [];

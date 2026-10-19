@@ -23,19 +23,23 @@
  *      loads by name, under node and bun, with a temporary HOME and
  *      USERPROFILE and no ASKMARCEL_* variable. Then `tsc --noEmit --skipLibCheck
  *      false` (module nodenext) runs on a file that uses each exported type once
- *      as it should and once wrongly: it must report exactly the expected error
- *      on each wrong line, so a missing declaration (TS2307) or a type that
- *      became `any` (no error at all) fails the check.
+ *      as it should and once wrongly, and calls each exported value once wrongly:
+ *      it must report exactly the expected error on each wrong line, so a missing
+ *      declaration (TS2307) or a type or value that became `any` (no error at
+ *      all) fails the check.
  *
  * Every run also proves that step 4 can fail (rule 15.10): it replaces the
  * installed index.d.ts with one that imports core (must fail with TS2307), and
- * with one whose types are `any` (must fail as a silent pass).
+ * with one whose types and values are `any` (must fail as a silent pass).
  *
  *   --selftest  proves steps 1 to 3 reject a stray file, core in dependencies,
- *               and a declaration that names core, without packing anything.
+ *               and a declaration that names core, and that the consumer file
+ *               expects an error on each wrong line and refuses an export with no
+ *               wrong use, without packing anything.
  *
- * An exported type with no entry in MISUSES fails the check: a new public type
- * comes with its own wrong use.
+ * An exported type with no entry in MISUSES, or an exported value with no entry
+ * in VALUE_MISUSES, fails the check: a new public export comes with its own
+ * wrong use.
  */
 
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -53,6 +57,7 @@ type Manifest = {
 };
 
 type Misuse = { readonly use: string; readonly fits: string; readonly misuse: string; readonly code: number };
+type ValueMisuse = { readonly misuse: string; readonly code: number };
 
 // One right and one wrong use per exported type name, the same in every package.
 const MISUSES: Readonly<Record<string, Misuse>> = {
@@ -68,6 +73,19 @@ const MISUSES: Readonly<Record<string, Misuse>> = {
     misuse: "{ tokenCache: '/h/.ask-marcel/token-cache.json' }",
     code: 2741,
   },
+  WriteGraph: { use: "ReturnType<WriteGraph['delete']>", fits: 'Promise.resolve({ ok: true as const, value: 1 })', misuse: "Promise.resolve('deleted')", code: 2322 },
+  TokenSource: { use: "Parameters<TokenSource['graphToken']>[0]", fits: "'basic'", misuse: "'guest'", code: 2322 },
+  Command: { use: "Command['meta']['effect']", fits: "'draft'", misuse: "'send'", code: 2322 },
+};
+
+// One wrong call per exported value name. The consumer imports every value of
+// the package, so a row may use another exported value.
+const VALUE_MISUSES: Readonly<Record<string, ValueMisuse>> = {
+  resolveAuthPaths: { misuse: 'resolveAuthPaths(1, {})', code: 2345 },
+  createWriteGraph: { misuse: "createWriteGraph('token')", code: 2345 },
+  createEnvThenHelperTokenSource: { misuse: 'createEnvThenHelperTokenSource(1)', code: 2554 },
+  createWriteClient: { misuse: "createWriteClient('x')", code: 2554 },
+  commands: { misuse: "commands['create-mail-draft']?.execute(createWriteClient(), { subject: 1 })", code: 2322 },
 };
 
 const CORE = '@ask-marcel/office-core';
@@ -118,7 +136,10 @@ const hasNodeModulesAbove = (dir: string): boolean => {
   return existsSync(join(parent, 'node_modules')) || hasNodeModulesAbove(parent);
 };
 
-const exportedTypes = (consumer: string, name: string): ReadonlyArray<string> => {
+type Exported = { readonly types: ReadonlyArray<string>; readonly values: ReadonlyArray<string> };
+
+// The exported names of the package, split into types and values.
+const exportedNames = (consumer: string, name: string): Exported => {
   const probe = join(consumer, 'exports-probe.ts');
   writeFileSync(probe, `export * from '${name}';\n`);
   const program = ts.createProgram([probe], { module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, types: [], noEmit: true });
@@ -129,13 +150,24 @@ const exportedTypes = (consumer: string, name: string): ReadonlyArray<string> =>
   const exports = moduleSymbol === undefined ? [] : checker.getExportsOfModule(moduleSymbol);
   const resolved = exports.map((symbol) => (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol));
   const typeFlags = ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface | ts.SymbolFlags.Class | ts.SymbolFlags.Enum;
-  return exports.filter((_, i) => ((resolved[i]?.flags ?? 0) & typeFlags) !== 0).map((symbol) => symbol.name);
+  const named = (flags: number): ReadonlyArray<string> => exports.filter((_, i) => ((resolved[i]?.flags ?? 0) & flags) !== 0).map((symbol) => symbol.name);
+  return { types: named(typeFlags), values: named(ts.SymbolFlags.Value) };
 };
 
-// The consumer file: per exported type, a right use and then a wrong one. Returns
-// the expected errors, as `line:TScode`.
-const writeUses = (consumer: string, name: string, types: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const lines = [`import type { ${types.join(', ')} } from '${name}';`];
+// The exports that have no wrong use in MISUSES or VALUE_MISUSES.
+const untoldExports = ({ types, values }: Exported): ReadonlyArray<string> => [
+  ...types.filter((type) => MISUSES[type] === undefined).map((type) => `exported type ${type} has no wrong use in MISUSES (scripts/check-packed-package.ts)`),
+  ...values.filter((value) => VALUE_MISUSES[value] === undefined).map((value) => `exported value ${value} has no wrong call in VALUE_MISUSES (scripts/check-packed-package.ts)`),
+];
+
+// The consumer file: per exported type, a right use and then a wrong one; per
+// exported value, a wrong call. Returns the text and the expected errors, as
+// `line:TScode`.
+const consumerSource = (name: string, { types, values }: Exported): { readonly text: string; readonly expected: ReadonlyArray<string> } => {
+  const lines = [
+    ...(types.length === 0 ? [] : [`import type { ${types.join(', ')} } from '${name}';`]),
+    ...(values.length === 0 ? [] : [`import { ${values.join(', ')} } from '${name}';`]),
+  ];
   const expected: string[] = [];
   for (const type of types) {
     const misuse = MISUSES[type];
@@ -143,8 +175,13 @@ const writeUses = (consumer: string, name: string, types: ReadonlyArray<string>)
     lines.push(`export const fits${type}: ${misuse.use} = ${misuse.fits};`, `export const misuse${type}: ${misuse.use} = ${misuse.misuse};`);
     expected.push(`${lines.length}:TS${misuse.code}`);
   }
-  writeFileSync(join(consumer, 'uses.ts'), `${lines.join('\n')}\n`);
-  return expected;
+  for (const value of values) {
+    const misuse = VALUE_MISUSES[value];
+    if (misuse === undefined) continue;
+    lines.push(`export const misuseValue${value} = ${misuse.misuse};`);
+    expected.push(`${lines.length}:TS${misuse.code}`);
+  }
+  return { text: `${lines.join('\n')}\n`, expected };
 };
 
 const typeProblems = (consumer: string, expected: ReadonlyArray<string>): ReadonlyArray<string> => {
@@ -186,23 +223,32 @@ const consumerProblems = async (tarball: string, manifest: Manifest): Promise<Re
     );
     const install = run(['bun', 'add', tarball], consumer);
     if (!install.ok) return [`the tarball does not install: ${install.out.slice(0, 400)}`];
-    const types = exportedTypes(consumer, manifest.name);
-    const untold = types.filter((type) => MISUSES[type] === undefined).map((type) => `exported type ${type} has no wrong use in MISUSES (scripts/check-packed-package.ts)`);
-    const expected = writeUses(consumer, manifest.name, types);
-    const real = [...untold, ...(types.length === 0 ? ['the library exports no type'] : []), ...typeProblems(consumer, expected), ...runtimeProblems(consumer, manifest)];
-    return [...real, ...(await controlProblems(consumer, manifest, types, expected))];
+    const exported = exportedNames(consumer, manifest.name);
+    const { text, expected } = consumerSource(manifest.name, exported);
+    writeFileSync(join(consumer, 'uses.ts'), text);
+    const real = [
+      ...untoldExports(exported),
+      ...(exported.types.length === 0 ? ['the library exports no type'] : []),
+      ...typeProblems(consumer, expected),
+      ...runtimeProblems(consumer, manifest),
+    ];
+    return [...real, ...(await controlProblems(consumer, manifest, exported, expected))];
   } finally {
     rmSync(consumer, { recursive: true, force: true });
   }
 };
 
 // The consumer typecheck must fail on a declaration that imports core, and on
-// types that became `any`. A check that passes these has stopped checking.
-const controlProblems = async (consumer: string, manifest: Manifest, types: ReadonlyArray<string>, expected: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
+// types and values that became `any`. A check that passes these has stopped
+// checking.
+const controlProblems = async (consumer: string, manifest: Manifest, { types, values }: Exported, expected: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
   const index = join(consumer, 'node_modules', manifest.name, 'dist', 'index.d.ts');
   const controls = {
     'an index.d.ts that imports core': `export type { ${types.join(', ')} } from '${CORE}/domain/result.ts';\n`,
-    'an index.d.ts whose types are any': types.map((type) => `export type ${type}<A = any, B = any, C = any, D = any> = any;\n`).join(''),
+    'an index.d.ts whose types and values are any': [
+      ...types.map((type) => `export type ${type}<A = any, B = any, C = any, D = any> = any;\n`),
+      ...values.map((value) => `export declare const ${value}: any;\n`),
+    ].join(''),
   };
   const passed: string[] = [];
   for (const [name, text] of Object.entries(controls)) {
@@ -212,12 +258,15 @@ const controlProblems = async (consumer: string, manifest: Manifest, types: Read
   return passed;
 };
 
+// The tarball's path comes from stdout alone (--quiet prints only the path).
+// stderr goes to the person: a warning there (as `nobody`, an unreadable CA
+// bundle) is not the path (.claude/LESSONS.md, 2026-10-18).
 const pack = (): { readonly tarball: string; readonly dir: string } => {
   const dir = mkdtempSync(join(tmpdir(), 'packed-'));
-  const packed = run(['bun', 'pm', 'pack', '--destination', dir, '--quiet', '--ignore-scripts'], process.cwd());
-  if (!packed.ok) throw new Error(`bun pm pack failed: ${packed.out}`);
-  // --quiet prints the tarball's path alone.
-  return { tarball: packed.out.trim().split('\n').at(-1) ?? '', dir };
+  const packed = Bun.spawnSync(['bun', 'pm', 'pack', '--destination', dir, '--quiet', '--ignore-scripts'], { cwd: process.cwd(), stdout: 'pipe', stderr: 'inherit' });
+  const out = packed.stdout.toString();
+  if (packed.exitCode !== 0) throw new Error(`bun pm pack failed: ${out}`);
+  return { tarball: out.trim().split('\n').at(-1) ?? '', dir };
 };
 
 const tarballProblems = async (tarball: string, dir: string): Promise<{ readonly problems: ReadonlyArray<string>; readonly manifest: Manifest }> => {
@@ -244,6 +293,18 @@ const SELFTEST_MANIFEST: Manifest = {
 // A package with a helper entry, as auth has: src/main.ts, src/index.ts and src/token.ts exist.
 const SELFTEST_BUNDLES = bundleTargets(SELFTEST_MANIFEST, (path) => ['src/main.ts', 'src/index.ts', 'src/token.ts'].includes(path));
 const SELFTEST_FILES = [...TOP_FILES, 'dist/cli.js', 'dist/index.js', 'dist/token.js', 'dist/index.d.ts', 'dist/shared/domain/result.d.ts'];
+const SELFTEST_EXPORTS: Exported = { types: ['Result'], values: ['resolveAuthPaths'] };
+const SELFTEST_CONSUMER = {
+  text: [
+    "import type { Result } from '@ask-marcel/office-x';",
+    "import { resolveAuthPaths } from '@ask-marcel/office-x';",
+    'export const fitsResult: Result<number, string> = { ok: true, value: 1 };',
+    "export const misuseResult: Result<number, string> = { ok: true, value: 'one' };",
+    'export const misuseValueresolveAuthPaths = resolveAuthPaths(1, {});',
+    '',
+  ].join('\n'),
+  expected: ['4:TS2322', '5:TS2345'],
+};
 
 const selftest = (): number => {
   const cases: ReadonlyArray<{ readonly name: string; readonly problems: number }> = [
@@ -298,12 +359,19 @@ const selftest = (): number => {
       name: 'a declaration that reaches ../core',
       problems: declarationProblems({ 'dist/a/b.d.ts': "export type { Result } from '../core/src/domain/result.js';" }).length === 1 ? 0 : 1,
     },
+    { name: 'an exported type and value, each with its wrong use', problems: untoldExports(SELFTEST_EXPORTS).length },
+    { name: 'an exported type with no wrong use', problems: untoldExports({ ...SELFTEST_EXPORTS, types: ['Result', 'Unlisted'] }).length === 1 ? 0 : 1 },
+    { name: 'an exported value with no wrong call', problems: untoldExports({ ...SELFTEST_EXPORTS, values: ['resolveAuthPaths', 'unlisted'] }).length === 1 ? 0 : 1 },
+    {
+      name: 'a consumer file that imports the values by value and expects an error on each wrong line',
+      problems: JSON.stringify(consumerSource('@ask-marcel/office-x', SELFTEST_EXPORTS)) === JSON.stringify(SELFTEST_CONSUMER) ? 0 : 1,
+    },
   ];
   const failed = cases.filter((c) => c.problems !== 0);
   for (const c of failed) process.stderr.write(`check-packed-package: SELFTEST FAILED, ${c.name} was judged wrongly\n`);
   if (failed.length === 0)
     process.stdout.write(
-      'check-packed-package: selftest passed (a stray file, a missing bin, a missing or stray helper entry, core in dependencies and a declaration naming core are rejected).\n'
+      'check-packed-package: selftest passed (a stray file, a missing bin, a missing or stray helper entry, core in dependencies, a declaration naming core and an export with no wrong use are rejected; the consumer file expects an error on each wrong line).\n'
     );
   return failed.length === 0 ? 0 : 1;
 };

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphClient } from '../../infra/graph-client.ts';
+import type { WriteGraph as GraphClient } from '@ask-marcel/office-core/infra/write-graph.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from './write-commands.ts';
 
 const command = commands['convert-group-post-attachment-to-pdf'];
 if (!command) throw new Error('convert-group-post-attachment-to-pdf is not registered');

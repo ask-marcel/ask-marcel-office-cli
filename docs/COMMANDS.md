@@ -17,7 +17,7 @@ For everything else:
 |---------|-------------|
 | `docs <cmd>` | Print Markdown docs for a single command |
 | `help-json [--terse] [--category <name>]` | Machine-readable manifest, full or filtered |
-| `mcp` | Serve the command registry to an MCP client over stdio (four gateway tools) |
+| `mcp` | Serve the command registry to an MCP client over stdio (three gateway tools) |
 | `next-page --url <link>` | Walk a paginated response by feeding the previous `nextLink` |
 
 <!-- AUTO-GENERATED-COMMANDS:BEGIN -->

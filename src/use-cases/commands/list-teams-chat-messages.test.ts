@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient } from '../../infra/graph-client.ts';
-import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
+import { fakeReadGraph } from '@ask-marcel/office-core/test-helpers/read-graph-fake.ts';
 import { commands } from './index.ts';
 
 const command = commands['list-teams-chat-messages'];
@@ -21,7 +21,7 @@ const page = {
 
 const graphWith = (overrides: Partial<GraphClient> = {}): { graph: GraphClient; gets: string[] } => {
   const gets: string[] = [];
-  const graph = fakeGraphClient({
+  const graph = fakeReadGraph({
     teamsChat: async () => ok(page),
     get: async (path) => {
       gets.push(path);

@@ -2,7 +2,7 @@
 // meta.test.ts with its text unchanged (package split, step 16), so the write package takes
 // this file whole.
 import { describe, expect, it } from 'bun:test';
-import { commands } from './index.ts';
+import { commands } from './write-commands.ts';
 
 describe('command meta — invariants on every registered command', () => {
   it('declares Files.ReadWrite on each PDF converter, because it uploads a temporary file to the OneDrive to convert it', () => {
