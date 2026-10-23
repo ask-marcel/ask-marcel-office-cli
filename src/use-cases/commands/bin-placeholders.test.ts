@@ -2,33 +2,33 @@ import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
 
-// Every command reference in the CLI's own text names its bin through a
-// placeholder (bin-names.ts): `{auth-bin}`, `{read-bin}` or `{write-bin}` before
-// a command of that package (command-directory.ts), `{bin}` before what every
-// package has. This guard reads the source, so a hint, a remedy or an example
-// that names a command of the wrong package, or a bin by hand, fails here.
+// Read's half of the bin-placeholder guard (package split, phase 6). Every
+// command reference in the CLI's own text names its bin through a placeholder
+// (bin-names.ts): `{auth-bin}`, `{read-bin}` or `{write-bin}` before a command
+// of that package (command-directory.ts), `{bin}` before what every package
+// has. This guard reads the source, so a hint, a remedy or an example that
+// names a command of the wrong package, or a bin by hand, fails here. It finds
+// its folder from its own path: until the move it reads the root src/, which
+// holds the read source, and after the move it reads read/src/. So the move
+// carries it with no edit.
 
 // What `{bin}` may stand before: the commands and help every package has, the
 // generic words the hints use for "any command", and the `--` of
 // `claude mcp add … {bin} -- {bin} mcp`, where the bin also names the server.
 const EVERY_PACKAGE = new Set(['docs', 'help', 'help-json', 'mcp', '--help', '<command>', '<cmd>', 'subcommand', '--']);
 
-// Words after a role placeholder that are not commands: the auth lock's holder.
-const NOT_COMMANDS: Readonly<Record<string, ReadonlySet<string>>> = { auth: new Set(['process']) };
-
-// The one line that keeps the bin by hand: written to stderr by the browser
-// sign-in itself, with no renderer between it and the terminal to fill it.
-const UNRENDERED_LINES = ['src/infra/browser-auth.ts: Clearing the browser session so the sign-in can be re-captured'];
-
-// The repository root, from this file rather than the working directory: a run
-// from another directory would otherwise scan nothing and pass.
+// The folder that holds src/ (the repository root until the move, read/
+// after it), from this file rather than the working directory: a run from
+// another directory would otherwise scan nothing and pass.
 const ROOT = join(import.meta.dir, '../../..');
-
-const PLACEHOLDER = /\{(?:(?:auth|read|write)-)?bin\}/;
 
 type Line = { readonly where: string; readonly text: string };
 
 const isComment = (text: string): boolean => /^\s*(\/\/|\/\*|\*)/.test(text);
+
+// A bin typed by hand before a word: the bin of the single package or of a
+// package of the split.
+const BIN_BY_HAND = /ask-marcel-office(-(auth|read|write))?\s/;
 
 const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
   const lines: Line[] = [];
@@ -44,12 +44,14 @@ const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
 
 const misnamed = (role: string, word: string): boolean => {
   if (role === '') return !EVERY_PACKAGE.has(word) && !word.startsWith('${');
-  return commandRole(word) !== role && !(NOT_COMMANDS[role]?.has(word) ?? false);
+  return commandRole(word) !== role;
 };
 
-describe('the bin placeholders in the source', () => {
-  it('are read from the whole source, wherever the tests run from', async () => {
-    expect((await sourceLines()).length).toBeGreaterThan(10_000);
+describe('the bin placeholders in read’s source', () => {
+  it('are read from the whole of read, the read registry included, wherever the tests run from', async () => {
+    const lines = await sourceLines();
+    expect(lines.length).toBeGreaterThan(10_000);
+    expect(lines.some(({ where }) => where.startsWith('src/use-cases/commands/index.ts:'))).toBe(true);
   });
 
   it('name the package that holds each command they stand before', async () => {
@@ -71,22 +73,8 @@ describe('the bin placeholders in the source', () => {
     expect(odd).toEqual([]);
   });
 
-  it('leave no bin typed by hand outside the one line no renderer fills', async () => {
-    const byHand = (await sourceLines())
-      .filter(({ text }) => text.includes('ask-marcel-office '))
-      .filter(({ where, text }) => !UNRENDERED_LINES.some((allowed) => allowed.startsWith(where.split(':')[0] ?? '') && text.includes(allowed.split(': ')[1] ?? '')))
-      .map(({ where }) => where);
+  it('leave no bin typed by hand', async () => {
+    const byHand = (await sourceLines()).filter(({ text }) => BIN_BY_HAND.test(text)).map(({ where }) => where);
     expect(byHand).toEqual([]);
-  });
-});
-
-describe('the generated command reference', () => {
-  it('carries the bins filled in, never a placeholder: gen-docs fills them', async () => {
-    const manifest = await Bun.file(join(ROOT, 'docs/commands.json')).text();
-    expect(manifest).toContain('"example": "ask-marcel-office list-drives');
-    for (const doc of ['docs/commands.json', 'docs/COMMANDS.md']) {
-      const text = await Bun.file(join(ROOT, doc)).text();
-      expect({ doc, placeholder: PLACEHOLDER.exec(text)?.[0] }).toEqual({ doc, placeholder: undefined });
-    }
   });
 });

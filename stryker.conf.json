@@ -30,7 +30,7 @@
   },
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
-  "_ignorePatterns_comment": "Skip non-source dirs from the sandbox copy. The workspace folders (auth/, core/, read/, write/) mutate with their own config. .claude/ may contain a symlink Stryker cannot copy (ENOTSUP); the rest are pure noise. Two exceptions: bin-placeholders.test.ts reads the generated docs/commands.json and docs/COMMANDS.md, so the two negations put them back. They come after *.md and *.json, because the last matching rule wins, and docs/ is listed as docs/* so that the files in it stay reachable.",
+  "_ignorePatterns_comment": "Skip non-source dirs from the sandbox copy. The workspace folders (auth/, core/, read/, write/) mutate with their own config. .claude/ may contain a symlink Stryker cannot copy (ENOTSUP); the rest are pure noise.",
   "ignorePatterns": [
     ".claude/",
     "/auth/",
@@ -51,8 +51,6 @@
     "*.md",
     "*.toml",
     "*.lock",
-    "*.json",
-    "!docs/commands.json",
-    "!docs/COMMANDS.md"
+    "*.json"
   ]
 }
