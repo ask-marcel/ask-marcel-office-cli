@@ -8,13 +8,13 @@ import type { Command, CommandMeta, ReadCommand } from '@ask-marcel/office-core/
 import { commands, registerCommands } from './index.ts';
 
 /*
- * The read guarantee inside the single package (package split, D9): the
- * registry gives each command only the graph its effect allows. A read command
- * holds the read graph (no put, patch, delete or upload session, and a POST
- * that reaches only the two query endpoints); a write command holds the write
- * graph (basic tier only). The type of each command's `execute` says the same
- * at compile time; these tests pin it at run time, through the registry every
- * surface uses.
+ * The read guarantee of the read package (package split, D9): the registry
+ * gives each read command the read graph only (no put, patch, delete or upload
+ * session, and a POST that reaches only the two query endpoints). The type of
+ * each command's `execute` says the same at compile time; these tests pin it
+ * at run time, through the registry every surface uses. Core
+ * (`command-graph-own`, `command-graph-kind`) and `command-graph-write.test.ts`
+ * pin the write view.
  */
 
 const READ_MEMBERS = [
