@@ -3,7 +3,8 @@
   // compiled from source through `paths` (the same mapping as core's
   // `exports`), so its declarations are emitted too and the build can ship
   // them inside dist/; rootDir is the repo root because the program holds both
-  // folders.
+  // folders. The include adds the vendored declarations of src/types/ (of
+  // word-extractor and turndown-plugin-gfm), which no import names.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
@@ -15,5 +16,6 @@
       "@ask-marcel/office-core/*": ["../core/src/*"]
     }
   },
-  "files": ["src/index.ts"]
+  "files": ["src/index.ts"],
+  "include": ["src/types/**/*.d.ts"]
 }
