@@ -14,15 +14,22 @@
  * FAILURE, not a pass: a reworded sentence would otherwise disable its own
  * check silently, which is the failure mode this gate exists to prevent.
  *
+ * The generated command reference (the `--manifest` JSON and the
+ * `--commands-doc` Markdown) must also carry the bins filled in: a `{bin}`,
+ * `{auth-bin}`, `{read-bin}` or `{write-bin}` left in either is a failure,
+ * because gen-docs fills them and a reader cannot run a placeholder.
+ *
  * Exit codes:
- *   0  every claim matches, and every anchor was found
- *   1  a claim disagrees with the registry, or an anchor matched nothing
+ *   0  every claim matches, every anchor was found, and no placeholder is left
+ *   1  a claim disagrees with the registry, an anchor matched nothing, or a
+ *      generated document holds a bin placeholder
  *
  *   2  an argument is missing, a --package exports no `commandPackage`, or
  *      two packages hold one command name with different entries
  *
- *   --selftest  proves the matcher rejects a wrong number, and that the join
- *               of the packages keeps every command and refuses a conflict
+ *   --selftest  proves the matcher rejects a wrong number, that a placeholder
+ *               is refused and a filled bin passes, and that the join of the
+ *               packages keeps every command and refuses a conflict
  *               (see rule 15.10: a gate only ever seen green is a hypothesis)
  *
  * The package and the three documents are arguments, not imports, so one
@@ -32,7 +39,8 @@
  *
  *   bun run scripts/check-doc-numbers.ts --package src/composition/single-package.ts \
  *     --package write/src/composition/write-package.ts \
- *     --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md
+ *     --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md \
+ *     --manifest docs/commands.json
  *
  * `--package` names a module that exports `commandPackage` (a CommandPackage).
  * It can come more than once: the registries are joined. Paths are relative to
@@ -44,12 +52,19 @@ import { buildManifest } from '@ask-marcel/office-core/use-cases/commands/docs-b
 import { loadPackages, mergePackages } from './command-packages.ts';
 
 const USAGE =
-  'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> [--package <another>] --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> [--selftest]';
+  'usage: bun run scripts/check-doc-numbers.ts --package <module exporting commandPackage> [--package <another>] --readme <README.md> --commands-doc <COMMANDS.md> --usage <USAGE.md> --manifest <commands.json> [--selftest]';
 
 const { values: args } = parseArgs({
-  options: { package: { type: 'string', multiple: true }, readme: { type: 'string' }, 'commands-doc': { type: 'string' }, usage: { type: 'string' }, selftest: { type: 'boolean' } },
+  options: {
+    package: { type: 'string', multiple: true },
+    readme: { type: 'string' },
+    'commands-doc': { type: 'string' },
+    usage: { type: 'string' },
+    manifest: { type: 'string' },
+    selftest: { type: 'boolean' },
+  },
 });
-if (args.package === undefined || args.readme === undefined || args['commands-doc'] === undefined || args.usage === undefined) {
+if (args.package === undefined || args.readme === undefined || args['commands-doc'] === undefined || args.usage === undefined || args.manifest === undefined) {
   console.error(`check-doc-numbers: ${USAGE}`);
   process.exit(2);
 }
@@ -67,7 +82,13 @@ if (!merged.ok) {
 const commandPackage = merged.value;
 
 /** The documents the claims sit in, by role: their paths are arguments. */
-const DOCS = { readme: args.readme, commandsDoc: args['commands-doc'], usage: args.usage } as const;
+const DOCS = { readme: args.readme, commandsDoc: args['commands-doc'], usage: args.usage, manifest: args.manifest } as const;
+
+/** The generated documents, which must hold no bin placeholder. */
+const GENERATED = [DOCS.manifest, DOCS.commandsDoc] as const;
+
+/** A bin placeholder that gen-docs fills: `{bin}` or a role form. */
+const PLACEHOLDER = /\{(?:(?:auth|read|write)-)?bin\}/g;
 
 type Claim = {
   /** Path of the document holding the claim, relative to the working directory. */
@@ -159,6 +180,9 @@ const checkClaim = (text: string, claim: Claim): ReadonlyArray<string> => {
   return failures;
 };
 
+const checkPlaceholders = (file: string, text: string): ReadonlyArray<string> =>
+  [...text.matchAll(PLACEHOLDER)].map((match) => `${file}:${lineOf(text, match.index)}  bin placeholder ${match[0]} left in a generated document (run docs:gen)`);
+
 // The join: the registry split in two packages (the second with other bins) must
 // come back whole with the names of the first, and a name that the second holds
 // with another summary must be refused.
@@ -194,12 +218,22 @@ const runSelftest = (): number => {
     console.error('check-doc-numbers: SELFTEST FAILED — a missing anchor was accepted');
     return 1;
   }
+  if (checkPlaceholders('selftest.md', 'run `{read-bin} list-drives` first').length === 0) {
+    console.error('check-doc-numbers: SELFTEST FAILED — a bin placeholder was accepted');
+    return 1;
+  }
+  if (checkPlaceholders('selftest.md', 'run `ask-marcel-office list-drives` first').length > 0) {
+    console.error('check-doc-numbers: SELFTEST FAILED — a filled bin was refused');
+    return 1;
+  }
   const joinFailure = selftestJoin();
   if (joinFailure !== undefined) {
     console.error(`check-doc-numbers: SELFTEST FAILED — ${joinFailure}`);
     return 1;
   }
-  console.log(`check-doc-numbers: selftest passed (a wrong total and a lost anchor are both rejected; the join keeps every command and refuses a conflict).`);
+  console.log(
+    `check-doc-numbers: selftest passed (a wrong total, a lost anchor and a bin placeholder are rejected, a filled bin passes; the join keeps every command and refuses a conflict).`
+  );
   return 0;
 };
 
@@ -211,15 +245,18 @@ const run = async (): Promise<number> => {
     const text = await Bun.file(claim.file).text();
     failures.push(...checkClaim(text, claim));
   }
+  for (const file of GENERATED) failures.push(...checkPlaceholders(file, await Bun.file(file).text()));
 
   if (failures.length > 0) {
-    console.error('check-doc-numbers: the docs disagree with the registry.\n');
+    console.error('check-doc-numbers: the docs disagree with the registry or hold a bin placeholder.\n');
     for (const failure of failures) console.error(`  ${failure}`);
     console.error(`\nRegistry now holds: ${total} commands (${read} read, ${write} write: ${draft} draft, ${transientUpload} transient-upload), ${readGet} GET reads, ${readOnlyPost} read-only POST, ${categories} categories, ${manifestTotal} in the help-json manifest.`);
     return 1;
   }
 
-  console.log(`check-doc-numbers: ${CLAIMS.length} claims match the registry (${total} commands, ${read} read, ${write} write, ${readGet} GET reads, ${categories} categories).`);
+  console.log(
+    `check-doc-numbers: ${CLAIMS.length} claims match the registry (${total} commands, ${read} read, ${write} write, ${readGet} GET reads, ${categories} categories), and the ${GENERATED.length} generated documents hold no bin placeholder.`
+  );
   return 0;
 };
 
