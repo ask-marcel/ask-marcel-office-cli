@@ -8,7 +8,8 @@
 #   - a workspace folder runs when a staged path is under it;
 #   - a staged path under core/ runs every workspace folder, since auth, read
 #     and write all build on core; so does a change to a root config that every
-#     folder extends (tsconfig.json, eslint.base.js);
+#     folder extends (tsconfig.json, eslint.base.js) or to the ownership lists
+#     that the folder configs import (eslint.ownership.js);
 #   - the root runs when a staged path is outside every workspace folder;
 #   - a move counts on both sides: `git mv src/x.ts core/src/x.ts` runs the
 #     root as well as every folder.
@@ -19,7 +20,7 @@
 
 set -euo pipefail
 
-SHARED_CONFIGS_RE='^(tsconfig\.json|eslint\.base\.js)$'
+SHARED_CONFIGS_RE='^(tsconfig\.json|eslint\.base\.js|eslint\.ownership\.js)$'
 
 workspace_folders() {
   bun --print "((await Bun.file('package.json').json()).workspaces ?? []).join('\n')"
@@ -71,6 +72,7 @@ selftest() {
   expect 'two folders run each once' 'auth write' 'auth/src/a.ts write/src/b.ts auth/src/c.ts'
   expect 'a core change runs every workspace folder' 'core auth read write' 'core/src/domain/result.ts'
   expect 'a root config every folder extends runs them all, and the root' '. core auth read write' 'tsconfig.json'
+  expect 'the ownership lists that the folder configs import run them all, and the root' '. core auth read write' 'eslint.ownership.js'
   expect 'a root file and a folder file run both' '. write' 'docs/plans/x.md write/README.md'
   expect 'a root file that only looks like a folder is the root' '.' 'readme-notes.md'
   # expect_move <label> <expected> <from> <to>: a real `git mv` in a scratch
