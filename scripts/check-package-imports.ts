@@ -14,19 +14,25 @@
  *   - no module outside auth reaches an auth module, by a relative path or by
  *     the package name (phase 4: read and write get tokens from the helper);
  *   - an auth module reaches only core and auth modules, and the package.json
- *     of its own package (phase 4: auth builds alone).
+ *     of its own package (phase 4: auth builds alone);
+ *   - a read module reaches only core and read modules, and the package.json
+ *     of its own package: the root's while read is in the root src/, then
+ *     read/package.json (phase 6: read builds alone).
  *
  * Phase 3 moved core from src/ to core/src/, phase 4 moved auth to auth/src/,
- * and phase 5 moves write to write/src/. A file under core/, auth/ or write/
- * gets its owner from its folder; the lists name `src/...` and apply to the
- * root src/ only (else SINGLE_PACKAGE_FILES `src/{index,main}.ts` would match
- * auth/src/main.ts and write/src/main.ts). The root imports core by its
+ * phase 5 moved write to write/src/, and phase 6 moves read to read/src/. A
+ * file under core/, auth/, read/ or write/ gets its owner from its folder; the
+ * lists name `src/...` and apply to the root src/ only (else
+ * SINGLE_PACKAGE_FILES `src/{index,main}.ts` would match auth/src/main.ts,
+ * read/src/main.ts and write/src/main.ts). The root imports core by its
  * workspace name (`@ask-marcel/office-core/<path>`, read here as
- * core/src/<path>), and `@ask-marcel/office-auth/<path>` and
- * `@ask-marcel/office-write/<path>` are read as auth/src/<path> and
- * write/src/<path>. Any other specifier of a workspace package is refused: the
- * hoisted workspace resolves it silently, and the check does not read that
- * package's folder.
+ * core/src/<path>), and `@ask-marcel/office-auth/<path>`,
+ * `@ask-marcel/office-read/<path>` and `@ask-marcel/office-write/<path>` are
+ * read as auth/src/<path>, read/src/<path> and write/src/<path>. Any other
+ * specifier of a workspace package is refused: the hoisted workspace resolves
+ * it silently, and the check does not read that package's folder. The fixtures
+ * find each read module that they name in the root src/ or in read/src/,
+ * wherever it is.
  *
  * Ownership comes from eslint.config.js (CORE_FILES, CORE_READ_ONLY_FILES),
  * the lists the core and read-only lint bans use, so a file has one owner
@@ -42,8 +48,9 @@
  * its name gives (`-write.test.ts`, `-auth.test.ts`), else the owner of the
  * module it is named after, else the one package its imports name, else read
  * when it imports the single package's wiring (the real-registry suites go with
- * read, step 13), else core. A module under auth/ is auth's, and a module or a
- * test under write/ is write's; a module in no list is read's. A test under
+ * read, step 13), else core. A module under auth/ is auth's, a module or a test
+ * under write/ is write's, and a module or a test under read/ is read's; a
+ * module in no list is read's. A test under
  * core/ imports core modules only: core runs its tests alone. A test under
  * auth/ imports auth and core modules only, and a test under write/ imports
  * write and core modules only, for the same reason. A test outside core/ never falls to core (phase 3 moved every
@@ -76,10 +83,10 @@ import { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES } from '../eslin
 const ROOT = resolve(import.meta.dir, '..');
 const COMMANDS = 'src/use-cases/commands';
 // The workspace folders whose files the check reads; each package name reaches its folder's src/.
-const FOLDERS = ['core', 'auth', 'write'] as const;
-const WORKSPACE_PACKAGE = /^@ask-marcel\/office-(core|auth|write)\/(.+)$/;
+const FOLDERS = ['core', 'auth', 'read', 'write'] as const;
+const WORKSPACE_PACKAGE = /^@ask-marcel\/office-(core|auth|read|write)\/(.+)$/;
 
-// Where a module of the root src/ is now: in core/, auth/ or write/ once its phase moved it there.
+// Where a module of the root src/ is now: in core/, auth/, read/ or write/ once its phase moved it there.
 const located = (path: string): string => {
   const folder = FOLDERS.find((name) => existsSync(join(ROOT, name, path)));
   return folder === undefined ? path : `${folder}/${path}`;
@@ -103,6 +110,12 @@ const MAIL_DRAFT_TEST = located(`${COMMANDS}/create-mail-draft.test.ts`);
 const DRAFT_RESPONSE = located(`${COMMANDS}/draft-response.ts`);
 const REPLY_DRAFT = located(`${COMMANDS}/create-reply-draft.ts`);
 const WRITE_TEST_FIXTURE = `${dirname(MAIL_DRAFT)}/fixture-write.test.ts`;
+// Read modules that the fixtures name: in the root src/ until phase 6 moves them to read/src/.
+const LIST_DRIVES = located(`${COMMANDS}/list-drives.ts`);
+const LINK_EXTRACTOR = located(`${COMMANDS}/sharepoint-link-extractor.ts`);
+const REGISTRY = located(`${COMMANDS}/index.ts`);
+// New test files with no folder: the rules give them their package from their imports alone.
+const MIXED_TEST_FIXTURE = `${COMMANDS}/fixture-mixed.test.ts`;
 
 // Tests of the single package as a whole: they read the whole root src/, every
 // package's commands included, so no one package takes them. Phases 4 to 6
@@ -121,14 +134,14 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   {
     name: 'a write command that imports a read helper',
     path: MAIL_DRAFT,
-    source: `import type { ResolvedLink } from '${specifierTo(MAIL_DRAFT, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport type F = ResolvedLink;\n`,
-    reported: `${MAIL_DRAFT} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
+    source: `import type { ResolvedLink } from '${specifierTo(MAIL_DRAFT, LINK_EXTRACTOR)}';\nexport type F = ResolvedLink;\n`,
+    reported: `${MAIL_DRAFT} reaches ${LINK_EXTRACTOR}`,
   },
   {
     name: 'a read command that imports a write-only helper',
-    path: `${COMMANDS}/list-drives.ts`,
-    source: `import { slimDraftResult } from '${specifierTo(`${COMMANDS}/list-drives.ts`, DRAFT_RESPONSE)}';\nexport const f = (): unknown => slimDraftResult;\n`,
-    reported: `${COMMANDS}/list-drives.ts reaches ${DRAFT_RESPONSE}`,
+    path: LIST_DRIVES,
+    source: `import { slimDraftResult } from '${specifierTo(LIST_DRIVES, DRAFT_RESPONSE)}';\nexport const f = (): unknown => slimDraftResult;\n`,
+    reported: `${LIST_DRIVES} reaches ${DRAFT_RESPONSE}`,
   },
   {
     name: 'a core module that loads a write command with a dynamic import',
@@ -139,38 +152,44 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   {
     name: 'a core module that imports a read helper',
     path: CORE_READER_FIXTURE,
-    source: `import { extractSharepointUrls } from '${specifierTo(CORE_READER_FIXTURE, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
-    reported: `${CORE_READER_FIXTURE} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
+    source: `import { extractSharepointUrls } from '${specifierTo(CORE_READER_FIXTURE, LINK_EXTRACTOR)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${CORE_READER_FIXTURE} reaches ${LINK_EXTRACTOR}`,
   },
   {
     name: 'a read command that imports an auth module by the package name',
-    path: `${COMMANDS}/list-drives.ts`,
+    path: LIST_DRIVES,
     source: "import type { Result } from '@ask-marcel/office-auth/index.ts';\nexport type F = Result<1, 2>;\n",
-    reported: `${COMMANDS}/list-drives.ts reaches auth/src/index.ts`,
+    reported: `${LIST_DRIVES} reaches auth/src/index.ts`,
   },
   {
     name: 'a read helper that imports an auth module by a relative path',
-    path: `${COMMANDS}/sharepoint-link-extractor.ts`,
-    source: `import { parseTokenArgs } from '${specifierTo(`${COMMANDS}/sharepoint-link-extractor.ts`, TOKEN_ARGS)}';\nexport const f = parseTokenArgs;\n`,
-    reported: `${COMMANDS}/sharepoint-link-extractor.ts reaches ${TOKEN_ARGS}`,
+    path: LINK_EXTRACTOR,
+    source: `import { parseTokenArgs } from '${specifierTo(LINK_EXTRACTOR, TOKEN_ARGS)}';\nexport const f = parseTokenArgs;\n`,
+    reported: `${LINK_EXTRACTOR} reaches ${TOKEN_ARGS}`,
   },
   {
     name: 'an auth module that imports a read helper',
     path: TOKEN_ARGS,
-    source: `import { extractSharepointUrls } from '${specifierTo(TOKEN_ARGS, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
-    reported: `${TOKEN_ARGS} reaches ${COMMANDS}/sharepoint-link-extractor.ts`,
+    source: `import { extractSharepointUrls } from '${specifierTo(TOKEN_ARGS, LINK_EXTRACTOR)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${TOKEN_ARGS} reaches ${LINK_EXTRACTOR}`,
   },
   {
     name: 'a read command that imports a write module by the package name',
-    path: `${COMMANDS}/list-drives.ts`,
+    path: LIST_DRIVES,
     source: "import type { Result } from '@ask-marcel/office-write/index.ts';\nexport type F = Result<1, 2>;\n",
-    reported: `${COMMANDS}/list-drives.ts reaches write/src/index.ts`,
+    reported: `${LIST_DRIVES} reaches write/src/index.ts`,
   },
   {
-    name: 'the root registry that imports a write command',
-    path: `${COMMANDS}/index.ts`,
-    source: `import * as draft from '${specifierTo(`${COMMANDS}/index.ts`, MAIL_DRAFT)}';\nexport const f = draft;\n`,
-    reported: `${COMMANDS}/index.ts reaches ${MAIL_DRAFT}`,
+    name: 'the read registry that imports a write command',
+    path: REGISTRY,
+    source: `import * as draft from '${specifierTo(REGISTRY, MAIL_DRAFT)}';\nexport const f = draft;\n`,
+    reported: `${REGISTRY} reaches ${MAIL_DRAFT}`,
+  },
+  {
+    name: 'a read module that imports the package.json of another package',
+    path: LIST_DRIVES,
+    source: `import pkg from '${specifierTo(LIST_DRIVES, 'write/package.json')}' with { type: 'json' };\nexport const f = pkg;\n`,
+    reported: `${LIST_DRIVES} reaches write/package.json`,
   },
   {
     name: 'a write module that imports an auth module',
@@ -198,38 +217,40 @@ const TEST_FIXTURES: ReadonlyArray<Fixture> = [
   {
     name: 'a write-side test that imports a read helper',
     path: WRITE_TEST_FIXTURE,
-    source: `import { extractSharepointUrls } from '${specifierTo(WRITE_TEST_FIXTURE, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
-    reported: `${WRITE_TEST_FIXTURE} (write) imports ${COMMANDS}/sharepoint-link-extractor.ts (read)`,
+    source: `import { extractSharepointUrls } from '${specifierTo(WRITE_TEST_FIXTURE, LINK_EXTRACTOR)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${WRITE_TEST_FIXTURE} (write) imports ${LINK_EXTRACTOR} (read)`,
   },
   {
     name: 'a test that imports modules of two packages',
-    path: `${COMMANDS}/fixture-mixed.test.ts`,
-    source: `import type { AuthManager } from '${specifierTo(`${COMMANDS}/fixture-mixed.test.ts`, AUTH_LADDER)}';\nimport { extractSharepointUrls } from './sharepoint-link-extractor.ts';\nexport type F = AuthManager;\nexport const f = extractSharepointUrls;\n`,
-    reported: `${COMMANDS}/fixture-mixed.test.ts imports modules of auth and read`,
+    path: MIXED_TEST_FIXTURE,
+    source: `import type { AuthManager } from '${specifierTo(MIXED_TEST_FIXTURE, AUTH_LADDER)}';\nimport { extractSharepointUrls } from '${specifierTo(MIXED_TEST_FIXTURE, LINK_EXTRACTOR)}';\nexport type F = AuthManager;\nexport const f = extractSharepointUrls;\n`,
+    reported: `${MIXED_TEST_FIXTURE} imports modules of auth and read`,
   },
+  // The read registry is the single package's wiring until the move, then a read module: the
+  // report names its owner after the path, so the fixtures match up to the path.
   {
-    name: 'a test under core/ that imports the single package wiring',
+    name: 'a test under core/ that imports the read registry',
     path: CORE_TEST_FIXTURE,
-    source: `import { commands } from '${specifierTo(CORE_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
-    reported: `${CORE_TEST_FIXTURE} (core) imports ${COMMANDS}/index.ts (single)`,
+    source: `import { commands } from '${specifierTo(CORE_TEST_FIXTURE, REGISTRY)}';\nexport const f = commands;\n`,
+    reported: `${CORE_TEST_FIXTURE} (core) imports ${REGISTRY} (`,
   },
   {
-    name: 'a test under auth/ that imports the single package wiring',
+    name: 'a test under auth/ that imports the read registry',
     path: AUTH_TEST_FIXTURE,
-    source: `import { commands } from '${specifierTo(AUTH_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
-    reported: `${AUTH_TEST_FIXTURE} (auth) imports ${COMMANDS}/index.ts (single)`,
+    source: `import { commands } from '${specifierTo(AUTH_TEST_FIXTURE, REGISTRY)}';\nexport const f = commands;\n`,
+    reported: `${AUTH_TEST_FIXTURE} (auth) imports ${REGISTRY} (`,
   },
   {
     name: 'a test under write/ that imports a read helper',
     path: WRITE_FOLDER_TEST_FIXTURE,
-    source: `import { extractSharepointUrls } from '${specifierTo(WRITE_FOLDER_TEST_FIXTURE, `${COMMANDS}/sharepoint-link-extractor.ts`)}';\nexport const f = extractSharepointUrls;\n`,
-    reported: `${WRITE_FOLDER_TEST_FIXTURE} (write) imports ${COMMANDS}/sharepoint-link-extractor.ts (read)`,
+    source: `import { extractSharepointUrls } from '${specifierTo(WRITE_FOLDER_TEST_FIXTURE, LINK_EXTRACTOR)}';\nexport const f = extractSharepointUrls;\n`,
+    reported: `${WRITE_FOLDER_TEST_FIXTURE} (write) imports ${LINK_EXTRACTOR} (read)`,
   },
   {
-    name: 'a test under write/ that imports the single package wiring',
+    name: 'a test under write/ that imports the read registry',
     path: WRITE_FOLDER_TEST_FIXTURE,
-    source: `import { commands } from '${specifierTo(WRITE_FOLDER_TEST_FIXTURE, `${COMMANDS}/index.ts`)}';\nexport const f = commands;\n`,
-    reported: `${WRITE_FOLDER_TEST_FIXTURE} (write) imports ${COMMANDS}/index.ts (single)`,
+    source: `import { commands } from '${specifierTo(WRITE_FOLDER_TEST_FIXTURE, REGISTRY)}';\nexport const f = commands;\n`,
+    reported: `${WRITE_FOLDER_TEST_FIXTURE} (write) imports ${REGISTRY} (`,
   },
   {
     name: 'a test outside core/ that imports core modules only',
@@ -262,9 +283,9 @@ const OVERLAP_FIXTURE = { name: 'a file in two ownership lists', path: CORE_FIXT
 
 // Must be refused: the hoisted workspace would resolve it, and the check would not see its module.
 const SPECIFIER_FIXTURE = {
-  name: 'an import of a workspace package outside core, auth and write',
-  path: `${COMMANDS}/list-drives.ts`,
-  specifier: '@ask-marcel/office-read/index.ts',
+  name: 'an import of a workspace package outside core, auth, read and write',
+  path: LIST_DRIVES,
+  specifier: '@ask-marcel/office-other/index.ts',
 } as const;
 
 // The files under src/ of the root (no folder) or of a workspace folder, repo-relative.
@@ -282,7 +303,7 @@ const readSources = async (tests: boolean): Promise<Sources> => {
   const sources = new Map<string, string>();
   for (const path of [...scan(), ...FOLDERS.flatMap((folder) => scan(folder))]) {
     const test = path.endsWith('.test.ts');
-    if (test !== tests || (!test && /^((core|auth|write)\/)?src\/test-helpers\//.test(path))) continue;
+    if (test !== tests || (!test && /^((core|auth|read|write)\/)?src\/test-helpers\//.test(path))) continue;
     sources.set(path, await Bun.file(join(ROOT, path)).text());
   }
   return sources;
@@ -290,7 +311,7 @@ const readSources = async (tests: boolean): Promise<Sources> => {
 
 // The repo-relative file a relative specifier names (a module, or data such as
 // package.json), or undefined for a package import. A relative specifier that
-// names no file, or a workspace package outside core, auth and write, is an error.
+// names no file, or a workspace package outside core, auth, read and write, is an error.
 const resolveSpecifier = (from: string, specifier: string): string | undefined => {
   const workspace = WORKSPACE_PACKAGE.exec(specifier);
   if (workspace !== null) return resolveSpecifier(`${workspace[1]}/src/index.ts`, `./${workspace[2]}`);
@@ -354,7 +375,10 @@ const violations = (graph: Graph, owners: Owners): ReadonlyArray<string> => {
   const outsideAuth = [...graph.keys()].filter((start) => !owners.auth.has(start));
   const authReached = outsideAuth.flatMap((start) => crossing(graph, start, (path) => !owners.auth.has(path)));
   const authReach = [...owners.auth].flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || owners.auth.has(path) || path === packageJsonOf(start)));
-  return [...new Set([...writeReach, ...writeReached, ...coreReach, ...authReached, ...authReach])];
+  // A read module is every module that no other package owns (the root src/ and read/), never a package.json.
+  const isRead = (path: string): boolean => !owners.core.has(path) && !owners.auth.has(path) && !owners.write.has(path) && !path.endsWith('package.json');
+  const readReach = [...graph.keys()].filter(isRead).flatMap((start) => crossing(graph, start, (path) => owners.core.has(path) || isRead(path) || path === packageJsonOf(start)));
+  return [...new Set([...writeReach, ...writeReached, ...coreReach, ...authReached, ...authReach, ...readReach])];
 };
 
 type Lists = { readonly core: ReadonlySet<string>; readonly auth: ReadonlySet<string>; readonly write: ReadonlySet<string>; readonly single: ReadonlySet<string> };
@@ -390,6 +414,7 @@ const testPackage = (path: string, imports: ReadonlyArray<string>, owner: OwnerO
   if (path.startsWith('core/')) return 'core';
   if (path.startsWith('auth/')) return 'auth';
   if (path.startsWith('write/')) return 'write';
+  if (path.startsWith('read/')) return 'read';
   if (SINGLE_PACKAGE_TESTS.has(path)) return 'single';
   const side = /-(write|auth)\.test\.ts$/.exec(path)?.[1];
   if (side === 'write' || side === 'auth') return side;
@@ -416,15 +441,15 @@ const testViolations = (tests: Graph, owner: OwnerOf): ReadonlyArray<string> =>
 
 // The test graph keeps only the imports of modules under src/ (not package.json, not a package).
 const buildTestGraph = (sources: Sources): Graph =>
-  new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => /^((core|auth|write)\/)?src\//.test(target))]));
+  new Map([...buildGraph(sources)].map(([path, imports]) => [path, imports.filter((target) => /^((core|auth|read|write)\/)?src\//.test(target))]));
 
 type CommandModule = { readonly meta?: { readonly effect?: unknown }; readonly execute?: unknown };
 
-// The command folders: the root's, and write's once phase 5 moves the write
-// commands there. A missing folder is left out (Bun.Glob.scanSync throws ENOENT on it).
-const commandFolders = (): ReadonlyArray<string> => [COMMANDS, `write/${COMMANDS}`].filter((folder) => existsSync(join(ROOT, folder)));
+// The command folders: the root's until phase 6 moves the read commands to
+// read's, and write's. A missing folder is left out (Bun.Glob.scanSync throws ENOENT on it).
+const commandFolders = (): ReadonlyArray<string> => [COMMANDS, `read/${COMMANDS}`, `write/${COMMANDS}`].filter((folder) => existsSync(join(ROOT, folder)));
 
-// The commands of the root registry and of the write package, split by effect.
+// The commands of the read registry and of the write package, split by effect.
 const registryCommands = async (): Promise<{ readonly reads: ReadonlyArray<string>; readonly writes: ReadonlyArray<string> }> => {
   const reads: string[] = [];
   const writes: string[] = [];
@@ -471,7 +496,7 @@ const main = async (): Promise<number> => {
   if (found.length > 0) console.error(`check-package-imports: a package boundary is crossed:\n  ${found.join('\n  ')}`);
   if (missed.length > 0) console.error(`check-package-imports: the check missed its fixture(s): ${missed.map((fixture) => fixture.name).join('; ')}.`);
   if (found.length > 0 || missed.length > 0) return 1;
-  console.log('check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; no test file imports a module of another package; every core test sits in core/, every auth test in auth/ and every write test in write/; every fixture is reported.');
+  console.log('check-package-imports: only write reaches write, and write reaches only core and write; core reaches only core; only auth reaches auth, and auth reaches only core and auth; read reaches only core and read; no test file imports a module of another package; every core test sits in core/, every auth test in auth/ and every write test in write/; every fixture is reported.');
   return 0;
 };
 
