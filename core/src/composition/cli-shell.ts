@@ -36,7 +36,7 @@ type CliOutput = {
 /*
  * The CLI builder is core (package split, step 13): it builds the CLI of the
  * package it is given and imports no registry and no lifecycle command. The
- * composition root hands it the package (`cli.ts` for the single package).
+ * composition root hands it the package (`cli.ts` for the read package).
  *
  * `buildLifecycleCli` (package split, phase 4) builds the CLI of a package with
  * no Graph command, such as auth: the global flags, `help`, `help-json`, `docs`,

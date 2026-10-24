@@ -115,7 +115,7 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
 
 // CORE_FILES: the core modules that the read-only ban does not reach.
 const CORE_FILES = [
-  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,skeleton-cli,token-source}.ts',
+  'src/composition/{cli-shell,mcp-shell,run-registry-command,date-zone,token-source}.ts',
   'src/use-cases/commands/{command-types,command-graph}.ts',
   'src/presenter/*.ts',
   'src/use-cases/ports/{filesystem,logger,process-runner,token-source}.ts',
