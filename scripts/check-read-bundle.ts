@@ -5,20 +5,22 @@
  * write method and no upload session. While one package still holds both
  * graphs, its dist cannot answer that, so this check bundles the read side on
  * its own: an entry that imports `createReadGraph` and every read command
- * module, built the way `build:js` builds (every dependency external, so only
- * this repo's code is scanned).
+ * module, built the way read's build does (the dependencies of
+ * read/package.json external, every other module inlined).
  *
  * It looks for the markers only the write graph carries: a `"PUT"`, `"PATCH"`
  * or `"DELETE"` string, and `createUploadSession`. The ESLint rule in
  * eslint.config.js keeps read code from importing write-graph.ts; this proves
  * that nothing reaches it through another path either.
  *
- * The real root entries are read bundles too since the root cut (package
- * split, phase 5): src/main.ts (the bin) and src/index.ts (the library),
- * built the same way, must hold no marker either.
+ * The real read entries are read bundles too since the root cut (package
+ * split, phase 5): main.ts (the bin) and index.ts (the library), built the
+ * same way, must hold no marker either. Read's files are in the root src/
+ * while it holds the read registry, and in read/src/ after the move (phase 6).
  *
  * Controls: the synthetic entry plus `createWriteGraph`, and the real entry of
- * the write bin (write/src/main.ts), must each show all four markers, so a
+ * the write bin (write/src/main.ts, with the dependencies of
+ * write/package.json external), must each show all four markers, so a
  * check that can no longer see them fails instead of passing (rule 15.10: a
  * gate only ever seen green is a hypothesis).
  *
@@ -32,14 +34,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
-const COMMANDS = join(ROOT, 'src/use-cases/commands');
-// The two graphs are core's (package split, phase 3): in core/src once moved,
-// in the root src/ before.
-const coreModule = (path: string): string => (existsSync(join(ROOT, 'core', path)) ? join(ROOT, 'core', path) : join(ROOT, path));
-const READ_GRAPH = coreModule('src/infra/read-graph.ts');
-const WRITE_GRAPH = coreModule('src/infra/write-graph.ts');
-// The real entries: the root's (read only) and the write bin (a control).
-const READ_ENTRIES: ReadonlyArray<string> = ['src/main.ts', 'src/index.ts'];
+// Read's source folder: the root src/ while it holds the read registry, else read/src/.
+const READ_SRC = existsSync(join(ROOT, 'src/use-cases/commands/index.ts')) ? 'src' : 'read/src';
+const COMMANDS = join(ROOT, READ_SRC, 'use-cases/commands');
+// The two graphs are core's (package split, phase 3).
+const READ_GRAPH = join(ROOT, 'core/src/infra/read-graph.ts');
+const WRITE_GRAPH = join(ROOT, 'core/src/infra/write-graph.ts');
+// The real entries: read's and the write bin (a control).
+const READ_ENTRIES: ReadonlyArray<string> = [`${READ_SRC}/main.ts`, `${READ_SRC}/index.ts`];
 const WRITE_ENTRY = 'write/src/main.ts';
 
 type Marker = { readonly name: string; readonly pattern: RegExp };
@@ -64,8 +66,9 @@ const readCommandFiles = async (): Promise<ReadonlyArray<string>> => {
   return reads;
 };
 
-const dependencies = async (): Promise<ReadonlyArray<string>> => {
-  const manifest = (await Bun.file(join(ROOT, 'package.json')).json()) as { readonly dependencies?: Record<string, string> };
+// The externals of a package's bundles: the keys of its dependencies (scripts/build-package.ts).
+const dependencies = async (folder: string): Promise<ReadonlyArray<string>> => {
+  const manifest = (await Bun.file(join(ROOT, folder, 'package.json')).json()) as { readonly dependencies?: Record<string, string> };
   return Object.keys(manifest.dependencies ?? {});
 };
 
@@ -96,13 +99,13 @@ const found = (code: string): ReadonlyArray<string> => MARKERS.filter((marker) =
 
 const main = async (): Promise<number> => {
   const files = await readCommandFiles();
-  const external = await dependencies();
+  const external = await dependencies('read');
   const dir = mkdtempSync(join(tmpdir(), 'read-bundle-'));
   try {
     const read = await bundle(dir, 'read', entrySource(files, false), external);
     const control = await bundle(dir, 'control', entrySource(files, true), external);
     const entries = await Promise.all(READ_ENTRIES.map(async (entry) => [entry, await build(entry, join(ROOT, entry), external)] as const));
-    const writeControl = await build(WRITE_ENTRY, join(ROOT, WRITE_ENTRY), external);
+    const writeControl = await build(WRITE_ENTRY, join(ROOT, WRITE_ENTRY), await dependencies('write'));
     if (read === undefined || control === undefined || writeControl === undefined || entries.some(([, code]) => code === undefined)) return 1;
     console.log(`check-read-bundle: the read graph and ${files.length} read commands, ${read.length} bytes built; ${READ_ENTRIES.join(' and ')} built as read bundles.`);
     const leaks = [['the read bundle', read] as const, ...entries.map(([entry, code]) => [`the bundle of ${entry}`, code ?? ''] as const)].flatMap(([name, code]) => {
