@@ -4,11 +4,8 @@
 linker = "hoisted"
 
 [test]
-# The root src/ only: each workspace folder (core/, auth/, read/, write/) runs
-# its own tests with its own bunfig.toml. `bun run test` runs them all.
-root = "src"
-# Fails any test that reaches the real network. See scripts/no-network-preload.ts.
+# The root has no source and no tests of its own: each workspace folder (core/,
+# auth/, read/, write/) runs its own tests with its own bunfig.toml, and
+# `bun run test` runs them all. A bare `bun test` at the root still refuses the
+# real network. See scripts/no-network-preload.ts.
 preload = ["./scripts/no-network-preload.ts"]
-coverage = true
-coverageSkipTestFiles = true
-coverageReporter = ["text"]

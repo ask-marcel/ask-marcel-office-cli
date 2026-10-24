@@ -72,6 +72,10 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@ask-marcel/office-core": "workspace:*"
+    "@ask-marcel/office-core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "commander": "^14.0.3",
+    "diff": "^9.0.0",
+    "docx": "^9.6.1"
   }
 }

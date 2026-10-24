@@ -34,10 +34,10 @@
  *
  * The package and the three documents are arguments, not imports, so one
  * script serves every package of the split (plan "Scripts ownership");
- * `bun run check:docs` passes the root package and the write package, which
- * the root documents together until the docs split (see command-packages.ts):
+ * `bun run check:docs` passes the read package and the write package, which
+ * the root docs describe together until the docs split (see command-packages.ts):
  *
- *   bun run scripts/check-doc-numbers.ts --package src/composition/single-package.ts \
+ *   bun run scripts/check-doc-numbers.ts --package read/src/composition/single-package.ts \
  *     --package write/src/composition/write-package.ts \
  *     --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md \
  *     --manifest docs/commands.json

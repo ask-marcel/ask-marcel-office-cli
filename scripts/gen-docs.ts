@@ -8,10 +8,10 @@
  *
  * The package and the two paths are arguments, not imports, so one script serves
  * every package of the split (plan "Scripts ownership"); `bun run docs:gen`
- * passes the root package and the write package, which the root documents
+ * passes the read package and the write package, which the root docs describe
  * together until the docs split (see command-packages.ts):
  *
- *   bun run scripts/gen-docs.ts --package src/composition/single-package.ts \
+ *   bun run scripts/gen-docs.ts --package read/src/composition/single-package.ts \
  *     --package write/src/composition/write-package.ts \
  *     --manifest docs/commands.json --commands-doc docs/COMMANDS.md
  *
@@ -25,8 +25,9 @@
  * pass split docs out (README is the landing page, the deep tables moved
  * to docs/COMMANDS.md) so the README would stop ballooning past 500 lines.
  *
- * Run via `bun run docs:gen`. The build pipeline runs this BEFORE
- * `bun build` so `dist/commands.json` is always up-to-date.
+ * Run via `bun run docs:gen`. The builds of read/ and write/ also run it with
+ * their own package and `--manifest dist/commands.json`, so each package ships
+ * the manifest of its own commands.
  */
 
 import { resolve } from 'node:path';
