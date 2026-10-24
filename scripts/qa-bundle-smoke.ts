@@ -23,7 +23,7 @@ import type { SpawnSyncReturns } from 'node:child_process';
 import {
   buildRichDocx, buildRichXlsx, buildRichPptx, buildRichOdt, buildRichOds, buildRichOdp,
   buildPdfWithText, buildPdfWithImage, buildSampleDoc, buildLegacyXls, buildSampleMsg, buildSampleEml, buildSampleZipArchive,
-} from '../src/test-helpers/office-fixtures.ts';
+} from '../read/src/test-helpers/office-fixtures.ts';
 
 const DIR = '/tmp/qa/smoke';
 mkdirSync(DIR, { recursive: true });
