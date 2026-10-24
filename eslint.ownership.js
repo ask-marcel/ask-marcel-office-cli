@@ -12,6 +12,10 @@
  * options when two blocks match the same file (it does not merge them), so a
  * file under two bans gets a block that lists both.
  */
+// READ_ONLY_IMPORT_BANS: read code never holds the write graph (D9). The root
+// config and read/eslint.config.js apply both bans to every read file except
+// build-deps.ts and graph-client.ts, which read's config holds to the first ban
+// only; core/eslint.config.js applies them to the core files that read code uses.
 const READ_ONLY_IMPORT_BANS = [
   {
     regex: '(^|/)write-graph(\\.[cm]?[jt]s)?$',
@@ -138,9 +142,10 @@ const SINGLE_PACKAGE_FILES = [
   'src/infra/graph-client.ts',
 ];
 
-// The option of the stdout ban, which the root eslint.config.js and the core, auth and write configs
-// apply to their files too (the MCP gateway moved to core in phase 3, the auth MCP tools to auth in
-// phase 4, and the write MCP server moves to write in phase 5).
+// The option of the stdout ban, which the root eslint.config.js and the core, auth, read and write
+// configs apply to their files too (the MCP gateway moved to core in phase 3, the auth MCP tools to
+// auth in phase 4, the write MCP server to write in phase 5, and the read MCP server moves to read in
+// phase 6).
 const STDOUT_BAN = {
   object: 'process',
   property: 'stdout',

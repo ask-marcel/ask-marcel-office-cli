@@ -27,17 +27,18 @@ export default [
   },
   {
     // Read-only code never holds the write graph (package split, D9): the read
-    // commands, their helpers and the read graph's own modules import neither
-    // write-graph.ts (its type included, so no read command can be typed against
-    // it) nor a value from graph-client.ts, which builds the client of the
-    // composition root: a read command runs on the graph that the registry
-    // gives it. Type imports from graph-client.ts (`GraphError`) are erased at
-    // build time.
-    // The registry (index.ts) is the exception. The write commands and their
-    // write-only helpers are in write/ since phase 5, outside this block.
+    // files import neither write-graph.ts (its type included, so no read command
+    // can be typed against it) nor a value from graph-client.ts, which builds the
+    // client of the composition root: a read command runs on the graph that the
+    // registry gives it. Type imports from graph-client.ts (`GraphError`) are
+    // erased at build time.
+    // The composition root (build-deps.ts) and graph-client.ts itself are the
+    // exceptions. The write commands and their write-only helpers are in write/
+    // since phase 5, outside this block. read/eslint.config.js applies the same
+    // scope to read's files after the move.
     // scripts/check-read-bundle.ts checks the same boundary on the built code.
-    files: ['src/use-cases/commands/**/*.ts', 'src/infra/read-graph.ts', 'src/infra/graph-request.ts', 'src/infra/graph-substrate.ts'],
-    ignores: ['**/*.test.ts', 'src/use-cases/commands/{index,command-graph,command-types}.ts'],
+    files: ['src/**/*.ts'],
+    ignores: ['**/*.test.ts', 'src/test-helpers/**', 'src/composition/build-deps.ts', 'src/infra/graph-client.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
