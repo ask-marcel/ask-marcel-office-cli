@@ -10,10 +10,11 @@
 //
 // Overrides: SMOKE_TO=<addr> (default: signed-in user), SMOKE_READ_BIN=<path to
 // the read cli> (get-mail-message, get-current-user, list-mail-messages; default
-// ask-marcel-office) and SMOKE_WRITE_BIN=<path to the write cli> (the 4 draft
-// commands; default ask-marcel-office-write). From a checkout:
+// read/dist/cli.js, so run it from the repository root after `bun run build` in
+// read/) and SMOKE_WRITE_BIN=<path to the write cli> (the 4 draft commands;
+// default ask-marcel-office-write). From a checkout:
 //
-//   SMOKE_READ_BIN=dist/cli.js SMOKE_WRITE_BIN=write/dist/cli.js bun scripts/qa-write-smoke.ts --yes-create-drafts
+//   SMOKE_WRITE_BIN=write/dist/cli.js bun scripts/qa-write-smoke.ts --yes-create-drafts
 //
 // Output is status-only: lengths + PASS/FAIL + draft IDs, never the body text
 // (which would carry real mailbox content).
@@ -22,7 +23,7 @@ import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-
 
 // The write commands run on the write bin, every other command on the read bin
 // (package split, phase 5): the role comes from core's command directory.
-const READ_BIN = process.env.SMOKE_READ_BIN ?? 'ask-marcel-office';
+const READ_BIN = process.env.SMOKE_READ_BIN ?? 'read/dist/cli.js';
 const WRITE_BIN = process.env.SMOKE_WRITE_BIN ?? 'ask-marcel-office-write';
 const binOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_BIN : READ_BIN);
 const TO = process.env.SMOKE_TO ?? '';

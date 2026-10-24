@@ -10,7 +10,8 @@
 //   bun scripts/qa-dedup-smoke.ts --yes-create-drafts
 //
 // Overrides: SMOKE_READ_BIN=<path to the read cli> (list-mail-folder-messages,
-// find-mail-drafts; default ask-marcel-office) and SMOKE_WRITE_BIN=<path to the
+// find-mail-drafts; default read/dist/cli.js, so run it from the repository
+// root after `bun run build` in read/) and SMOKE_WRITE_BIN=<path to the
 // write cli> (create-reply-draft; default ask-marcel-office-write). Output is
 // status-only (ids + counts), never body text.
 
@@ -18,7 +19,7 @@ import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-
 
 // The write commands run on the write bin, every other command on the read bin
 // (package split, phase 5): the role comes from core's command directory.
-const READ_BIN = process.env.SMOKE_READ_BIN ?? 'ask-marcel-office';
+const READ_BIN = process.env.SMOKE_READ_BIN ?? 'read/dist/cli.js';
 const WRITE_BIN = process.env.SMOKE_WRITE_BIN ?? 'ask-marcel-office-write';
 const binOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_BIN : READ_BIN);
 

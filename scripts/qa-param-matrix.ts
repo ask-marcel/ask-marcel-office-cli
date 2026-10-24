@@ -5,9 +5,9 @@
  * For EVERY command, exercises four validation cases that all fire BEFORE any
  * Graph call (strictly offline against the built bundles — the honest bundle,
  * not the source): a write command against `write/dist/cli.js`, every other
- * command against the root `dist/cli.js`, by the role in core's command
- * directory (the merged docs/commands.json still lists the 7 writes, which the
- * root bin no longer runs; package split, phase 5). Build both first.
+ * command against `read/dist/cli.js`, by the role in core's command directory
+ * (the merged docs/commands.json lists the read and the write commands; package
+ * split, phases 5 and 6). Build both first (`bun run build` in read/ and write/).
  *   - unknown-flag              → must reject (unknown option OR, on a command
  *                                 with required flags, the actionable
  *                                 missing-required message — both are correct)
@@ -21,7 +21,7 @@
  */
 import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
 
-const READ_CLI = 'dist/cli.js';
+const READ_CLI = 'read/dist/cli.js';
 const WRITE_CLI = 'write/dist/cli.js';
 const cliOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_CLI : READ_CLI);
 const manifest = JSON.parse(await Bun.file('docs/commands.json').text());
