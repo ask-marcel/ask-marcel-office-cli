@@ -23,7 +23,7 @@ ask-marcel-office help-json --terse --category mail     # ~8 KB JSON for one cat
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
 
-To upgrade, re-install from npm with the tool you installed with: `npm i -g ask-marcel-office-cli@latest` or `bun add -g ask-marcel-office-cli@latest`. From a clone you can keep using `bun run src/main.ts <command>` directly.
+To upgrade, re-install from npm with the tool you installed with: `npm i -g ask-marcel-office-cli@latest` or `bun add -g ask-marcel-office-cli@latest`. From a clone you can keep using `bun run read/src/main.ts <command>` directly.
 
 The first launch prints a one-time notice if a newer version is on npm.
 
@@ -186,7 +186,7 @@ Serves every command to an MCP client over stdio. Register it:
 ```bash
 claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
 # from a dev clone:
-claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
+claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/read/src/main.ts mcp
 ```
 
 Six gateway tools, not one per command (one schema per command would be ~190 per session, the
@@ -329,7 +329,7 @@ const md = await commands['convert-local-file-to-markdown'].executeLocal?.(creat
 const images = await commands['extract-local-file-images'].executeLocal?.(createNodeFileSystem(), { path: './deck.pdf' });
 ```
 
-The full export list (registry, factories, `Result`, branded types, ports) is in [`src/index.ts`](../src/index.ts). The machine-readable manifest is also available as a JSON subpath import:
+The full export list (registry, factories, `Result`, branded types, ports) is in [`read/src/index.ts`](../read/src/index.ts). The machine-readable manifest is also available as a JSON subpath import:
 
 ```ts
 import manifest from 'ask-marcel-office-cli/commands.json' with { type: 'json' };
@@ -397,19 +397,19 @@ Environment variables read at composition time:
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun test           # full suite (5,500+ tests)
+bun run test       # full suite of every folder (5,500+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
-bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
-bun run mutate:changed  # mutation testing on changed domain/use-case files (>90% kill threshold)
+bun run coverage   # in a folder: per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
+bun run mutate:changed  # in a folder: mutation testing on changed domain/use-case files (>90% kill threshold)
 bun run check:read-bundle  # the read graph and the read commands, built alone, hold no write method
 bun run check:package-imports  # a write module imports only core and write modules; read and core never reach write; a test file imports one package besides core
 ```
 
 The repo is also a Bun workspace for the package split (`docs/plans/2026-10-01-package-split.md`):
 `core/`, `auth/`, `read/` and `write/` each hold their own `package.json`, configs, tests and gates.
-At the root, `bun test` runs the root `src/` only; `bun run test` runs it and then every folder's
-tests. In a folder, the same commands run that folder's gates (`bun test`, `bun run lint`,
+Since phase 6 the root holds no package and no `src/`: at the root, `bun run test` runs every
+folder's tests. In a folder, the same commands run that folder's gates (`bun test`, `bun run lint`,
 `bun run typecheck`, `bun run coverage`, `bun run mutate:changed`), and a published folder adds
 `bun run build` and `bun run check:packed` (the packed tarball, installed into a clean consumer).
 
