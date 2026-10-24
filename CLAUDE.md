@@ -14,7 +14,8 @@ consult the skill before acting. If the skill and any doc disagree, the skill wi
 
 Each of `auth/ core/ read/ write/` is an atelier Bun TypeScript script repo (package split, ADR 0003):
 its own `src/{domain,use-cases,infra,presenter,composition}`, coverage tiers and mutation, run from
-that folder. The root `src/` is the single package until the split moves it out.
+that folder. Since phase 6 of the split the root holds no package and no `src/`: it keeps the shared
+configs, `scripts/` and the docs.
 
 Always use Atelier Skill
 
