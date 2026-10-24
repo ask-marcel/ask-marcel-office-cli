@@ -4,7 +4,7 @@ import { commands } from './index.ts';
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 // The directory is static so core can read it without the registry; this suite
-// is what keeps it true to the registry the single package ships.
+// is what keeps it true to the registry the read package ships.
 describe('the command-to-package directory', () => {
   it('places every registry command in the package its effect chooses: read for a read, write for a write', () => {
     const misplaced = Object.entries(commands)

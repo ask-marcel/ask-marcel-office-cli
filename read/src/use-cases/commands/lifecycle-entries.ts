@@ -8,10 +8,10 @@ import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/com
  * per-command docs. These stub entries surface them under category
  * 'lifecycle' with no graphMethod / options (the path template is a
  * `(meta) ...` description so the JSON shape stays uniform with regular
- * commands). The single package hands them to the shells as its
+ * commands). The read package hands them to the shells as its
  * `CommandPackage.lifecycle` (`composition/single-package.ts`). `login`,
  * `logout` and `status` are the auth package's (`auth-lifecycle-entries.ts`),
- * and the single package does not list them.
+ * and the read package does not list them.
  */
 export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {

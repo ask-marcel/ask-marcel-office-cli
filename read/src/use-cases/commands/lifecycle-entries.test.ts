@@ -4,12 +4,12 @@ import type { CommandManifestEntry } from '@ask-marcel/office-core/use-cases/com
 import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
 
 /*
- * The lifecycle commands of the single package after the root cut (package
- * split, phase 4): `docs`, `help-json` and `mcp`. The sign-in commands are the
- * auth package's (`auth-lifecycle-entries.ts`), so the root lists none of them.
+ * The lifecycle commands of the read package: `docs`, `help-json` and `mcp`.
+ * The sign-in commands are the auth package's (`auth-lifecycle-entries.ts`),
+ * so read lists none of them.
  */
 
-const ROOT_LIFECYCLE = { registry: {}, lifecycle: LIFECYCLE_ENTRIES, packageName: 'ask-marcel-office-cli' };
+const ROOT_LIFECYCLE = { registry: {}, lifecycle: LIFECYCLE_ENTRIES, packageName: '@ask-marcel/office-read' };
 const ROOT_COMMANDS = ['docs', 'help-json', 'mcp'];
 
 const entry = (name: string): CommandManifestEntry => {
@@ -18,7 +18,7 @@ const entry = (name: string): CommandManifestEntry => {
   return found;
 };
 
-describe('the lifecycle entries of the single package', () => {
+describe('the lifecycle entries of the read package', () => {
   it('lists docs, help-json and mcp, and no sign-in command', () => {
     expect(buildManifest(ROOT_LIFECYCLE, '1.0.0').commands.map((command) => command.name)).toEqual(ROOT_COMMANDS);
   });

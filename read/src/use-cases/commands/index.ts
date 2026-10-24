@@ -417,7 +417,7 @@ const modules: Record<string, ReadCommand> = {
 /*
  * Every command is wrapped so an undeclared parameter is refused before it runs
  * (2026-07-24), and so it runs on the read view of the graph (package split,
- * D9): the root holds read commands only, and the write commands are in
+ * D9): read holds read commands only, and the write commands are in
  * @ask-marcel/office-write. The wraps live HERE rather than in composition
  * because a library consumer reaches `commands[x].execute(...)` directly, never
  * passing through the CLI or the MCP gateway — wrapping at assembly is the only

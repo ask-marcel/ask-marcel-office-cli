@@ -1,6 +1,6 @@
 /*
- * The single package's MCP server: the core gateway (`mcp-shell.ts`) given the
- * single package (`single-package.ts`). It has no sign-in tools: `login` and
+ * The read package's MCP server: the core gateway (`mcp-shell.ts`) given the
+ * read package (`single-package.ts`). It has no sign-in tools: `login` and
  * `status` are tools of the auth package's own server (`auth-server.ts`).
  * main.ts imports this module dynamically, so a plain command never loads the SDK.
  */

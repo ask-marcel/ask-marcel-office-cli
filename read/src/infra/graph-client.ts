@@ -4,8 +4,8 @@ import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { createReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 
 /*
- * The root package's client: the read graph, for the composition root. The
- * root holds the read commands only, so its client has no write member (no
+ * The read package's client: the read graph, for the composition root. Read
+ * holds the read commands only, so its client has no write member (no
  * put, patch, delete or upload session, and a POST that reaches only the two
  * query endpoints). The write commands and the write graph are in
  * @ask-marcel/office-write (docs/plans/2026-10-01-package-split.md, D9).

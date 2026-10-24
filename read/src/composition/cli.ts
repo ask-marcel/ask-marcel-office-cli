@@ -1,6 +1,6 @@
 /*
- * The single package's CLI: the core CLI builder (`cli-shell.ts`) given the
- * single package (`single-package.ts`). It has no sign-in commands: `login`,
+ * The read package's CLI: the core CLI builder (`cli-shell.ts`) given the
+ * read package (`single-package.ts`). It has no sign-in commands: `login`,
  * `logout` and `status` are commands of the auth package (`auth-program.ts`).
  * Its deps are the ones `main.ts` and the real-registry suites pass.
  */

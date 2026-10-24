@@ -22,7 +22,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
   },
 });
 
-// A test registry with the single package's lifecycle entries, as the docs builders take it.
+// A test registry with the read package's lifecycle entries, as the docs builders take it.
 const withLifecycle = (registry: Readonly<Record<string, Command>>, packageName = 'fake-pkg'): Pick<CommandPackage, 'registry' | 'lifecycle' | 'packageName'> => ({
   registry,
   lifecycle: LIFECYCLE_ENTRIES,
