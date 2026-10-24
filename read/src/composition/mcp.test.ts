@@ -152,7 +152,7 @@ describe('running a read command over MCP', () => {
     const result = await client.callTool({ name: 'run-command', arguments: { command: 'list-mail-messages', params: { tenantId: 'not-a-guid; rm -rf /' } } });
     expect(isError(result)).toBe(true);
     expect(textOf(result)).toContain('not a parameter of this command');
-    expect(textOf(result)).not.toContain('next: ask-marcel-office next-page');
+    expect(textOf(result)).not.toContain('next: ask-marcel-office-read next-page');
   });
 
   it('surfaces a Graph failure as a tool error carrying the curated hint, so the agent can self-correct', async () => {

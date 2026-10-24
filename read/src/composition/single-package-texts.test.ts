@@ -32,10 +32,10 @@ const rootCli = (): Command => buildCli({ graph: fakeGraphClient(), logger: crea
 
 const WRITE_NAMES = [...COMMAND_DIRECTORY].filter(([, role]) => role === 'write').map(([name]) => name);
 
-describe('the texts of the root package', () => {
-  it('gives the docs help an example from its own registry: `ask-marcel-office docs list-mail-messages`', async () => {
+describe('the texts of the read package', () => {
+  it('gives the docs help an example from its own registry: `ask-marcel-office-read docs list-mail-messages`', async () => {
     const docs = rootCli().commands.find((command) => command.name() === 'docs');
-    expect(flat(await captureStdout(() => docs?.outputHelp()))).toContain('Example: ask-marcel-office docs list-mail-messages');
+    expect(flat(await captureStdout(() => docs?.outputHelp()))).toContain('Example: ask-marcel-office-read docs list-mail-messages');
   });
 
   it('shows where each of the 7 write commands lives: in the list of the root commands, or in @ask-marcel/office-write', () => {

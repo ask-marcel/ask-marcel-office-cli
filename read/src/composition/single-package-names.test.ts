@@ -4,7 +4,7 @@ import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-clie
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { buildCli } from './cli.ts';
 
-// The root fills each bin placeholder with the bin of the package that runs
+// Read fills each bin placeholder with the bin of the package that runs
 // the command (single-package-names.ts): its own bin for a read command, the
 // auth bin for a sign-in command and the write bin for a write command. The
 // bins are pinned as literals, not read from a package.json: the Stryker
@@ -32,9 +32,9 @@ const docsOf = (name: string): Promise<string> => {
   return captureStdout(() => cli.parseAsync(['node', 'ask-marcel-office', 'docs', name]));
 };
 
-describe('the bins that the root names in its docs', () => {
-  it('names its own bin before a read command: `ask-marcel-office list-drives`', async () => {
-    expect(await docsOf('list-drives')).toContain('ask-marcel-office list-drives');
+describe('the bins that read names in its docs', () => {
+  it('names its own bin before a read command: `ask-marcel-office-read list-drives`', async () => {
+    expect(await docsOf('list-drives')).toContain('ask-marcel-office-read list-drives');
   });
 
   it('names the auth bin before a sign-in command: `ask-marcel-office-auth login`', async () => {
@@ -44,6 +44,6 @@ describe('the bins that the root names in its docs', () => {
   it('names the write bin before a write command: `ask-marcel-office-write create-mail-draft`', async () => {
     const page = await docsOf('create-mail-draft');
     expect(page).toContain('ask-marcel-office-write create-mail-draft');
-    expect(page).not.toContain('ask-marcel-office create-mail-draft');
+    expect(page).not.toContain('ask-marcel-office-read create-mail-draft');
   });
 });

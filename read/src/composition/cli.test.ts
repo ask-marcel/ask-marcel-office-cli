@@ -447,7 +447,7 @@ describe('buildCli command surface', () => {
     const cli = buildCli({ graph: okGraph({}), logger, version: '1.0.0', fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help-json']));
     const parsed = JSON.parse(out.trim()) as { package: string; version: string; commands: ReadonlyArray<{ name: string }> };
-    expect(parsed.package).toBe('ask-marcel-office-cli');
+    expect(parsed.package).toBe('@ask-marcel/office-read');
     expect(parsed.version).toBe('1.0.0');
     expect(parsed.commands.length).toBeGreaterThan(100);
     expect(parsed.commands.some((c) => c.name === 'list-drives')).toBe(true);
@@ -820,7 +820,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office']));
-    expect(out).toContain('Usage: ask-marcel-office');
+    expect(out).toContain('Usage: ask-marcel-office-read');
     expect(out).toContain('help-json');
     expect(out).toContain('list-drives');
   });
@@ -845,7 +845,7 @@ describe('buildCli command surface', () => {
     const logger = createLoggerFake();
     const cli = buildCli({ graph: okGraph({}), logger, fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help']));
-    expect(out).toContain('Usage: ask-marcel-office');
+    expect(out).toContain('Usage: ask-marcel-office-read');
   });
 
   it('omitting --output-path leaves the JSON envelope unchanged (existing consumers still get base64) (under --output json)', async () => {
