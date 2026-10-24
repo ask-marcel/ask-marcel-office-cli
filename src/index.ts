@@ -1,44 +1,32 @@
 /*
- * Public library API for `ask-marcel-office-cli`.
+ * Public library API of the read package (dist/index.js and dist/index.d.ts),
+ * F3 of the package split:
  *
- * Anything re-exported here is part of the package's public surface and
- * follows semver. Anything NOT re-exported here is implementation detail
- * (presenter, individual command files, format-error, ports, fakes).
+ * - `commands`: the read commands, each on the read graph alone;
+ * - `createReadGraph(tokens)`: the read graph (every read tier, the chat
+ *   substrate and a POST that reaches only the two query endpoints) over a
+ *   token source;
+ * - `createEnvThenHelperTokenSource()`: the tier variables of this process,
+ *   else the token helper of @ask-marcel/office-auth;
+ * - `createReadClient()`: the two above together.
  *
- * Consumers:
- *   import { commands, buildDeps } from 'ask-marcel-office-cli';
+ * This entry imports no logger, so dist/index.js carries no winston. Core is
+ * private and never published: the build inlines its code, and its types reach
+ * the published declarations only through re-exports such as the ones below
+ * (docs/plans/2026-10-01-package-split.md, Library API per package).
  */
 
-import type { Command as CoreCommand, GraphExecute } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import type { GraphClient } from './infra/graph-client.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { Command as CoreCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
-export { accessToken, accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
-export type { AccessToken, AccessTokenError } from '@ask-marcel/office-core/domain/access-token.ts';
-export { envVar, envVarUnsafe } from '@ask-marcel/office-core/domain/env-var.ts';
-export type { EnvVar, EnvVarError } from '@ask-marcel/office-core/domain/env-var.ts';
-export { decodeJwtPayload, isGraphToken, isTokenFresh } from '@ask-marcel/office-core/domain/jwt-utils.ts';
-export { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 export type { Result } from '@ask-marcel/office-core/domain/result.ts';
+export { createReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+export type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+export type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
 
-export { createBunFileSystem } from '@ask-marcel/office-core/infra/filesystem-bun.ts';
-export { createNodeFileSystem } from '@ask-marcel/office-core/infra/filesystem-node.ts';
-export type { FetchFn, GraphClient, GraphError } from './infra/graph-client.ts';
-export { createWinstonLogger } from '@ask-marcel/office-core/infra/logger.ts';
-export type { WinstonLoggerConfig } from '@ask-marcel/office-core/infra/logger.ts';
-export { createBunProcessRunner } from '@ask-marcel/office-core/infra/process-runner-bun.ts';
-export { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-runner-node.ts';
-
-export type { AtomicFileWrites, FileExistence, FileSystem, FileSystemError } from '@ask-marcel/office-core/use-cases/ports/filesystem.ts';
-export type { Logger, LogMeta } from '@ask-marcel/office-core/use-cases/ports/logger.ts';
-export type { ProcessRunner, ProcessRunnerError, ProcessRunOptions, ProcessRunResult } from '@ask-marcel/office-core/use-cases/ports/process-runner.ts';
+/** A read command: its meta and its run on the read graph. */
+export type Command = CoreCommand<ReadGraph>;
 
 export { commands } from './use-cases/commands/index.ts';
-export type { CommandSchema } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-
-/** A command of `commands`: its meta and its run on the read graph that `GraphClient` names. */
-export type Command = CoreCommand<GraphClient>;
-/** The run of a command of `commands` on `GraphClient`. */
-export type CommandExecute = GraphExecute<GraphClient>;
-
-export { buildDeps } from './composition/build-deps.ts';
-export type { BuildDepsConfig, BuiltDeps } from './composition/build-deps.ts';
+export { createEnvThenHelperTokenSource } from './composition/read-token-source.ts';
+export { createReadClient } from './composition/read-client.ts';
