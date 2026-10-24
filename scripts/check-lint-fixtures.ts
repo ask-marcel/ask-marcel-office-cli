@@ -108,8 +108,6 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   { name: 'the CLI builder never loads the registry with a dynamic import', path: 'src/composition/cli-shell.ts', source: DYNAMIC_REGISTRY_IMPORT, rule: 'no-restricted-syntax', fires: true, strict: false },
   { name: 'a core docs builder never loads the registry with a dynamic import', path: 'src/use-cases/commands/docs-builders.ts', source: DYNAMIC_REGISTRY_IMPORT.replace('../use-cases/commands/index.ts', './index.ts'), rule: 'no-restricted-syntax', fires: true, strict: false },
   { name: 'control: the core file system loads its Node half dynamically', path: 'src/infra/filesystem-bun.ts', source: DYNAMIC_SIBLING_IMPORT, rule: 'no-restricted-syntax', fires: false, strict: false },
-  { name: 'control: the composition root wires the registry', path: 'src/composition/single-package.ts', source: REGISTRY_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
-  { name: 'control: a login import outside the core ban', path: 'src/composition/single-package.ts', source: LOGIN_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the auth ladder never loads the browser', path: 'src/infra/auth.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },
   { name: 'control: the browser half of auth loads it', path: 'src/infra/auth-browser.ts', source: BROWSER_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: false, strict: false },
   { name: 'the token helper never loads winston', path: 'src/composition/token-helper.ts', source: WINSTON_IMPORT, rule: '@typescript-eslint/no-restricted-imports', fires: true, strict: false },

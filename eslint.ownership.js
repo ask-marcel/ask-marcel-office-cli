@@ -2,8 +2,8 @@
  * The data the lint configs share (package split): the core file lists, and
  * the import and stdout bans. Pure data, so a folder's eslint.config.js can
  * import it without loading the root config (two configs that each call
- * baseConfig leave typescript-eslint with two tsconfig roots). The root
- * eslint.config.js and the folder configs apply the bans.
+ * baseConfig leave typescript-eslint with two tsconfig roots). The folder
+ * configs apply the bans.
  * scripts/check-package-imports.ts reads no list: the folder decides the
  * package of a file.
  */
@@ -13,10 +13,16 @@
  * options when two blocks match the same file (it does not merge them), so a
  * file under two bans gets a block that lists both.
  */
-// READ_ONLY_IMPORT_BANS: read code never holds the write graph (D9). The root
-// config and read/eslint.config.js apply both bans to every read file except
-// build-deps.ts and graph-client.ts, which read's config holds to the first ban
-// only; core/eslint.config.js applies them to the core files that read code uses.
+// READ_ONLY_IMPORT_BANS: read code never holds the write graph (package split,
+// D9). A read file imports neither write-graph.ts (its type included, so no read
+// command can be typed against it) nor a value from graph-client.ts, which
+// builds the client of the composition root: a read command runs on the graph
+// that the registry gives it. Type imports from graph-client.ts (`GraphError`)
+// are erased at build time. read/eslint.config.js applies both bans to every
+// read file except build-deps.ts and graph-client.ts, which it holds to the
+// first ban only; core/eslint.config.js applies them to the core files that read
+// code uses. scripts/check-read-bundle.ts checks the same boundary on the built
+// code.
 const READ_ONLY_IMPORT_BANS = [
   {
     regex: '(^|/)write-graph(\\.[cm]?[jt]s)?$',
@@ -30,6 +36,12 @@ const READ_ONLY_IMPORT_BANS = [
   },
 ];
 
+// CORE_IMPORT_BANS: core never knows which package it serves (package split,
+// step 13). The core files take the registry, the lifecycle entries and the
+// names from the CommandPackage that the composition root hands them, so they
+// never import the registry (by path, by folder, through the package entry or
+// with a dynamic import), a lifecycle command, or the modules that wire a
+// package. core/eslint.config.js applies them to the two core lists below.
 const CORE_IMPORT_BANS = [
   {
     regex: '^(\\./|\\.\\./(.*/)?commands/)(index|login|logout|status|login-status|token|token-args|token-tier-capability|lifecycle-entries)(\\.[cm]?[jt]s)?$',
@@ -67,7 +79,7 @@ const AUTH_LADDER_IMPORT_BANS = [
 // The token helper (auth/src/token.ts, auth/src/composition/token-helper.ts;
 // auth/eslint.config.js applies the ban) stays near bare Node startup: read and
 // write spawn it for every bearer they lack. It never loads the CLI or the MCP
-// server (the root's builders, auth's builders, the MCP SDK, zod), winston, the
+// server (core's CLI and MCP shells, auth's builders, the MCP SDK, zod), winston, the
 // update notifier, the renderer or, statically, the browser; the browser
 // ladder comes in by a dynamic import only for a person at a terminal. Type
 // imports are erased, so they stay allowed. src/token.ts is a bundle entry, so
@@ -126,10 +138,17 @@ const CORE_READ_ONLY_FILES = [
   'src/infra/{graph-request,read-graph,graph-substrate}.ts',
 ];
 
-// The option of the stdout ban, which the root eslint.config.js and the core, auth, read and write
-// configs apply to their files too (the MCP gateway moved to core in phase 3, the auth MCP tools to
-// auth in phase 4, the write MCP server to write in phase 5, and the read MCP server to read in
-// phase 6).
+// The option of the stdout ban, which the core, auth, read and write configs apply to their files
+// (the MCP gateway moved to core in phase 3, the auth MCP tools to auth in phase 4, the write MCP
+// server to write in phase 5, and the read MCP server to read in phase 6). An MCP server serves
+// JSON-RPC frames over stdout, and ANY other write to that stream corrupts the protocol. Nothing
+// else can catch it: the MCP tests drive InMemoryTransport (never stdout), and even a real stdio
+// handshake stays green, because the SDK's client-side ReadBuffer skips the lines it cannot parse
+// (verified 2026-07-17 by injecting a banner: a Client-based probe reported a clean handshake
+// against a provably corrupt stream). Only a raw-stdout probe, as in the bundle smokes, sees a
+// stray write. So the ban is the enforcement. It is an allowlist since package-split step 13:
+// stdout is banned in every file but the CLI writers, so a new MCP file is covered the day it
+// lands, whatever its name. Render with renderToString / renderErrorToString and return the string.
 const STDOUT_BAN = {
   object: 'process',
   property: 'stdout',

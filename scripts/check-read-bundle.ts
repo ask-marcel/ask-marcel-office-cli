@@ -10,13 +10,12 @@
  *
  * It looks for the markers only the write graph carries: a `"PUT"`, `"PATCH"`
  * or `"DELETE"` string, and `createUploadSession`. The ESLint rule in
- * eslint.config.js keeps read code from importing write-graph.ts; this proves
- * that nothing reaches it through another path either.
+ * read/eslint.config.js keeps read code from importing write-graph.ts; this
+ * proves that nothing reaches it through another path either.
  *
  * The real read entries are read bundles too since the root cut (package
- * split, phase 5): main.ts (the bin) and index.ts (the library), built the
- * same way, must hold no marker either. Read's files are in the root src/
- * while it holds the read registry, and in read/src/ after the move (phase 6).
+ * split, phase 5): read/src/main.ts (the bin) and read/src/index.ts (the
+ * library), built the same way, must hold no marker either.
  *
  * Controls: the synthetic entry plus `createWriteGraph`, and the real entry of
  * the write bin (write/src/main.ts, with the dependencies of
@@ -29,13 +28,13 @@
  *   1  a read bundle has a marker, a control misses one, or a build failed
  */
 
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
-// Read's source folder: the root src/ while it holds the read registry, else read/src/.
-const READ_SRC = existsSync(join(ROOT, 'src/use-cases/commands/index.ts')) ? 'src' : 'read/src';
+// Read's source folder (package split, phase 6).
+const READ_SRC = 'read/src';
 const COMMANDS = join(ROOT, READ_SRC, 'use-cases/commands');
 // The two graphs are core's (package split, phase 3).
 const READ_GRAPH = join(ROOT, 'core/src/infra/read-graph.ts');

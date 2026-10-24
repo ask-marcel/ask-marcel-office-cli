@@ -2,8 +2,8 @@ import { baseConfig } from '../eslint.base.js';
 import { READ_ONLY_IMPORT_BANS, STDOUT_BAN } from '../eslint.ownership.js';
 
 /*
- * Read's own path-scoped rules (package split, phase 6), which the root holds
- * for these files until the move. The reasons of the bans live beside their
+ * Read's own path-scoped rules (package split, phase 6), which the root held
+ * for these files before the move. The reasons of the bans live beside their
  * data in eslint.ownership.js; scripts/check-lint-fixtures.ts proves that they
  * fire here. No ban on auth or write imports: the import check
  * (scripts/check-package-imports.ts) refuses them.

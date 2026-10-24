@@ -10,8 +10,8 @@ import tsPlugin from 'typescript-eslint';
  * The lint rules every folder shares (package split, D7): the root config and
  * the config of each workspace folder (core/, auth/, read/, write/) spread this
  * base, then add the blocks that only their own files need. Globs here are
- * relative to the config that spreads the base, so `src/**` names the root
- * src/ in the root config and core/src/ in core's.
+ * relative to the config that spreads the base, so `src/**` names core/src/
+ * in core's config and read/src/ in read's. The root has no src/ (phase 6).
  *
  * tsconfigRootDir: the folder whose tsconfig.json the type-aware lint
  * (LINT_STRICT) reads; pass `import.meta.dirname` of the spreading config.
