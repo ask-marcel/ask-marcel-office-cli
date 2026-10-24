@@ -50,6 +50,7 @@ import '@ask-marcel/office-core/infra/token-helper-run.ts';
 import '../src/index.ts';
 
 import '../src/composition/build-deps.ts';
+import '../src/composition/read-token-source.ts';
 import '../src/composition/cli.ts';
 import '@ask-marcel/office-core/composition/cli-shell.ts';
 import '../src/composition/single-package.ts';
