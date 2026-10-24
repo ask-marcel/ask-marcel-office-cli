@@ -7,15 +7,15 @@ import { formatError } from '@ask-marcel/office-core/domain/utilities/format-err
 const ONE_WEEK_MS = 1000 * 60 * 60 * 24 * 7;
 
 /*
- * `ask-marcel-office mcp` serves the MCP gateway over stdio instead of running a
- * command. It is intercepted HERE, before anything else in main, for two
- * reasons:
+ * The bin of @ask-marcel/office-read (dist/cli.js).
+ * `ask-marcel-office-read mcp` serves the read MCP gateway over stdio instead
+ * of running a command. It is intercepted HERE, before anything else in main,
+ * for two reasons:
  *
  * 1. stdout is the JSON-RPC frame channel in this mode. update-notifier must
  *    never run — a "new version available" banner would corrupt the stream.
  * 2. It is deliberately NOT a commander subcommand. Registering it would pull
- *    the MCP SDK into the module graph for all 183 commands, and would add a
- *    lifecycle entry that `docs.test.ts` pins exactly.
+ *    the MCP SDK into the module graph of every read command.
  *
  * The imports are dynamic so a normal command never evaluates the SDK.
  */

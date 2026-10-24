@@ -24,14 +24,6 @@ export default [
     },
   },
   {
-    // The skeleton bin writes its answers to stdout until the read bin
-    // replaces it.
-    files: ['src/main.ts'],
-    rules: {
-      'no-restricted-properties': 'off',
-    },
-  },
-  {
     // A read file never builds the client of the composition root either:
     // only the composition root (build-deps.ts) takes it from the module that
     // builds it (graph-client.ts).
