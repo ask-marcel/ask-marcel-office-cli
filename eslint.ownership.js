@@ -4,7 +4,7 @@
  * so a folder's eslint.config.js can import it without loading the root config
  * (two configs that each call baseConfig leave typescript-eslint with two
  * tsconfig roots). The root eslint.config.js and the folder configs apply
- * the bans; scripts/check-package-imports.ts reads the lists.
+ * the bans. scripts/check-package-imports.ts reads no list: the folder decides.
  */
 
 /*
@@ -92,17 +92,15 @@ const CORE_DYNAMIC_IMPORT_BANS = CORE_IMPORT_BANS.map(({ regex, message }) => ({
 
 /*
  * Who owns each module after the package split (docs/plans/2026-10-01-package-split.md,
- * "What goes where"). The lint blocks read these lists, and
- * scripts/check-package-imports.ts reads them too. A file joins a list when it
- * becomes core.
+ * "What goes where"). The lint blocks read these lists. A file joins a list
+ * when it becomes core.
  *
  * A file under core/, auth/ or write/ belongs to its folder's package (phases 3
  * to 5): auth and write have no list, and the lists below apply to the root
  * src/ only. A write module may import only core and write modules, and no
  * module outside write/ may reach a write module (the check, not a list,
- * guards this). A test file belongs to one package too (step 16): the check
- * reads SINGLE_PACKAGE_FILES for that, and no lint block reads it yet. A module
- * of the root src/ in no list is read's.
+ * guards this). A test file belongs to the package of its folder too (step 16).
+ * No check and no lint block reads SINGLE_PACKAGE_FILES now.
  */
 
 // CORE_FILES: the core modules that the read-only ban does not reach.

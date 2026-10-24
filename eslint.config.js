@@ -84,5 +84,5 @@ export default [
   },
 ];
 
-// The ownership lists stay importable from here, where the checks have read them since step 15.
+// The ownership lists stay importable from here, where the checks read them from step 15 to phase 6.
 export { CORE_FILES, CORE_READ_ONLY_FILES, SINGLE_PACKAGE_FILES } from './eslint.ownership.js';
