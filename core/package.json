@@ -24,6 +24,6 @@
     "@modelcontextprotocol/sdk": "^1.32.1",
     "commander": "^14.0.3",
     "winston": "^3.19.0",
-    "zod": "^4.3.6"
+    "zod": "^4.6.6"
   }
 }
