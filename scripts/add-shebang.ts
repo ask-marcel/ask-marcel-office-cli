@@ -7,9 +7,9 @@
  *
  * Bun build does not insert shebangs, so this runs after `bun build`.
  *
- * Each build names its own entries: `bun run scripts/add-shebang.ts
- * dist/cli.js` at the root, `bun run ../scripts/add-shebang.ts dist/cli.js` in
- * a workspace folder. With no argument, it stops with exit 1.
+ * Each build names its own entries, from its workspace folder: for example
+ * `bun run ../scripts/add-shebang.ts dist/cli.js`. With no argument, it stops
+ * with exit 1.
  */
 
 import { chmodSync } from 'node:fs';
