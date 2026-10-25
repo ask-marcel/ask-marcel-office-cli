@@ -1,7 +1,7 @@
 {
   "package": "ask-marcel-office-cli",
   "version": "2.8.0",
-  "generatedAt": "2026-10-18T11:41:49.733Z",
+  "generatedAt": "2026-09-28T12:55:00.506Z",
   "commands": [
     {
       "name": "convert-calendar-event-attachment-to-markdown",
@@ -58,8 +58,7 @@
       ],
       "example": "ask-marcel-office convert-calendar-event-attachment-to-markdown --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-calendar-event-attachment-to-pdf",
@@ -82,10 +81,9 @@
           "description": "Attachment ID inside that event. Returned by `list-calendar-event-attachments`."
         }
       ],
-      "example": "ask-marcel-office-write convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
+      "example": "ask-marcel-office convert-calendar-event-attachment-to-pdf --event-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true,
-      "effect": "transient-upload"
+      "producesBytes": true
     },
     {
       "name": "convert-drive-item-zip-to-markdown",
@@ -147,8 +145,7 @@
         }
       ],
       "example": "ask-marcel-office convert-drive-item-zip-to-markdown --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted.",
-      "effect": "read"
+      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }` instead. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted."
     },
     {
       "name": "convert-group-post-attachment-to-markdown",
@@ -217,8 +214,7 @@
       ],
       "example": "ask-marcel-office convert-group-post-attachment-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file and reference attachments run through the conversion dispatch; an embedded item is rendered locally). Plain-text sources return the raw-bytes envelope, and a PDF source carries `pageCount`. Unsupported types return an api_error with status 415 naming `get-group-post-attachment` as the way to the bytes.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-group-post-attachment-to-pdf",
@@ -253,10 +249,9 @@
           "description": "Attachment ID inside that post. Returned by `list-group-post-attachments`."
         }
       ],
-      "example": "ask-marcel-office-write convert-group-post-attachment-to-pdf --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
+      "example": "ask-marcel-office convert-group-post-attachment-to-pdf --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-path ./deck.pdf",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. Plain-text and pdf sources short-circuit to `{ contentType, size, base64, note }`; image attachments return api_error 415; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true,
-      "effect": "transient-upload"
+      "producesBytes": true
     },
     {
       "name": "convert-group-post-to-markdown",
@@ -313,8 +308,7 @@
       ],
       "example": "ask-marcel-office convert-group-post-to-markdown --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: headers, the turndown-rendered body and, when present, an attachments list. The optional `note` carries the attachments-list failure hint and/or the quoted-chain notice with the share of the body text it removed.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-local-file-to-markdown",
@@ -397,8 +391,7 @@
       ],
       "example": "ask-marcel-office convert-local-file-to-markdown --path ./report.docx",
       "responseShape": "`{ contentType: \"text/markdown\" | \"text/plain\", size, text }` for a single file; `{ count, files: [{ path, contentType, size, text } | { path, note }] }` for a `.zip` (one entry per contained file, unsupported entries noted). With `--include-images true` each `.zip` entry also carries `images: [{ path, contentType, sizeBytes, base64 }]` when it has extractable embedded images. A missing file returns api_error 404 with the path. Pair with the global `--output-path` to land the markdown on disk.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-to-markdown",
@@ -461,8 +454,7 @@
       ],
       "example": "ask-marcel-office convert-mail-attachment-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` on success (file/reference attachments converted via Graph + turndown; itemAttachment rendered locally). Plain-text source extensions return the raw-bytes envelope; unsupported types return an api_error with status 400.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-to-pdf",
@@ -485,10 +477,9 @@
           "description": "Attachment ID inside that message. Returned by `list-mail-attachments`."
         }
       ],
-      "example": "ask-marcel-office-write convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
+      "example": "ask-marcel-office convert-mail-attachment-to-pdf --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text source extensions and pdf sources short-circuit to `{ contentType, size, base64, note }` with their native bytes; itemAttachment returns api_error 400. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
-      "producesBytes": true,
-      "effect": "transient-upload"
+      "producesBytes": true
     },
     {
       "name": "convert-mail-attachment-zip-to-markdown",
@@ -544,8 +535,7 @@
         }
       ],
       "example": "ask-marcel-office convert-mail-attachment-zip-to-markdown --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
-      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path; non-mojibake names). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }`. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted. A non-fileAttachment (itemAttachment / referenceAttachment) or a non-zip payload returns an api_error.",
-      "effect": "read"
+      "responseShape": "`{ count, files: [{ path, contentType, size, text }] }` — one entry per file in the archive (sorted by path; non-mojibake names). Convertible files carry `{ contentType, size, text }` (the markdown); unsupported / failed entries carry `{ path, note }`. When the archive has more than 100 entries the response adds `truncated: true` + `totalEntries` and only the first 100 are converted. A non-fileAttachment (itemAttachment / referenceAttachment) or a non-zip payload returns an api_error."
     },
     {
       "name": "convert-mail-to-markdown",
@@ -583,8 +573,7 @@
       ],
       "example": "ask-marcel-office convert-mail-to-markdown --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }` — headers + turndown-rendered body + (when present) a file-attachments list. The optional `note` carries a partial-success hint when the attachments-metadata fetch fails after the body succeeded, and/or a flag that a quoted reply chain was stripped, carrying the share of the body’s readable text that went with it (`quoted reply chain stripped (removed 62% of the body text) — pass --keep-quoted true to include it`). A share near 100% on a message that should have had a real reply above the quote is the signature of a mis-detected boundary: refetch with `--keep-quoted true` to confirm.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-team-channel-message-to-markdown",
@@ -628,8 +617,7 @@
       ],
       "example": "ask-marcel-office convert-team-channel-message-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note? }`, the same envelope as `convert-mail-to-markdown`: the post heading, its body, then the replies as quoted blocks. The optional `note` reports a failed or truncated replies read.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "convert-team-channel-messages-to-markdown",
@@ -685,8 +673,7 @@
       ],
       "example": "ask-marcel-office convert-team-channel-messages-to-markdown --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text, note }`: a `# Transcript of <channel>` heading, then every post as `### date time · author` with its body and quoted replies. The `note` counts the posts and pages read, the system events omitted, and says when the walk was cut at `--max-pages`.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "create-forward-draft",
@@ -743,10 +730,10 @@
           }
         }
       ],
-      "example": "ask-marcel-office-write create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --comment \"Bob owns this now, forwarding for your action.\"",
+      "example": "ask-marcel-office create-forward-draft --forward-message-id \"AAMkAD...\" --to-recipients \"bob@example.com\" --comment \"Bob owns this now, forwarding for your action.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "Text: POST { comment: '{comment}', toRecipients: '{to-recipients}' } then optional PATCH { ccRecipients?: '{cc-recipients}', subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '', toRecipients: '{to-recipients}' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, ccRecipients?: '{cc-recipients}', subject?: '{subject}' }",
-      "effect": "draft"
+      "mutates": true
     },
     {
       "name": "create-mail-draft",
@@ -823,10 +810,10 @@
           }
         }
       ],
-      "example": "ask-marcel-office-write create-mail-draft --subject \"Q3 Report\" --body-content \"Please review the attached report.\" --to-recipients \"alice@example.com,bob@example.com\" --importance High",
+      "example": "ask-marcel-office create-mail-draft --subject \"Q3 Report\" --body-content \"Please review the attached report.\" --to-recipients \"alice@example.com,bob@example.com\" --importance High",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just supplied it; read it back with `get-mail-message --id <the returned id>` if you need it. The `id` is the draft — modify it with `update-mail-draft` before sending.",
       "bodyTemplate": "{ subject: '{subject}', body: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients: '{to-recipients}', ccRecipients: '{cc-recipients}', bccRecipients: '{bcc-recipients}', importance: '{importance}' }",
-      "effect": "draft"
+      "mutates": true
     },
     {
       "name": "create-reply-draft",
@@ -884,10 +871,10 @@
           }
         }
       ],
-      "example": "ask-marcel-office-write create-reply-draft --reply-to-message-id \"AAMkAD...\" --comment \"Confirmed for Contoso, aligned with the group choice.\"",
+      "example": "ask-marcel-office create-reply-draft --reply-to-message-id \"AAMkAD...\" --comment \"Confirmed for Contoso, aligned with the group choice.\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "Text: POST { comment: '{comment}' } then optional PATCH { subject?: '{subject}' }. HTML ({body-content-type}): POST { comment: '' } then ONE PATCH { body: { contentType: 'HTML', content: <'{comment}' spliced at the top of the body, above Graph's <hr> separator and the quote> }, subject?: '{subject}' }",
-      "effect": "draft"
+      "mutates": true
     },
     {
       "name": "diff-drive-item-versions",
@@ -950,7 +937,6 @@
       "example": "ask-marcel-office diff-drive-item-versions --drive-id 'b!1234' --item-id '01ABC' --before yesterday",
       "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed, versionId }` — `text` is the unified diff; `note` says when nothing was saved after the instant, when the two render the same, when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.",
       "producesBytes": true,
-      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -1013,8 +999,7 @@
       ],
       "example": "ask-marcel-office diff-drive-items --drive-id 'b!1234' --item-id '01WEEK6' --other-drive-id 'b!1234' --other-item-id '01WEEK7'",
       "responseShape": "`{ contentType: \"text/x-diff\", size, text, added, removed }` — `text` is the unified diff; `note` says when the two render the same (empty `text`, zero counts), when they differ too much to diff (no counts), which sheets were over the `--max-cells` cap and not compared, and any note a conversion attached, prefixed with its side.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-as-markdown",
@@ -1096,8 +1081,7 @@
       ],
       "example": "ask-marcel-office download-drive-item-as-markdown --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the locally-converted case (docx/xlsx/csv/.msg); `{ contentType: \"text/plain\", size, text }` for plain-text passthrough sources (txt/md/json/etc.) — bytes are inlined whether Graph returns them directly or via a CDN redirect that the CLI follows internally.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-as-pdf",
@@ -1128,8 +1112,7 @@
       ],
       "example": "ask-marcel-office download-drive-item-as-pdf --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"application/pdf\", size, base64 }` — the PDF bytes, inlined. The CLI follows the SharePoint media-transform redirect internally so the LLM never has to fetch an external URL. Plain-text and pdf sources skip the format=pdf round-trip and return the raw file bytes under the same envelope shape (with their native contentType) plus `passthrough: true` and a `note` explaining why conversion was skipped — the LLM can branch on the flag if it cares whether Graph actually converted. Pair with the global `--output-path` to land the bytes on disk and replace `base64` with `savedTo` for multi-MB PDFs.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-content",
@@ -1160,8 +1143,7 @@
       ],
       "example": "ask-marcel-office download-drive-item-content --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "`{ contentType: \"text/plain\", size, text }` when the bytes decode as valid UTF-8; `{ contentType, size, base64 }` otherwise (binary, or non-UTF-8-encoded text). Pair with the global `--output-path <path>` flag to land the bytes on disk and replace the inline field with `savedTo` for multi-MB files.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "download-drive-item-version",
@@ -1232,7 +1214,6 @@
       "example": "ask-marcel-office download-drive-item-version --drive-id 'b!1234' --item-id '01ABC' --version-id '4.0' --format pdf",
       "responseShape": "`--format original` & `--format pdf`: `{ contentType, size, base64 }` — the bytes, inlined. `--format pdf` adds `passthrough: true` + `note` when Graph short-circuits (plain-text or pdf source) OR silently falls back to raw source bytes — in that case save with the source extension, NOT `.pdf` (the global output-path flag refuses the mismatch). `--format markdown`: `{ contentType: \"text/markdown\", size: <chars>, text: \"...\" }` for the converted case; raw-bytes envelope for plain-text source extensions. Pair with the global `--output-path` to land bytes on disk and replace `base64`/`text` with `savedTo` for multi-MB versions.",
       "producesBytes": true,
-      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -1270,8 +1251,7 @@
       ],
       "example": "ask-marcel-office extract-drive-item-images --drive-id 'b!1234' --item-id '01ABC' --output-dir ./deck-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true,
-      "effect": "read"
+      "producesMedia": true
     },
     {
       "name": "extract-group-post-attachment-images",
@@ -1308,8 +1288,7 @@
       ],
       "example": "ask-marcel-office extract-group-post-attachment-images --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./post-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true,
-      "effect": "read"
+      "producesMedia": true
     },
     {
       "name": "extract-local-file-images",
@@ -1328,8 +1307,7 @@
       ],
       "example": "ask-marcel-office extract-local-file-images --path /tmp/deck.pdf --output-dir ./deck-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the source part path — `ppt/media/image3.png` for OOXML, `pdf/page2/<key>.png` for PDF (every PDF image is re-encoded as PNG). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo: <dir>/<filename>` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` with an empty `media` array means the document embeds no extractable images (after the emf/wmf/audio/video filter). A missing file returns api_error 404 with the path.",
-      "producesMedia": true,
-      "effect": "read"
+      "producesMedia": true
     },
     {
       "name": "extract-mail-attachment-images",
@@ -1360,8 +1338,7 @@
       ],
       "example": "ask-marcel-office extract-mail-attachment-images --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1' --output-dir ./att-images",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }`. `path` is the in-package part path (e.g. `ppt/media/image3.png`). Pair with the global `--output-dir <dir>` to write each image to that folder — the response then replaces each `base64` with `savedTo` (the part path is flattened, e.g. `pdf_page2_Im0.png`). `count: 0` means the attachment embeds no extractable images (after the emf/wmf/audio/video filter).",
-      "producesMedia": true,
-      "effect": "read"
+      "producesMedia": true
     },
     {
       "name": "extract-sharepoint-links-in-documents",
@@ -1385,8 +1362,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-documents --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
-      "effect": "read"
+      "responseShape": "`{ driveId, itemId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the document’s external relationships. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "extract-sharepoint-links-in-group-post",
@@ -1416,8 +1392,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AAMkAD...'",
-      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
-      "effect": "read"
+      "responseShape": "`{ groupId, threadId, postId, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "extract-sharepoint-links-in-mail",
@@ -1435,8 +1410,7 @@
         }
       ],
       "example": "ask-marcel-office extract-sharepoint-links-in-mail --message-id 'AAMkADk0...'",
-      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access.",
-      "effect": "read"
+      "responseShape": "`{ messageId, subject, links: [{ url, driveId, itemId, name, webUrl } | { url, error, location?, hint? }], truncated, skippedCount }` — one entry per unique SharePoint URL found in the body, ordered by first occurrence. A failed link names where it points in `location` (`{ kind: \"onedrive\", owner }` or `{ kind: \"site\", site }`, read from the URL), and a refused one (403) adds a `hint` on asking for access."
     },
     {
       "name": "extract-teams-chat-message-images",
@@ -1462,7 +1436,6 @@
       "example": "ask-marcel-office extract-teams-chat-message-images --chat-id '19:abc@thread.v2' --message-id '1727000000000'",
       "responseShape": "`{ count, media: [{ path, contentType, sizeBytes, base64 }] }` — `path` is `image-<n>.<ext>`, in the order the images appear. Pair with the global `--output-dir <dir>` to write each image there (the response then carries `savedTo` in place of `base64`). `count: 0` with a `note` means the message holds no pasted image.",
       "producesMedia": true,
-      "effect": "read",
       "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
@@ -1495,7 +1468,6 @@
       ],
       "example": "ask-marcel-office find-chats-with-user --name 'Alex Kim'",
       "responseShape": "`{ name, matches: [{ chatId, title, chatType, threadType, memberCount, lastMessageAt?, matchedMembers: [{ mri, displayName, email, userSubType }] }], matchCount, pagesFetched, chatsScanned, chatsHydrated, unresolvedMemberCount, hasMore, nextContinuationToken?, hint? }`. `matchedMembers` always carries the matching entries' identifying fields — pass `chatId` into `list-teams-chat-history` to read message bodies. `chatsHydrated` counts the per-chat members lookups spent resolving bare cross-tenant members in direct (1:1) chats. `unresolvedMemberCount` is how many cross-tenant members are still unresolved by name (bare members in group/meeting chats, which are not deep-probed, plus any 1:1 hydration that errored); when `matchCount` is 0 and this is non-zero, a `hint` is present explaining the likely cause and the object-id / read-by-chat-id remedy — so an empty result is never silently confident. `hasMore: true` means `--max-pages` was hit before exhausting the chat list; chain with the existing `--continuation-token` flag on `list-teams-chats-with-messages` if you need to scan further (this command does not advertise a `--continuation-token` because resuming a partial search is rare; users either widen `--max-pages` or refine `--name`).",
-      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -1521,8 +1493,7 @@
         }
       ],
       "example": "ask-marcel-office find-mail-drafts --subject \"Contoso Q3 budget\" --to-recipients \"kim@example.com\"",
-      "responseShape": "`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window.",
-      "effect": "read"
+      "responseShape": "`{ matches: message[], conversationIds: string[], scanned: number, scanLimit: number }`. `matches` are the drafts whose normalized subject (RE:/FW:/localized prefixes stripped) equals yours, each carrying `{ id, subject, toRecipients, ccRecipients, conversationId, lastModifiedDateTime, webLink }`; pass a match `id` to update-mail-draft to revise it instead of creating a duplicate. `conversationIds` is the de-duplicated union of conversationIds across the matches (a thread can span several). `scanned` is how many drafts were examined and `scanLimit` the cap (50): when `scanned` equals `scanLimit`, older drafts may exist beyond the window."
     },
     {
       "name": "get-calendar-event",
@@ -1552,8 +1523,7 @@
         }
       ],
       "example": "ask-marcel-office get-calendar-event --event-id 'AAMkAGI2THVS...' --select id,subject,start,end,attendees",
-      "responseShape": "single Microsoft Graph `event` resource (or projection of the requested `--select` fields)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `event` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-channel-files-folder",
@@ -1589,8 +1559,7 @@
         }
       ],
       "example": "ask-marcel-office get-channel-files-folder --team-id 'tm1' --channel-id 'ch1'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (folder)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
     },
     {
       "name": "get-chat",
@@ -1621,7 +1590,6 @@
       ],
       "example": "ask-marcel-office get-chat --chat-id '19:abc...@thread.v2'",
       "responseShape": "single Microsoft Graph `chat` resource projected to the default `--select` set (or, when overridden, to the requested fields). `--expand members` adds an inline `members[]` array.",
-      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -1646,8 +1614,7 @@
         }
       ],
       "example": "ask-marcel-office get-current-user",
-      "responseShape": "single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `user` resource projected to the default `--select` set (or, when overridden, to the requested fields)"
     },
     {
       "name": "get-drive-delta",
@@ -1690,8 +1657,7 @@
       ],
       "example": "ask-marcel-office get-drive-delta --drive-id 'b!1234' --item-id '01ROOT'",
       "responseShape": "collection of changed Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "get-drive-item",
@@ -1733,8 +1699,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item --drive-id 'b!1234' --item-id '01ABC' --select 'id,name,size,lastModifiedDateTime'",
-      "responseShape": "single Microsoft Graph `driveItem` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `driveItem` resource"
     },
     {
       "name": "get-drive-item-analytics",
@@ -1758,8 +1723,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-analytics --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "single Microsoft Graph `itemAnalytics` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `itemAnalytics` resource"
     },
     {
       "name": "get-drive-item-created-by-user",
@@ -1795,8 +1759,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-created-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,jobTitle,mail'",
-      "responseShape": "single Microsoft Graph `user` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `user` resource"
     },
     {
       "name": "get-drive-item-last-modified-by-user",
@@ -1832,8 +1795,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-last-modified-by-user --drive-id 'b!1234' --item-id '01ABC' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `user` resource"
     },
     {
       "name": "get-drive-item-list-item",
@@ -1875,8 +1837,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-item-list-item --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "single Microsoft Graph `listItem` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `listItem` resource"
     },
     {
       "name": "get-drive-root-delta",
@@ -1907,8 +1868,7 @@
       ],
       "example": "ask-marcel-office get-drive-root-delta",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "get-drive-root-item",
@@ -1938,8 +1898,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-root-item --drive-id 'b!1234'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (the root folder)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `driveItem` resource (the root folder)"
     },
     {
       "name": "get-drive-special-folder",
@@ -1969,8 +1928,7 @@
         }
       ],
       "example": "ask-marcel-office get-drive-special-folder --folder-name 'documents'",
-      "responseShape": "single Microsoft Graph `driveItem` resource (folder)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `driveItem` resource (folder)"
     },
     {
       "name": "get-excel-chart-image",
@@ -2013,8 +1971,7 @@
       ],
       "example": "ask-marcel-office get-excel-chart-image --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1' --chart-id 'Chart 1' --output-path ./chart.png",
       "responseShape": "`{ contentType: \"image/png\", size, base64 }` — the rendered chart PNG, inlined. Pair with the global `--output-path <file>` to write the PNG to disk (the response then replaces `base64` with `savedTo`).",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-excel-range",
@@ -2056,8 +2013,7 @@
         }
       ],
       "example": "ask-marcel-office get-excel-range --drive-id 'b!1234' --item-id '01XLSX' --worksheet-id 'Sheet1' --address 'A1:C10'",
-      "responseShape": "single Microsoft Graph `workbookRange` resource (values, formulas, format)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `workbookRange` resource (values, formulas, format)"
     },
     {
       "name": "get-excel-table",
@@ -2087,8 +2043,7 @@
         }
       ],
       "example": "ask-marcel-office get-excel-table --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
-      "responseShape": "single Microsoft Graph `workbookTable` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `workbookTable` resource"
     },
     {
       "name": "get-excel-used-range",
@@ -2133,8 +2088,7 @@
         }
       ],
       "example": "ask-marcel-office get-excel-used-range --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
-      "responseShape": "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`).",
-      "effect": "read"
+      "responseShape": "Slim projection (default): `{ address, rowCount, columnCount, values, projection: 'slim' }` — `values[]` is the 2D cell-value array. Oversize variant: `{ address, rowCount, columnCount, projection: 'slim', truncated: true, maxCells, hint }` (no `values`). With `--full true`: the raw Graph `workbookRange` resource (adds `text`, `numberFormat`, `formulas` 2D arrays) plus `projection: 'full'`. Workbook Online (WAC) errors are translated to a clear `item is not an accessible Excel workbook` envelope (see `excel-error.ts`)."
     },
     {
       "name": "get-group",
@@ -2164,8 +2118,7 @@
         }
       ],
       "example": "ask-marcel-office get-group --group-id 'a1b2c3d4-...' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `group` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `group` resource"
     },
     {
       "name": "get-group-post",
@@ -2207,8 +2160,7 @@
         }
       ],
       "example": "ask-marcel-office get-group-post --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
-      "responseShape": "single Microsoft Graph `post` resource: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from` (normally the group address), `sender` (the person who wrote it). With `--expand attachments`, an `attachments[]` array of `fileAttachment` / `itemAttachment` / `referenceAttachment` entries, file attachments carrying `contentBytes` inline.",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `post` resource: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from` (normally the group address), `sender` (the person who wrote it). With `--expand attachments`, an `attachments[]` array of `fileAttachment` / `itemAttachment` / `referenceAttachment` entries, file attachments carrying `contentBytes` inline."
     },
     {
       "name": "get-group-post-attachment",
@@ -2257,8 +2209,7 @@
       ],
       "example": "ask-marcel-office get-group-post-attachment --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...' --attachment-id 'AAMkAD...'",
       "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-mail-attachment",
@@ -2295,8 +2246,7 @@
       ],
       "example": "ask-marcel-office get-mail-attachment --message-id 'AAMkAGI2...' --attachment-id 'AAMkABC...'",
       "responseShape": "single Microsoft Graph `attachment` resource. fileAttachments include `contentBytes` (Graph) AND `base64` (CLI mirror) so `--output-path` works; with `--output-path` set, both byte fields are stripped from stdout and replaced by `savedTo`. itemAttachments and referenceAttachments are returned unchanged.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-mail-message",
@@ -2326,8 +2276,7 @@
         }
       ],
       "example": "ask-marcel-office get-mail-message --message-id 'AAMkAGI2...'",
-      "responseShape": "single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML.",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `message` resource projected to the default `--select` set (or, when overridden, to the requested fields). The default omits `body`, `internetMessageHeaders`, and `uniqueBody` — request them explicitly via `--select` when you need the full HTML."
     },
     {
       "name": "get-mail-message-mime",
@@ -2346,8 +2295,7 @@
       ],
       "example": "ask-marcel-office get-mail-message-mime --message-id 'AAMkAD...'",
       "responseShape": "`{ contentType: \"text/plain\", size, base64 }` — Graph returns the raw MIME envelope wrapped as `text/plain` (NOT `message/rfc822` as the older docs suggested). Pair with the global `--output-path <path>` flag to land the .eml on disk and replace `base64` with `savedTo` for messages with large attachments.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-mail-rule",
@@ -2371,8 +2319,7 @@
         }
       ],
       "example": "ask-marcel-office get-mail-rule --message-rule-id 'AQAAANC...'",
-      "responseShape": "single Microsoft Graph `messageRule` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `messageRule` resource"
     },
     {
       "name": "get-mail-signature",
@@ -2394,8 +2341,7 @@
       ],
       "example": "ask-marcel-office get-mail-signature",
       "responseShape": "`{ contentType: \"text/html\", size, text, sourceMessageId, sentDateTime?, inlinedImages, note? }`. `text` is the signature block itself (the `<div id=\"Signature\">` element, not the whole body), ready to append to a reply. `inlinedImages` counts the logos embedded as data: URIs; any image too large (> 2 MB) or unfetchable keeps its raw `cid:` reference and is named in `note` — no placeholder is substituted, so the reference stays resolvable via get-mail-attachment. `--output-path` writes the HTML to a file.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-mailbox-settings",
@@ -2406,8 +2352,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get-mailboxsettings",
       "options": [],
       "example": "ask-marcel-office get-mailbox-settings",
-      "responseShape": "single Microsoft Graph `mailboxSettings` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `mailboxSettings` resource"
     },
     {
       "name": "get-my-calendar",
@@ -2431,8 +2376,7 @@
         }
       ],
       "example": "ask-marcel-office get-my-calendar --select 'id,name'",
-      "responseShape": "single Microsoft Graph `calendar` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `calendar` resource"
     },
     {
       "name": "get-my-manager",
@@ -2456,8 +2400,7 @@
         }
       ],
       "example": "ask-marcel-office get-my-manager --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description).",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the signed-in user has no manager set. Detect the no-manager case via `data.manager === null` (also: `data.note` carries a human description)."
     },
     {
       "name": "get-my-profile-photo",
@@ -2469,8 +2412,7 @@
       "options": [],
       "example": "ask-marcel-office get-my-profile-photo",
       "responseShape": "`{ contentType: \"image/jpeg\", size: <bytes>, base64: \"<encoded>\" }` — the photo bytes, inlined. Pair with the global `--output-path <path>` flag to land the image on disk and replace `base64` with `savedTo`.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-onenote-page-as-markdown",
@@ -2515,8 +2457,7 @@
       ],
       "example": "ask-marcel-office get-onenote-page-as-markdown --onenote-page-id '1-abc...'",
       "responseShape": "`{ contentType: \"text/markdown\", size, text }` — turndown-rendered page body with inline images embedded as data URIs by default. With `--include-metadata true`, a `## OneNote metadata` block is appended after the body.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-onenote-page-content",
@@ -2535,8 +2476,7 @@
       ],
       "example": "ask-marcel-office get-onenote-page-content --onenote-page-id '1-abc...'",
       "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-organization",
@@ -2560,8 +2500,7 @@
         }
       ],
       "example": "ask-marcel-office get-organization --select 'id,displayName,verifiedDomains'",
-      "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of one Microsoft Graph `organization` resource under `value[]`"
     },
     {
       "name": "get-planner-bucket",
@@ -2579,8 +2518,7 @@
         }
       ],
       "example": "ask-marcel-office get-planner-bucket --planner-bucket-id 'sFNeQRFu_kqhxpwwAhmA15gAGfoT'",
-      "responseShape": "single Microsoft Graph `plannerBucket` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `plannerBucket` resource"
     },
     {
       "name": "get-planner-plan",
@@ -2598,8 +2536,7 @@
         }
       ],
       "example": "ask-marcel-office get-planner-plan --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
-      "responseShape": "single Microsoft Graph `plannerPlan` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `plannerPlan` resource"
     },
     {
       "name": "get-planner-plan-details",
@@ -2617,8 +2554,7 @@
         }
       ],
       "example": "ask-marcel-office get-planner-plan-details --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
-      "responseShape": "single Microsoft Graph `plannerPlanDetails` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `plannerPlanDetails` resource"
     },
     {
       "name": "get-planner-task",
@@ -2636,8 +2572,7 @@
         }
       ],
       "example": "ask-marcel-office get-planner-task --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
-      "responseShape": "single Microsoft Graph `plannerTask` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `plannerTask` resource"
     },
     {
       "name": "get-planner-task-details",
@@ -2655,8 +2590,7 @@
         }
       ],
       "example": "ask-marcel-office get-planner-task-details --planner-task-id '01tx7Ic7-USXEwt0lvR1cmgAH8gK'",
-      "responseShape": "single Microsoft Graph `plannerTaskDetails` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `plannerTaskDetails` resource"
     },
     {
       "name": "get-schedule",
@@ -2693,8 +2627,7 @@
       ],
       "example": "ask-marcel-office get-schedule --schedules 'alice@contoso.com,bob@contoso.com' --start-date-time today --end-date-time +1d --availability-view-interval 30",
       "responseShape": "collection of Microsoft Graph `scheduleInformation` resources under `value[]` — one per requested address, each `{ scheduleId, availabilityView, scheduleItems: [{ status, start, end, subject?, location? }], workingHours, error? }`",
-      "bodyTemplate": "{ schedules: [{schedules}], startTime: { dateTime: '{start-date-time}', timeZone: 'UTC' }, endTime: { dateTime: '{end-date-time}', timeZone: 'UTC' }, availabilityViewInterval?: {availability-view-interval} }",
-      "effect": "read"
+      "bodyTemplate": "{ schedules: [{schedules}], startTime: { dateTime: '{start-date-time}', timeZone: 'UTC' }, endTime: { dateTime: '{end-date-time}', timeZone: 'UTC' }, availabilityViewInterval?: {availability-view-interval} }"
     },
     {
       "name": "get-shared-mailbox-message",
@@ -2730,8 +2663,7 @@
         }
       ],
       "example": "ask-marcel-office get-shared-mailbox-message --user-id 'shared-mailbox@contoso.com' --message-id 'AAMkAD...' --select 'id,subject,from'",
-      "responseShape": "single Microsoft Graph `message` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `message` resource"
     },
     {
       "name": "get-sharepoint-list-column",
@@ -2776,8 +2708,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-list-column --site-id '...' --list-id '...' --column-id 'Title'",
-      "responseShape": "single Microsoft Graph `columnDefinition` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `columnDefinition` resource"
     },
     {
       "name": "get-sharepoint-site",
@@ -2807,8 +2738,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site --site-id 'contoso.sharepoint.com,1234,5678'",
-      "responseShape": "single Microsoft Graph `site` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `site` resource"
     },
     {
       "name": "get-sharepoint-site-by-path",
@@ -2832,8 +2762,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-by-path --hostname 'contoso.sharepoint.com' --path '/sites/Marketing'",
-      "responseShape": "single Microsoft Graph `site` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `site` resource"
     },
     {
       "name": "get-sharepoint-site-drive-by-id",
@@ -2869,8 +2798,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-drive-by-id --site-id 'contoso.sharepoint.com,1234,5678' --drive-id 'b!abcd'",
-      "responseShape": "single Microsoft Graph `drive` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `drive` resource"
     },
     {
       "name": "get-sharepoint-site-list",
@@ -2909,8 +2837,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-list --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Documents'",
-      "responseShape": "single Microsoft Graph `list` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `list` resource"
     },
     {
       "name": "get-sharepoint-site-list-item",
@@ -2955,8 +2882,7 @@
         }
       ],
       "example": "ask-marcel-office get-sharepoint-site-list-item --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks' --list-item-id '7'",
-      "responseShape": "single Microsoft Graph `listItem` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `listItem` resource"
     },
     {
       "name": "get-sharepoint-site-onenote-page-content",
@@ -2981,8 +2907,7 @@
       ],
       "example": "ask-marcel-office get-sharepoint-site-onenote-page-content --site-id 'contoso.sharepoint.com,...' --onenote-page-id 'p1'",
       "responseShape": "`{ contentType: \"text/html\", size: <chars>, text: \"<html>...\" }` — the rendered OneNote page body wrapped in a JSON envelope. Pair with the global `--output-path <path>` to write the raw HTML to disk.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "get-site-analytics",
@@ -3000,8 +2925,7 @@
         }
       ],
       "example": "ask-marcel-office get-site-analytics --site-id 'contoso.sharepoint.com,...'",
-      "responseShape": "single Microsoft Graph `itemAnalytics` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `itemAnalytics` resource"
     },
     {
       "name": "get-specific-calendar-event",
@@ -3037,8 +2961,7 @@
         }
       ],
       "example": "ask-marcel-office get-specific-calendar-event --calendar-id 'primary' --event-id 'AAMkABC...' --select 'id,subject,start,end'",
-      "responseShape": "single Microsoft Graph `event` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `event` resource"
     },
     {
       "name": "get-team",
@@ -3068,8 +2991,7 @@
         }
       ],
       "example": "ask-marcel-office get-team --team-id 'abc-1234-...' --select displayName,description,visibility",
-      "responseShape": "single Microsoft Graph `team` resource (or projection of the requested `--select` fields)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `team` resource (or projection of the requested `--select` fields)"
     },
     {
       "name": "get-team-channel",
@@ -3105,8 +3027,7 @@
         }
       ],
       "example": "ask-marcel-office get-team-channel --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --select 'id,displayName'",
-      "responseShape": "single Microsoft Graph `channel` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `channel` resource"
     },
     {
       "name": "get-team-channel-message",
@@ -3142,8 +3063,7 @@
         }
       ],
       "example": "ask-marcel-office get-team-channel-message --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
-      "responseShape": "single Microsoft Graph `chatMessage` resource: `id`, `replyToId`, `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `chatMessage` resource: `id`, `replyToId`, `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`"
     },
     {
       "name": "get-team-primary-channel",
@@ -3173,8 +3093,7 @@
         }
       ],
       "example": "ask-marcel-office get-team-primary-channel --team-id 'tm1'",
-      "responseShape": "single Microsoft Graph `channel` resource",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `channel` resource"
     },
     {
       "name": "get-teams-chat-message",
@@ -3199,7 +3118,6 @@
       ],
       "example": "ask-marcel-office get-teams-chat-message --chat-id '19:abc...@unq.gbl.spaces' --message-id '1700000000000'",
       "responseShape": "single Teams chat message — `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, etc., plus `webUrl`, and `event`, `files` and `reactions` when present. **Microsoft-internal schema — fields may change without notice.**",
-      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -3237,12 +3155,11 @@
         }
       ],
       "example": "ask-marcel-office get-todo-task --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
-      "responseShape": "single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied), with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `todoTask` resource (slimmed by `--select` when supplied), with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)"
     },
     {
       "name": "get-user",
-      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the basic token — no elevated login needed. On a tenant that restricts basic directory reads the id path falls back to the elevated M365 token; re-capture that with `ask-marcel-office-auth login` (preflight tiers with `ask-marcel-office-auth status`, no Graph call). An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Only THIS tenant's directory is queried: a person's home-tenant object id (e.g. a cross-tenant Teams `8:orgid:<home-id>` participant, whose id lives in their own tenant) and any email that is not their `mail`/UPN here are unresolvable by design — reach an external person via their LOCAL guest projection (by name, or by their real `mail`), never by their home id. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query. Re-query by the candidate's `id` when it is a directory GUID; an EXTERNAL contact's candidate carries a base64-ish People-API id instead, which nothing can resolve — re-query those by the candidate's `mail` (the CLI rejects an opaque contact id with that remedy rather than returning empty matches). Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search. Without `--select`, the profile ships a default projection of id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone.",
+      "summary": "Look up a directory user. Pass an Azure AD id, UPN, or email as --user-id and get that user's FULL profile (displayName, mail, jobTitle, department, officeLocation, phones) via GET /users/{id} on the basic token — no elevated login needed. On a tenant that restricts basic directory reads the id path falls back to the elevated M365 token; re-capture that with `ask-marcel-office login` (preflight tiers with `ask-marcel-office scopes-check`, no Graph call). An email resolves even when it is the user's `mail` rather than their sign-in UPN: guest / B2B users carry a `#EXT#` UPN whose local part is NOT their email address, so when the direct lookup 404s the command falls back to `GET /users?$filter=mail eq '<email>'` and returns the single match. Only THIS tenant's directory is queried: a person's home-tenant object id (e.g. a cross-tenant Teams `8:orgid:<home-id>` participant, whose id lives in their own tenant) and any email that is not their `mail`/UPN here are unresolvable by design — reach an external person via their LOCAL guest projection (by name, or by their real `mail`), never by their home id. Pass a NAME instead and it searches your relevant-people graph (GET /me/people) and returns candidate matches (id, displayName, mail, jobTitle, department) so you can pick the right person and re-query. Re-query by the candidate's `id` when it is a directory GUID; an EXTERNAL contact's candidate carries a base64-ish People-API id instead, which nothing can resolve — re-query those by the candidate's `mail` (the CLI rejects an opaque contact id with that remedy rather than returning empty matches). Name search covers colleagues in your people graph, not the whole tenant directory; use `microsoft-search-query` for a broader tenant-wide person search. Without `--select`, the profile ships a default projection of id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/users/{user-id}  (id / UPN; an email that misses falls back to /users?$filter=mail eq)  OR /me/people?$search=\"{user-id}\"  (a bare name)",
@@ -3268,8 +3185,7 @@
         }
       ],
       "example": "ask-marcel-office get-user --user-id 'alice@contoso.com' --select 'id,displayName,mail,jobTitle,department'",
-      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path resolves on the basic token; on a tenant that restricts basic directory reads it falls back to the elevated M365 token, which fail-fasts with `secondary_token_unavailable` when that token is cold (preflight with `ask-marcel-office-auth status`, re-capture with `ask-marcel-office-auth login`).",
-      "effect": "read",
+      "responseShape": "For an id / UPN / email: a single Microsoft Graph `user` resource projected to the default `$select` (id, displayName, userPrincipalName, mail, jobTitle, department, officeLocation, businessPhones, mobilePhone) unless `--select` overrides it; honours `--expand`. An email is tried against the sign-in UPN first, then falls back to the `mail` attribute (`$filter=mail eq`) so guest/B2B users resolve; an email that matches nobody returns the direct-path 404. For a name: `{ query, matches: [{ id, displayName, mail, jobTitle, department }] }` from the People API (empty `matches` when nobody in your relevant-people graph matches; re-query by a chosen GUID `id`, or by `mail` when the candidate is an external contact with a base64-ish People-API id — passing that id back is rejected with the same remedy). The id path resolves on the basic token; on a tenant that restricts basic directory reads it falls back to the elevated M365 token, which fail-fasts with `secondary_token_unavailable` when that token is cold (preflight with `ask-marcel-office scopes-check`, re-capture with `ask-marcel-office login`).",
       "needsElevatedToken": true
     },
     {
@@ -3300,8 +3216,7 @@
         }
       ],
       "example": "ask-marcel-office get-user-manager --user-id 'alice@contoso.com' --select 'id,displayName,mail'",
-      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`).",
-      "effect": "read"
+      "responseShape": "single Microsoft Graph `user` resource on success, OR `{ manager: null, note: <string> }` when the target user has no manager set. Detect the no-manager case via `data.manager === null` (same discriminator as `get-my-manager`)."
     },
     {
       "name": "list-accessible-drives",
@@ -3331,8 +3246,7 @@
         }
       ],
       "example": "ask-marcel-office list-accessible-drives --output json",
-      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId?, size?, estimatedFileCount? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each drive, omitted past the 200-drive count cap or when the per-drive query fails. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `size` (when present) is the drive's total bytes used (`quota.used`, recursive) — surfaced free from the drive resource, omitted for the rare drive without a quota facet; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign \"can't reach this one\" results (404/403/423/400) are dropped, not listed.",
-      "effect": "read"
+      "responseShape": "`{ value: [{ id, name, driveType, webUrl, sources: [\"activity\"|\"channel\"|\"joinedTeam\"|\"memberOfGroup\"|\"personal\"|\"sharedWithMe\"|\"siteLibrary\"], groupId?, size?, estimatedFileCount? }], count, fileEstimate?, truncated?: true, partialErrors?: [{ source, error }] }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each drive, omitted past the 200-drive count cap or when the per-drive query fails. `value[]` is deduped by drive `id` and sorted by id; `sources[]` lists every vector that surfaced the drive (`channel` = a private/shared Teams channel files folder; `activity` = a recently-used / followed / trending item drive; `siteLibrary` = a non-default document library of a discovered site); `groupId` is present only for Teams/group drives. `size` (when present) is the drive's total bytes used (`quota.used`, recursive) — surfaced free from the drive resource, omitted for the rare drive without a quota facet; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders you can access across ALL of SharePoint/OneDrive; it is INDEX-WIDE, not limited to the `value[]` drives above. `truncated: true` means a `--max-groups` cap was hit — raise it to see more. `partialErrors[]` (present only when something actionable failed) names each vector/group/channel/site whose sub-call returned an actionable error (auth, throttling, 5xx, network); benign \"can't reach this one\" results (404/403/423/400) are dropped, not listed."
     },
     {
       "name": "list-all-onenote-sections",
@@ -3381,8 +3295,7 @@
       ],
       "example": "ask-marcel-office list-all-onenote-sections",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-event-attachments",
@@ -3437,8 +3350,7 @@
       ],
       "example": "ask-marcel-office list-calendar-event-attachments --event-id 'AAMkAGI2...'",
       "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — that discriminator is what the attachment-converting commands branch on.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-event-instances",
@@ -3518,8 +3430,7 @@
       ],
       "example": "ask-marcel-office list-calendar-event-instances --calendar-id 'AAMkAGI2THVS...' --event-id 'AAMkABC...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-events",
@@ -3568,8 +3479,7 @@
       ],
       "example": "ask-marcel-office list-calendar-events",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-events-delta",
@@ -3588,8 +3498,7 @@
       ],
       "example": "ask-marcel-office list-calendar-events-delta --top 50",
       "responseShape": "collection of changed Microsoft Graph `event` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-group-calendars",
@@ -3644,8 +3553,7 @@
       ],
       "example": "ask-marcel-office list-calendar-group-calendars --calendar-group-id 'AAMkADk0...'",
       "responseShape": "collection of Microsoft Graph `calendar` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-groups",
@@ -3694,8 +3602,7 @@
       ],
       "example": "ask-marcel-office list-calendar-groups",
       "responseShape": "collection of Microsoft Graph `calendarGroup` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendar-view",
@@ -3755,8 +3662,7 @@
         }
       ],
       "example": "ask-marcel-office list-calendar-view --start-date-time 'start-of-week' --end-date-time 'end-of-week'",
-      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
       "name": "list-calendar-view-delta",
@@ -3787,8 +3693,7 @@
       ],
       "example": "ask-marcel-office list-calendar-view-delta --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z' --top 50",
       "responseShape": "collection of changed Microsoft Graph `event` occurrences under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-calendars",
@@ -3837,8 +3742,7 @@
       ],
       "example": "ask-marcel-office list-calendars",
       "responseShape": "collection of Microsoft Graph `calendar` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-changed-files",
@@ -3863,8 +3767,7 @@
       ],
       "example": "ask-marcel-office list-changed-files --since yesterday --query 'filetype:xlsx'",
       "responseShape": "`{ since, count, value: [<Microsoft Graph driveItem resource: { id, name, webUrl, lastModifiedDateTime, lastModifiedBy, parentReference: { driveId }, … }>], note, truncated?: true }`, newest first, only files modified at or after `since`. `note` states the index limits. `truncated: true` means the sweep stopped at 2000 files or on a failed later page — narrow with `--query` or a later `--since`.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '({query}) AND LastModifiedTime>=<the UTC day before {since}>' }, from: <page*200>, size: 200 }] } — re-issued per page until `moreResultsAvailable` is false or the 10-page ceiling is hit",
-      "effect": "read"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '({query}) AND LastModifiedTime>=<the UTC day before {since}>' }, from: <page*200>, size: 200 }] } — re-issued per page until `moreResultsAvailable` is false or the 10-page ceiling is hit"
     },
     {
       "name": "list-chat-members",
@@ -3901,8 +3804,7 @@
       ],
       "example": "ask-marcel-office list-chat-members --chat-id '19:abc...@thread.v2'",
       "responseShape": "collection of Microsoft Graph `conversationMember` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-chats",
@@ -3940,7 +3842,6 @@
       "example": "ask-marcel-office list-chats",
       "responseShape": "collection of Microsoft Graph `chat` resources under `value[]`, each projected to the default `--select` set (or, when overridden, to the requested fields).",
       "pagination": true,
-      "effect": "read",
       "needsElevatedToken": true
     },
     {
@@ -3984,8 +3885,7 @@
       ],
       "example": "ask-marcel-office list-conversation-messages --conversation-id 'AAQkAD...=' --top 5 --select id,subject,receivedDateTime",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]` (unordered). This command ships no default `$select`, so an unflagged call returns the full `message` resource. `internetMessageHeaders` IS honored here (verified live 2026-08-29): naming it in `--select` returns the raw RFC 5322 headers for every message in the thread in ONE call, so a per-message `get-mail-message --select internetMessageHeaders` follow-up is unnecessary. Use `get-mail-message-mime` when the complete raw source, not just the headers, is needed.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-document-comments",
@@ -4015,8 +3915,7 @@
         }
       ],
       "example": "ask-marcel-office list-document-comments --drive-id 'b!1234' --item-id '01ABC'",
-      "responseShape": "`{ name, format, count, comments: [{ author, date?, anchor?, text, mentions }] }`. `format` is `docx`, `xlsx` or `pptx`. `anchor` is the commented text (docx), the cell as `Sheet!A1` with non-plain sheet names quoted (xlsx), or `slide N` (pptx); it is absent when the file does not record it. `date` is absent on Excel notes, which keep none. `mentions` lists the names written after an `@` that the file knows (its people and its commenters). A file of any other type returns a 415.",
-      "effect": "read"
+      "responseShape": "`{ name, format, count, comments: [{ author, date?, anchor?, text, mentions }] }`. `format` is `docx`, `xlsx` or `pptx`. `anchor` is the commented text (docx), the cell as `Sheet!A1` with non-plain sheet names quoted (xlsx), or `slide N` (pptx); it is absent when the file does not record it. `date` is absent on Excel notes, which keep none. `mentions` lists the names written after an `@` that the file knows (its people and its commenters). A file of any other type returns a 415."
     },
     {
       "name": "list-drive-item-permissions",
@@ -4077,8 +3976,7 @@
       ],
       "example": "ask-marcel-office list-drive-item-permissions --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `permission` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-drive-item-thumbnails",
@@ -4139,8 +4037,7 @@
       ],
       "example": "ask-marcel-office list-drive-item-thumbnails --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `thumbnailSet` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-drive-item-versions",
@@ -4201,8 +4098,7 @@
       ],
       "example": "ask-marcel-office list-drive-item-versions --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `driveItemVersion` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-drives",
@@ -4251,8 +4147,7 @@
       ],
       "example": "ask-marcel-office list-drives",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-comments",
@@ -4313,8 +4208,7 @@
       ],
       "example": "ask-marcel-office list-excel-comments --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `workbookComment` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-defined-names",
@@ -4375,8 +4269,7 @@
       ],
       "example": "ask-marcel-office list-excel-defined-names --drive-id 'b!1234' --item-id '01ABC'",
       "responseShape": "collection of Microsoft Graph `workbookNamedItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-table-rows",
@@ -4431,8 +4324,7 @@
       ],
       "example": "ask-marcel-office list-excel-table-rows --drive-id 'b!1234' --item-id '01XLSX' --table-id 'Table1'",
       "responseShape": "collection of Microsoft Graph `workbookTableRow` resources (each `values` is a 2D array) under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-tables",
@@ -4481,8 +4373,7 @@
       ],
       "example": "ask-marcel-office list-excel-tables --drive-id 'b!1234' --item-id '01XLSX'",
       "responseShape": "collection of Microsoft Graph `workbookTable` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-worksheet-charts",
@@ -4552,8 +4443,7 @@
       ],
       "example": "ask-marcel-office list-excel-worksheet-charts --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
       "responseShape": "collection of Microsoft Graph `workbookChart` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-worksheet-pivot-tables",
@@ -4623,8 +4513,7 @@
       ],
       "example": "ask-marcel-office list-excel-worksheet-pivot-tables --drive-id 'b!1234' --item-id '01ABC' --worksheet-id 'Sheet1'",
       "responseShape": "collection of Microsoft Graph `workbookPivotTable` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-excel-worksheets",
@@ -4667,8 +4556,7 @@
       ],
       "example": "ask-marcel-office list-excel-worksheets --drive-id 'b!1234' --item-id '01XLSX'",
       "responseShape": "collection of Microsoft Graph `worksheet` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-focused-inbox-overrides",
@@ -4717,8 +4605,7 @@
       ],
       "example": "ask-marcel-office list-focused-inbox-overrides",
       "responseShape": "collection of Microsoft Graph `inferenceClassificationOverride` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-folder-files",
@@ -4779,8 +4666,7 @@
       ],
       "example": "ask-marcel-office list-folder-files --drive-id 'b!1234' --item-id '01ROOT'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-followed-drive-items",
@@ -4823,8 +4709,7 @@
       ],
       "example": "ask-marcel-office list-followed-drive-items",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-calendar-view",
@@ -4891,8 +4776,7 @@
       ],
       "example": "ask-marcel-office list-group-calendar-view --group-id 'a1b2c3d4-...' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-conversations",
@@ -4941,8 +4825,7 @@
       ],
       "example": "ask-marcel-office list-group-conversations --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `conversation` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-events",
@@ -4997,8 +4880,7 @@
       ],
       "example": "ask-marcel-office list-group-events --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-members",
@@ -5053,8 +4935,7 @@
       ],
       "example": "ask-marcel-office list-group-members --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-owners",
@@ -5109,8 +4990,7 @@
       ],
       "example": "ask-marcel-office list-group-owners --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-planner-plans",
@@ -5135,8 +5015,7 @@
       ],
       "example": "ask-marcel-office list-group-planner-plans --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `plannerPlan` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-group-post-attachments",
@@ -5178,8 +5057,7 @@
         }
       ],
       "example": "ask-marcel-office list-group-post-attachments --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...' --post-id 'AQMkAD...'",
-      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body.",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary), with no page cursor. Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select`; that discriminator is what the converting sibling branches on. An inline image carries `isInline: true` and a `contentId` matching a `cid:` reference in the post body."
     },
     {
       "name": "list-group-thread-posts",
@@ -5215,8 +5093,7 @@
         }
       ],
       "example": "ask-marcel-office list-group-thread-posts --group-id 'a1b2c3d4-...' --thread-id 'AAQkAD...'",
-      "responseShape": "collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly.",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `post` resources under `value[]`: `id`, `createdDateTime`, `lastModifiedDateTime`, `changeKey`, `categories`, `receivedDateTime`, `hasAttachments`, `body { contentType, content }`, `from`, `sender`. No `nextLink` is ever emitted. `hasAttachments` is false for a post whose only attachments are inline images. `--expand attachments` inlines every attachment of every post with its base64 `contentBytes`, so use it sparingly."
     },
     {
       "name": "list-group-threads",
@@ -5265,8 +5142,7 @@
       ],
       "example": "ask-marcel-office list-group-threads --group-id 'a1b2c3d4-...'",
       "responseShape": "collection of Microsoft Graph `conversationThread` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-groups",
@@ -5309,8 +5185,7 @@
       ],
       "example": "ask-marcel-office list-groups",
       "responseShape": "collection of Microsoft Graph `group` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-incomplete-planner-tasks",
@@ -5359,8 +5234,7 @@
       ],
       "example": "ask-marcel-office list-incomplete-planner-tasks --top 25",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]` where `percentComplete < 100`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-incomplete-todo-tasks",
@@ -5421,8 +5295,7 @@
       ],
       "example": "ask-marcel-office list-incomplete-todo-tasks --todo-task-list-id 'tasks' --top 5",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]` where `status != \"completed\"`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-joined-teams",
@@ -5434,8 +5307,7 @@
       "options": [],
       "example": "ask-marcel-office list-joined-teams",
       "responseShape": "collection of Microsoft Graph `team` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-attachments",
@@ -5490,8 +5362,7 @@
       ],
       "example": "ask-marcel-office list-mail-attachments --message-id 'AAMkAGI2...'",
       "responseShape": "collection of Microsoft Graph `attachment` resources under `value[]` (slim metadata by default — see summary). Graph always includes `@odata.type` and `@odata.mediaContentType` on every entry regardless of `--select` — these fields are the discriminator the attachment-converting commands branch on; don't be surprised to see them appear even if you didn't request them.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-child-folders",
@@ -5559,8 +5430,7 @@
       ],
       "example": "ask-marcel-office list-mail-child-folders --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-folder-messages",
@@ -5628,8 +5498,7 @@
       ],
       "example": "ask-marcel-office list-mail-folder-messages --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-folder-messages-delta",
@@ -5672,8 +5541,7 @@
       ],
       "example": "ask-marcel-office list-mail-folder-messages-delta --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page (CLI strips the original `@odata.*` keys from `data`). A `deltaLink` on the FIRST page means the folder is fully synced, not that it was truncated.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-folders",
@@ -5735,8 +5603,7 @@
       ],
       "example": "ask-marcel-office list-mail-folders",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-folders-delta",
@@ -5748,8 +5615,7 @@
       "options": [],
       "example": "ask-marcel-office list-mail-folders-delta",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-messages",
@@ -5811,8 +5677,7 @@
       ],
       "example": "ask-marcel-office list-mail-messages",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-mail-rules",
@@ -5830,8 +5695,7 @@
         }
       ],
       "example": "ask-marcel-office list-mail-rules",
-      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `messageRule` resources under `value[]`"
     },
     {
       "name": "list-my-direct-reports",
@@ -5880,8 +5744,7 @@
       ],
       "example": "ask-marcel-office list-my-direct-reports",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-my-memberships",
@@ -5930,8 +5793,7 @@
       ],
       "example": "ask-marcel-office list-my-memberships",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-my-transitive-memberships",
@@ -5980,8 +5842,7 @@
       ],
       "example": "ask-marcel-office list-my-transitive-memberships",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-onenote-notebook-sections",
@@ -6036,8 +5897,7 @@
       ],
       "example": "ask-marcel-office list-onenote-notebook-sections --notebook-id '1-12abc...'",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-onenote-notebooks",
@@ -6086,8 +5946,7 @@
       ],
       "example": "ask-marcel-office list-onenote-notebooks",
       "responseShape": "collection of Microsoft Graph `notebook` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-onenote-section-pages",
@@ -6142,8 +6001,7 @@
       ],
       "example": "ask-marcel-office list-onenote-section-pages --onenote-section-id '1-abc...'",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-outlook-categories",
@@ -6154,8 +6012,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/outlookuser-list-mastercategories",
       "options": [],
       "example": "ask-marcel-office list-outlook-categories",
-      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `outlookCategory` resources under `value[]`"
     },
     {
       "name": "list-plan-buckets",
@@ -6180,8 +6037,7 @@
       ],
       "example": "ask-marcel-office list-plan-buckets --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
       "responseShape": "collection of Microsoft Graph `plannerBucket` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-plan-tasks",
@@ -6200,8 +6056,7 @@
       ],
       "example": "ask-marcel-office list-plan-tasks --planner-plan-id 'xqQg5FS2LkCp935s-FIFm5gAB6'",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-planner-plans",
@@ -6220,8 +6075,7 @@
       ],
       "example": "ask-marcel-office list-planner-plans",
       "responseShape": "collection of Microsoft Graph `plannerPlan` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-planner-tasks",
@@ -6270,8 +6124,7 @@
       ],
       "example": "ask-marcel-office list-planner-tasks",
       "responseShape": "collection of Microsoft Graph `plannerTask` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-recent-files",
@@ -6327,8 +6180,7 @@
       ],
       "example": "ask-marcel-office list-recent-files",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-recently-used-insights",
@@ -6390,12 +6242,11 @@
       ],
       "example": "ask-marcel-office list-recently-used-insights",
       "responseShape": "collection of Microsoft Graph `usedInsight` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-relevant-people",
-      "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `scoredEmailAddresses`, `jobTitle`, `companyName`, etc.",
+      "summary": "List people relevant to the signed-in user — colleagues they email and meet with most. Microsoft's relevance ranking, not the full directory. Returns `displayName`, `emailAddresses`, `jobTitle`, `companyName`, etc.",
       "category": "user",
       "graphMethod": "GET",
       "graphPathTemplate": "/me/people",
@@ -6440,8 +6291,7 @@
       ],
       "example": "ask-marcel-office list-relevant-people",
       "responseShape": "collection of Microsoft Graph `person` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-room-lists",
@@ -6490,8 +6340,7 @@
       ],
       "example": "ask-marcel-office list-room-lists",
       "responseShape": "collection of Microsoft Graph `roomList` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-rooms",
@@ -6540,8 +6389,7 @@
       ],
       "example": "ask-marcel-office list-rooms",
       "responseShape": "collection of Microsoft Graph `room` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sensitivity-labels",
@@ -6590,8 +6438,7 @@
       ],
       "example": "ask-marcel-office list-sensitivity-labels",
       "responseShape": "collection of Microsoft Graph `sensitivityLabel` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-calendar-events",
@@ -6646,8 +6493,7 @@
       ],
       "example": "ask-marcel-office list-shared-calendar-events --user-id 'colleague@contoso.com'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-calendar-view",
@@ -6714,8 +6560,7 @@
       ],
       "example": "ask-marcel-office list-shared-calendar-view --user-id 'colleague@contoso.com' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-insights",
@@ -6777,8 +6622,7 @@
       ],
       "example": "ask-marcel-office list-shared-insights",
       "responseShape": "collection of Microsoft Graph `sharedInsight` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-mailbox-child-folders",
@@ -6852,8 +6696,7 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-child-folders --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-mailbox-folder-messages",
@@ -6914,8 +6757,7 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-folder-messages --user-id 'shared-mailbox@contoso.com' --mail-folder-id 'inbox'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-mailbox-folders",
@@ -6983,8 +6825,7 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-folders --user-id 'shared-mailbox@contoso.com'",
       "responseShape": "collection of Microsoft Graph `mailFolder` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-mailbox-messages",
@@ -7039,8 +6880,7 @@
       ],
       "example": "ask-marcel-office list-shared-mailbox-messages --user-id 'shared-mailbox@contoso.com'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-shared-with-me",
@@ -7051,8 +6891,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/drive-sharedwithme",
       "options": [],
       "example": "ask-marcel-office list-shared-with-me",
-      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]` (each with a `remoteItem` pointer)"
     },
     {
       "name": "list-sharepoint-list-columns",
@@ -7088,8 +6927,7 @@
         }
       ],
       "example": "ask-marcel-office list-sharepoint-list-columns --site-id 'contoso.sharepoint.com,abc...,def...' --list-id 'list-guid' --select 'name,displayName,readOnly'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
     },
     {
       "name": "list-sharepoint-list-item-versions",
@@ -7150,8 +6988,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-list-item-versions --site-id 'contoso.sharepoint.com,...' --list-id 'list-guid' --list-item-id '12'",
       "responseShape": "collection of Microsoft Graph `listItemVersion` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-drives",
@@ -7200,8 +7037,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-drives --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `drive` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-list-items",
@@ -7259,8 +7095,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-list-items --site-id 'contoso.sharepoint.com,1234,5678' --list-id 'Tasks'",
       "responseShape": "collection of Microsoft Graph `listItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-lists",
@@ -7309,8 +7144,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-lists --site-id 'contoso.sharepoint.com,1234,5678'",
       "responseShape": "collection of Microsoft Graph `list` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-members",
@@ -7328,8 +7162,7 @@
         }
       ],
       "example": "ask-marcel-office list-sharepoint-site-members --site-id 'contoso.sharepoint.com,11111111-2222-3333-4444-555555555555,66666666-7777-8888-9999-000000000000'",
-      "responseShape": "`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`).",
-      "effect": "read"
+      "responseShape": "`{ group: { id, displayName, mail } | null, owners: [user], members: [user], sharePointGroups: [{ name, roles }], sharingLinks: [{ scope, roles }], note }` — each user carries `id`, `displayName`, `mail`, `userPrincipalName`, `userType` (`Member` or `Guest`)."
     },
     {
       "name": "list-sharepoint-site-onenote-notebook-sections",
@@ -7390,8 +7223,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-notebook-sections --site-id 'contoso.sharepoint.com,...' --notebook-id 'nb1'",
       "responseShape": "collection of Microsoft Graph `onenoteSection` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-onenote-notebooks",
@@ -7446,8 +7278,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-notebooks --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `notebook` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-onenote-section-pages",
@@ -7508,8 +7339,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-onenote-section-pages --site-id 'contoso.sharepoint.com,...' --onenote-section-id 's1'",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-sharepoint-site-pages",
@@ -7558,8 +7388,7 @@
       ],
       "example": "ask-marcel-office list-sharepoint-site-pages --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `sitePage` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-site-columns",
@@ -7589,8 +7418,7 @@
         }
       ],
       "example": "ask-marcel-office list-site-columns --site-id 'contoso.sharepoint.com,...' --select 'name,displayName'",
-      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `columnDefinition` resources under `value[]`"
     },
     {
       "name": "list-site-content-types",
@@ -7639,8 +7467,7 @@
       ],
       "example": "ask-marcel-office list-site-content-types --site-id 'contoso.sharepoint.com,...'",
       "responseShape": "collection of Microsoft Graph `contentType` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-specific-calendar-events",
@@ -7695,8 +7522,7 @@
       ],
       "example": "ask-marcel-office list-specific-calendar-events --calendar-id 'primary'",
       "responseShape": "collection of Microsoft Graph `event` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-specific-calendar-view",
@@ -7762,8 +7588,7 @@
         }
       ],
       "example": "ask-marcel-office list-specific-calendar-view --calendar-id 'primary' --start-date-time '2026-04-01T00:00:00Z' --end-date-time '2026-05-01T00:00:00Z'",
-      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `event` resources (single occurrences) under `value[]`"
     },
     {
       "name": "list-team-channel-members",
@@ -7800,8 +7625,7 @@
       ],
       "example": "ask-marcel-office list-team-channel-members --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
       "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-team-channel-message-replies",
@@ -7844,8 +7668,7 @@
       ],
       "example": "ask-marcel-office list-team-channel-message-replies --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --message-id '1700000000000'",
       "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`, each with `replyToId` set to the root post: `id`, `messageType`, `createdDateTime`, `deletedDateTime`, `from { user { id, displayName } }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-team-channel-messages",
@@ -7888,8 +7711,7 @@
       ],
       "example": "ask-marcel-office list-team-channel-messages --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --top 20",
       "responseShape": "collection of Microsoft Graph `chatMessage` resources under `value[]`: `id`, `replyToId` (null on a root post), `messageType`, `createdDateTime`, `lastModifiedDateTime`, `deletedDateTime`, `subject`, `importance`, `webUrl`, `from { user { id, displayName }, application, device }`, `body { contentType, content }`, `attachments[]`, `mentions[]`, `reactions[]`, `channelIdentity { teamId, channelId }`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-team-channel-messages-delta",
@@ -7932,8 +7754,7 @@
       ],
       "example": "ask-marcel-office list-team-channel-messages-delta --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2' --since '7d' --expand replies",
       "responseShape": "collection of Microsoft Graph `chatMessage` root posts under `data.value[]`. Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page; feed either to `next-page`.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-team-channel-tabs",
@@ -7969,8 +7790,7 @@
         }
       ],
       "example": "ask-marcel-office list-team-channel-tabs --team-id 'abc-1234-...' --channel-id '19:def@thread.tacv2'",
-      "responseShape": "collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `teamsTab` resources under `value[]`: `id`, `displayName`, `webUrl`, `configuration { entityId, contentUrl, websiteUrl, removeUrl }` and an inline `teamsApp { id, externalId, displayName, distributionMethod }`"
     },
     {
       "name": "list-team-channels",
@@ -8000,8 +7820,7 @@
         }
       ],
       "example": "ask-marcel-office list-team-channels --team-id 'abc-1234-...'",
-      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`",
-      "effect": "read"
+      "responseShape": "collection of Microsoft Graph `channel` resources under `value[]`"
     },
     {
       "name": "list-team-installed-apps",
@@ -8020,8 +7839,7 @@
       ],
       "example": "ask-marcel-office list-team-installed-apps --team-id 'tm1'",
       "responseShape": "collection of Microsoft Graph `teamsAppInstallation` resources under `value[]`, each with an inline `teamsAppDefinition` (`displayName`, `version`, `distributionMethod`)",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-team-members",
@@ -8052,8 +7870,7 @@
       ],
       "example": "ask-marcel-office list-team-members --team-id 'abc-1234-...'",
       "responseShape": "collection of Microsoft Graph `aadUserConversationMember` resources under `value[]`: `id`, `roles[]`, `displayName`, `userId`, `email`, `tenantId`, `visibleHistoryStartDateTime`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-teams-chat-history",
@@ -8134,7 +7951,6 @@
       ],
       "example": "ask-marcel-office list-teams-chat-history --chat-id '19:abc...@unq.gbl.spaces' --max-pages 5",
       "responseShape": "`{ messages: [...], hasMore: boolean, pagesFetched: number, nextSyncState?: string, projection: 'slim' | 'full' }`. Slim projection (default) emits `{ id, sequenceId, composetime, originalarrivaltime, messagetype, event?, from, imdisplayname, content, webUrl, files?, reactions? }` per message, with `truncated: true` + `originalContentChars` on entries whose `content` exceeded `--max-content-chars` (default 4096). With `--full true`, returns the raw IC3 substrate shape: `id`, `sequenceId` (monotonic per-chat counter), `composetime`, `originalarrivaltime`, `messagetype`, `content`, `from`, `imdisplayname`, `properties.subject`, etc. **`hasMore: true`** means the safety cap was hit and there is older history beyond what was returned — chain a follow-up call with `--sync-state $(jq -r .data.nextSyncState <prev>)` to continue. **`hasMore: false`** means the walk reached the start of what was asked: the chat's earliest message, or the `--since` bound. `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. **Microsoft-internal schema — fields may change without notice.**",
-      "effect": "read",
       "needsSubstrateToken": "ic3",
       "stability": "experimental"
     },
@@ -8181,7 +7997,6 @@
       ],
       "example": "ask-marcel-office list-teams-chat-messages --chat-id '19:abc...@unq.gbl.spaces'",
       "responseShape": "Substrate envelope: `{ messages: [...], messageToken: string }`. Returns up to the 200 most recent messages per chat — older history is NOT reachable via this endpoint. Each message has `id`, `from`, `imDisplayName`, `content`, `contentType`, `composeTime`, `originalArrivalTime`, `sequenceId`, etc., plus `webUrl` (the Teams deep link), `event` on a system entry, and `files` / `reactions` when it has any; `omitted` counts the messages `--skip-system` or `--mentions-me` dropped. `messageToken` is returned for forward compatibility but is currently a static snapshot identifier (server ignores it as a pagination cursor). **Microsoft-internal schema — fields may change without notice.** For history older than the 200 most recent, use `list-teams-chat-history` (rides the IC3 substrate with a working syncState cursor).",
-      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -8208,7 +8023,6 @@
       ],
       "example": "ask-marcel-office list-teams-chats-with-messages --page-size 100",
       "responseShape": "`{ chats: [...], continuationToken?: string, hasMoreData?: boolean }`. Each chat carries `id`, `title`, `chatType`, `threadType`, `members[]` (each member's `mri` and display name; emails come from `list-chat-members`), `createdAt`, AND `lastMessage` (the most recent message body inlined — `content`, `from`, `composeTime`, `imDisplayName`, etc.). When `hasMoreData: true`, chain a follow-up call with `--continuation-token \"$(jq -r .data.continuationToken <prev>)\"`. **Microsoft-internal schema — fields may change without notice; treat the response as semi-structured.**",
-      "effect": "read",
       "needsSubstrateToken": "chatsvcagg",
       "stability": "experimental"
     },
@@ -8271,8 +8085,7 @@
       ],
       "example": "ask-marcel-office list-todo-linked-resources --todo-task-list-id 'AAMkAGI...' --todo-task-id 'AAMkABC...'",
       "responseShape": "collection of Microsoft Graph `linkedResource` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-todo-task-lists",
@@ -8309,8 +8122,7 @@
       ],
       "example": "ask-marcel-office list-todo-task-lists",
       "responseShape": "collection of Microsoft Graph `todoTaskList` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-todo-tasks",
@@ -8371,8 +8183,7 @@
       ],
       "example": "ask-marcel-office list-todo-tasks --todo-task-list-id 'AAMkAGI...'",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`; absent when `--select` leaves out `id`)",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-todo-tasks-delta",
@@ -8391,8 +8202,7 @@
       ],
       "example": "ask-marcel-office list-todo-tasks-delta --todo-task-list-id 'AAMkAD...'",
       "responseShape": "collection of Microsoft Graph `todoTask` resources under `data.value[]`, each with `webUrl`, the link the To Do web app opens it with (`https://to-do.office.com/tasks/id/<id>/details`). Cursor tokens are hoisted to envelope level: top-level `nextLink` while paging, then top-level `deltaLink` on the final page.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-trending-insights",
@@ -8454,8 +8264,7 @@
       ],
       "example": "ask-marcel-office list-trending-insights",
       "responseShape": "collection of Microsoft Graph `trending` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "list-user-direct-reports",
@@ -8510,8 +8319,7 @@
       ],
       "example": "ask-marcel-office list-user-direct-reports --user-id 'alice@contoso.com'",
       "responseShape": "collection of Microsoft Graph `directoryObject` resources (typically `user`) under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "microsoft-search-query",
@@ -8536,8 +8344,7 @@
       ],
       "example": "ask-marcel-office microsoft-search-query --query 'q3 budget'",
       "responseShape": "merged Microsoft Graph `searchResponse` envelope: `{ value: [{ searchTerms, hitsContainers: [{ total, hits: [{ hitId, rank, summary, resource }] }] }, …], partialErrors?: [{ entityType, error }] }`. value[] holds one container per entityType that succeeded; partialErrors[] (only present when at least one sub-request failed) lists which entityTypes returned errors.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given",
-      "effect": "read"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['<one-of-driveItem-listItem-site-message-event-person>'], query: { queryString: '{query}' }, size: 25 }] } — sent six times in parallel, one per entityType; `size` is the --top value when given"
     },
     {
       "name": "my-quick-context",
@@ -8548,8 +8355,7 @@
       "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/api/user-get",
       "options": [],
       "example": "ask-marcel-office my-quick-context",
-      "responseShape": "`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user's role string from Azure AD (e.g. \"Engineering Manager\"). `tenantTimeZone` is the Outlook timezone string (e.g. \"Romance Standard Time\", \"Pacific Standard Time\"); `tenantLocale` is the IETF tag (e.g. \"en-US\"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command's fan-out to keep the envelope LLM-tractable.",
-      "effect": "read"
+      "responseShape": "`{ user: { id, displayName, userPrincipalName, mail, jobTitle? }, primaryDriveId?, inboxId?, primaryCalendarId?, primaryPlannerPlanId?, defaultNotebookId?, firstJoinedTeamId?, recentDriveItemId?, tenantTimeZone?, tenantLocale?, tenantWorkingHours?: { start, end, timeZone? } }` — every field except `user.id` is optional and absent when its source call failed. `user.jobTitle` is the user's role string from Azure AD (e.g. \"Engineering Manager\"). `tenantTimeZone` is the Outlook timezone string (e.g. \"Romance Standard Time\", \"Pacific Standard Time\"); `tenantLocale` is the IETF tag (e.g. \"en-US\"). For Microsoft To Do lists, call `list-todo-task-lists` separately — they were dropped from this command's fan-out to keep the envelope LLM-tractable."
     },
     {
       "name": "next-page",
@@ -8582,8 +8388,7 @@
         }
       ],
       "example": "ask-marcel-office next-page --url 'https://graph.microsoft.com/v1.0/me/messages?$skip=10'",
-      "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level.",
-      "effect": "read"
+      "responseShape": "same shape as the originating endpoint — `{ ok: true, data: { value: [...] }, nextLink: \"...\" }` with the cursor at envelope level."
     },
     {
       "name": "read-mail-attachment",
@@ -8646,8 +8451,7 @@
       ],
       "example": "ask-marcel-office read-mail-attachment --message-id 'AAMkAD...' --attachment-id 'AAMkAD...attach1'",
       "responseShape": "Polymorphic by attachment content-type. A zip → `{ count, files: [{ path, contentType, size, text } | { path, note }], truncated? }` (the convert-mail-attachment-zip-to-markdown shape). Everything else → `{ contentType: \"text/markdown\" | \"text/plain\", size, text, pageCount? }` (the convert-mail-attachment-to-markdown shape; `pageCount` present for PDF sources). Unsupported types (image / scanned PDF / legacy .ppt) return an api_error (415/400) naming the right next command.",
-      "producesBytes": true,
-      "effect": "read"
+      "producesBytes": true
     },
     {
       "name": "resolve-calendar-link",
@@ -8665,8 +8469,7 @@
         }
       ],
       "example": "ask-marcel-office resolve-calendar-link --url 'https://outlook.office.com/calendar/item/AAMkAGI2THVS...'",
-      "responseShape": "`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`.",
-      "effect": "read"
+      "responseShape": "`{ eventId: string }`. `eventId` is URL-decoded and ready to pass to `get-calendar-event --event-id <id>`."
     },
     {
       "name": "resolve-drive-share-link",
@@ -8684,8 +8487,7 @@
         }
       ],
       "example": "ask-marcel-office resolve-drive-share-link --url 'https://contoso.sharepoint.com/:b:/s/team/EaB1cD2eF...?e=abc'",
-      "responseShape": "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder).",
-      "effect": "read"
+      "responseShape": "`{ driveId, itemId, name, webUrl, size, lastModifiedDateTime, shareToken, tenantId? }`. `driveId` (from the item's `parentReference`) + `itemId` feed every `*-drive-item` command directly — no second call. `shareToken` is the `u!<base64url>` form, kept for reuse against other `/shares/{token}/...` endpoints. **`tenantId` is present ONLY when the link belongs to a partner tenant you are a guest in** — when it is there, pass it as `--tenant-id` to every follow-up `*-drive-item` call (`download-drive-item-content`, `convert-drive-item-*`, `extract-drive-item-images`, `get-drive-item`, …), because `driveId`/`itemId` carry no tenant and those commands would otherwise fail with `invalidAudienceUri`. When `tenantId` is absent the file is in your own tenant and no flag is needed. Any other field is absent/`undefined` when the resolved driveItem omits it (e.g. `size` on a folder)."
     },
     {
       "name": "resolve-mail-link",
@@ -8703,8 +8505,7 @@
         }
       ],
       "example": "ask-marcel-office resolve-mail-link --url 'https://outlook.office.com/mail/inbox/id/AAMkAGI2THVS...'",
-      "responseShape": "`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`.",
-      "effect": "read"
+      "responseShape": "`{ messageId: string }`. `messageId` is URL-decoded and ready to pass to `get-mail-message --message-id <id>` or `convert-mail-to-markdown --message-id <id>`."
     },
     {
       "name": "resolve-teams-link",
@@ -8722,8 +8523,18 @@
         }
       ],
       "example": "ask-marcel-office resolve-teams-link --url 'https://teams.microsoft.com/l/message/19%3A...%40unq.gbl.spaces/1700000000000?tenantId=...&groupId=...&ctx=chat'",
-      "responseShape": "`{ chatId: string, messageId: string, tenantId?: string, groupId?: string, parentMessageId?: string, context?: string }`. `chatId` and `messageId` are URL-decoded and ready to pass to other commands. Optional fields are included only when the source URL carried them.",
-      "effect": "read"
+      "responseShape": "`{ chatId: string, messageId: string, tenantId?: string, groupId?: string, parentMessageId?: string, context?: string }`. `chatId` and `messageId` are URL-decoded and ready to pass to other commands. Optional fields are included only when the source URL carried them."
+    },
+    {
+      "name": "scopes-check",
+      "summary": "Decode the cached Teams web client access token and return its scopes, audience, and expiry without making a Graph call. It never opens a browser: an expired or missing session is reported as such (negative `expiresInSeconds`, or a not-signed-in error), and `login` is the command that refreshes it. Use this as a self-test before running a command an LLM expects to fail with `accessDenied` — if the required scope isn't in the returned list, the call will reject regardless of tenant config. Each command's `scopesRequired` field in `help-json` lists the scopes that command needs; intersect with the array returned here for a pre-flight check (pipe both through `jq` and diff). The `expiresInSeconds` field lets an LLM decide pre-emptively to `login` again — typically worth doing under ~5 minutes (300 s) so a long-running session doesn't hit the wall mid-command. The `elevated` block reports whether the *separate* M365ChatClient-elevated token (needed by the historical-version download / convert commands) is cached and still usable — so a fresh process can pre-flight `deep-scan`-style workloads instead of discovering a 403 mid-run; `available:false` when it is absent, expired, or within the same 5-minute buffer the download path applies. The `chatsvcagg` and `ic3` blocks report the two Teams-chat substrate tokens (used by `list-teams-chat*` / `find-chats-with-user`) the same way; both self-heal from the shared refresh token, so they are informational rather than a preflight gate. Every tier block also lists that token's OWN granted scopes (decoded from its `scp` claim, distinct per token) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated tier, which carries no refresh token of its own and is re-captured by a browser login); the `hint` field says how to refresh them.",
+      "category": "meta",
+      "graphMethod": "GET",
+      "graphPathTemplate": "(meta) cached-token introspection — no Graph endpoint",
+      "graphDocsUrl": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "options": [],
+      "example": "ask-marcel-office scopes-check",
+      "responseShape": "`{ scopes: string[], audience: string, expiresAt: string (ISO 8601), expiresInSeconds: number, elevated: TokenTier, chatsvcagg: TokenTier, ic3: TokenTier, hint: string }` where `TokenTier = { available: boolean, expiresInSeconds?: number, scopes: string[], refresh: \"automatic\" | \"interactive\", reason?: string }`. Top-level `scopes`/`audience`/`expiresAt`/`expiresInSeconds` describe the basic Teams token (back-compat). Each tier block also carries that token's OWN `scopes` (decoded from its `scp` claim: elevated ~20 Graph scopes, chatsvcagg `user_impersonation`, ic3 `Teams.AccessAsUser.All`) and its `refresh` route (`automatic` = self-heals from the shared refresh token; `interactive` = the elevated token, re-captured only by a browser login). `available` is `true` only when the token is present and beyond the 5-minute buffer; `expiresInSeconds` is the raw remaining seconds (negative when expired) and is omitted when the token is absent. `reason` is present ONLY when `available` is `false` — a plain-language note on why the tier is missing and how to restore it (so an empty `scopes: []` on an absent token is not mistaken for \"no scopes\"); it is omitted when the token is available. `hint` names `login --force` as the single refresh action. EVERY tier — `basic` included — is reported as its own block with the SAME shape, and each block carries a `reads` line: a plain-language description of what that tier lets you read (e.g. `chatsvcagg` -> \"Teams chat message content\"), so a caller never has to know what a tier codename means. The `basic` block mirrors the loose top-level `scopes`/`expiresAt`/`expiresInSeconds` fields, which are still emitted unchanged for back-compat; prefer the block. `basic.available` applies the same 300-second freshness buffer as the other tiers, so `available` means the same thing everywhere."
     },
     {
       "name": "search-all-accessible-sites",
@@ -8748,8 +8559,7 @@
       ],
       "example": "ask-marcel-office search-all-accessible-sites --output json",
       "responseShape": "`{ value: [<Microsoft Graph site resource: { id, name, displayName?, webUrl, size?, estimatedFileCount?, … }>], count, fileEstimate?, archivedExcluded?, nonNavigableExcluded?, notFoundExcluded?, archiveProbeErrors?, truncated?: true, archiveProbeTruncated?: true }`. `estimatedFileCount` appears only with `--count-files true` — the security-trimmed `driveItem` (files+folders) estimate scoped to each site, omitted past the 200-site count cap or when the per-site query fails. `value[]` is deduped by site `id` across pages; `count` is the number of distinct sites returned (the authoritative figure). `size` (when present) is the site's DEFAULT document library's total bytes used (`drive.quota.used`, recursive) — folded onto the same per-site probe for free, omitted for sites past the probe ceiling or without a default drive; it is a data-volume signal, not a file count. `fileEstimate` (best-effort, omitted if the extra query fails) is the Microsoft Search index's security-trimmed `driveItem` count — roughly how many files+folders the user can access across all of SharePoint/OneDrive. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion. `archivedExcluded` (omitted when 0) counts sites dropped as archived/locked by the per-site probe; `nonNavigableExcluded` counts sites dropped by URL shape (add-in app domains, `/contentstorage/` SharePoint Embedded containers, `/_layouts/` system pages); `notFoundExcluded` counts sites whose probe returned 404. `archiveProbeErrors` (omitted when 0) counts sites whose probe failed for an unrelated reason — those are KEPT, so an archived one could slip through. `archiveProbeTruncated: true` means more sites were returned than the probe ceiling (250); the overflow is kept unprobed — narrow with `--query`.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false",
-      "effect": "read"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['site'], query: { queryString: '{query}' }, from: <page*25>, size: 25 }] } — `{query}` defaults to `*` (all accessible sites); re-issued per page, advancing `from` by 25 until `moreResultsAvailable` is false"
     },
     {
       "name": "search-all-files",
@@ -8768,8 +8578,7 @@
       ],
       "example": "ask-marcel-office search-all-files --query 'q1 budget filetype:xlsx'",
       "responseShape": "`{ value: [<Microsoft Graph driveItem resource: { id, name, webUrl, parentReference: { driveId }, size, … }>], count, truncated?: true }`. `value[]` is deduped by `hitId` across pages; `count` is the number of distinct files returned. `truncated: true` means paging stopped early (page ceiling hit, or a later page errored) — narrow with `--query` to see the rest; its absence means the sweep ran to completion.",
-      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit",
-      "effect": "read"
+      "bodyTemplate": "{ requests: [{ entityTypes: ['driveItem'], query: { queryString: '{query}' }, from: <page*200>, size: 200 }] } — re-issued per page, advancing `from` by 200 until `moreResultsAvailable` is false or the 25-page ceiling is hit"
     },
     {
       "name": "search-mail-messages",
@@ -8824,8 +8633,7 @@
       ],
       "example": "ask-marcel-office search-mail-messages --query 'from:alice subject:Q3'",
       "responseShape": "collection of Microsoft Graph `message` resources under `value[]`, ranked by relevance, each projected to the default `--select` set (or the requested fields when overridden). The default omits `body`, `internetMessageHeaders`, and `uniqueBody`.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "search-my-documents",
@@ -8874,8 +8682,7 @@
       ],
       "example": "ask-marcel-office search-my-documents --query 'q1 budget'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "search-onedrive-files",
@@ -8930,8 +8737,7 @@
       ],
       "example": "ask-marcel-office search-onedrive-files --drive-id 'b!1234' --query 'q1 budget'",
       "responseShape": "collection of Microsoft Graph `driveItem` resources under `value[]`",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "search-onenote-pages",
@@ -8980,8 +8786,7 @@
       ],
       "example": "ask-marcel-office search-onenote-pages --query 'meeting notes' --top 25",
       "responseShape": "collection of Microsoft Graph `onenotePage` resources under `value[]` whose title contains the substring",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "search-sharepoint-sites-by-name",
@@ -9036,8 +8841,7 @@
       ],
       "example": "ask-marcel-office search-sharepoint-sites-by-name --query 'marketing'",
       "responseShape": "collection of Microsoft Graph `site` resources under `value[]` (up to 25), each carrying `size?` — its default document library's total bytes used (`drive.quota.used`, recursive), folded onto the same probe for free (a data-volume signal, not a file count; omitted when the site has no default drive). Sites you cannot open are excluded: `nonNavigableExcluded` drops add-in app domains, `/contentstorage/` (SharePoint Embedded) containers, and `/_layouts/` system URLs by URL shape (no probe); each remaining match is probed (`GET /sites/{id}?$select=…,siteCollection&$expand=drive($select=quota)`) and `archivedExcluded` drops archived / `423 resourceLocked` sites while `notFoundExcluded` drops probes that 404. All three counters are omitted when 0. `archiveProbeErrors` (omitted when 0) counts matches kept because their probe failed for an unrelated reason. Active personal OneDrives are kept.",
-      "pagination": true,
-      "effect": "read"
+      "pagination": true
     },
     {
       "name": "update-mail-draft",
@@ -9133,10 +8937,10 @@
           }
         }
       ],
-      "example": "ask-marcel-office-write update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
+      "example": "ask-marcel-office update-mail-draft --message-id \"AAMkAD...\" --subject \"Updated: Q3 Report\" --to-recipients \"alice@example.com,charlie@example.com\"",
       "responseShape": "A confirmation of the write, NOT the whole message: `{ id, subject, toRecipients, ccRecipients, bccRecipients, importance, bodyPreview, isDraft, webLink, conversationId }` (only the fields Graph returned; `{ ok: true }` when Graph answers 204). The `body` is deliberately omitted — you just wrote it, and echoing a long thread's quoted history back cost ~174 KB of context per call. Read the full body with `get-mail-message --id <the returned id>` when you actually need it; `bodyPreview` is Graph's ~255-char summary, enough to confirm WHICH draft answered. The `id` is the draft — refine it with `update-mail-draft`, or open Outlook Drafts to review and send. Dedup caveat: a `conversationId` `$filter` on the Drafts folder is not a reliable 'does a draft already exist on this thread' check. Reply and forward drafts do not always inherit the inbound message's `conversationId` (one thread can split across several), and Graph `$filter` on Drafts is not read-your-writes consistent, so a just-created draft can be missed. To find existing drafts, use the `find-mail-drafts` command, which scans recent drafts and matches client-side on subject and recipients; to revise a draft this session created, reuse the returned `id`.",
       "bodyTemplate": "{ subject?: '{subject}', body?: { contentType: '{body-content-type}', content: '{body-content}' }, toRecipients?: '{to-recipients}', ccRecipients?: '{cc-recipients}', bccRecipients?: '{bcc-recipients}', importance?: '{importance}' } — only provided fields are sent. With '{comment}': body.content is the draft's own body with the text above the quote replaced, and body.contentType is the draft's own, unchanged. A '{body-content}' aimed at a draft that still carries a quote costs one GET of body,isDraft and is refused unless '{replace-quoted-history}' is true",
-      "effect": "draft"
+      "mutates": true
     }
   ]
 }
