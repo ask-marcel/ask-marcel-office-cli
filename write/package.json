@@ -31,6 +31,8 @@
     "dist/",
     "CHANGELOG.md",
     "README.md",
+    "USAGE.md",
+    "COMMANDS.md",
     "LICENSE"
   ],
   "engines": {

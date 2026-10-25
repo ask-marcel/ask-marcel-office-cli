@@ -10,10 +10,10 @@
  * resolves `@ask-marcel/office-core` for every check that runs inside it. So
  * this packs the package with `bun pm pack` and checks the tarball itself:
  *
- *   1. the files: package.json, README.md, LICENSE, CHANGELOG.md, each file
- *      that `bin` and `exports` name, each bundle that the build makes
- *      (scripts/package-targets.ts: dist/token.js in auth), and declarations
- *      under dist/; no other;
+ *   1. the files: package.json, README.md, USAGE.md, COMMANDS.md, LICENSE,
+ *      CHANGELOG.md, each file that `bin` and `exports` name, each bundle
+ *      that the build makes (scripts/package-targets.ts: dist/token.js in
+ *      auth), and declarations under dist/; no other;
  *   2. the manifest: `@ask-marcel/office-core` only in devDependencies (bun
  *      publish rewrites `workspace:*` to core's version, and an install would
  *      then 404 on the never-published core);
@@ -32,10 +32,10 @@
  * installed index.d.ts with one that imports core (must fail with TS2307), and
  * with one whose types and values are `any` (must fail as a silent pass).
  *
- *   --selftest  proves steps 1 to 3 reject a stray file, core in dependencies,
- *               and a declaration that names core, and that the consumer file
- *               expects an error on each wrong line and refuses an export with no
- *               wrong use, without packing anything.
+ *   --selftest  proves steps 1 to 3 reject a stray file, a missing USAGE.md,
+ *               core in dependencies, and a declaration that names core, and
+ *               that the consumer file expects an error on each wrong line and
+ *               refuses an export with no wrong use, without packing anything.
  *
  * An exported type with no entry in MISUSES, or an exported value with no entry
  * in VALUE_MISUSES, fails the check: a new public export comes with its own
@@ -95,7 +95,9 @@ const VALUE_MISUSES: Readonly<Record<string, ValueMisuse>> = {
 
 const CORE = '@ask-marcel/office-core';
 const RUNTIME_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies', 'bundleDependencies', 'bundledDependencies'];
-const TOP_FILES = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md'];
+// USAGE.md and COMMANDS.md ship as 2.8.0 shipped docs/USAGE.md and docs/COMMANDS.md,
+// so an agent can read them in node_modules.
+const TOP_FILES = ['package.json', 'README.md', 'USAGE.md', 'COMMANDS.md', 'LICENSE', 'CHANGELOG.md'];
 const TSC = resolve(import.meta.dir, '../node_modules/typescript/bin/tsc');
 
 const withoutDot = (path: string): string => (path.startsWith('./') ? path.slice(2) : path);
@@ -334,6 +336,17 @@ const selftest = (): number => {
           : 1,
     },
     {
+      name: 'a missing USAGE.md',
+      problems:
+        fileProblems(
+          SELFTEST_FILES.filter((f) => f !== 'USAGE.md'),
+          SELFTEST_MANIFEST,
+          SELFTEST_BUNDLES
+        ).length === 1
+          ? 0
+          : 1,
+    },
+    {
       name: 'a missing helper entry',
       problems:
         fileProblems(
@@ -376,7 +389,7 @@ const selftest = (): number => {
   for (const c of failed) process.stderr.write(`check-packed-package: SELFTEST FAILED, ${c.name} was judged wrongly\n`);
   if (failed.length === 0)
     process.stdout.write(
-      'check-packed-package: selftest passed (a stray file, a missing bin, a missing or stray helper entry, core in dependencies, a declaration naming core and an export with no wrong use are rejected; the consumer file expects an error on each wrong line).\n'
+      'check-packed-package: selftest passed (a stray file, a missing bin, a missing USAGE.md, a missing or stray helper entry, core in dependencies, a declaration naming core and an export with no wrong use are rejected; the consumer file expects an error on each wrong line).\n'
     );
   return failed.length === 0 ? 0 : 1;
 };
