@@ -48,7 +48,7 @@ Run these commands in the folder that you change:
 | `bun run build` | `dist/`: the bundles with core inlined, and the declarations | auth, read, write |
 | `bun run check:packed` | Packs the package, and installs the tarball in a clean consumer | auth, read, write |
 | `bun run docs:gen` | Makes the generated tables of `COMMANDS.md` (and, in `build`, `dist/commands.json`) | auth, read, write |
-| `bun run check:docs` | Fails when `COMMANDS.md` is out of date. In read and write, it also fails when `dist/commands.json` is out of date. | auth, read, write |
+| `bun run check:docs` | Fails when `COMMANDS.md` is out of date. In read and write, it also fails when `dist/commands.json` is out of date. It also fails when a count in `README.md`, `USAGE.md` or `COMMANDS.md` does not match the registry, or when a count in `README.md` or `USAGE.md` has no claim. | auth, read, write |
 | `bun run smoke` | Runs `dist/` under node and bun | auth, read, write |
 | `bun run smoke:packed` | Installs the packed tarball in an empty folder and runs the smoke | read |
 
@@ -117,6 +117,11 @@ Run them in the folder before you commit. CI runs them all.
 
 - Each published folder has `README.md` (for npm), `USAGE.md` and
   `COMMANDS.md`. A doc gives only the counts of its own package.
+- `bun run check:docs` checks the counts of commands and entries in these
+  three docs against the registry (`scripts/check-doc-numbers.ts`). Write such
+  a count in digits, in an anchored sentence of a claim of that script. A new
+  count sentence in `README.md` or `USAGE.md` needs a new claim in the same
+  commit.
 - The root `README.md` is the index of the packages.
 - `docs/COMMANDS.md`, `docs/USAGE.md`, `docs/commands.json` and `docs/demo.gif`
   are the docs of `ask-marcel-office-cli` 2.8.0. Its npm page links them. Do

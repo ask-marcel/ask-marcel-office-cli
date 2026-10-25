@@ -148,7 +148,7 @@ helper. Then, from this folder:
 | `bun run check:packed` | Packs the package and checks the tarball and a clean consumer install |
 | `bun run smoke` | After the build: runs `dist/` under node and bun on temporary homes (`scripts/qa-write-bundle-smoke.ts`) |
 | `bun run docs:gen` | Makes the tables of `COMMANDS.md` from the registry |
-| `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date |
+| `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date. It also fails when a count in `README.md`, `USAGE.md` or `COMMANDS.md` does not match the registry, or when a count in `README.md` or `USAGE.md` has no claim. |
 
 ## License
 

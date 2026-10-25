@@ -365,7 +365,7 @@ helper. Then, from this folder:
 | `bun run smoke` | After the build: runs `dist/` under node and bun on every converter, the MCP server and the read bin (`scripts/qa-bundle-smoke.ts`) |
 | `bun run smoke:packed` | After the build: installs the packed tarball in an empty folder and runs the smoke on it (`scripts/qa-packed-install-smoke.ts`) |
 | `bun run docs:gen` | Makes the tables of `COMMANDS.md` from the registry |
-| `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date |
+| `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date. It also fails when a count in `README.md`, `USAGE.md` or `COMMANDS.md` does not match the registry, or when a count in `README.md` or `USAGE.md` has no claim. |
 
 ## License
 
