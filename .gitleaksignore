@@ -1,7 +1,7 @@
 # gitleaks: reviewed historical false positives, one fingerprint per line.
 #
-# The pre-commit hook runs `gitleaks protect --staged` (the staged diff only);
-# CI runs `gitleaks detect` over the FULL history. The full-history scan is the
+# The pre-commit hook runs `gitleaks git --staged` (the staged diff only);
+# CI runs `gitleaks git` over the FULL history. The full-history scan is the
 # stricter of the two, and because history is immutable it keeps re-reporting
 # any finding that ever existed, including one whose code is long deleted.
 #
