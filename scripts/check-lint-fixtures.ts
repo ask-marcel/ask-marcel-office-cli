@@ -73,6 +73,20 @@ const DYNAMIC_REGISTRY_IMPORT = "export const f = async (): Promise<unknown> => 
 const DYNAMIC_SIBLING_IMPORT = "export const f = async (): Promise<unknown> => import('./filesystem-node.ts');\n";
 const CORE_FAKE_IMPORT = "import { fakeLogger } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';\nexport const f = (): unknown => fakeLogger;\n";
 const SIBLING_FAKE_IMPORT = "import { fakeLogger } from '../test-helpers/logger-fake.ts';\nexport const f = (): unknown => fakeLogger;\n";
+// Rule 15 (no inline ignores) and rule 13 (no mocks), from eslint.base.js, so
+// every folder holds them.
+const INLINE_DISABLE = "// eslint-disable-next-line no-console\nexport const f = (): void => {\n  console.log('hidden');\n};\n";
+const TS_EXPECT_ERROR = "// @ts-expect-error: a described one is banned too\nexport const n: number = 'a';\n";
+const TOOL_MARKER = '// prettier-ignore\nexport const n = 1;\n';
+const PLAIN_COMMENT = '// A plain comment names no tool.\nexport const n = 1;\n';
+const SPY_IMPORT = "import { spyOn } from 'bun:test';\nexport const f = (): unknown => spyOn;\n";
+const TEST_IMPORT = "import { expect, test } from 'bun:test';\ntest('t', () => {\n  expect(1).toBe(1);\n});\n";
+const CALL_ASSERTION = "import { expect, test } from 'bun:test';\ntest('t', () => {\n  const fake = { calls: 0 };\n  expect(fake).toHaveBeenCalledWith(1);\n});\n";
+const CALL_ASSERTION_IN_SOURCE = "export const f = (e: { toHaveBeenCalled: () => void }): void => {\n  e.toHaveBeenCalled();\n};\n";
+
+// With linterOptions.noInlineConfig, ESLint reports each directive comment
+// with no rule id. The fixtures name that report with this label.
+const INLINE_CONFIG = 'linterOptions.noInlineConfig';
 
 // One real source file per workspace folder, relative to the folder.
 const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
@@ -80,6 +94,26 @@ const WORKSPACE_FILES: ReadonlyArray<readonly [string, string]> = [
   ['auth', 'src/composition/auth-program.ts'],
   ['read', 'src/use-cases/commands/list-drives.ts'],
   ['write', 'src/composition/write-program.ts'],
+];
+
+// One real test file per workspace folder, relative to the folder.
+const WORKSPACE_TESTS: ReadonlyArray<readonly [string, string]> = [
+  ['core', 'src/composition/cli-shell-flags.test.ts'],
+  ['auth', 'src/composition/auth-names.test.ts'],
+  ['read', 'src/composition/build-deps.test.ts'],
+  ['write', 'src/composition/cli-write.test.ts'],
+];
+
+// The rule 13 and rule 15 bans of eslint.base.js, in each folder.
+const baseBanFixtures = ([cwd, path]: readonly [string, string], [, testPath]: readonly [string, string]): ReadonlyArray<Fixture> => [
+  { name: `${cwd}: an inline eslint directive is reported`, path, source: INLINE_DISABLE, rule: INLINE_CONFIG, fires: true, strict: false, cwd },
+  { name: `${cwd}: an inline eslint directive hides nothing`, path, source: INLINE_DISABLE, rule: 'no-console', fires: true, strict: false, cwd },
+  { name: `${cwd}: a described @ts-expect-error is rejected`, path, source: TS_EXPECT_ERROR, rule: '@typescript-eslint/ban-ts-comment', fires: true, strict: false, cwd },
+  { name: `${cwd}: the ignore marker of another tool is rejected`, path, source: TOOL_MARKER, rule: 'no-warning-comments', fires: true, strict: false, cwd },
+  { name: `control: ${cwd}: a plain comment is not a marker`, path, source: PLAIN_COMMENT, rule: 'no-warning-comments', fires: false, strict: false, cwd },
+  { name: `${cwd}: a test never imports spyOn`, path: testPath, source: SPY_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
+  { name: `control: ${cwd}: a test imports expect and test`, path: testPath, source: TEST_IMPORT, rule: 'no-restricted-imports', fires: false, strict: false, cwd },
+  { name: `${cwd}: a test never asserts on recorded calls`, path: testPath, source: CALL_ASSERTION, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
 ];
 
 const FIXTURES: ReadonlyArray<Fixture> = [
@@ -135,6 +169,11 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   // names `src/**`, which must resolve inside the folder.
   ...WORKSPACE_FILES.map(([cwd, path]): Fixture => ({ name: `${cwd}: strict lint rejects a needless assertion`, path, source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true, cwd })),
   { name: 'control: core: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false, cwd: 'core' },
+  ...WORKSPACE_FILES.flatMap((file, i) => baseBanFixtures(file, WORKSPACE_TESTS[i] ?? file)),
+  // Core's own no-restricted-syntax blocks replace the base's options, so they
+  // repeat the call-assertion ban: one file of each block.
+  { name: 'core: a core file keeps the call-assertion ban', path: 'src/composition/cli-shell.ts', source: CALL_ASSERTION_IN_SOURCE, rule: 'no-restricted-syntax', fires: true, strict: false, cwd: 'core' },
+  { name: 'core: a read-only core file keeps the call-assertion ban', path: 'src/use-cases/commands/docs-builders.ts', source: CALL_ASSERTION_IN_SOURCE, rule: 'no-restricted-syntax', fires: true, strict: false, cwd: 'core' },
 ];
 
 type LintMessage = { readonly ruleId: string | null; readonly message: string };
@@ -172,6 +211,8 @@ const lint = async (fixture: Fixture): Promise<Outcome> => {
   }
 };
 
+const ruleOf = (m: LintMessage): string | null => (m.ruleId === null && m.message.includes("'noInlineConfig' setting") ? INLINE_CONFIG : m.ruleId);
+
 // The folders that a guarded file of the root src/ moves to (package split, phases 3 to 6).
 const MOVED_TO: ReadonlyArray<string> = ['core', 'auth', 'write', 'read'];
 
@@ -205,20 +246,39 @@ const check = async (listed: Fixture): Promise<boolean> => {
   }
   // A message without a rule is a parse error or an "ignored file" warning: the
   // text was never linted, so neither a firing nor a silent rule proves anything.
-  const unlinted = outcome.messages.find((m) => m.ruleId === null);
+  // The noInlineConfig report has no rule either, and has its own label.
+  const unlinted = outcome.messages.find((m) => ruleOf(m) === null);
   if (unlinted) {
     console.log(`  FAIL  ${label}\n        not linted: ${unlinted.message}`);
     return false;
   }
-  const fired = outcome.messages.some((m) => m.ruleId === fixture.rule);
+  const fired = outcome.messages.some((m) => ruleOf(m) === fixture.rule);
   const held = fired === fixture.fires;
   console.log(`  ${held ? 'ok  ' : 'FAIL'}  ${label} ${fired ? 'fired' : 'silent'}`);
   return held;
 };
 
+// At most this many eslint processes run at once. Each one takes about 180 MB,
+// and 86 fixtures at once filled the 16 GB of a 4-core machine: the run took
+// more than 30 minutes instead of about one.
+const PARALLEL = Math.max(2, navigator.hardwareConcurrency);
+
+const checkAll = async (fixtures: ReadonlyArray<Fixture>): Promise<ReadonlyArray<boolean>> => {
+  const held: boolean[] = [];
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (let i = next++; i < fixtures.length; i = next++) {
+      const fixture = fixtures[i];
+      if (fixture !== undefined) held[i] = await check(fixture);
+    }
+  };
+  await Promise.all(Array.from({ length: PARALLEL }, worker));
+  return held;
+};
+
 const main = async (): Promise<number> => {
   console.log('lint fixtures:');
-  const outcomes = await Promise.all(FIXTURES.map(check));
+  const outcomes = await checkAll(FIXTURES);
   const failed = outcomes.filter((held) => !held).length;
   if (failed > 0) {
     console.error(`lint fixtures: ${failed} fixture(s) failed. A path-scoped rule stopped matching its files, or fires where it must not.`);
