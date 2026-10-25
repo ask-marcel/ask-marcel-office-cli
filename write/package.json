@@ -53,7 +53,7 @@
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
     "docs:gen": "bun run ../scripts/gen-docs.ts --package src/composition/write-package.ts --commands-doc COMMANDS.md",
-    "check:docs": "bun run ../scripts/gen-docs.ts --package src/composition/write-package.ts --check --commands-doc COMMANDS.md --manifest dist/commands.json",
+    "check:docs": "bun run ../scripts/gen-docs.ts --package src/composition/write-package.ts --check --commands-doc COMMANDS.md --manifest dist/commands.json && bun run ../scripts/check-doc-numbers.ts --package src/composition/write-package.ts --readme README.md --usage USAGE.md --commands-doc COMMANDS.md --manifest dist/commands.json",
     "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts && bun run ../scripts/gen-docs.ts --package src/composition/write-package.ts --manifest dist/commands.json",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
     "smoke": "bun ../scripts/qa-write-bundle-smoke.ts",

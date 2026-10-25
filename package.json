@@ -30,10 +30,8 @@
     "lint:staged": "bash scripts/lint-staged.sh",
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "bun --bun x tsc --noEmit",
-    "check:docs": "bun run scripts/check-doc-numbers.ts --package read/src/composition/single-package.ts --package write/src/composition/write-package.ts --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md --manifest docs/commands.json",
     "check:read-bundle": "bun run scripts/check-read-bundle.ts",
-    "check:package-imports": "bun run scripts/check-package-imports.ts",
-    "docs:gen": "bun run scripts/gen-docs.ts --package read/src/composition/single-package.ts --package write/src/composition/write-package.ts --manifest docs/commands.json --commands-doc docs/COMMANDS.md"
+    "check:package-imports": "bun run scripts/check-package-imports.ts"
   },
   "devDependencies": {
     "@ask-marcel/office-core": "workspace:*",

@@ -19,15 +19,17 @@
  * Each published folder checks its command reference after its build (package
  * split, phase 7). The workspace job runs `bun run check:docs` after `bun run
  * build`, for the published folders. The `check:docs` script of each published
- * folder names `gen-docs.ts`, `--check` and `--commands-doc COMMANDS.md`. Else
- * the freshness gate can go dark, and a stale COMMANDS.md passes CI.
+ * folder names `gen-docs.ts`, `--check` and `--commands-doc COMMANDS.md`, and
+ * `check-doc-numbers.ts` for the counts in its docs. Else the freshness gate or
+ * the count gate can go dark, and a stale doc passes CI.
  *
  *   --selftest  proves a missing folder, an extra folder, a missing matrix, a
  *               missing or misplaced mutation job, a wrong shard count and a
  *               wrong skip are rejected, and a right workflow passes (rule 15.10).
  *               It also proves that no docs step, a docs step before the build,
- *               a `check:docs` script without `--check` and a published folder
- *               with no `check:docs` script are rejected.
+ *               a `check:docs` script without `--check` or without the count
+ *               gate, and a published folder with no `check:docs` script are
+ *               rejected.
  *
  * Exit codes: 0 the matrix lists exactly the workspaces, read mutates in its
  * shards only, and each published folder checks its command reference; 1 it
@@ -91,8 +93,8 @@ const workspaceMutationProblems = (workflow: Workflow): ReadonlyArray<string> =>
 const BUILD = 'bun run build';
 const CHECK_DOCS = 'bun run check:docs';
 const PUBLISHED = 'matrix.published';
-// The words of the check:docs script of a published folder: the freshness check of gen-docs on its COMMANDS.md.
-const CHECK_DOCS_WORDS = ['gen-docs.ts', '--check', '--commands-doc COMMANDS.md'];
+// The words of the check:docs script of a published folder: the freshness check of gen-docs on its COMMANDS.md, and the count gate.
+const CHECK_DOCS_WORDS = ['gen-docs.ts', '--check', '--commands-doc COMMANDS.md', 'check-doc-numbers.ts'];
 
 const publishedFolders = (workflow: Workflow): ReadonlyArray<string> =>
   (workflow.jobs?.[JOB]?.strategy?.matrix?.include ?? []).flatMap((entry) => (entry.published === true && entry.folder !== undefined ? [entry.folder] : []));
@@ -150,7 +152,7 @@ const selftest = (): number => {
   });
   const build = { run: BUILD, if: PUBLISHED };
   const docs = { run: CHECK_DOCS, if: PUBLISHED };
-  const script = 'bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --check --commands-doc COMMANDS.md';
+  const script = 'bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --check --commands-doc COMMANDS.md && bun run ../scripts/check-doc-numbers.ts';
   const cases = [
     { name: 'a right workflow', found: problems(['core', 'auth'], workflow(['auth', 'core'], sharded, SKIP_SHARDED)).length, expected: 0 },
     { name: 'a missing folder', found: problems(['core', 'auth', 'read'], workflow(['core', 'auth'], sharded, SKIP_SHARDED)).length, expected: 1 },
@@ -165,13 +167,18 @@ const selftest = (): number => {
     { name: 'no docs step', found: docsProblems(docsWorkflow([build]), { read: script }).length, expected: 1 },
     { name: 'a docs step before the build', found: docsProblems(docsWorkflow([docs, build]), { read: script }).length, expected: 1 },
     { name: 'a check:docs script without --check', found: docsProblems(docsWorkflow([build, docs]), { read: script.replace(' --check', '') }).length, expected: 1 },
+    {
+      name: 'a check:docs script without the count gate',
+      found: docsProblems(docsWorkflow([build, docs]), { read: script.replace(' && bun run ../scripts/check-doc-numbers.ts', '') }).length,
+      expected: 1,
+    },
     { name: 'a published folder with no check:docs script', found: docsProblems(docsWorkflow([build, docs]), {}).length, expected: 1 },
   ];
   const wrong = cases.filter((c) => c.found !== c.expected);
   for (const c of wrong) process.stderr.write(`check-ci-matrix: SELFTEST FAILED, ${c.name} gave ${c.found} problem(s), expected ${c.expected}\n`);
   if (wrong.length === 0)
     process.stdout.write(
-      'check-ci-matrix: selftest passed (a missing folder, an extra folder, no matrix, no or a misplaced mutation job, a wrong shard count, a wrong skip, no docs step, a docs step before the build, a check:docs script without --check and a missing check:docs script are rejected).\n'
+      'check-ci-matrix: selftest passed (a missing folder, an extra folder, no matrix, no or a misplaced mutation job, a wrong shard count, a wrong skip, no docs step, a docs step before the build, a check:docs script without --check or without the count gate, and a missing check:docs script are rejected).\n'
     );
   return wrong.length === 0 ? 0 : 1;
 };

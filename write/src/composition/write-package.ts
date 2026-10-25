@@ -3,9 +3,8 @@
  * write registry, its lifecycle entries, its own description, its bin and its
  * npm name. The write CLI (`write-program.ts`), the write MCP server
  * (`write-server.ts`) and the docs builders read it. Write's `bun run docs:gen`
- * (it writes write/COMMANDS.md), write's build, and the root `bun run docs:gen`
- * and `bun run check:docs` read it through `--package` (the name
- * `commandPackage`).
+ * (it writes write/COMMANDS.md), write's build and write's `bun run
+ * check:docs` read it through `--package` (the name `commandPackage`).
  */
 import type { WriteGraph } from '@ask-marcel/office-core/infra/write-graph.ts';
 import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';

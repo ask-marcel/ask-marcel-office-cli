@@ -100,10 +100,9 @@ jobs:
         run: bun run typecheck
       - name: coverage gate selftest (a file below its tier and a file outside every tier are rejected)
         run: bun run scripts/check-coverage.ts --selftest
-      - name: doc numbers match the registry (selftest first, so the gate proves it can fail)
-        run: |
-          bun run check:docs --selftest
-          bun run check:docs
+      - name: doc numbers selftest (a wrong count, a lost anchor, an unmatched count and a placeholder are refused; the check:docs script of each published folder runs the gate on its docs)
+        working-directory: read
+        run: bun run ../scripts/check-doc-numbers.ts --package src/composition/single-package.ts --selftest
       - name: command reference red fixture (in read, a copy of COMMANDS.md passes, and the same copy with a wrong count gives exit 1 exactly), then the gen-docs selftest
         # Nothing is built in this job, so the fixture gives no manifest:
         # a missing manifest would make each run stale for the wrong reason.
@@ -260,7 +259,7 @@ jobs:
       - name: build (bundles with core inlined, declarations with core under dist/shared)
         if: matrix.published
         run: bun run build
-      - name: command reference (COMMANDS.md and dist/commands.json match the registry; else run `bun run docs:gen` or `bun run build`)
+      - name: command reference and doc counts (COMMANDS.md and dist/commands.json match the registry, else run `bun run docs:gen` or `bun run build`; each count in README.md, USAGE.md and COMMANDS.md is true)
         if: matrix.published
         run: bun run check:docs
       - name: packed output (no core outside devDependencies or in a .d.ts) and a clean consumer (bin, library, deliberate type errors)
