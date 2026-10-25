@@ -48,6 +48,8 @@ jobs:
         with:
           fetch-depth: 0 # full history for gitleaks detect and mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile # lockfile drift fails here (rule 5.3)
       - name: package.json (no latest / * / bare dist-tag)
         run: |
@@ -127,6 +129,8 @@ jobs:
         with:
           fetch-depth: 0 # full history for mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
         working-directory: .
       - name: mutation (read's changed files, shard ${{ matrix.shard }} of 8; see deviation 2 in the header)
@@ -164,6 +168,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -206,6 +212,8 @@ jobs:
         with:
           fetch-depth: 0 # full history for mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -252,6 +260,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
