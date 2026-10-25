@@ -2,11 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { commandRole } from './command-directory.ts';
 
-// Core's half of the bin-placeholder guard (package split, phase 3). The root's
-// src/use-cases/commands/bin-placeholders.test.ts reads the root src/; the hints,
-// remedies and docs text that moved to core/src/ are read here, so a command
-// reference in core that names the wrong package, or a bin typed by hand, fails
-// in core's own test run.
+// Core's half of the bin-placeholder guard (package split, phase 3). Each
+// package has its own sweep over its own src/; this one reads core/src/: the
+// hints, remedies and docs text of core are read here, so a command reference
+// in core that names the wrong package, or a bin typed by hand, fails in core's
+// own test run.
 
 // What `{bin}` may stand before: the commands and help every package has, the
 // generic words the hints use for "any command", and the `--` of
@@ -16,6 +16,12 @@ const EVERY_PACKAGE = new Set(['docs', 'help', 'help-json', 'mcp', '--help', '<c
 // Words after a role placeholder that are not commands: the auth lock's holder.
 const NOT_COMMANDS: Readonly<Record<string, ReadonlySet<string>>> = { auth: new Set(['process']) };
 
+// The one file that may keep a bin by hand, on one line: the PATH search of the
+// token helper looks for the auth bin, which is the same for every caller, and a
+// library caller gets the text with no renderer to fill a placeholder.
+const UNRENDERED_FILE = 'src/infra/token-helper-run.ts';
+const UNRENDERED_LINE = 'and ask-marcel-office-auth is not on PATH.';
+
 // The core folder, from this file rather than the working directory: a run
 // from another directory would otherwise scan nothing and pass.
 const CORE = join(import.meta.dir, '../../..');
@@ -23,6 +29,10 @@ const CORE = join(import.meta.dir, '../../..');
 type Line = { readonly where: string; readonly text: string };
 
 const isComment = (text: string): boolean => /^\s*(\/\/|\/\*|\*)/.test(text);
+
+// A bin typed by hand before a word: the bin of the single package or of a
+// package of the split.
+const BIN_BY_HAND = /ask-marcel-office(-(auth|read|write))?\s/;
 
 const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
   const lines: Line[] = [];
@@ -40,6 +50,8 @@ const misnamed = (role: string, word: string): boolean => {
   if (role === '') return !EVERY_PACKAGE.has(word) && !word.startsWith('${');
   return commandRole(word) !== role && !(NOT_COMMANDS[role]?.has(word) ?? false);
 };
+
+const isUnrendered = ({ where, text }: Line): boolean => where.startsWith(`core/${UNRENDERED_FILE}:`) && text.includes(UNRENDERED_LINE);
 
 describe('the bin placeholders in core’s source', () => {
   it('are read from the whole of core, the hint text included, wherever the tests run from', async () => {
@@ -68,8 +80,11 @@ describe('the bin placeholders in core’s source', () => {
     expect(odd).toEqual([]);
   });
 
-  it('leave no bin typed by hand: every core line goes through a renderer that fills the placeholder', async () => {
-    const byHand = (await sourceLines()).filter(({ text }) => text.includes('ask-marcel-office ')).map(({ where }) => where);
+  it('leave no bin typed by hand outside the one line that names the auth bin of the PATH search', async () => {
+    const byHand = (await sourceLines())
+      .filter(({ text }) => BIN_BY_HAND.test(text))
+      .filter((line) => !isUnrendered(line))
+      .map(({ where }) => where);
     expect(byHand).toEqual([]);
   });
 });

@@ -3,9 +3,9 @@ import { CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_
 
 /*
  * Core's own path-scoped rules (package split, phase 3), the root's rules for
- * the files that moved here. The ownership lists name `src/...`, so their globs
- * match core's files from this folder. The reasons live beside each rule in the
- * root eslint.config.js and in eslint.ownership.js; scripts/check-lint-fixtures.ts proves each still fires
+ * the files that moved here. The core lists name `src/...`, so their globs
+ * match core's files from this folder. The reasons live beside their data in
+ * eslint.ownership.js; scripts/check-lint-fixtures.ts proves each still fires
  * here.
  */
 

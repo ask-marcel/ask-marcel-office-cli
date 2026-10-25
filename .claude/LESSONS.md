@@ -773,3 +773,38 @@ Rule for next time: a probe that looks for files under HOME allows bun's own cac
 
 `write/src/main.ts` uses the env-then-helper token source of core, as the root does since phase 4. It writes no token cache and no locator. In a new checkout, `bun run write/src/main.ts create-mail-draft ...` thus fails with `token_helper_unavailable` until an auth run records the helper (the 2026-10-18 entry on the root sign-in). The write smokes use `ASKMARCEL_TOKEN_BASIC=bad` and never a helper search, because a stale `auth/dist` can be on PATH.
 Rule for next time: run the auth bin once before a write command in a dev checkout, and again after you change between the source and `dist/`.
+
+## [decision] 2026-10-24 | SUPERSEDES the root parts of the 2026-10-18 folder entries: the root holds no package, and the folder decides the package of every file
+
+Package-split phase 6 moved the rest of `src/` to `read/src/` and deleted the root package. The root `package.json` has no source, build, bin or runtime dependency. `bun run test` at the root runs the tests of each folder. `coverage`, `mutate:changed` and `build` run in a folder only. The root lints its three config files and typechecks `scripts/`. `check-package-imports` gives each file the package of its folder (core, auth, read or write), and `SINGLE_PACKAGE_FILES` and the `single` owner are deleted. The ban reasons are next to their data in `eslint.ownership.js`, and each folder's `eslint.config.js` applies them. CI keeps the job ids `gates`, `mutation` and `smoke` (required checks): `gates` has no root test, and `mutation` and `smoke` run in `read/`. `check:docs` and `docs:gen` join `read/src/composition/single-package.ts` and `write/src/composition/write-package.ts` until the per-package docs of phase 7. Rejected: the literal F5 reading (shards and smokes in the `read` row of the workspace matrix), because it changes the required checks of branch protection.
+Rule for next time: run the gates of a change in the folder of each changed file. In the 2026-10-18 entries, "the root `src/`" and "the root package" now mean `read/src/` and the read package.
+
+## [gotcha] 2026-10-24 | When a move lands on the entry paths of a skeleton, delete the skeleton entries in the move commit
+
+`read/package.json` names `src/main.ts` and `src/index.ts` in `bin` and `exports`, and read's workspace job builds and packs them on every push. So the 11-line skeleton entries could not go before the move, and the root files could not stay after it. Commit 15 deleted the two skeleton entries and renamed the root files onto their paths. Plain `git diff -M` shows two deletions and two edits. `git diff -B -M` shows the root files renamed onto the skeleton paths at 100%. The skeleton `bin.ts` and its test had other paths, so they stayed until the commit that replaced the bin.
+Rule for next time: in a move onto a folder that has entry files at the same paths, delete those entries in the move commit, and prove the purity with `-B -M`. Keep each skeleton file that has no collision until a later commit.
+
+## [gotcha] 2026-10-24 | A test that reads a file outside its folder fails in that folder's Stryker sandbox
+
+The root bin sweep also read `docs/commands.json` and `docs/COMMANDS.md`. After the move it would read `read/docs/` (no such folder), and read's Stryker sandbox holds only the folder, so the dry run fails before a mutant runs. Commit 5 moved that check to `check:docs` (`--manifest`, the bin placeholders), and commit 6 deleted the case from the sweep before the move.
+Rule for next time: a folder test reads only files under its folder. A check of repository files (docs, workflows, other folders) goes in a script that the `gates` job runs.
+
+## [gotcha] 2026-10-24 | When a manifest loses its dependencies, a package that no workspace declares leaves bun.lock
+
+Read imports `diff`, and only the root `dependencies` declared it. A `bun install --lockfile-only` with the root dependencies deleted dropped `diff` from `bun.lock`, and read then failed its typecheck, its tests and its build on a clean install. The hoisted install hid the gap until then. Commit 17 put `diff`, `commander`, the MCP SDK and `docx` in read's `devDependencies`, and `zod`, the MCP SDK, `commander` and `winston` in core's.
+Rule for next time: before you delete dependencies from a manifest, list the imports of each workspace and make sure that a workspace declares each package. Then do `bun install --frozen-lockfile` on a clean `node_modules` and run the typecheck in each folder.
+
+## [mistake] 2026-10-24 | The phase 6 design asked for `--incremental false`, which the 2026-05-30 entry says does not exist
+
+Open question 5 of the phase 6 design asked for read's full Stryker run with `--incremental false`. Stryker 9.6.1 reads the value as a config file name and stops. The 2026-05-30 entry and the comment of `scripts/mutate-changed.sh` already said so. The run gave each shard a new, empty `--incrementalFile` instead.
+Rule for next time: before a design names a tool flag, read the LESSONS entries and the scripts that use that tool. For a mutation run with no earlier results, point `--incrementalFile` at a new, empty file.
+
+## [gotcha] 2026-10-24 | A longer bin name moves the line breaks of commander's `--help`
+
+The read bin `ask-marcel-office-read` is 5 characters longer than `ask-marcel-office`. Commander wraps option texts at a fixed width, so in 67 `--help` texts a line break moved, and a break can come right after the bin. A comparison that changes the bin only before a space, a quote or a backtick reports these calls as defects.
+Rule for next time: when you compare the output of two bin names, change the bin also before a line end and an escaped quote, and compare `--help` with each run of white space as one space.
+
+## [gotcha] 2026-10-24 | The unit tests run under bun, so only a smoke under node proves a library's runtime pick and its export list
+
+The read library picks the file system and the process runner of the runtime that loads it (`onBun() ? createBun… : createNode…`). With the Bun pick forced, all read tests, the build, `check:packed` and both smokes passed, but a node caller got `token_helper_unavailable` ("Bun is not defined"). With two exports deleted from `read/src/index.ts`, every gate passed too: `check:packed` reads the exports that exist, and the tests import only `commands` and the types. Commit 28 now loads the library by name under node and bun, checks the exact export list, and gets a token from a stub helper that `ASKMARCEL_TOKEN_COMMAND` names. The stub builds its token at run time.
+Rule for next time: when a package exports a library, its bundle smoke loads it by name under node and under bun, checks the exact export list, and calls each export that picks a runtime. A unit test under bun cannot prove a node branch.

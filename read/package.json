@@ -21,6 +21,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./commands.json": "./dist/commands.json",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -49,12 +50,32 @@
     "mutate": "stryker run",
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
-    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts",
+    "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts && bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --manifest dist/commands.json",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
+    "smoke": "bun ../scripts/qa-bundle-smoke.ts",
+    "smoke:packed": "bun ../scripts/qa-packed-install-smoke.ts",
     "prepublishOnly": "bun run build && bun run lint:strict && bun run typecheck && bun run coverage && bun run check:packed"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@kenjiuno/msgreader": "^1.28.0",
+    "fast-xml-parser": "^5.8.0",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "postal-mime": "~4.0.11",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2",
+    "unpdf": ">=1.6.2 <1.8.0",
+    "update-notifier": "^7.3.1",
+    "winston": "^3.19.0",
+    "word-extractor": "^1.0.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.6"
+  },
   "devDependencies": {
-    "@ask-marcel/office-core": "workspace:*"
+    "@ask-marcel/office-core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "commander": "^14.0.3",
+    "diff": "^9.0.0",
+    "docx": "^9.6.1"
   }
 }

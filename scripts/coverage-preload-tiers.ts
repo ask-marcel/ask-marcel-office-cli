@@ -8,9 +8,8 @@
  *
  * It finds the files itself: a Bun.Glob over src/{domain,use-cases,infra,
  * presenter,composition} of the folder that runs it (the working directory),
- * minus the tests and the type-only ports. The root's own
- * scripts/coverage-preload.ts is a hand-kept list; a list like that misses the
- * files nobody added to it.
+ * minus the tests and the type-only ports. It keeps no list of files by hand:
+ * a list like that misses the files nobody added to it.
  *
  * Shared at the root and run with the folder as the working directory:
  * `bun run ../scripts/check-coverage.ts --preload ../scripts/coverage-preload-tiers.ts`.

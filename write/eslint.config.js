@@ -4,8 +4,8 @@ import { STDOUT_BAN } from '../eslint.ownership.js';
 /*
  * Write's own path-scoped rules (package split, phase 5), which the root held
  * for these files before the move. The reason of the stdout ban lives beside
- * its rule in the root eslint.config.js; scripts/check-lint-fixtures.ts proves
- * it still fires here. No ban on auth or read imports: the import check
+ * its data in eslint.ownership.js; scripts/check-lint-fixtures.ts proves it
+ * still fires here. No ban on auth or read imports: the import check
  * (scripts/check-package-imports.ts) refuses them.
  */
 

@@ -2,14 +2,14 @@
  * Loads the packages that `gen-docs.ts` and `check-doc-numbers.ts` document, and joins
  * them into one surface.
  *
- * Until the docs split (phases 6 and 7) the root documents the read commands and the
- * write package together, so the product docs keep one surface of 211 commands while
- * the root registry holds the read commands only (package split, phase 5, open
- * question 4). Each `--package` names a module that exports `commandPackage`. The
- * registries are joined. The lifecycle entries, the description, the names and the
- * npm name come from the first package, so every entry is filled with its bins. A
- * command name in two packages must have the same meta (compared before the names
- * are filled), else the join fails.
+ * Until the docs split (phase 7) the root docs describe the read and the write
+ * packages together, so the product docs keep one surface of 211 commands while each
+ * registry holds its own commands (package split, phase 5, open question 4). Each
+ * `--package` names a module that exports `commandPackage`. The registries are
+ * joined. The lifecycle entries, the description, the names and the npm name come
+ * from the first package, so every entry is filled with its bins. A command name in
+ * two packages must have the same meta (compared before the names are filled), else
+ * the join fails.
  */
 
 import { resolve } from 'node:path';

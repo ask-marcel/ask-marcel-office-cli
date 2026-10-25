@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs. Phase 5 (write moved to `write/src/`, the root holds the read commands only) built on 2026-10-18, in review; see "As built in phase 5". Phase 5 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs. Phase 5 (write moved to `write/src/`, the root holds the read commands only) built on 2026-10-18, in review; see "As built in phase 5". Phase 5 exit pending: the live checks, which the maintainer runs. Phase 6 (read moved to `read/src/`, the root holds no package) built on 2026-10-24, in review; see "As built in phase 6". Phase 6 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -1448,6 +1448,217 @@ Live checks of phase 5, for the maintainer (back up `~/.ask-marcel/` first, and 
 job, and point the doc-number gate at read's registry in the same push. Live:
 `scripts/qa-live-sweep.ts` across all tiers through the helper, and a read MCP server registered via
 npx and launched with a minimal PATH.
+
+As built in phase 6 (2026-10-24). The numbers in this note are the commit numbers of the phase 6
+design. Design commit 21 is two commits here (21a and 21b), so the phase has 33 commits. Commit 15,
+the move, is the only commit with `--no-verify`. The hook of every other commit ran the gitleaks
+scan, and its log shows "no leaks found".
+
+- Decisions. F1: the move is a pure rename commit. F2: the read package signs through its own
+  token source and has its own names, the bin `ask-marcel-office-read` and the npm name
+  `@ask-marcel/office-read`. F3: the read library exports the commands, the read graph and its
+  token source only. F4: the follow-up of phase 5 (the header of the read registry test, and
+  wider bin sweeps in auth and core). F5: the root holds no package.
+- Follow-up of phase 5 (1 to 3, F4). The header of `command-graph.test.ts` says that the file
+  pins the read half. The sweeps of auth and core refuse a hand-typed bin of any package
+  (`/ask-marcel-office(-(auth|read|write))?\s/`). Each sweep allows one line that no renderer
+  fills: the sign-in line of `auth/src/infra/browser-auth.ts` and the "is not on PATH" line of
+  `core/src/infra/token-helper-run.ts`.
+- Hook, doc check and read's sweep (4 to 6). A staged `eslint.ownership.js` runs the hook in every
+  folder. `check:docs` takes `--manifest` and refuses a `{bin}`, `{auth-bin}`, `{read-bin}` or
+  `{write-bin}` placeholder in `docs/commands.json` and `docs/COMMANDS.md`. The root sweep became
+  read's sweep: write's pattern, no allowance, and it must read the read registry. It finds its
+  folder from `import.meta.dir`, so the move carried it with no edit.
+- Read library (7 to 10, F2 and F3). `read/package.json` declares 13 runtime dependencies: the 12
+  externals of the old root build and `zod`. `read/tsconfig.build.json` includes the vendored
+  declarations of `src/types/`. `read-token-source.ts` holds `READ_NEEDED_BY` (from the registry)
+  and `buildReadTokenSource(options)`, and `build-deps.ts` signs through it. `read-client.ts`
+  gives `createReadClient()`. The library exports `commands`, `createReadGraph`,
+  `createEnvThenHelperTokenSource`, `createReadClient` and the types `Command`, `ReadGraph`,
+  `TokenSource` and `Result`. It has no `buildDeps`, no ports and no adapters (BREAKING CHANGE).
+  `check:packed` has a misuse row for each export, and the `commands` row is the same for every
+  package. Two cases pin the defaults of the library token source: the helper that the locator
+  under this process's home folder names, and the stdin of a terminal only when there is one.
+- Checks follow read's files (11 to 14). `read/eslint.config.js` bans stdout and the write graph
+  in read's source, and the read-only bans everywhere except `build-deps.ts` and
+  `graph-client.ts`. `check-lint-fixtures` lints a fixture with the config of the folder that
+  holds its file, and refuses a fixture with no `cwd` whose path is in two folders.
+  `check-package-imports` gives a file under `read/` to read. A read module reaches only core,
+  read and its own `package.json`. `check:read-bundle` and `command-packages.ts` found read's
+  files in the root `src/` before the move and in `read/src/` after it. Commits 17, 21 and 22
+  removed these lookups.
+- The move (15): 480 renames at 100% (the 476 files of `src/` at B0 and the 4 files of commits 8
+  and 9) and one edit, the fixture import path of `scripts/qa-bundle-smoke.ts`. The move deleted
+  the two skeleton entries `read/src/main.ts` and `read/src/index.ts`. `git diff -B -M` shows
+  `src/main.ts` and `src/index.ts` renamed onto them at 100%. The token scan found no other
+  change. `main.ts` reads `../package.json`, so the version became `1.0.0` and the update notice
+  asks for `@ask-marcel/office-read`. From B1 (commit 14) to the move, the 456 CLI calls and the
+  raw MCP session (with `generatedAt` masked) are the same after `2.8.0` → `1.0.0`, and the
+  in-memory MCP dump is byte-identical.
+- Read's full Stryker run, on B1 with the move applied, before commit 15 (the run had 2 fewer
+  cases in `read-token-source.test.ts`; a new case can only kill more mutants): 273 files, 14,645
+  mutants, 8 shards at break 90, each from an empty incremental file. Shard scores: 94.63, 92.50,
+  94.51, 96.54, 94.42, 95.26, 93.99 and 95.04%. All: 94.71% (13,847 killed, 24 timed out, 774
+  survived, no error). Some files are far below 90 (the lowest is `onenote-5k-limit.ts` at
+  52.38%). The break applies to each shard, as in CI.
+- The root holds no package (16 to 23, F5). Read's build writes `dist/commands.json` (204
+  commands), and `exports` has `./commands.json`. `smoke` and `smoke:packed` run from `read/`.
+  `smoke:packed` reads the installed manifest: the library's commands, the package and version
+  of the bin, and no bin placeholder.
+  The root `package.json` has no source, build, bin, dependencies or publish fields. Its `test`
+  runs every folder (`bun run --filter '@ask-marcel/*' test`), and `check:docs` and `docs:gen`
+  name `read/src/composition/single-package.ts` and `write/src/composition/write-package.ts`.
+  Read's `devDependencies` get `diff`, `commander`, the MCP SDK and `docx`. Core's get `zod`, the
+  MCP SDK, `commander` and `winston`. The root `bunfig.toml` keeps only the no-network preload,
+  and `check-coverage.ts` needs `--preload`. The root `stryker.conf.json`, `tsconfig.build.json`,
+  `scripts/coverage-preload.ts`, `scripts/fix-dts-extensions.ts` and `.npmignore` are deleted,
+  and each folder's `stryker.conf.json` holds its own reasons. `check-package-imports` gives
+  each file the package of its folder, and `SINGLE_PACKAGE_FILES` is deleted. The root lint
+  covers its three config files only, and the ban reasons are next to their data in
+  `eslint.ownership.js`. CI keeps the job ids `gates`, `mutation` and `smoke`. `gates` has no
+  root test and no root coverage. `mutation` (8 shards) and `smoke` (Node 20) run in `read/`, and
+  the workspace mutation step skips read. `check-ci-matrix` proves both.
+- Read's names and cleanup (24 to 29). `single-package-names.ts` gives the read bin and the bins
+  of the split, and `single-package.ts` gives `@ask-marcel/office-read`. The MCP server name, the
+  `{bin}` and `{read-bin}` places, the help-json `package` and the update notice follow. Read's
+  comments say "read package". `read/src/main.ts` replaces the skeleton bin (`bin.ts` and its
+  test are deleted), and read's lint bans stdout in it too. The skeleton CLI of core is deleted
+  with its test. The bundle smoke has a read section: the version, `help-json` (207 entries), the
+  pointers of `create-mail-draft` and `login`, `env_token_invalid`, an unknown flag, the MCP
+  server name, the files under HOME, and no write marker or heavy library in `dist/`. The library
+  loads by name with exactly its four exports, and its token source gets a token from a stub
+  helper under node and under bun (the runtime picks the file system and the process runner, and
+  no unit test runs under node). The live
+  and QA drivers run `read/dist/cli.js` (the live sweep takes `SWEEP_BIN`).
+- Read bin at T against the root bin at B0, with the B0 side normalised (the read
+  bin, `@ask-marcel/office-read`, `1.0.0`): 456 CLI calls with 0 defects (389 the same, and 67
+  `--help` texts where commander moves a line break, because the bin is longer), and the same
+  exit codes. The 1,023 parameter-matrix cases, the 204 read commands in process through the CLI
+  (408 runs) and MCP (623 calls), and a raw MCP session are the same. Expected differences: the
+  read bin, the help-json `package`, the MCP server name, the update notice and the version.
+- Counts at the end of the phase: core 1029 tests (1032 at B0), auth 518 (518), read 4586 (2),
+  write 280 (280), the root none (4579). Coverage meets every tier gate in each folder. The test
+  map (`--test-map`, 322 files): core 92, auth 26, read 177, write 27, no `single` owner. Read's
+  177: `composition/` 16, `infra/` 16, `use-cases/commands/` 144, and `index.test.ts`.
+- Differences from the phase 6 design, and why:
+  - Commit 5: `--manifest` is required, as the other document arguments are. Without it the
+    script exits 2.
+  - Commit 6 keeps the constant name `ROOT` and changes only its comment, because a rename is a
+    test edit outside the approved batch. `mutate:staged` found nothing in scope, so a Stryker
+    `--dryRunOnly` run proved the new root config.
+  - Commit 10: the return type of `runCommand` in `src/index.test.ts` is
+    `ReturnType<Command['execute']>`, because the API has no `CommandExecute`. No assertion
+    changed.
+  - Commit 11: the stdout allowance of `src/main.ts` is a block of its own, so `main.ts` kept
+    the write-graph ban until commit 26 deleted the block. The new fixtures name the write graph
+    by its core path and the client by its export name.
+  - Commit 12: the fixtures on a core, auth or write test that imports the registry match the
+    target path only, because the owner of the registry is `single` before the move and `read`
+    after it.
+  - Commit 15, step 3 of section 3.1: `--stat` lists each rename at 0 lines, and
+    `qa-bundle-smoke.ts` at 1 line, because the edit is the `} from '…'` line of a multi-line
+    import. With `-I'^\} from '` added, no file has a changed line. The version differences of
+    the B1-to-B2 comparison show in the raw MCP session; the in-memory dump gives its own
+    version.
+  - Read's full Stryker run: Stryker 9.6.1 reads `--incremental false` as a config file name, so
+    each shard got a new, empty incremental file (the method of `mutate-changed.sh`). The shards
+    ran 4 at a time at concurrency 1 (the container has 4 CPUs), in 15.4 hours.
+  - Commit 17: the root keeps `engines`. The lock also moves `readable-stream` 3.6.2 to the top
+    level when the root dependencies go. A false comment of `gen-docs.ts` is fixed.
+  - Commit 18: a missing `--preload` exits 2, and a selftest case shows that a root preload is
+    now a file with no tier.
+  - Commit 19: the four folder configs stay the same as each other. No setting changes.
+  - Commit 21 is two commits, because the change was 337 lines. 21a (293 lines) rewrites the
+    check and keeps each comment true; 21b deletes `SINGLE_PACKAGE_FILES` and rewrites the
+    comments. The overlap rule and its fixture go, because no list is left. The "mixed" fixture
+    and the three "outside" fixtures are one fixture, "a test outside every workspace folder".
+    A new fixture: a test under `read/` that imports a write module.
+  - Commit 22 changes 8 files: the comments of `read/eslint.config.js` and `eslint.base.js` also
+    became false. A reason comment is added above `CORE_IMPORT_BANS`.
+  - Commit 23: the `smoke` job runs `bun run smoke`. `check-ci-matrix` also reports a workspace
+    job with no mutation step.
+  - Commit 24: the comment of `single-package-names.test.ts` is on L7, not L8. The header of
+    `single-package.ts` loses its stale "(plan step 13)".
+  - Commit 25 also fixes the header of `read/src/infra/graph-client.ts`, which the move made
+    false.
+  - Commit 26: the comment of `main.ts` no longer says that `docs.test.ts` pins the `mcp`
+    lifecycle entry (`lifecycle-entries.test.ts` does), and a header names the bin.
+  - Commit 28: the success line of the smoke is "ALL CONVERTERS + MCP + READ BIN OK".
+  - Commit 29: the write and dedup smokes keep `ask-marcel-office-write` as their default write
+    bin; only the default read bin changes.
+  - Section 3.3 ran on commit 26: commits 27 to 29 change no file under `read/src/` and not
+    `read/package.json`. The normalisation also covers the bin before a line end and before a
+    backslash (an escaped quote in JSON). One wall-clock mask: `get-schedule` takes its default
+    window from the time of the run.
+  - Commit 31 also fixes the playbook rows A1 to A5b, B2, B3 and B6, the row of the write and
+    dedup smokes, and the gate list of `docs/USAGE.md`, because their root commands and paths
+    (`coverage`, `mutate:changed`, the root Stryker config, `src/use-cases/commands/`,
+    `src/index.ts` and the root `dist/cli.js`) stop working.
+  - Commit 31 does not change `CLAUDE.md`, so its subject names the usage paths, not the
+    project guide. The design calls that change the maintainer's own edit, and an agent does
+    not edit the project guide. Proposed text for L16-17: "Since phase 6 of the split the root
+    holds no package and no `src/`: it keeps the shared configs, `scripts/` and the docs."
+  - Review fixes, each in the commit where it belongs: commit 8 pins the two defaults of the
+    library token source; commit 16 makes `smoke:packed` read the shipped manifest; commit 22
+    fixes the reason of the token-helper ban, which named "the root's builders"; commit 28 adds
+    the library probe (the export list, and a token under node and bun); commit 31 fixes the
+    playbook rows B2, B3 and the write smoke row.
+- Not in phase 6:
+  - The live checks below. Do not run them from an agent session.
+  - `bun audit --audit-level=high` fails in the `gates` job on three advisories that also fail
+    at B0: `body-parser` below 2.4.0 (through the MCP SDK), `postal-mime` below 4.0.8 (a major
+    version) and `zod` below 4.6.6. The fix is a dependency update with its own approval.
+  - The docs keep the 2.8.0 names (open question 9): `docs/commands.json` and `docs/COMMANDS.md`
+    are not generated again, and README and USAGE still show `buildDeps`, the old bin and the
+    root `src/` layout. Phase 7.
+  - Renames of the read wiring modules (open question 4), of `GraphClient` (open question 3), and
+    `fakeGraphClient` in the read tests (open question 24).
+  - Test edits for a later rule-24 batch:
+    - Comments and names that still say "root": `read/src/index.test.ts` L10 ("the root
+      typecheck"); in `single-package-texts.test.ts`, the header ("the root package"), the
+      helper `rootCli` and the case name "… in the list of the root commands …"; in
+      `lifecycle-entries.test.ts`, `ROOT_LIFECYCLE` and `ROOT_COMMANDS`. No assertion is wrong.
+    - Core's floor case does not require the allowed line of `token-helper-run.ts`, as auth's
+      floor case does for its allowed file.
+    - No test proves that `build-deps.ts` gives its `home` to the read token source (a gap since
+      B0). A case in `build-deps-token-source.test.ts` would close it.
+  - Write has the gaps that the review found in read since phase 5: no test pins the defaults of
+    `write-token-source.ts`, and the write smoke does not get a token under node.
+  - Core texts that still describe the single package (phase 5 open question 16).
+  - The undeclared direct imports of auth and write (open question 27, before publish), and the
+    `@types` packages in the root (open question 28).
+  - A Windows round trip through read's token source (open question 22, phase 8).
+
+Live checks of phase 6, for the maintainer (back up `~/.ask-marcel/` first, unset every
+`ASKMARCEL_*` variable, and use Node 20):
+
+1. `cd auth && bun run build`, then `node auth/dist/cli.js login --force` and `status`. The basic,
+   elevated, chatsvcagg and ic3 tokens are available, and the locator is recorded.
+2. `cd read && bun run build` and `cd write && bun run build`.
+3. `node read/dist/cli.js --version` gives `1.0.0`. `node read/dist/cli.js create-mail-draft` and
+   `node read/dist/cli.js login` exit 1 and name `@ask-marcel/office-write` and
+   `@ask-marcel/office-auth`.
+4. Record `sha256sum ~/.ask-marcel/token-helper.json`.
+5. Within an hour of step 1: `bun scripts/qa-live-sweep.ts` (default bin `read/dist/cli.js`).
+   Expect each read command to pass or to be listed as untestable this run, no write command, no
+   browser, and the elevated, chatsvcagg and ic3 commands to pass. If you know a partner tenant
+   link, run `resolve-drive-share-link` on it (guest tier).
+6. A read MCP server through npx with a minimal PATH: `cd read && bun pm pack --destination
+   /tmp/p6`, then
+   `claude mcp add ask-marcel-office-read -- /usr/bin/env -i HOME="$HOME" PATH="$(dirname "$(command -v node)"):/usr/bin:/bin" npx -y --package /tmp/p6/<tarball> ask-marcel-office-read mcp`.
+   Expect only the tools `list-commands`, `get-command-docs` and `run-command`. `run-command` of
+   `list-drives` and of one Teams chat command gives data, `run-command` of `create-mail-draft`
+   names `ask-marcel-office-write mcp`, and `get-command-docs` of `login` names the auth server.
+   Move `~/.ask-marcel/token-helper.json` away: `run-command list-drives` gives
+   `token_helper_unavailable` with the `ASKMARCEL_TOKEN_COMMAND` and `@ask-marcel/office-auth`
+   remedy. Put the file back.
+7. `sha256sum ~/.ask-marcel/token-helper.json` gives the value of step 4.
+8. The open live checks of phase 4, with `node read/dist/cli.js list-drives` in place of
+   `bun run start list-drives` (step 8). Step 9 is the `windows-helper` job.
+9. The open live checks of phase 5: build in `read/` and `write/` (step 2), and
+   `SMOKE_READ_BIN=read/dist/cli.js SMOKE_WRITE_BIN=write/dist/cli.js bun scripts/qa-write-smoke.ts --yes-create-drafts`
+   (step 4; delete the drafts after). Step 5 finds the mail with `node read/dist/cli.js`.
+10. Delete the stale root `dist/` and `reports/` by hand (`rm -rf dist reports` at the root).
 
 **Phase 7: docs.** Per-package README, USAGE and COMMANDS via the per-folder `gen-docs`; the root
 README becomes an index. `docs/COMMANDS.md`, `docs/USAGE.md` and `docs/demo.gif` stay reachable at

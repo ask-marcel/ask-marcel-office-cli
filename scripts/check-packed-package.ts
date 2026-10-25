@@ -74,6 +74,8 @@ const MISUSES: Readonly<Record<string, Misuse>> = {
     code: 2741,
   },
   WriteGraph: { use: "ReturnType<WriteGraph['delete']>", fits: 'Promise.resolve({ ok: true as const, value: 1 })', misuse: "Promise.resolve('deleted')", code: 2322 },
+  // The read graph posts only to the two query endpoints, in its published types too.
+  ReadGraph: { use: "Parameters<ReadGraph['post']>[0]", fits: "'/search/query'", misuse: "'/me/sendMail'", code: 2322 },
   TokenSource: { use: "Parameters<TokenSource['graphToken']>[0]", fits: "'basic'", misuse: "'guest'", code: 2322 },
   Command: { use: "Command['meta']['effect']", fits: "'draft'", misuse: "'send'", code: 2322 },
 };
@@ -85,7 +87,10 @@ const VALUE_MISUSES: Readonly<Record<string, ValueMisuse>> = {
   createWriteGraph: { misuse: "createWriteGraph('token')", code: 2345 },
   createEnvThenHelperTokenSource: { misuse: 'createEnvThenHelperTokenSource(1)', code: 2554 },
   createWriteClient: { misuse: "createWriteClient('x')", code: 2554 },
-  commands: { misuse: "commands['create-mail-draft']?.execute(createWriteClient(), { subject: 1 })", code: 2322 },
+  createReadGraph: { misuse: "createReadGraph('token')", code: 2345 },
+  createReadClient: { misuse: "createReadClient('x')", code: 2554 },
+  // The same row for every package: the params of a command are strings.
+  commands: { misuse: 'Object.values(commands)[0]?.execute(undefined as never, { top: 1 })', code: 2322 },
 };
 
 const CORE = '@ask-marcel/office-core';

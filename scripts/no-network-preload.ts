@@ -8,9 +8,9 @@
  * 0, 3 and 5 failures on one unchanged tree (2026-08-31). They were fixed by
  * injection; this stops the next one being written at all.
  *
- * Wired in `bunfig.toml` under `[test] preload`, unlike
- * `scripts/coverage-preload.ts`, which is spawned only by
- * `scripts/check-coverage.ts` because it drags in heavy SDKs. This file imports
+ * Wired in each `bunfig.toml` under `[test] preload`, unlike
+ * `scripts/coverage-preload-tiers.ts`, which `scripts/check-coverage.ts` loads
+ * only for a coverage run because it drags in heavy SDKs. This file imports
  * nothing and costs nothing, so every `bun test` run can afford it.
  *
  * There is deliberately NO escape hatch. Every IO boundary in `src/infra`

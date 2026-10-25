@@ -1,8 +1,8 @@
 /*
  * The tools of the auth package's MCP server: `login` and `status`
  * (docs/plans/2026-10-01-package-split.md). `auth-server.ts` gives them to its
- * own `McpServer`; the root's gateway (`mcp.ts`, on core's `mcp-shell.ts`)
- * does not have them. Like every MCP module, nothing here writes to stdout: a
+ * own `McpServer`; the read and write gateways (on core's `mcp-shell.ts`) do
+ * not have them. Like every MCP module, nothing here writes to stdout: a
  * tool returns its text.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

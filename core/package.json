@@ -19,5 +19,11 @@
     "mutate": "stryker run",
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "commander": "^14.0.3",
+    "winston": "^3.19.0",
+    "zod": "^4.6.6"
   }
 }

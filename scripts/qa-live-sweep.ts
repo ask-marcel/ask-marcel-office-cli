@@ -12,22 +12,27 @@
  * command, and reports harvest completeness so untestable-this-run commands are
  * explicit, never silently counted as healthy.
  *
- * Prereqs: clean `main`, `bun run build`, `npm i -g .`, a warm `ask-marcel-office-auth
- * login` (since phase 4 of the split, the root signs through the auth token
- * helper). Run: `bun scripts/qa-live-sweep.ts`. Ledger → /tmp/qa/live-ledger.json.
+ * Prereqs: clean `main`, `cd read && bun run build`, and a warm auth `login`
+ * (`node auth/dist/cli.js login` after `cd auth && bun run build`): the read bin
+ * signs through the auth token helper. Run from the repository root:
+ * `bun scripts/qa-live-sweep.ts`. It runs `read/dist/cli.js` and reads
+ * `read/dist/commands.json`; SWEEP_BIN=<path or bin name> runs another read
+ * bin, such as an installed `ask-marcel-office-read`. Ledger →
+ * /tmp/qa/live-ledger.json.
  *
  * Replaces the ad-hoc drivers that used to rot in .claude/qa-reports/ (they
  * invoked the pre-rename binary and depended on stale temp files).
  */
 import { spawnSync } from 'node:child_process';
 
-const BIN = 'ask-marcel-office';
-const manifest = JSON.parse(await Bun.file('docs/commands.json').text());
+const BIN = process.env.SWEEP_BIN ?? 'read/dist/cli.js';
+const MANIFEST = 'read/dist/commands.json';
+const manifest = JSON.parse(await Bun.file(MANIFEST).text());
 
 // An allow-list, not a deny-list: a command runs only when it says it reads.
 const withoutEffect = manifest.commands.filter((c: any) => typeof c.effect !== 'string').map((c: any) => c.name);
 if (withoutEffect.length > 0) {
-  console.log(`!! ${withoutEffect.length} commands in docs/commands.json have no effect (run \`bun run docs:gen\`): ${withoutEffect.join(', ')}`);
+  console.log(`!! ${withoutEffect.length} commands in ${MANIFEST} have no effect (run \`bun run build\` in read/): ${withoutEffect.join(', ')}`);
   process.exit(1);
 }
 
@@ -193,7 +198,7 @@ const argFor = (cmd: string, opt: string): string[] | null => {
   // effectively unaudited — a real regression in it would have looked identical.
   if (opt === 'path')
     return LOCAL.has(cmd)
-      ? ['--path', cmd === 'extract-local-file-images' ? 'src/test-helpers/assets/image-sample.docx' : 'src/test-helpers/assets/sample.msg']
+      ? ['--path', cmd === 'extract-local-file-images' ? 'read/src/test-helpers/assets/image-sample.docx' : 'read/src/test-helpers/assets/sample.msg']
       : siteUrl
         ? ['--path', siteUrl.pathname]
         : null;

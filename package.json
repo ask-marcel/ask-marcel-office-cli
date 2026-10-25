@@ -20,81 +20,20 @@
   },
   "homepage": "https://github.com/ask-marcel/ask-marcel-office-cli#readme",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./commands.json": "./dist/commands.json",
-    "./package.json": "./package.json"
-  },
-  "bin": {
-    "ask-marcel-office": "./dist/cli.js"
-  },
-  "files": [
-    "dist/",
-    "docs/COMMANDS.md",
-    "docs/USAGE.md",
-    "CHANGELOG.md",
-    "README.md",
-    "LICENSE"
-  ],
   "engines": {
     "node": ">=20",
     "bun": ">=1.0"
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "keywords": [
-    "microsoft-graph",
-    "microsoft-365",
-    "office-365",
-    "m365",
-    "cli",
-    "mcp",
-    "mcp-server",
-    "llm",
-    "ai-agent",
-    "ai-agents",
-    "claude",
-    "claude-code",
-    "cursor",
-    "markdown",
-    "outlook",
-    "teams",
-    "onedrive",
-    "sharepoint",
-    "calendar",
-    "excel",
-    "onenote",
-    "planner",
-    "graph-api",
-    "typescript",
-    "bun"
-  ],
   "scripts": {
-    "start": "bun run src/main.ts",
-    "test": "bun test && bun run --filter '@ask-marcel/*' test",
+    "test": "bun run --filter '@ask-marcel/*' test",
     "lint": "eslint --cache --max-warnings=0",
     "lint:staged": "bash scripts/lint-staged.sh",
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "bun --bun x tsc --noEmit",
-    "coverage": "bun run scripts/check-coverage.ts",
-    "check:docs": "bun run scripts/check-doc-numbers.ts --package src/composition/single-package.ts --package write/src/composition/write-package.ts --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md",
+    "check:docs": "bun run scripts/check-doc-numbers.ts --package read/src/composition/single-package.ts --package write/src/composition/write-package.ts --readme README.md --commands-doc docs/COMMANDS.md --usage docs/USAGE.md --manifest docs/commands.json",
     "check:read-bundle": "bun run scripts/check-read-bundle.ts",
     "check:package-imports": "bun run scripts/check-package-imports.ts",
-    "mutate": "stryker run",
-    "mutate:changed": "bash scripts/mutate-changed.sh",
-    "mutate:staged": "bash scripts/mutate-staged.sh",
-    "build:js": "bun build src/main.ts --target=node --outfile=dist/cli.js --format=esm --external update-notifier --external xlsx --external mammoth --external jszip --external unpdf --external turndown --external turndown-plugin-gfm --external word-extractor --external @kenjiuno/msgreader --external postal-mime --external fast-xml-parser --external winston && bun build src/index.ts --target=node --outfile=dist/index.js --format=esm --external update-notifier --external xlsx --external mammoth --external jszip --external unpdf --external turndown --external turndown-plugin-gfm --external word-extractor --external @kenjiuno/msgreader --external postal-mime --external fast-xml-parser --external winston",
-    "build:types": "bun --bun x tsc -p tsconfig.build.json",
-    "docs:gen": "bun run scripts/gen-docs.ts --package src/composition/single-package.ts --package write/src/composition/write-package.ts --manifest docs/commands.json --commands-doc docs/COMMANDS.md",
-    "build": "rm -rf dist && bun run docs:gen && bun run build:js && bun run build:types && bun run scripts/fix-dts-extensions.ts && bun run scripts/add-shebang.ts dist/cli.js && cp docs/commands.json dist/commands.json",
-    "prepublishOnly": "bun run build && bun test && bun run lint:strict && bun run typecheck && bun run coverage"
+    "docs:gen": "bun run scripts/gen-docs.ts --package read/src/composition/single-package.ts --package write/src/composition/write-package.ts --manifest docs/commands.json --commands-doc docs/COMMANDS.md"
   },
   "devDependencies": {
     "@ask-marcel/office-core": "workspace:*",
@@ -103,7 +42,6 @@
     "@types/bun": "^1.2.0",
     "@types/turndown": "^5.0.6",
     "@types/update-notifier": "^6.0.8",
-    "docx": "^9.6.1",
     "eslint": "^9.28.0",
     "eslint-plugin-prettier": "^5.4.1",
     "eslint-plugin-security": "^3.0.1",
@@ -113,25 +51,9 @@
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.33.1"
   },
-  "dependencies": {
-    "@kenjiuno/msgreader": "^1.28.0",
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "commander": "^14.0.3",
-    "diff": "^9.0.0",
-    "fast-xml-parser": "^5.8.0",
-    "jszip": "^3.10.1",
-    "mammoth": "^1.12.0",
-    "postal-mime": "^3.0.1",
-    "turndown": "^7.2.4",
-    "turndown-plugin-gfm": "^1.0.2",
-    "unpdf": ">=1.6.2 <1.8.0",
-    "update-notifier": "^7.3.1",
-    "winston": "^3.19.0",
-    "word-extractor": "^1.0.4",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.3.6"
-  },
   "overrides": {
-    "proxy-addr": "^2.0.8"
+    "body-parser": "^2.4.0",
+    "proxy-addr": "^2.0.8",
+    "zod": "^4.6.6"
   }
 }

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
 
-// Auth's half of the bin-placeholder guard (package split, phase 4). The root's
-// src/use-cases/commands/bin-placeholders.test.ts reads the root src/ and core's
-// reads core/src/; the sign-in texts, remedies and docs that moved to auth/src/
-// are read here, so a command reference in auth that names the wrong package, or
-// a bin typed by hand, fails in auth's own test run.
+// Auth's half of the bin-placeholder guard (package split, phase 4). Each
+// package has its own sweep over its own src/; this one reads auth/src/: the
+// sign-in texts, remedies and docs of auth are read here, so a command
+// reference in auth that names the wrong package, or a bin typed by hand, fails
+// in auth's own test run.
 
 // What `{bin}` may stand before: the commands and help every package has, the
 // generic words the hints use for "any command", and the `--` of
@@ -28,6 +28,10 @@ const AUTH = join(import.meta.dir, '../../..');
 type Line = { readonly where: string; readonly text: string };
 
 const isComment = (text: string): boolean => /^\s*(\/\/|\/\*|\*)/.test(text);
+
+// A bin typed by hand before a word: the bin of the single package or of a
+// package of the split.
+const BIN_BY_HAND = /ask-marcel-office(-(auth|read|write))?\s/;
 
 const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
   const lines: Line[] = [];
@@ -77,7 +81,7 @@ describe('the bin placeholders in auth’s source', () => {
 
   it('leave no bin typed by hand outside the one line of the browser sign-in that no renderer fills', async () => {
     const byHand = (await sourceLines())
-      .filter(({ text }) => text.includes('ask-marcel-office '))
+      .filter(({ text }) => BIN_BY_HAND.test(text))
       .filter((line) => !isUnrendered(line))
       .map(({ where }) => where);
     expect(byHand).toEqual([]);

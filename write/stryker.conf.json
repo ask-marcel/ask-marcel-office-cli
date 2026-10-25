@@ -1,17 +1,21 @@
 {
   "$schema": "../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Mutation testing for this workspace folder alone: run from this folder (bun run mutate, bun run mutate:changed). The settings and their reasons are the root's stryker.conf.json.",
+  "_comment": "atelier mutation testing for this workspace folder alone: run from this folder (bun run mutate, bun run mutate:changed). See skills/atelier/references/workflow.md (Mutation testing).",
+  "_packageManager_comment": "Stryker does not fully understand Bun yet; tell it npm so it does not probe for yarn or pnpm lockfiles.",
   "packageManager": "npm",
   "testRunner": "command",
+  "_commandRunner_comment": "Only the summary reaches Stryker. It keeps every killed mutant's whole process output as its status reason and serialises all of them into one report; on GitHub Actions bun test lists every test (1.2 MB a run on 2026-09-03), so a thousand killed mutants pushed JSON.stringify past V8's string limit (RangeError: Invalid string length) after the score had already passed. pipefail keeps bun's exit code, which is what decides killed vs survived.",
   "commandRunner": {
     "command": "bash -o pipefail -c 'bun test 2>&1 | tail -n 20'"
   },
+  "_mutate_comment": "src/domain and src/use-cases only. Test files have no logic to mutate; ports/ files are type-only (zero mutable code).",
   "mutate": ["src/domain/**/*.ts", "src/use-cases/**/*.ts", "!**/*.test.ts", "!**/ports/**"],
   "thresholds": {
     "high": 95,
     "low": 90,
     "break": 90
   },
+  "_incremental_comment": "The incremental file keeps a full bun run mutate fast. mutate:changed and mutate:staged point Stryker at a new, empty incremental file for each run, because a shared file folds old results into the score (see scripts/mutate-changed.sh).",
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
   "concurrency": 4,
@@ -22,6 +26,6 @@
   },
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
-  "_ignorePatterns_comment": "The sandbox needs the sources and their tests only. bunfig.toml stays out, as in the root config: its preload path is relative to this folder and does not resolve from the sandbox.",
+  "_ignorePatterns_comment": "The sandbox needs the sources and their tests only. bunfig.toml stays out: its preload path is relative to this folder and does not resolve from the sandbox.",
   "ignorePatterns": [".stryker-tmp/", "reports/", "node_modules/", "dist/", "coverage/", "*.md", "*.toml", "*.lock"]
 }

@@ -6,20 +6,13 @@
 # and nothing merges while it is red. The pre-commit hook (.githooks/pre-commit)
 # is the fast first line; this is the real one.
 #
-# Adapted from the atelier assets/ci.yml template, with three deviations that
+# Adapted from the atelier assets/ci.yml template, with two deviations that
 # this repo's shape forces. Each is deliberate; do not "restore" them without
 # reading the reason.
 #
 #   1. gitleaks is installed explicitly. The template runs `gitleaks detect`
 #      directly, but stock ubuntu-latest runners do not ship it.
-#   2. No coverage-preload --check step. scripts/coverage-preload.ts here is
-#      hand-maintained and deliberately BROADER than the upstream generator:
-#      it preloads 75 src/use-cases files as well as the infra tier, so untested
-#      use-cases show at 0% and fail the gate. The generator only scans
-#      src/{infra,composition,presenter} and would delete those 75 imports,
-#      weakening the gate. The upstream regenerator is intentionally not
-#      installed in this repo.
-#   3. No full `bun run mutate` sweep on main. The mutation scope here is 266
+#   2. No full `bun run mutate` sweep on main. Read's mutation scope is 273
 #      files; at the documented 1-3 min/file a full sweep is 4-13 hours against
 #      a 6-hour job limit, so it would time out and sit permanently red. Main
 #      pushes mutate the WHOLE PUSHED RANGE instead (BASE=github.event.before),
@@ -28,14 +21,17 @@
 #      and the survivors they added surfaced a push later. Run the full
 #      `bun run mutate` as a periodic manual audit, not per push. The pushed
 #      range can still be large (241 commits on 2026-10-15 ran past the job
-#      limit), so the root mutation runs in its own `mutation` job, in 8
+#      limit), so read's mutation runs in its own `mutation` job, in 8
 #      parallel shards.
 #
-# Package split (docs/plans/2026-10-01-package-split.md, Checks and CI): `gates`
-# and `smoke` are the root src/ job and keep every gate until phase 6 deletes
-# src/. `workspace` runs one job per workspace folder (core, auth, read, write)
+# Package split (docs/plans/2026-10-01-package-split.md, Checks and CI): the
+# root holds no package since phase 6. `gates` is the repo-wide job: the
+# scripts, their selftests, the docs gate, the secret scan and the audit.
+# `workspace` runs one job per workspace folder (core, auth, read, write)
 # with the folder's own configs; `gates` fails when the matrix misses a folder.
-# `windows-helper` runs the token helper round trip on Windows.
+# `mutation` and `smoke` run read's mutation shards and smokes in read/ (they
+# keep their ids, which branch protection requires). `windows-helper` runs the
+# token helper round trip on Windows.
 name: ci
 on:
   push:
@@ -52,6 +48,8 @@ jobs:
         with:
           fetch-depth: 0 # full history for gitleaks detect and mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile # lockfile drift fails here (rule 5.3)
       - name: package.json (no latest / * / bare dist-tag)
         run: |
@@ -90,7 +88,7 @@ jobs:
           gitleaks version
       - name: secret scan (full history)
         run: gitleaks detect --redact --no-banner
-      - name: lint (strict, type-aware, zero errors AND zero warnings)
+      - name: lint (strict, type-aware, zero errors AND zero warnings; the root config files)
         run: bun run lint:strict
       - name: lint fixtures (every path-scoped rule still fires on its files, and only there)
         run: bun run scripts/check-lint-fixtures.ts
@@ -98,14 +96,10 @@ jobs:
         run: bun run check:read-bundle
       - name: package imports (a write module reaches only core and write; no read command and no core module reaches write; fixtures prove it can fail)
         run: bun run check:package-imports
-      - name: typecheck
+      - name: typecheck (the scripts)
         run: bun run typecheck
-      - name: tests
-        run: bun test
       - name: coverage gate selftest (a file below its tier and a file outside every tier are rejected)
         run: bun run scripts/check-coverage.ts --selftest
-      - name: coverage (per-tier thresholds)
-        run: bun run coverage
       - name: doc numbers match the registry (selftest first, so the gate proves it can fail)
         run: |
           bun run check:docs --selftest
@@ -115,23 +109,31 @@ jobs:
       - name: dependency CVEs (fails on high)
         run: bun audit --audit-level=high
   mutation:
-    # The root src/ mutation, divided over parallel shards. One job ran into the
-    # 6-hour job limit on 2026-10-15: a push of 241 commits gave 13888 mutants.
-    # Each shard mutates every SHARD_COUNT-th file of the same scope
-    # (scope_shard in scripts/mutation-scope.sh), so the shards together cover
-    # the whole scope once, and each shard must reach the break score alone.
+    # Read's mutation, run in read/ and divided over parallel shards. One job
+    # ran into the 6-hour job limit on 2026-10-15: a push of 241 commits gave
+    # 13888 mutants. Each shard mutates every SHARD_COUNT-th file of the same
+    # scope (scope_shard in scripts/mutation-scope.sh), so the shards together
+    # cover the whole scope once, and each shard must reach the break score
+    # alone. The workspace job skips read's mutation, so it runs here only;
+    # scripts/check-ci-matrix.ts checks both.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    defaults:
+      run:
+        working-directory: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history for mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      - name: mutation (changed files, shard ${{ matrix.shard }} of 8; see deviation 3 in the header)
+        working-directory: .
+      - name: mutation (read's changed files, shard ${{ matrix.shard }} of 8; see deviation 2 in the header)
         env:
           # The branch tip BEFORE this push. Read via env rather than inlined,
           # so the shell never interpolates a ref name into its own source.
@@ -150,37 +152,45 @@ jobs:
             BASE=HEAD~1 bun run mutate:changed
           fi
   smoke:
-    # The shipped bundle, run the way users run it: from dist, and installed from
-    # the packed tarball into an empty directory outside the repo. A separate job
-    # with no `needs`: the packed install pulls dependencies fresh from the
-    # registry, so an outage or a broken upstream release fails this job without
-    # blocking the `mutation` job or the audit in `gates` (a red push there would leave its
-    # range unmutated). Node 20 is the floor `engines` promises. The smokes run as
-    # `bun <file>`, not `bun run <file>`, so bun never puts its own `node` shim on
-    # PATH and the node probes really run on node.
+    # Read's shipped bundle, run the way users run it: from dist, and installed
+    # from the packed tarball into an empty directory outside the repo. A
+    # separate job with no `needs`: the packed install pulls dependencies fresh
+    # from the registry, so an outage or a broken upstream release fails this job
+    # without blocking the `mutation` job or the audit in `gates` (a red push
+    # there would leave its range unmutated). Node 20 is the floor `engines`
+    # promises. The smoke scripts run the smokes as `bun <file>`, not
+    # `bun run <file>`, so bun never puts its own `node` shim on PATH and the
+    # node probes really run on node (each smoke prints the node version).
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: read
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: bun install --frozen-lockfile
+        working-directory: .
       - name: build (the bundle the package ships)
         run: bun run build
       - name: bundle smoke (every converter and the MCP stdout handshake, from dist, under node and bun)
         timeout-minutes: 10
-        run: bun scripts/qa-bundle-smoke.ts
+        run: bun run smoke
       - name: packed-install smoke (the tarball installs and runs outside the repo)
         timeout-minutes: 10
-        run: bun scripts/qa-packed-install-smoke.ts
+        run: bun run smoke:packed
   workspace:
     # One job per workspace folder (package split, D7), run from the folder with
     # its own configs. scripts/check-ci-matrix.ts (in `gates`) fails when a
     # folder of the root package.json has no entry here. `published` folders
     # also build, pack, and install the tarball into a clean consumer (node 20 is
     # the floor that `engines` promises). auth and write also run their bundle
-    # smoke.
+    # smoke; read runs its smokes and its mutation in the `smoke` and `mutation`
+    # jobs.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -202,6 +212,8 @@ jobs:
         with:
           fetch-depth: 0 # full history for mutate:changed
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -215,7 +227,8 @@ jobs:
         run: bun test
       - name: coverage (every tier at 100%; the preload lists the folder's tier files itself)
         run: bun run coverage
-      - name: mutation (changed files of this folder; see deviation 3 in the header)
+      - name: mutation (changed files of this folder; see deviation 2 in the header; read mutates in the `mutation` job)
+        if: matrix.folder != 'read'
         env:
           PUSHED_FROM: ${{ github.event.before }}
         run: |
@@ -247,6 +260,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20

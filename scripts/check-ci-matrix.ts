@@ -9,24 +9,41 @@
  * go unmutated, which the mutation scope cannot see from inside the folder.
  * So the matrix's folders must equal the workspaces, both ways.
  *
- *   --selftest  proves a missing folder, an extra folder and a missing matrix
- *               are rejected, and an equal one passes (rule 15.10)
+ * Read's mutation is the one exception (package split, phase 6): its scope is
+ * too big for one job, so the `mutation` job runs it in read/, in parallel
+ * shards, and the mutation step of the workspace job skips read. So the
+ * `mutation` job must run in read with a SHARD_COUNT equal to its shard list
+ * (else some files go unmutated), and the workspace step must skip read and
+ * only read (else read mutates twice, or another folder not at all).
  *
- * Exit codes: 0 the matrix lists exactly the workspaces; 1 it does not.
+ *   --selftest  proves a missing folder, an extra folder, a missing matrix, a
+ *               missing or misplaced mutation job, a wrong shard count and a
+ *               wrong skip are rejected, and a right workflow passes (rule 15.10)
+ *
+ * Exit codes: 0 the matrix lists exactly the workspaces and read mutates in
+ * its shards only; 1 it does not.
  */
 
-type Workflow = {
-  readonly jobs?: Readonly<Record<string, { readonly strategy?: { readonly matrix?: { readonly include?: ReadonlyArray<{ readonly folder?: string }> } } }>>;
+type Step = { readonly name?: string; readonly if?: string; readonly env?: Readonly<Record<string, unknown>> };
+type Job = {
+  readonly defaults?: { readonly run?: { readonly 'working-directory'?: string } };
+  readonly strategy?: { readonly matrix?: { readonly include?: ReadonlyArray<{ readonly folder?: string }>; readonly shard?: ReadonlyArray<unknown> } };
+  readonly steps?: ReadonlyArray<Step>;
 };
+type Workflow = { readonly jobs?: Readonly<Record<string, Job>> };
 
 const JOB = 'workspace';
+const MUTATION_JOB = 'mutation';
+// The folder whose mutation runs in the shards of the mutation job, not in the workspace job.
+const SHARDED = 'read';
+const SKIP_SHARDED = `matrix.folder != '${SHARDED}'`;
 
 const matrixFolders = (workflow: Workflow): ReadonlyArray<string> | undefined => {
   const include = workflow.jobs?.[JOB]?.strategy?.matrix?.include;
   return include?.map((entry) => entry.folder ?? '');
 };
 
-const problems = (workspaces: ReadonlyArray<string>, workflow: Workflow): ReadonlyArray<string> => {
+const matrixProblems = (workspaces: ReadonlyArray<string>, workflow: Workflow): ReadonlyArray<string> => {
   const folders = matrixFolders(workflow);
   if (folders === undefined) return [`ci.yml has no jobs.${JOB}.strategy.matrix.include`];
   return [
@@ -35,17 +52,69 @@ const problems = (workspaces: ReadonlyArray<string>, workflow: Workflow): Readon
   ];
 };
 
+// The mutation job runs in the sharded folder, and its SHARD_COUNT equals its shard list.
+const mutationJobProblems = (workflow: Workflow): ReadonlyArray<string> => {
+  const job = workflow.jobs?.[MUTATION_JOB];
+  if (job === undefined) return [`ci.yml has no ${MUTATION_JOB} job, so ${SHARDED} goes unmutated`];
+  const folder = job.defaults?.run?.['working-directory'];
+  const shards = job.strategy?.matrix?.shard ?? [];
+  const counts = (job.steps ?? []).flatMap((step) => (step.env?.['SHARD_COUNT'] === undefined ? [] : [Number(step.env['SHARD_COUNT'])]));
+  return [
+    ...(folder === SHARDED ? [] : [`the ${MUTATION_JOB} job runs in ${folder ?? 'the root'}, not in ${SHARDED}`]),
+    ...(shards.length > 0 && counts.length > 0 && counts.every((count) => count === shards.length)
+      ? []
+      : [`the ${MUTATION_JOB} job has ${shards.length} shard(s), but its SHARD_COUNT is ${counts.join(', ') || 'missing'}`]),
+  ];
+};
+
+// The mutation step of the workspace job skips the sharded folder and only it.
+const workspaceMutationProblems = (workflow: Workflow): ReadonlyArray<string> => {
+  const step = workflow.jobs?.[JOB]?.steps?.find((candidate) => (candidate.name ?? '').startsWith('mutation'));
+  if (step === undefined) return [`the ${JOB} job has no mutation step`];
+  return step.if === SKIP_SHARDED
+    ? []
+    : [`the mutation step of the ${JOB} job must skip ${SHARDED} and only ${SHARDED} (if: ${SKIP_SHARDED}), not ${step.if ?? 'run for every folder'}`];
+};
+
+const problems = (workspaces: ReadonlyArray<string>, workflow: Workflow): ReadonlyArray<string> => [
+  ...matrixProblems(workspaces, workflow),
+  ...mutationJobProblems(workflow),
+  ...workspaceMutationProblems(workflow),
+];
+
 const selftest = (): number => {
-  const matrix = (folders: ReadonlyArray<string>): Workflow => ({ jobs: { [JOB]: { strategy: { matrix: { include: folders.map((folder) => ({ folder })) } } } } });
+  const mutationJob = (folder: string | undefined, shards: number, count: number): Job => ({
+    ...(folder === undefined ? {} : { defaults: { run: { 'working-directory': folder } } }),
+    strategy: { matrix: { shard: Array.from({ length: shards }, (_, index) => index) } },
+    steps: [{ name: 'mutation', env: { SHARD_COUNT: count } }],
+  });
+  const workflow = (folders: ReadonlyArray<string> | undefined, mutation: Job | undefined, skip: string | undefined): Workflow => ({
+    jobs: {
+      [JOB]: {
+        ...(folders === undefined ? {} : { strategy: { matrix: { include: folders.map((folder) => ({ folder })) } } }),
+        steps: [{ name: 'mutation (changed files)', ...(skip === undefined ? {} : { if: skip }) }],
+      },
+      ...(mutation === undefined ? {} : { [MUTATION_JOB]: mutation }),
+    },
+  });
+  const sharded = mutationJob(SHARDED, 8, 8);
   const cases = [
-    { name: 'an equal matrix', found: problems(['core', 'auth'], matrix(['auth', 'core'])).length, expected: 0 },
-    { name: 'a missing folder', found: problems(['core', 'auth', 'read'], matrix(['core', 'auth'])).length, expected: 1 },
-    { name: 'an extra folder', found: problems(['core'], matrix(['core', 'read'])).length, expected: 1 },
-    { name: 'no matrix', found: problems(['core'], { jobs: {} }).length, expected: 1 },
+    { name: 'a right workflow', found: problems(['core', 'auth'], workflow(['auth', 'core'], sharded, SKIP_SHARDED)).length, expected: 0 },
+    { name: 'a missing folder', found: problems(['core', 'auth', 'read'], workflow(['core', 'auth'], sharded, SKIP_SHARDED)).length, expected: 1 },
+    { name: 'an extra folder', found: problems(['core'], workflow(['core', 'read'], sharded, SKIP_SHARDED)).length, expected: 1 },
+    { name: 'no matrix', found: problems(['core'], workflow(undefined, sharded, SKIP_SHARDED)).length, expected: 1 },
+    { name: 'no mutation job', found: problems(['core'], workflow(['core'], undefined, SKIP_SHARDED)).length, expected: 1 },
+    { name: 'a mutation job at the root', found: problems(['core'], workflow(['core'], mutationJob(undefined, 8, 8), SKIP_SHARDED)).length, expected: 1 },
+    { name: 'a wrong shard count', found: problems(['core'], workflow(['core'], mutationJob(SHARDED, 8, 4), SKIP_SHARDED)).length, expected: 1 },
+    { name: 'an unskipped read', found: problems(['core'], workflow(['core'], sharded, undefined)).length, expected: 1 },
+    { name: 'a skip of another folder', found: problems(['core'], workflow(['core'], sharded, "matrix.folder != 'write'")).length, expected: 1 },
   ];
   const wrong = cases.filter((c) => c.found !== c.expected);
   for (const c of wrong) process.stderr.write(`check-ci-matrix: SELFTEST FAILED, ${c.name} gave ${c.found} problem(s), expected ${c.expected}\n`);
-  if (wrong.length === 0) process.stdout.write('check-ci-matrix: selftest passed (a missing folder, an extra folder and no matrix are rejected).\n');
+  if (wrong.length === 0)
+    process.stdout.write(
+      'check-ci-matrix: selftest passed (a missing folder, an extra folder, no matrix, no or a misplaced mutation job, a wrong shard count and a wrong skip are rejected).\n'
+    );
   return wrong.length === 0 ? 0 : 1;
 };
 
@@ -56,7 +125,9 @@ const main = async (): Promise<number> => {
   const found = problems(workspaces, workflow);
   for (const problem of found) process.stderr.write(`check-ci-matrix: ${problem}\n`);
   if (found.length > 0) return 1;
-  process.stdout.write(`check-ci-matrix: the ${JOB} matrix covers every workspace folder (${workspaces.join(', ')}).\n`);
+  process.stdout.write(
+    `check-ci-matrix: the ${JOB} matrix covers every workspace folder (${workspaces.join(', ')}); ${SHARDED} mutates in the shards of the ${MUTATION_JOB} job only.\n`
+  );
   return 0;
 };
 

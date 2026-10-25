@@ -18,11 +18,14 @@
  *   2. `--version` answers the manifest's version, through the bin path under
  *      node and bun and through the installed `.bin` shim;
  *   3. the library loads by package name, and its `commands.json` subpath
- *      resolves, under node and bun;
+ *      resolves, under node and bun; that manifest lists the library's
+ *      commands, names the package and version that the bin's help-json
+ *      names, and holds no bin placeholder;
  *   4. qa-bundle-smoke.ts, pointed at the installed copy, passes: every
  *      converter and the MCP stdout-purity handshake, under node and bun.
  *
- * Run after the build: `bun run build && bun scripts/qa-packed-install-smoke.ts`.
+ * Run from the package folder after the build: in read/, `bun run build && bun
+ * run smoke:packed`. The working directory is the package that is packed.
  * Needs the registry, since the tarball's dependencies are installed fresh.
  * Exit non-zero on any failure.
  */
@@ -30,6 +33,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 type Manifest = {
@@ -38,7 +42,15 @@ type Manifest = {
   readonly bin?: Record<string, string>;
 };
 
+type ShippedManifest = {
+  readonly package?: string;
+  readonly version?: string;
+  readonly commands?: ReadonlyArray<{ readonly name: string }>;
+};
+
 const RUNTIMES = ['node', 'bun'] as const;
+// The bin placeholders that gen-docs fills in a manifest.
+const BIN_PLACEHOLDER = /\{(?:auth-|read-|write-)?bin\}/;
 const PROBE_TIMEOUT_MS = 60000;
 const INSTALL_TIMEOUT_MS = 300000;
 
@@ -133,15 +145,33 @@ try {
   if (shimVersion !== installed.version) fail(`the ${binName} shim answered ${JSON.stringify(shimVersion)}, expected ${installed.version}`);
   console.log(`  ✓ --version ${installed.version} under node, bun and the ${binName} shim`);
 
-  const library = `const m = await import(${JSON.stringify(source.name)}); process.stdout.write(JSON.stringify({ commands: Object.keys(m.commands).length, manifest: import.meta.resolve(${JSON.stringify(`${source.name}/commands.json`)}) }));`;
-  for (const rt of RUNTIMES) {
-    const answer = JSON.parse(evaluate(rt, library, consumer)) as { commands: number; manifest: string };
-    if (answer.commands === 0) fail(`the library loaded by name under ${rt} exports no commands`);
+  const library = `const m = await import(${JSON.stringify(source.name)}); process.stdout.write(JSON.stringify({ commands: Object.keys(m.commands).sort(), manifest: import.meta.resolve(${JSON.stringify(`${source.name}/commands.json`)}) }));`;
+  const answers = RUNTIMES.map((rt) => {
+    const answer = JSON.parse(evaluate(rt, library, consumer)) as { commands: ReadonlyArray<string>; manifest: string };
+    if (answer.commands.length === 0) fail(`the library loaded by name under ${rt} exports no commands`);
     if (!existsSync(new URL(answer.manifest))) fail(`${source.name}/commands.json resolved under ${rt} to a missing file: ${answer.manifest}`);
-  }
+    return answer;
+  });
   console.log(`  ✓ the library loads by name and ${source.name}/commands.json resolves, under node and bun`);
 
-  const smoke = spawnSync('bun', [join(repo, 'scripts/qa-bundle-smoke.ts'), '--package-root', root], { cwd: repo, stdio: 'inherit', timeout: INSTALL_TIMEOUT_MS });
+  // The shipped manifest must describe this package: a build that hands
+  // gen-docs another package's registry ships a manifest that still resolves.
+  const answer = answers[0] ?? fail('no runtime loaded the library');
+  const shippedText = await Bun.file(fileURLToPath(answer.manifest)).text();
+  const shipped = JSON.parse(shippedText) as ShippedManifest;
+  const told = JSON.parse(run('node', [join(root, binPath), 'help-json'], consumer, PROBE_TIMEOUT_MS, binEnv)) as { package?: string };
+  const shippedNames = (shipped.commands ?? []).map((c) => c.name).sort();
+  if (shipped.package !== told.package) fail(`${source.name}/commands.json names the package ${shipped.package}, but the bin's help-json names ${told.package}`);
+  if (shipped.version !== installed.version) fail(`${source.name}/commands.json names the version ${shipped.version}, not ${installed.version}`);
+  if (shippedNames.join(',') !== answer.commands.join(','))
+    fail(`${source.name}/commands.json lists ${shippedNames.length} commands, not the ${answer.commands.length} of the library`);
+  const placeholder = BIN_PLACEHOLDER.exec(shippedText);
+  if (placeholder !== null) fail(`${source.name}/commands.json holds the bin placeholder ${placeholder[0]}`);
+  console.log(
+    `  ✓ ${source.name}/commands.json lists the ${shippedNames.length} commands of the library, names ${shipped.package} ${shipped.version} as the bin does, and holds no bin placeholder`
+  );
+
+  const smoke = spawnSync('bun', [join(import.meta.dir, 'qa-bundle-smoke.ts'), '--package-root', root], { cwd: repo, stdio: 'inherit', timeout: INSTALL_TIMEOUT_MS });
   if (smoke.error !== undefined || smoke.signal !== null || smoke.status !== 0) fail('the bundle smoke failed against the installed copy');
   console.log('packed-install smoke: the tarball installs and runs outside the repo ✓');
 } catch (error) {
