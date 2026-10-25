@@ -1,0 +1,23 @@
+# From the atelier asset gitattributes, adapted to this repo.
+#
+# Text checks out exactly as committed, LF, on every machine. Git for Windows
+# sets core.autocrlf=true for the whole system, and without this file a
+# checkout there turns every text file CRLF: the endOfLine 'lf' of prettier
+# then fails every line of every file in the lint gate. CI runs a job on
+# Windows (windows-helper). Git finds binary files itself and does not change
+# them (text=auto).
+* text=auto eol=lf
+
+# Binary assets stay binary, also if a file looks like text to git: the demo
+# GIF of the docs, the Office and Outlook samples of the read tests, and the
+# formats that the conversion commands read or write.
+*.gif binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.msg binary
