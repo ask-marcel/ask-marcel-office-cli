@@ -9,8 +9,8 @@ import { LIFECYCLE_ENTRIES } from './lifecycle-entries.ts';
  * so read lists none of them.
  */
 
-const ROOT_LIFECYCLE = { registry: {}, lifecycle: LIFECYCLE_ENTRIES, packageName: '@ask-marcel/office-read' };
-const ROOT_COMMANDS = ['docs', 'help-json', 'mcp'];
+const LIFECYCLE_ONLY = { registry: {}, lifecycle: LIFECYCLE_ENTRIES, packageName: '@ask-marcel/office-read' };
+const LIFECYCLE_COMMANDS = ['docs', 'help-json', 'mcp'];
 
 const entry = (name: string): CommandManifestEntry => {
   const found = LIFECYCLE_ENTRIES.find((candidate) => candidate.name === name);
@@ -20,10 +20,10 @@ const entry = (name: string): CommandManifestEntry => {
 
 describe('the lifecycle entries of the read package', () => {
   it('lists docs, help-json and mcp, and no sign-in command', () => {
-    expect(buildManifest(ROOT_LIFECYCLE, '1.0.0').commands.map((command) => command.name)).toEqual(ROOT_COMMANDS);
+    expect(buildManifest(LIFECYCLE_ONLY, '1.0.0').commands.map((command) => command.name)).toEqual(LIFECYCLE_COMMANDS);
   });
 
-  for (const name of ROOT_COMMANDS) {
+  for (const name of LIFECYCLE_COMMANDS) {
     it(`gives \`${name}\` the meta that the docs and help-json render`, () => {
       const lifecycle = entry(name);
       expect(lifecycle.category).toBe('lifecycle');
