@@ -6,73 +6,76 @@
 
 **One sign-in. No Azure app registration. Every document as clean markdown.**
 
-[![npm version](https://img.shields.io/npm/v/ask-marcel-office-cli.svg?logo=npm&color=cb3837)](https://www.npmjs.com/package/ask-marcel-office-cli)
-[![license: MIT](https://img.shields.io/npm/l/ask-marcel-office-cli.svg?color=blue)](LICENSE)
-[![types included](https://img.shields.io/npm/types/ask-marcel-office-cli?logo=typescript&color=3178c6)](docs/USAGE.md)
-
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
 
-[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 211 commands](docs/COMMANDS.md)
+[Packages](#the-three-packages) · [Install](#install) · [Agent skill](#the-agent-skill) · [Develop](#develop)
 
 </div>
 
 ---
 
-Your agent is smart enough to answer *"what did Contoso say about the Q3 budget, and what's in the attached deck?"* It just can't see your mailbox.
+ask-marcel-office gives a tool-calling agent (Claude Code, Cursor, Cline, an MCP
+host or your own loop) access to your Microsoft 365 data through Microsoft
+Graph. You sign in one time, in a browser, as yourself. You do not need an Azure
+app registration, the consent of a tenant admin or a client secret. Office
+files, PDF files and mail become clean markdown, so the agent can read them.
 
-`ask-marcel-office` gives any tool-calling LLM (Claude Code, Cursor, Cline, an MCP server, your own loop) eyes on your entire Microsoft 365:
+The project is three npm packages. Each package has its own bin, its own MCP
+server, its own library and its own docs.
 
-```bash
-npm i -g ask-marcel-office-cli
-ask-marcel-office login          # your normal Microsoft sign-in, in a browser, once
-ask-marcel-office list-mail-messages --top 5
+## The three packages
+
+| Package | Bin | What it does | Do you need it? | Docs |
+|:--|:--|:--|:--|:--|
+| `@ask-marcel/office-auth` | `ask-marcel-office-auth` | Signs you in, keeps the token cache and gives the tokens to the other two packages. | Yes | [README](auth/README.md) · [USAGE](auth/USAGE.md) · [COMMANDS](auth/COMMANDS.md) |
+| `@ask-marcel/office-read` | `ask-marcel-office-read` | Reads mail, calendar, OneDrive and SharePoint, Teams and chats, users, Excel, OneNote, To Do and Planner. Converts files and mail to markdown. It cannot change your tenant. | Yes | [README](read/README.md) · [USAGE](read/USAGE.md) · [COMMANDS](read/COMMANDS.md) |
+| `@ask-marcel/office-write` | `ask-marcel-office-write` | Writes mail drafts and never sends them. Converts mail, group post and calendar attachments to PDF through a temporary OneDrive file. | Only for drafts and PDF conversions | [README](write/README.md) · [USAGE](write/USAGE.md) · [COMMANDS](write/COMMANDS.md) |
+
+Start with the [read package README](read/README.md). It shows what an agent
+can do with your Microsoft 365 data.
+
+## Install
+
+> The three packages are not on npm yet. npm installs `ask-marcel-office-cli`
+> 2.8.0 now. Its docs are [docs/USAGE.md](docs/USAGE.md) and
+> [docs/COMMANDS.md](docs/COMMANDS.md).
+
+To read only, install auth and read, then sign in:
+
+```sh
+npm i -g @ask-marcel/office-auth @ask-marcel/office-read
+ask-marcel-office-auth login
+ask-marcel-office-read my-quick-context
 ```
 
-That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And little for a runaway agent to break: the command surface is read-mostly by design. A write leaves an unsent draft, or a temporary OneDrive file that the command tries to delete.
+To also write mail drafts and convert attachments to PDF, install the three
+packages:
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ask-marcel/ask-marcel-office-cli/main/docs/demo.gif" alt="ask-marcel-office converting an Outlook .msg file into clean markdown in one command, offline" width="880">
-</p>
-
-The product pages are now in the [read package README](read/README.md): the comparison with raw Microsoft Graph, the three walls, "See it work", what your agent can reach, files to markdown, the agent loop, MCP and the library.
-
-## Install in 60 seconds
-
-```bash
-# Bun >=1.0 or Node >=20 · macOS, Windows, Linux
-npm i -g ask-marcel-office-cli
-
-ask-marcel-office login             # browser opens once, tokens cached
-ask-marcel-office my-quick-context  # who am I + my IDs, one round trip
-ask-marcel-office list-calendar-view --start-date-time today --end-date-time +7d
-ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
+```sh
+npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-write
 ```
 
-## Deep docs
+The packages need Node 20 or later, or Bun 1.0 or later, on macOS, Windows or
+Linux. Each package README shows how to register its MCP server.
 
-- **[All 211 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
-- **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
-- **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
-- **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release
+## The agent skill
 
-## Roadmap
+The [`skills/`](skills/SKILL.md) folder holds an agent skill: it tells an agent
+how to answer a question from your Microsoft 365 data, and how to write a reply
+as an unsent draft. No package ships it. To use it, copy `skills/` to
+`~/.claude/skills/ask-marcel/`, or to the skill folder of your agent.
 
-Read-only stays the default forever. Coverage grows out of real LLM workflows as they come up: suggestions, requests, and pull requests welcome on the [issues page](https://github.com/ask-marcel/ask-marcel-office-cli/issues).
+## Develop
 
-## Built with
-
-- **Bun + TypeScript**: single-package install, Node >=20 fallback, `Result<T, E>` at every IO boundary, a 100% coverage gate on every tier
-- **Microsoft Graph v1.0**: the public API surface, no beta endpoints in production code
-- **Playwright**: the headed browser behind the one-time sign-in
+- [CONTRIBUTING.md](CONTRIBUTING.md): the workspace, the commands of each
+  folder, the pre-commit hook and the CI jobs.
+- [QA playbook](docs/QA-PLAYBOOK.md): the full health check of the command
+  surface before a release.
+- [The package split plan](docs/plans/2026-10-01-package-split.md) and the
+  [architecture decision records](docs/adr/).
+- Questions, requests and pull requests: the
+  [issues page](https://github.com/ask-marcel/ask-marcel-office-cli/issues).
 
 ## License
 
 MIT © Vincent Delacourt
-
----
-
-<div align="center">
-
-**If this saved your agent a few round trips, a ⭐ helps other agents' humans find it.**
-
-</div>
