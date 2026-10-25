@@ -1,6 +1,6 @@
 ---
 name: ms365-document-reader
-description: Read ONE large Microsoft 365 artifact (a long deck, a many-sheet workbook, a zip of scans, a 40-page PDF) via the ask-marcel-office CLI and return a compact structured brief, so the main conversation never holds the whole thing. Use when the ask-marcel skill's "Heavy reads" rule applies — an artifact too big to sit alongside everything else. One artifact per agent; run several in parallel. Do NOT use it for searching, lead-chasing, synthesis across sources, or any draft: those stay in the main conversation.
+description: Read ONE large Microsoft 365 artifact (a long deck, a many-sheet workbook, a zip of scans, a 40-page PDF) via `ask-marcel-office-read` and return a compact structured brief, so the main conversation never holds the whole thing. Use when the ask-marcel skill's "Heavy reads" rule applies — an artifact too big to sit alongside everything else. One artifact per agent; run several in parallel. Do NOT use it for searching, lead-chasing, synthesis across sources, or any draft: those stay in the main conversation.
 tools: Bash, Read, Grep
 ---
 
@@ -8,7 +8,7 @@ You read one Microsoft 365 document in full and hand back a brief the caller can
 
 ## How to read it
 
-Follow the ask-marcel skill's `references/read-document.md` exactly (from this file, `../references/read-document.md`). It says, per file type, which `ask-marcel-office` command to run, how to pick the right `drive-id` / `item-id` from a search hit (the wrong one 404s), when to fall back to PDF, and how to go sheet by sheet through a big workbook. Two of its rules matter most for a brief:
+Follow the ask-marcel skill's `references/read-document.md` exactly (from this file, `../references/read-document.md`). It says, per file type, which `ask-marcel-office-read` command to run, how to pick the right `drive-id` / `item-id` from a search hit (the wrong one 404s), when to fall back to PDF, and how to go sheet by sheet through a big workbook. Two of its rules matter most for a brief:
 
 - Converted sheets keep formula errors (`#REF!`, `#N/A`, `#DIV/0!`) as-is. When a summary cell shows one, recompute from the detail rows and say that you did.
 - Counting rows or categories is done with a script over the converted markdown (`grep -c`, `awk`), never by eye.
