@@ -1,24 +1,22 @@
 # @ask-marcel/office-write
 
-> Not released yet. This package is part of the package split
-> (`docs/plans/2026-10-01-package-split.md` in the repository). Until then, use
-> [`ask-marcel-office-cli`](https://www.npmjs.com/package/ask-marcel-office-cli).
-
-`@ask-marcel/office-write` holds the Microsoft Graph commands that change the
-state of your tenant: the four mail-draft commands and the three
-attachment-to-PDF conversions. Its bin is `ask-marcel-office-write`. It sends no
-mail: a draft stays unsent until you send it. It cannot create or modify
-calendar items.
+`@ask-marcel/office-write` holds the 7 write commands: 4 mail-draft operations
+and 3 PDF conversions. These Microsoft Graph commands change the state of your
+tenant. Its bin is `ask-marcel-office-write`. It sends no mail: a draft
+stays unsent until you send it from Outlook. It cannot create or change calendar
+items.
 
 Install it next to `@ask-marcel/office-read` and `@ask-marcel/office-auth`. The
-write commands take ids that the read commands give (for example the message id
-of `list-mail-messages`, or a draft of `find-mail-drafts`), and auth signs you
-in.
+write commands take ids that the read commands give, for example the message id
+of `list-mail-messages` or a draft of `find-mail-drafts`. The auth package signs
+you in.
 
 ```sh
 npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-write
 ask-marcel-office-auth login
 ```
+
+The package needs Node 20 or later, or Bun 1.0 or later.
 
 ## Commands
 
@@ -36,8 +34,14 @@ ask-marcel-office-auth login
 | `ask-marcel-office-write help-json [--terse]` | Prints the command manifest as JSON. |
 | `ask-marcel-office-write --version` | Prints the version. |
 
-To convert an attachment, a PDF conversion uploads it to a temporary file in the
-`.ask-marcel-temp` folder of your OneDrive, and then tries to delete that file. A
+`help-json` lists 10 entries: the commands, and `docs`, `help-json` and `mcp`.
+The tables are in
+[COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/COMMANDS.md).
+The draft flow and the rules of each command are in
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md).
+
+A PDF conversion of a file attachment uploads it to a temporary file in the
+`.ask-marcel-temp` folder of your OneDrive. Then it tries to delete that file. A
 failed cleanup can leave the file there. Use `--output-path <file>` to write the
 PDF to a file.
 
@@ -52,18 +56,47 @@ token, it reads the `ASKMARCEL_TOKEN_<TIER>` variable first (for example
 `@ask-marcel/office-auth`: `ASKMARCEL_TOKEN_COMMAND`, else the helper that
 `~/.ask-marcel/token-helper.json` names, else `ask-marcel-office-auth token` on
 PATH. Only the auth bin writes that file, so run `ask-marcel-office-auth login`
-(or `status`) once after an install or an update.
+(or `status`) one time after an install or an update.
+
+When a token lapses, run `ask-marcel-office-auth login` (no flag). A plain
+`login` captures a missing elevated token again and keeps the browser session.
+Use `ask-marcel-office-auth login --force` only when a tier stays stuck after a
+plain `login`: it clears the browser session, so you usually type your password
+again.
 
 ## MCP server
+
+Register the server in Claude Code with the global bin:
 
 ```sh
 claude mcp add --transport stdio --scope user ask-marcel-office-write -- ask-marcel-office-write mcp
 ```
 
+Or with npx, with no global install:
+
+```sh
+claude mcp add --transport stdio --scope user ask-marcel-office-write -- npx -y @ask-marcel/office-write mcp
+```
+
+Other MCP clients (Claude Desktop, Cursor, Cline) take an `mcpServers` block:
+
+```json
+{
+  "mcpServers": {
+    "ask-marcel-office-write": {
+      "command": "npx",
+      "args": ["-y", "@ask-marcel/office-write", "mcp"]
+    }
+  }
+}
+```
+
 The server has three tools: `list-commands`, `get-command-docs` and
 `run-write-command`. `run-write-command` runs only the 7 write commands. A read
 command gets a pointer to the read server (`ask-marcel-office-read mcp`). Register
-this server only on hosts that may write drafts.
+this server only on hosts that may write drafts. Read the npx note in the
+[auth usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/auth/USAGE.md#the-npx-cache)
+before you use the npx line.
 
 ## Library
 
@@ -89,7 +122,9 @@ The library exports:
 - the types `Command`, `WriteGraph`, `TokenSource` and `Result`.
 
 Each `execute` returns a `Result`: `{ ok: true, value }` or `{ ok: false, error }`.
-`@ask-marcel/office-write/commands.json` is the command manifest.
+`@ask-marcel/office-write/commands.json` is the command manifest. To give the
+library your own token, set a tier variable or `ASKMARCEL_TOKEN_COMMAND` (see
+[USAGE.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/write/USAGE.md#your-own-token)).
 
 ## Develop
 
@@ -109,6 +144,8 @@ helper. Then, from this folder:
 | `bun run build` | `dist/`: `cli.js` and `index.js` (core inlined), the declarations and `commands.json` |
 | `bun run check:packed` | Packs the package and checks the tarball and a clean consumer install |
 | `bun run smoke` | After the build: runs `dist/` under node and bun on temporary homes (`scripts/qa-write-bundle-smoke.ts`) |
+| `bun run docs:gen` | Makes the tables of `COMMANDS.md` from the registry |
+| `bun run check:docs` | Fails when `COMMANDS.md` or `dist/commands.json` is out of date |
 
 ## License
 
