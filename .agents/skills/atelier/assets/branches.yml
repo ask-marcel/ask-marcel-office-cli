@@ -1,0 +1,33 @@
+# .github/workflows/branches.yml - the branch watchdog (hard rule 38;
+# references/workflow.md, Branch lifecycle). Not a merge gate: a branch goes
+# stale while nobody pushes to it, so this runs on a schedule and fails when a
+# branch whose work already landed is still on the remote, or one has stayed off
+# the trunk for more than a day. Delete or land what it lists. The second step
+# checks the host itself: main the default branch and protected against deletion,
+# force pushes and merge commits, merges by rebase only, head branches deleted on
+# merge (check-host.py; its owner sets them once with --apply).
+name: branches
+on:
+  schedule:
+    - cron: '30 6 * * *'       # daily, after the audit watchdog
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  branches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0       # every branch and its history: landed is judged by content
+      - name: no landed or day-old branch (rule 38)
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
+        run: bash scripts/check-branches.sh
+      - name: main is the default branch and protected, merges rebase only (rule 38)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RULESET: scripts/host-ruleset.json
+          # HOST_RULESET: unavailable   # a private repository on GitHub Free only (references/workflow.md, Branch lifecycle)
+        run: python3 scripts/check-host.py

@@ -1,6 +1,6 @@
 # Error handling with `Result<T, E>`
 
-Expected failures are data. Exceptions are for bugs. Every port that crosses an IO boundary and every use-case returns a `Result<T, E>`. Thrown exceptions are reserved for programmer errors — unreachable code, invariant violations, genuine crashes. The top-level `main.ts` catches them and reports "crashed (unexpected)".
+Expected failures are data. Exceptions are for bugs. Every port that crosses an IO boundary and every use-case returns a `Result<T, E>`. Thrown exceptions are reserved for programmer errors: unreachable code, invariant violations, genuine crashes. The top-level `main.ts` catches them and reports "crashed (unexpected)".
 
 This reference explains the pattern, the discriminated-union error design, the `try/catch` quarantine, the fan-out batch convention, the retry rewrite, and the testing patterns that come with it.
 
@@ -32,6 +32,8 @@ export const unwrap = <T, E>(r: Result<T, E>): T => {
 ```
 
 `unwrap` is reserved for bootstrapping code and tests where the error branch is genuinely impossible. Production code pattern-matches on `.ok`.
+
+Branded-type factories at a trust boundary return `Result` too: `parseEmail(raw)` yields `Result<Email, EmailError>` and the use-case pattern-matches it, while `email(value)` stays the throwing assertion for values already proven (SKILL.md, Value objects at trust boundaries; `references/clean-code.md`, calisthenics rule 3). One shape for ports, use-cases, and parsers, so a failure never changes channel between them.
 
 ## Per-port discriminated-union errors
 
@@ -122,12 +124,12 @@ After adopting `Result`, the repo has exactly these places that may contain `try
 | Location | What for |
 |:---|:---|
 | `src/infra/**` | Every adapter wraps its third-party call (`fetch`, `googleapis`, `Bun.file`, `twitter-api-v2`). The catch translates thrown exceptions into the port's discriminated-union error variants and returns `err(...)`. |
-| `src/domain/**` | Only for native synchronous APIs whose normal contract is to throw: `JSON.parse` (with a safe fallback), `URL` constructor (validation gate), `decodeURIComponent`. |
-| `src/main.ts` | Exactly one top-level catch. Sends the bug report ("crashed (unexpected)"), calls `process.exit(1)`. |
+| `src/domain/**` | Only for native synchronous APIs whose normal contract is to throw: `JSON.parse` (with a safe fallback), the `URL` constructor (validation gate), `Buffer.from(b64).toString()`, `decodeURIComponent`, `BigInt(...)`, `new Date(invalid).toISOString()`. The list is illustrative, not exhaustive: any built-in that throws on bad input qualifies, provided the call sits in pure domain code and the catch returns a `Result`. |
+| `src/main.ts` | Exactly one top-level catch. Sends the bug report ("crashed (unexpected)"), sets `process.exitCode = 1` (never `process.exit(1)`, which unicorn's `no-process-exit` rejects). |
 
-`*.test.ts` files and `src/test-helpers/**` sit outside the quarantine — test code may catch (mirrors hard rule 20's test carve-out).
+`*.test.ts` files and `src/test-helpers/**` sit outside the quarantine: test code may catch (mirrors hard rule 20's test carve-out).
 
-`src/use-cases/**` has **zero** `try/catch`. Every port call is pattern-matched on `.ok`. If you catch a thrown exception inside a use-case, the port has lied about its contract — fix the port, don't silence the symptom.
+`src/use-cases/**` has **zero** `try/catch`. Every port call is pattern-matched on `.ok`. If you catch a thrown exception inside a use-case, the port has lied about its contract: fix the port, don't silence the symptom. That scope is lint: the `TRY_BAN` block in `eslint.config.js` (`references/bun-typescript.md`) rejects any `try` under `src/use-cases/**` outside tests. The domain fallback, the adapter catch and the single catch in `main.ts` are review-checked.
 
 ```ts
 // BAD - try/catch inside a use-case hides a lying port contract
@@ -135,8 +137,8 @@ export const placeOrder = async (input, deps): Promise<Result<Summary, StepError
   try {
     await deps.orders.save(input);
     return ok({ saved: 1, errored: 0 });
-  } catch (e) {
-    return err({ step: 'placeOrder', cause: 'unknown', message: formatError(e) });
+  } catch (error) {
+    return err({ step: 'placeOrder', cause: 'unknown', message: formatError(error) });
   }
 };
 
@@ -150,11 +152,11 @@ export const placeOrder = async (input, deps): Promise<Result<Summary, StepError
 };
 ```
 
-**Mapping errors to an HTTP status.** That flatten is also why an inbound HTTP adapter cannot exhaustively switch a use-case failure to `401`/`404`/`429`: `cause` is now a plain `string`, not the literal `kind` union. So decide precise client errors (`400`) upstream at the branded request checkpoint where the type is still narrow, and default a use-case `StepError` to `500`. To honor a typed status from a port failure, compute it at the `.ok` guard — where `error.kind` is still a literal union TypeScript checks for totality — and carry it as plain data through the flatten (the way `retryOnErr` branches on the live `e.kind` before any flatten). See `references/architecture.md` § Inbound HTTP (server archetype).
+**Mapping errors to an HTTP status.** That flatten is also why an inbound HTTP adapter cannot exhaustively switch a use-case failure to `401`/`404`/`429`: `cause` is now a plain `string`, not the literal `kind` union. So decide precise client errors (`400`) upstream at the branded request checkpoint where the type is still narrow, and default a use-case `StepError` to `500`. To honor a typed status from a port failure, compute it at the `.ok` guard (where `error.kind` is still a literal union TypeScript checks for totality) and carry it as plain data through the flatten (the way `retryOnErr` branches on the live `e.kind` before any flatten). See `references/architecture.md` § Inbound HTTP (server archetype).
 
 ## Adapter pattern: the `try/catch` boundary
 
-An infra adapter is the only place where a `throw` from a third-party library gets turned into a `Result`. This is the quarantine — everything beyond it is exception-free.
+An infra adapter is the only place where a `throw` from a third-party library gets turned into a `Result`. This is the quarantine: everything beyond it is exception-free.
 
 ```ts
 // src/infra/sheets-google.ts
@@ -163,16 +165,16 @@ export const createSheetsGoogle = (client: SheetsClient): Sheets => ({
     try {
       const response = await client.spreadsheets.values.get({ range: tab });
       return ok(rowsFromResponse(response));
-    } catch (e) {
-      return err(classifySheetsError(e));
+    } catch (error) {
+      return err(classifySheetsError(error));
     }
   },
   appendOrUpdate: async (tab, row) => {
     try {
       await client.spreadsheets.values.append({ range: tab, resource: { values: [toRow(row)] } });
       return ok(undefined);
-    } catch (e) {
-      return err(classifySheetsError(e));
+    } catch (error) {
+      return err(classifySheetsError(error));
     }
   },
   // ...
@@ -186,7 +188,7 @@ const classifySheetsError = (e: unknown): SheetsError => {
 };
 ```
 
-Every `catch (e)` uses the shared `formatError(err: unknown): string` helper from `src/domain/utilities/format-error.ts` — never `String(e)`, which returns `"[object Object]"` for non-Error throws (SonarJS S6551).
+Every `catch (error)` uses the shared `formatError(err: unknown): string` helper from `src/domain/utilities/format-error.ts`, never `String(error)`, which returns `"[object Object]"` for non-Error throws (SonarJS S6551).
 
 ## Fan-out batch semantics: `ok(summary)` with an `errored` count
 
@@ -213,11 +215,11 @@ for (const row of rows.value) {
 return ok({ published, errored });
 ```
 
-`err(...)` is reserved for use-case-level prerequisites that prevent the batch from starting at all — the initial `sheets.readRows` fails, the API credentials are missing, the pipeline config is malformed. Rows are best-effort. This keeps a run-pipeline that orchestrates multiple channels from short-circuiting when one of them has a single bad record.
+`err(...)` is reserved for use-case-level prerequisites that prevent the batch from starting at all: the initial `sheets.readRows` fails, the API credentials are missing, the pipeline config is malformed. Rows are best-effort. This keeps a run-pipeline that orchestrates multiple channels from short-circuiting when one of them has a single bad record.
 
 ## Retry: `retryOnErr`, not `withRetry`
 
-The pre-Result `withRetry(() => port.call())` retried on thrown exceptions. After the migration, ports do not throw — so the retry path is dead code. Replace it with a Result-aware retry that branches on the error `kind`.
+The pre-Result `withRetry(() => port.call())` retried on thrown exceptions. After the migration, ports do not throw, so the retry path is dead code. Replace it with a Result-aware retry that branches on the error `kind`.
 
 ```ts
 // src/domain/utilities/retry-on-err.ts
@@ -270,7 +272,8 @@ export const createSheetsFake = (config?: {
   };
 }): Sheets => {
   const store = new Map<string, SheetRow[]>();
-  for (const [tab, rows] of Object.entries(config?.tabs ?? {})) store.set(tab, [...(rows ?? [])]);
+  const seededTabs = Object.entries(config?.tabs ?? {});
+  for (const [tab, rows] of seededTabs) store.set(tab, [...(rows ?? [])]);
 
   return {
     readRows: async (tab) => {
@@ -288,7 +291,7 @@ export const createSheetsFake = (config?: {
 };
 ```
 
-In a test, reach for the `errors` knob — never for a mocking library.
+In a test, reach for the `errors` knob, never for a mocking library.
 
 ```ts
 it('when the post-write fails, the row is counted as errored and the batch completes', async () => {
@@ -307,22 +310,22 @@ it('when the post-write fails, the row is counted as errored and the batch compl
 });
 ```
 
-The error-map value must be the port's discriminated-union error shape — cast literals to `{ kind: 'write-failed' as const, message: 'quota' }` so TypeScript narrows to the union member.
+The error-map value must be the port's discriminated-union error shape: cast literals to `{ kind: 'write-failed' as const, message: 'quota' }` so TypeScript narrows to the union member.
 
 ### Rejection assertions: `captureRejection`
 
-SonarJS S4123 fires on `await expect(p).rejects.toThrow(...)` because the matcher chain is not recognised as a `Thenable`. The fix is a tiny helper that reads more clearly anyway. The canonical implementation ships in `assets/capture-rejection.ts` — copy it verbatim (don't hand-retype `String(e)` into the non-Error branch; that would trip S6551, the very rule the helper set exists to respect). Shape:
+SonarJS S4123 fires on `await expect(p).rejects.toThrow(...)` because the matcher chain is not recognised as a `Thenable`. The fix is a tiny helper that reads more clearly anyway. The canonical implementation ships in `assets/capture-rejection.ts`: copy it verbatim (don't hand-retype `String(e)` into the non-Error branch; that would trip S6551, the very rule the helper set exists to respect). Shape:
 
 ```ts
-// src/test-helpers/capture-rejection.ts — see assets/capture-rejection.ts for the full body
+// src/test-helpers/capture-rejection.ts: see assets/capture-rejection.ts for the full body
 export const captureRejection = async (promise: Promise<unknown>): Promise<Error> => {
   try {
     await promise;
-  } catch (e) {
-    if (e instanceof Error) return e;
-    // formatNonError avoids String(e) (SonarJS S6551) — full impl in the asset.
-    // { cause: e } preserves the original value (ESLint preserve-caught-error).
-    throw new Error(`captureRejection: rejected with non-Error value: ${formatNonError(e)}`, { cause: e });
+  } catch (error) {
+    if (error instanceof Error) return error;
+    // formatNonError avoids String(error) (SonarJS S6551), full impl in the asset.
+    // { cause: error } preserves the original value (ESLint preserve-caught-error).
+    throw new Error(`captureRejection: rejected with non-Error value: ${formatNonError(error)}`, { cause: error });
   }
   throw new Error('captureRejection: expected promise to reject, but it resolved');
 };
@@ -353,4 +356,4 @@ If `unwrap` ever actually throws in a test, the test name is wrong or the fake s
 4. Update every caller in `src/use-cases/` to pattern-match on `.ok`. Delete any existing `try/catch` around port calls.
 5. Update the fake in `src/test-helpers/` to add an `errors` knob.
 6. Replace any `withRetry(() => port.call())` with `retryOnErr(...)` and an explicit "retry on kind X" predicate.
-7. Run the 4-check loop (`bun test`, `bun run lint`, `bun run typecheck`, `bun run coverage`). See `references/workflow.md`.
+7. Run the 4-check loop (`bun run test`, `bun run lint`, `bun run typecheck`, `bun run coverage`). See `references/workflow.md`.

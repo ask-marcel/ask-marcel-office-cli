@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  atelier rules 35, 15 and 4.
+
+  Rule 35: cyclomatic complexity at most 10 per method.
+
+  The size caps (short methods, one indentation level) are prose; this is the
+  gate, and it counts what they miss: a one-line chain of && / || / ternaries,
+  a wide switch. PMD reports a method whose complexity is AT OR ABOVE
+  methodReportLevel (verified on PMD 7.17: level 10 flags a complexity-10
+  method), so "at most 10" is level 11, the same boundary as the TypeScript
+  variants' `complexity: ['error', 10]`.
+
+  Copied to the repository root as pmd-ruleset.xml; the canonical pom binds
+  pmd:check to verify (references/java-quarkus.md, Gates and hooks). The fix
+  for a violation is never a higher level: split the method or dispatch on a
+  map (references/complexity.md).
+
+  Rule 15: no inline ignore. NoSuppressWarnings flags every @SuppressWarnings
+  annotation. It cannot see @SuppressWarnings("PMD") on the annotated element,
+  because PMD honours that argument on its own report, so this rule is defence
+  in depth: scripts/check-no-suppressions.sh (the fast hook and CI) is the
+  authority, and the canonical pom sets an impossible suppressMarker so a
+  // NOPMD comment is inert.
+
+  Rule 4: no System.out, no System.err, no printStackTrace; the injected logger
+  only. SystemPrintln is PMD's own rule. printStackTrace is our XPath rule
+  because PMD 7.17's AvoidPrintStackTrace stays silent on both a bare call and
+  one inside a catch (probed 2026-09-19); //MethodCall[@MethodName] is the
+  PMD 7 AST and fires on both.
+-->
+<ruleset name="atelier"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+  <description>atelier rules 35 (cyclomatic complexity at most 10 per method), 15 (no @SuppressWarnings) and 4 (no System.out, no printStackTrace)</description>
+  <rule ref="category/java/bestpractices.xml/SystemPrintln" />
+  <rule name="NoPrintStackTrace" language="java" since="7.0"
+      message="No printStackTrace: log the failure through the injected logger (rule 4)"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <description>Rule 4: a stack trace printed to stderr bypasses the logger, its redaction and its JSON shape.</description>
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[@MethodName='printStackTrace']
+]]></value>
+      </property>
+    </properties>
+  </rule>
+  <rule ref="category/java/design.xml/CyclomaticComplexity">
+    <properties>
+      <property name="methodReportLevel" value="11" />
+    </properties>
+  </rule>
+  <rule name="NoSuppressWarnings" language="java" since="7.0"
+      message="No @SuppressWarnings: refactor, or change the rule's severity at project level with a comment (rule 15)"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <description>Rule 15: no inline ignore, ever. A suppression annotation hides a finding instead of fixing it.</description>
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//Annotation[pmd-java:typeIs('java.lang.SuppressWarnings')]
+]]></value>
+      </property>
+    </properties>
+  </rule>
+</ruleset>

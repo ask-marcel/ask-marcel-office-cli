@@ -33,6 +33,10 @@ describe('formatError renders any thrown value as a readable string', () => {
     expect(formatError({ code: 'E_IO', retriable: true })).toBe('{"code":"E_IO","retriable":true}');
   });
 
+  test('undefined is named, never returned as undefined', () => {
+    expect(formatError(undefined)).toBe('undefined');
+  });
+
   test('a value that cannot be stringified falls back to a placeholder', () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;

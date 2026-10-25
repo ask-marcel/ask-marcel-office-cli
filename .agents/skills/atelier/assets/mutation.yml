@@ -1,0 +1,23 @@
+# .github/workflows/mutation.yml - the daily full mutation sweep (workflow.md,
+# Mutation testing). Deliberately NOT in the gates job: the full sweep over
+# src/domain/** and src/use-cases/** takes one to two hours on a mature repo,
+# so the merge gate (ci.yml) mutates the changed files only and this sweep
+# catches what a per-diff run cannot: a test weakened elsewhere, a mutant that
+# now survives through an untouched neighbour. A red run here is today's task,
+# not a blocked merge; it is not a required status check.
+name: mutation
+on:
+  schedule:
+    - cron: '0 3 * * *'        # daily, before the working day (UTC)
+  workflow_dispatch:           # on demand, after a large refactor
+permissions:
+  contents: read
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: mutation (the full sweep, break 90)
+        run: bun run mutate

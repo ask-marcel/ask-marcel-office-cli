@@ -3,11 +3,16 @@
 # Rule 29 tripwire: every outbound call in an infra adapter has a deadline.
 #
 # Checks files the STAGED DIFF touches under the infra layer; `--all` scans the
-# whole layer (adopt-mode audit). Per-file heuristic: a file that makes an
-# outbound call must also mention a deadline marker somewhere in the file.
+# whole layer (adopt-mode audit). Per-call heuristic on the TypeScript side: a
+# deadline marker must appear within the 8 lines after each call, comment lines
+# stripped first, so a `// TODO timeout` cannot satisfy it and a marker on an
+# unrelated call elsewhere in the file cannot vouch for this one. The Java side
+# stays per-file.
 #
-#   TS   call marker:      fetch(
-#        deadline markers: AbortSignal | signal: | timeout
+#   TS   call markers:     fetch(  |  globalThis.fetch(   (the doctrine's idiom,
+#                          references/bun-typescript.md; a member call such as
+#                          deps.fetch( is a known gap, name the wrapper instead)
+#        deadline markers: AbortSignal.timeout(  |  signal:
 #   Java call marker:      HttpClient.new
 #        deadline markers: .timeout( | connectTimeout
 #
@@ -30,11 +35,36 @@ candidate_files() {
   fi
 }
 
+# Prints the original line number of the first fetch call with no deadline
+# marker within the 8 lines that follow it (comment lines dropped first), or
+# nothing when every call is covered.
+first_uncovered_fetch() {
+  awk '
+    /^[[:space:]]*(\/\/|\*|\/\*)/ { next }
+    { orig[++n] = NR; line[n] = $0 }
+    END {
+      for (i = 1; i <= n; i++) {
+        if (line[i] ~ /(^|[^A-Za-z_.$])fetch\(/ || line[i] ~ /globalThis\.fetch\(/) {
+          ok = 0
+          for (j = i; j <= i + 8 && j <= n; j++) if (line[j] ~ /AbortSignal\.timeout\(|signal:/) ok = 1
+          if (!ok) { print orig[i]; exit }
+        }
+      }
+    }'
+}
+
 status=0
 while IFS= read -r f; do
-  [ -n "$f" ] && [ -f "$f" ] || continue
+  [ -n "$f" ] || continue
   case "$f" in *.test.ts|*.test.tsx|*test-helpers*) continue ;; esac
-  content=$(cat "$f")
+  # Staged mode reads what will be committed, the index, never the working tree: a
+  # deadline added in the editor but left unstaged passed the gate until 2026-09-27.
+  if [ "$MODE" = "--all" ]; then
+    [ -f "$f" ] || continue
+    content=$(cat "$f")
+  else
+    content=$(git show ":$f")
+  fi
   case "$f" in
     *.java)
       if echo "$content" | grep -q 'HttpClient\.new' \
@@ -44,9 +74,9 @@ while IFS= read -r f; do
       fi
       ;;
     *)
-      if echo "$content" | grep -qE '(^|[^.a-zA-Z])fetch\(' \
-        && ! echo "$content" | grep -qE 'AbortSignal|signal:|timeout'; then
-        echo "  ╳ $f calls fetch with no deadline marker (rule 29)" >&2
+      uncovered=$(printf '%s\n' "$content" | first_uncovered_fetch)
+      if [ -n "$uncovered" ]; then
+        echo "  ╳ $f:$uncovered calls fetch with no deadline marker within 8 lines (rule 29)" >&2
         status=1
       fi
       ;;

@@ -4,8 +4,8 @@
 # (src/domain/** and src/use-cases/**, excluding tests and ports).
 #
 # An optional local pre-check (`bun run mutate:staged`); the enforcing home is
-# CI (`mutate:changed` on pull requests, full `mutate` on main). Never wired
-# into the hook. Skips with exit 0 when no relevant
+# CI (`mutate:changed` on every pull request and push; the full `mutate` sweep
+# is the daily assets/mutation.yml). Never wired into the hook. Skips with exit 0 when no relevant
 # files are staged, so commits that touch only docs, tests, or scripts are
 # unaffected.
 #
@@ -41,3 +41,10 @@ mutate_arg=$(echo "$files" | paste -sd, -)
 # via `incrementalFile`, so a config change silently turns the delete into a
 # no-op and the stale-score trap returns.
 bunx stryker run --force --mutate "$mutate_arg"
+
+# Stryker's break judges the whole run's score, and under --mutate its report keeps earlier results
+# for other files in that score: a file at 55.56 passed in a run that totalled 90.00 (2026-10-23).
+# The per-file gate holds each file this run mutated to the same break.
+set --
+while IFS= read -r f; do set -- "$@" "$f"; done <<<"$files"
+bun run scripts/check-mutation-score.ts "$@"

@@ -1,0 +1,110 @@
+# .github/workflows/ci.yml for the Next.js variant - the authoritative gate set (canon 4.6, 15.1)
+#
+# The simple-git-hooks pre-commit (gate 2, the identity gate, the discipline wrapper, then
+# test and lint per package; commitlint on the message) is the fast first line; this is the one that cannot be skipped with
+# --no-verify: make it a required status check in branch protection (canon 13.2,
+# governance.md), and nothing merges while it is red. Same grammar as the hook for the
+# commit messages (commitlint, config-conventional) over the pushed range, gate 2 over
+# every manifest, the secret scan over the full history, identity and the discipline
+# tripwires over the whole tree, then test, lint, typecheck and build for every workspace
+# on a frozen lockfile, the README's Verify block, and the bundle budget on each export.
+# No coverage or mutation step: the Next variant has neither gate (SKILL.md, What applies
+# where); its test-driven surface is src/lib and src/config.
+#
+# Actions are pinned to major tags for readability; pin to a commit SHA for
+# supply-chain safety in a real repo (canon 5.4).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    # ready_for_review: a draft marked ready runs CI again, so the land job sees it
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    env:
+      # The left side of the pushed range for the two commit gates. On a push to main HEAD
+      # already equals origin/main, so without this they would check an empty range and
+      # pass vacuously. Empty on a pull request (the base ref wins).
+      GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+      # The gzipped ceiling per exported package, in KB (canon 17.7); a bump is a reviewed change.
+      BUDGET_KB: 250
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history for the gitleaks history scan and the commit gates
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile # lockfile drift fails here (canon 5.3)
+      - name: commit messages (Conventional Commits through commitlint, the hook's grammar, rule 23 / canon 1.3)
+        run: |
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --quiet origin "$GITHUB_BASE_REF"
+            from="origin/${GITHUB_BASE_REF}"
+          elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "$GITHUB_EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            from="$GITHUB_EVENT_BEFORE"
+          else
+            from="HEAD~1"
+          fi
+          bunx --yes commitlint --from "$from" --to HEAD --verbose
+      - name: commit size per commit in the range (gate 1 / canon 8.1)
+        run: bash scripts/check-commit-range.sh
+      - name: package.json (rules 5 and 19, no latest, no foreign lockfile, no node or npm in scripts)
+        run: bash scripts/check-package-json.sh
+      - name: install gitleaks (pinned and checksum-verified; not preinstalled on ubuntu runners)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          # SHA-256 from the release's gitleaks_8.30.1_checksums.txt; a version bump changes both lines
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks && sudo install gitleaks /usr/local/bin/ && rm gitleaks gitleaks.tar.gz
+      - name: secret scan (full history)
+        run: gitleaks git --ignore-gitleaks-allow --redact --no-banner
+      - name: identity in file contents (rule 26, the whole tree)
+        env:
+          # the host's own answer: rule 26 blocks in a public repository, warns in a private one
+          REPO_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+        run: bash scripts/check-identity.sh --all
+      - name: discipline tripwires (rules 27, 29, 30, the whole tree)
+        run: bash scripts/check-disciplines.sh --all
+      - name: tests (random order, rule 36)
+        run: bun run --filter '*' test
+      - name: lint (zero errors AND zero warnings, rule 15)
+        run: bun run --filter '*' lint
+      - name: typecheck
+        run: bun run --filter '*' typecheck
+      - name: build (static export)
+        run: bun run --filter '*' build
+      - name: README Verify block runs (canon 12.1, references/governance.md)
+        run: bash scripts/check-docs.sh
+      - name: bundle budget per exported package (canon 17.7)
+        run: |
+          for out in packages/*/out; do
+            [ -d "$out" ] || continue
+            bash scripts/check-bundle-size.sh "$out"
+          done
+  land:
+    # Land on green (rule 38; references/workflow.md, Landing on green): once every job above passed
+    # on a pull request, rebase-merge it pinned to the tested head and delete its branch, so nobody
+    # presses merge and nothing lands red. A draft, a fork and the repository variable
+    # LAND_ON_GREEN=off skip it. A merge made with GITHUB_TOKEN starts no push run on main, so the
+    # script refuses when main moved since CI ran, and waits for the checks of other workflows.
+    needs: [gates]
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && vars.LAND_ON_GREEN != 'off'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: land on green (rebase merge, pinned to the tested head)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          LAND_JOB: land
+        run: bash scripts/land-on-green.sh

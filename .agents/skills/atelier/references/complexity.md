@@ -1,6 +1,6 @@
 # Managing Complexity
 
-> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>`: hard rule 16, see `references/result-type.md`.
 
 ## The two kinds of complexity
 
@@ -117,14 +117,14 @@ export type User = {
 
 ## The lazy ladder
 
-KISS and YAGNI answer *how simple*; the lazy ladder turns them into a procedure you run *before writing code*. The cheapest, most correct, fastest-to-review code is the code you never wrote — so stop at the first rung that solves the problem:
+KISS and YAGNI answer *how simple*; the lazy ladder turns them into a procedure you run *before writing code*. The cheapest, most correct, fastest-to-review code is the code you never wrote, so stop at the first rung that solves the problem:
 
 1. **Does it need to exist?** YAGNI at the top of the ladder. If no current requirement forces it, the rung is "don't build it." A deleted requirement beats an elegant implementation.
 2. **Standard library or language feature?** `Array`/`Map`/`Set`, `structuredClone`, `Intl`, `Object.groupBy`, optional chaining, etc. Reach for the language before hand-rolling.
 3. **Native runtime capability?** In a Bun repo the runtime replaces whole categories of dependency: `Bun.file`/`Bun.write` for file IO (hard rule 20), `crypto.subtle` and `crypto.randomUUID()` for crypto, the global `fetch`, `URL`/`URLSearchParams`, `Bun.password` for hashing. Prefer the platform before `bun add`.
-4. **A dependency already in `package.json`?** If something installed already does the job, use it — do not add a second library for the same capability (and never `bun add` a near-duplicate; hard rule 19).
+4. **A dependency already in `package.json`?** If something installed already does the job, use it: do not add a second library for the same capability (and never `bun add` a near-duplicate; guideline 2. Hard rule 19 governs how a dependency you do add is pinned).
 5. **One clear line?** If the whole thing collapses to one readable expression, that is the implementation.
-6. **Only then** write the minimum that works — the absolute smallest correct version, no speculative abstractions (what "no speculative seams" does and does not mean: see *Defer the build, not the seam* below).
+6. **Only then** write the minimum that works: the absolute smallest correct version, no speculative abstractions (what "no speculative seams" does and does not mean: see *Defer the build, not the seam* below).
 
 **Tiebreaker.** When two stdlib approaches are the same size, pick the one that is edge-case-correct and more efficient (e.g. `re.exec` in a loop over `.matchAll` spread only when you need the perf; the *correct* boundary handling always wins over the cute one-liner). Two more reflexes: **delete before adding** (a diff that removes code is usually the better fix), and **boring over clever** (the next reader, possibly you in six months, pays for cleverness).
 
@@ -141,13 +141,13 @@ So the lazy ladder's "no speculative abstractions" bans inventing *domain* abstr
 
 The ladder trims *speculation*, never *safety*. Five things stay off the chopping block no matter how lazy the rung:
 
-- **Trust-boundary validation** — branded value objects with validating factories at every source→sink crossing (see `references/security.md`, `references/object-design.md`).
-- **`Result` error handling at IO boundaries** — real failure modes belong in the type (hard rule 16). "No error handling for impossible scenarios" means skip the *impossible* ones; a network call failing is not impossible.
-- **Security** — the source-to-sink discipline is never "simplified away."
-- **Accessibility** — semantic elements, focus states, ARIA on interactive controls in the design system (see `references/atomic-design.md`).
-- **Anything the user explicitly requested** — laziness applies to *unrequested* scope, never to the actual ask.
+- **Trust-boundary validation**: branded value objects with validating factories at every source→sink crossing (see `references/security.md`, `references/object-design.md`).
+- **`Result` error handling at IO boundaries**: real failure modes belong in the type (hard rule 16). "No error handling for impossible scenarios" means skip the *impossible* ones; a network call failing is not impossible.
+- **Security**: the source-to-sink discipline is never "simplified away."
+- **Accessibility**: semantic elements, focus states, ARIA on interactive controls in the design system (see `references/atomic-design.md`).
+- **Anything the user explicitly requested**: laziness applies to *unrequested* scope, never to the actual ask.
 
-The test: would a reviewer call this *lazy* (good — minimal, used the platform) or *negligent* (bad — dropped a checkpoint)? If the latter, you cut the wrong thing.
+The test: would a reviewer call this *lazy* (good: minimal, used the platform) or *negligent* (bad: dropped a checkpoint)? If the latter, you cut the wrong thing.
 
 ---
 
@@ -238,6 +238,9 @@ export const processOrder = async (order: Order, deps: ProcessOrderDeps): Promis
   deps.validator.validate(order);
   const total = deps.calculator.calculateTotal(order);
   const saved = await deps.repo.save(order, total);
+  // the send follows a commit, so in production it is an outbox row the save writes in the same
+  // transaction and a worker delivers, never an inline call (rule 29, references/reliability.md,
+  // Do not fire and forget); the notifier port here only shows where the responsibility split falls
   await deps.notifier.notifyConfirmation(saved);
   return { kind: 'success', order: saved };
 };
@@ -263,7 +266,7 @@ The Boy Scout impulse applies **only to lines your change already touches**, and
 - Improve one small thing on a line you were editing anyway.
 - Fix a name that your own change made inaccurate.
 - Extract a function when your change created the third duplication (Rule of Three).
-- Add a missing test for behaviour you just touched (proposed and confirmed first — rule 24).
+- Add a missing test for behaviour you just touched (proposed and confirmed first, rule 24).
 
 ### When to pay down debt
 

@@ -1,0 +1,28 @@
+# .github/workflows/mutation-java.yml - the daily full mutation sweep (Java
+# variant; java-quarkus.md, Testing). Deliberately NOT in the gates job: the
+# full PIT run over domain and usecases takes long on a mature service, so the
+# merge gate (ci-java.yml) mutates the changed classes only and this sweep
+# catches what a per-diff run cannot: a test weakened elsewhere, a mutant that
+# now survives through an untouched neighbour. A red run here is today's task,
+# not a blocked merge; it is not a required status check.
+name: mutation
+on:
+  schedule:
+    - cron: '0 3 * * *'        # daily, before the working day (UTC)
+  workflow_dispatch:           # on demand, after a large refactor
+permissions:
+  contents: read
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: mutation (PIT, the full sweep, >= 90 on domain and usecases)
+        run: ./mvnw -q test-compile org.pitest:pitest-maven:mutationCoverage
+      - name: every class at the threshold (PIT's own judges the whole run)
+        run: python3 scripts/check-pit-score.py

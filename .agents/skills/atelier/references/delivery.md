@@ -21,7 +21,7 @@ Emit a machine-readable deployment event from the same job, so delivery statisti
 
 - Every resource lives in version-controlled files (OpenTofu/Terraform or equivalent) and the whole environment rebuilds from scratch with one command in minutes. A resource clicked into existence in a console has no history, no review, and no way back.
 - **Only the pipeline holds write access to production infrastructure.** Humans get read-only; a change reaches the cloud by merging reviewed code. That makes every infra change versioned, reviewed, and reversible by construction, and it is the separation-of-duties control (`references/governance.md`) expressed mechanically.
-- Branch protection itself is code (required reviews, required checks, `enforce_admins`), not a setting someone toggled once.
+- Branch protection itself is code, not a setting someone toggled once: `assets/host-ruleset.json` holds `main` against deletion, force pushes and merge commits for everyone, admins included, and `check-host.py` checks it every morning (`references/workflow.md`, Branch lifecycle). A team that lands only through pull requests adds required reviews and required status checks to that file, and the check holds them too.
 
 ## Environments: separate, honest, disposable
 
@@ -52,7 +52,7 @@ A managed service is safe to depend on when it is the managed form of an open in
 | Email | SMTP behind a port |
 | Telemetry | OpenTelemetry (`references/observability.md`) |
 
-The application reads everything from injected configuration and never imports a cloud SDK outside an adapter (rule 12's config module + the port discipline); the proprietary remainder lives in the IaC layer, which is per-cloud by nature. When a proprietary service is genuinely worth the lock-in, take it deliberately: behind a port, with the exit written down in a decision record (`references/governance.md`).
+The application reads everything from injected configuration and never imports a cloud SDK outside an adapter (the config module, `src/composition/env.ts`, whose values cross the boundary as branded types, rule 12; plus the port discipline); the proprietary remainder lives in the IaC layer, which is per-cloud by nature. When a proprietary service is genuinely worth the lock-in, take it deliberately: behind a port, with the exit written down in a decision record (`references/governance.md`).
 
 **The proof is mechanical**: a compose file boots the full stack on generic pinned backends (Postgres, MinIO), and CI runs the smoke suite against it on every merge. If that boots, the app depends on interfaces, not a cloud, and it is the same mechanism that puts a new laptop on the full system before lunch.
 
@@ -76,14 +76,14 @@ Base images are pinned like any dependency and updated on a deliberate cadence, 
 
 ## Backups you have actually restored
 
-An untested backup is a rumour. Schedule a drill (at least quarterly; weekly is cheap in CI) that restores the latest backup into a scratch database, asserts the data is really there, times the restore so you know your recovery time, and drops the scratch. A real incident should be a rehearsal, not a first attempt.
+An untested backup is a rumour. Schedule a drill (at least quarterly; weekly is cheap in CI) that restores the latest backup into a restore-only target inside the production boundary (the production access tier, the job's identity the restore role only, never a lower environment: that would be the production clone rule 34 and canon 6.6 forbid) or restores a synthetic backup from the same pipeline, asserts the data is really there by count and never by row, times the restore against the stated recovery objective, and drops the target. A real incident should be a rehearsal, not a first attempt.
 
 ```yaml
 on: { schedule: [{ cron: '0 3 * * 1' }] }
 steps:
-  - run: pg_restore --clean --dbname "$SCRATCH_DB_URL" latest.dump   # timed
-  - run: psql "$SCRATCH_DB_URL" -c "SELECT count(*) FROM receipts" | grep -qv ' 0$'
-  - run: psql "$ADMIN_URL" -c "DROP DATABASE scratch_restore"
+  - run: pg_restore --clean --dbname "$RESTORE_DRILL_URL" latest.dump   # timed; production boundary, restore role
+  - run: test "$(psql -tAc 'SELECT count(*) FROM receipts' "$RESTORE_DRILL_URL")" -gt 0   # a count, never a row; -tA prints the bare number, so an empty table fails
+  - run: psql "$ADMIN_URL" -c "DROP DATABASE restore_drill"
 ```
 
 ## Learn from every failure (blameless postmortems)

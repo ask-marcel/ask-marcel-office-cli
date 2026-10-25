@@ -15,10 +15,14 @@
 # Usage:
 #   bash scripts/check-commit-messages.sh [range]
 #
-# The range defaults to the GitHub Actions context (the PR's base branch), then
-# to origin/main..HEAD locally. Pass one explicitly to check any other span.
-# Merge commits are excluded; the hook's own exemptions (Revert, fixup!,
-# squash!, amend!) still apply.
+# The range defaults to the GitHub Actions context: the PR's base branch on a
+# pull request, and on a push the commits the push added (GITHUB_EVENT_BEFORE,
+# exported by the shipped workflow from github.event.before). On a push to the
+# trunk HEAD already IS origin/main, so that older default was an empty range
+# that passed vacuously, the CI half of rule 23 checking nothing on the
+# trunk-based workflow the standard mandates. Locally it is origin/main..HEAD.
+# Pass one explicitly to check any other span. Merge commits are excluded; the
+# hook's own exemptions (Revert, fixup!, squash!, amend!) still apply.
 #
 # Installed alongside the other gate scripts:
 #
@@ -44,11 +48,23 @@ EOF
   exit 1
 fi
 
+zero_sha=0000000000000000000000000000000000000000
 range="${1:-}"
 if [ -z "$range" ]; then
   if [ -n "${GITHUB_BASE_REF:-}" ]; then
     git fetch --quiet origin "$GITHUB_BASE_REF" 2>/dev/null || true
     range="origin/${GITHUB_BASE_REF}..HEAD"
+  elif [ "${GITHUB_EVENT_NAME:-}" = "push" ]; then
+    # What the push added. github.event.before is the zero SHA for a new
+    # branch and absent when the workflow does not export it; either way the
+    # tip commit is the honest minimum, never an empty range.
+    before="${GITHUB_EVENT_BEFORE:-}"
+    if [ -n "$before" ] && [ "$before" != "$zero_sha" ] \
+      && git rev-parse --quiet --verify "${before}^{commit}" >/dev/null 2>&1; then
+      range="${before}..HEAD"
+    else
+      range="HEAD~1..HEAD"
+    fi
   else
     range="origin/main..HEAD"
   fi

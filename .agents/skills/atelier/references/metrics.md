@@ -37,7 +37,7 @@ Group every metric by service or team, never by person. A per-developer leaderbo
 
 ## The trend, not the snapshot
 
-A single reading means little; normal variation looks like a crisis or a win. Read the direction over weeks and alert only on a sustained shift (a 7-day average holding above threshold for a day), the same alert hygiene as `references/observability.md`. The trend is also the scoreboard for the standard itself: if the gates and disciplines are paying off, these four lines say so.
+A single reading means little; normal variation looks like a crisis or a win. Read the direction over weeks and alert only on a sustained shift (a 7-day average holding above threshold for a day; the profile's default for delivery health is a change failure rate above 0.15 on the 7-day window, held 24 hours), the same alert hygiene as `references/observability.md`. The trend is also the scoreboard for the standard itself: if the gates and disciplines are paying off, these four lines say so.
 
 ## Cost is a first-class metric
 
@@ -45,7 +45,7 @@ Cloud spend is a latency-shaped metric: measure it per service, alert on unexpla
 
 ```yaml
 - alert: DailyCostAnomaly
-  expr: avg_over_time(cloud_cost_usd_total[7d]) > 1.5 * avg_over_time(cloud_cost_usd_total[7d] offset 7d)
+  expr: increase(cloud_cost_usd_total[7d]) > 1.5 * increase(cloud_cost_usd_total[7d] offset 7d)   # a _total is a cumulative counter: compare what it grew by, never its running level
   for: 24h   # spend up >50% week-over-week, sustained, before anyone is paged
 ```
 

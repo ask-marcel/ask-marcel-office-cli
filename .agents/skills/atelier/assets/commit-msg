@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# atelier commit-msg hook — enforce Conventional Commits
+# atelier commit-msg hook: enforce Conventional Commits
 #
 # Fires after the message is composed (separate from the fast-gate
 # pre-commit hook, which inspects the staged diff). git passes the path to
@@ -16,8 +16,11 @@
 #
 # This is the dependency-free validator for the Bun-script variant, matching
 # the hand-rolled style of the other gate scripts. The Next.js monorepo
-# variant enforces the identical grammar through @commitlint/config-conventional
-# wired as a simple-git-hooks `commit-msg` step — see references/nextjs-monorepo.md.
+# variant enforces the same header grammar (the type set, the scope, the subject and
+# its length) through @commitlint/config-conventional wired as a simple-git-hooks
+# `commit-msg` step: see references/nextjs-monorepo.md. commitlint also rejects a
+# sentence-, start-, pascal- or upper-case subject and checks body line length,
+# which this hook leaves to review.
 #
 # Installed via `core.hooksPath .githooks` alongside the pre-commit hook:
 #
@@ -42,7 +45,7 @@ case "$header" in
     ;;
 esac
 
-# The @commitlint/config-conventional type set — keep in lockstep with the
+# The @commitlint/config-conventional type set, keep in lockstep with the
 # Next.js variant so both enforce the same contract.
 types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
 max_len=100
@@ -61,7 +64,7 @@ fail() {
 
   Required: type(optional-scope)!: subject
     type   one of: feat fix docs style refactor perf test build ci chore revert
-    scope  optional, lowercase, in parentheses — e.g. (auth), (api)
+    scope  optional, lowercase, in parentheses, e.g. (auth), (api)
     !      optional, marks a breaking change
     subject  required, no trailing period, header ≤ ${max_len} chars
 

@@ -18,12 +18,12 @@ const call = (): Promise<Response> =>
     method: 'POST',
     body,
     headers: { 'idempotency-key': key }, // provider dedupes; the retry is safe
-    signal: AbortSignal.timeout(2_000), // fail fast, free the caller
+    signal: AbortSignal.timeout(2000), // fail fast, free the caller
   });
 const res = await retryOnErr(() => toResult(call()), (e) => e.kind === 'io' || e.kind === 'rate-limited', { maxAttempts: 3, baseDelayMs: 200, jitter: true });
 ```
 
-Java: `HttpClient.newBuilder().connectTimeout(...)` plus a per-request `.timeout(...)`, `Idempotency-Key` header, `@Retry(maxRetries = 3, jitter = 200)` on the adapter (`references/java-quarkus.md`).
+Java: `HttpClient.newBuilder().connectTimeout(...)` plus a per-request `.timeout(...)`, `Idempotency-Key` header, `@Retry(maxRetries = 3, jitter = 200)` on the throwing client call one bean inside the adapter, never on the method that returns `Err`, where it never fires (`references/java-quarkus.md`).
 
 ## Reads are explicit; writes go through the mapper
 
@@ -38,7 +38,8 @@ const rows = await db.execute(sql`
   SELECT r.id, r.total_cents, count(l.id) AS line_count
   FROM receipts r LEFT JOIN receipt_lines l ON l.receipt_id = r.id
   WHERE r.org_id = ${orgId}
-  GROUP BY r.id ORDER BY r.created_at DESC LIMIT 50`);
+  GROUP BY r.id ORDER BY r.created_at DESC LIMIT 50
+`);
 await db.insert(receipts).values(newReceipt);
 ```
 
@@ -123,7 +124,7 @@ The same discipline applies to API responses: version or add fields; a client yo
 
 ## Performance is a budget, not a hope
 
-Commit to response-time numbers (p95/p99 per route) and prove them under production-like load before shipping: a load-test gate in the pipeline (k6 or similar) with a threshold that fails the build, e.g. `p(99) < 300ms` at expected peak. Finding the p99 from angry users is the Don't. Targets live with the other thresholds (`references/governance.md`, Numbers not adjectives); alerting on them is `references/observability.md`.
+Commit to response-time numbers (p95/p99 per route) and prove them under production-like load before shipping: a load-test gate in the pipeline (k6 or similar) with a threshold that fails the build. The profile's starting point: k6 in CI, `p(99) < 300ms` with 100 virtual users held for two minutes, raised to the expected peak once traffic is known. Finding the p99 from angry users is the Don't. Targets live with the other thresholds (`references/governance.md`, Numbers not adjectives); alerting on them is `references/observability.md`.
 
 ## Money, time, and the types that carry proof
 
@@ -132,7 +133,7 @@ Parse, don't validate (rule 12): validate once at the boundary, then carry the f
 - **Money is integer minor units** (`cents`) behind a branded type or value record, never a float: `0.1 + 0.2 !== 0.3`, and the rounding error lands on an invoice.
 - **Instants are UTC** behind a type; a timezone is a display concern applied at the presentation edge, never stored in the domain value.
 
-## Separate the analytical store from the operational one (10.14)
+## Separate the analytical store from the operational one (canon 10.14)
 
 The transactional database serves the running application only. Anything that reads at volume (reporting, dashboards, bulk export, data science) reads a **separate analytical copy** (a warehouse or lake) fed by ETL or change-data-capture, never the production store directly. A heavy scan on the primary competes with real users and couples every report to the app's private schema.
 
@@ -147,7 +148,7 @@ Writes stay on the transactional path, done by a user; reads at scale move to th
 
 ## Executable tripwires
 
-The mechanical slices of rules 29 and 30 ship as staged-diff gates (`references/workflow.md`, Discipline tripwires): `assets/check-io-deadlines.sh` blocks an infra file that calls `fetch` (or opens a Java `HttpClient`) with no deadline marker, and `assets/check-data-lifecycle.sh` blocks a hard delete in application code and destructive DDL in a non-contract migration. Exceptions ride on path conventions, never inline suppressions: erasure/retention/prune/sweep paths for the sanctioned hard deletes, a `*contract*` filename for the deliberate contract-step migration. Tripwires, not proofs; the checklist below stays the review duty.
+The mechanical slices of rules 29 and 30 ship as staged-diff gates (`references/workflow.md`, Discipline tripwires): `assets/check-io-deadlines.sh` blocks an infra `fetch` or `globalThis.fetch` call with no `AbortSignal.timeout(` or `signal:` within the eight lines after it, comments stripped first (a Java `HttpClient` with no `.timeout(` or `connectTimeout` in the file), and `assets/check-data-lifecycle.sh` blocks a hard delete in application code and destructive DDL (DROP COLUMN or TABLE, RENAME, TRUNCATE, ALTER COLUMN TYPE) in a non-contract migration. Exceptions ride on path conventions, never inline suppressions, and are matched against the path alone, so a comment naming the exception exempts nothing: erasure/retention/prune/sweep paths for the sanctioned hard deletes, a `*contract*` filename for the deliberate contract-step migration. Tripwires, not proofs; the checklist below stays the review duty.
 
 ## Review checklist (changes touching IO, persistence, or state)
 

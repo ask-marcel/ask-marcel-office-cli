@@ -5,7 +5,7 @@
 # Why these thresholds: small commits are easier to review, revert, and
 # bisect. Large commits hide bugs (one slip across 300 lines is hard to
 # spot). Every commit on `main` becomes git history that the next engineer
-# reads — keep each one a coherent slice.
+# reads: keep each one a coherent slice.
 #
 # The thresholds are conservative because they force the discipline.
 # Loosening them undermines the rule. Bypass with `git commit --no-verify`

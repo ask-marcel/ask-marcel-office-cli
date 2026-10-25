@@ -12,14 +12,19 @@
 # `--no-verify` bypass cannot skip.
 #
 # Usage: bash scripts/check-commit-range.sh [base] [head]
-#   Defaults: base = origin/$GITHUB_BASE_REF (pull request) or HEAD~1 (push),
+#   Defaults: base = origin/$GITHUB_BASE_REF (pull request), else
+#             $GITHUB_EVENT_BEFORE (a push: every commit it added, exported by
+#             the shipped workflow from github.event.before), else HEAD~1;
 #             head = HEAD. Never walks the whole history.
 #
-# Merge commits are excluded: a merge legitimately touches many files.
+# A merge commit in the range fails (hard rule 38: main stays linear, a branch
+# lands by rebase or fast-forward). The one merge stepped over is GitHub's own:
+# a pull_request checkout sits on a synthetic merge of the PR into its base
+# ("Merge <sha> into <sha>"), and the PR's commits end at its second parent.
 # Keep MAX_FILES / MAX_LINES in lockstep with check-commit-size.sh.
 #
 # Adopted from a consumer repo that had written it independently, found by the
-# 2026-08-30 field test (field-test.md). See references/workflow.md
+# 2026-08-30 field test. See references/workflow.md
 # (Commit size limits).
 set -euo pipefail
 
@@ -42,13 +47,25 @@ if [ "${1:-}" = "--selftest" ]; then
   if bash "$gate" HEAD~1 HEAD >/dev/null 2>&1; then
     echo "selftest FAIL: an oversized commit was accepted" >&2; exit 1
   fi
-  # a merge legitimately touches many files and is excluded by design
+  # rule 38: a merge commit at the tip of the range fails, for its own reason
   git checkout -q -b side HEAD~1 && echo s > s.txt && git add -A && git commit -qm "feat: side"
   git checkout -q - && git merge -q --no-ff side -m "Merge branch 'side'" >/dev/null 2>&1
-  if ! MAX_FILES=1000 MAX_LINES=100000 bash "$gate" HEAD~1 HEAD >/dev/null; then
-    echo "selftest FAIL: a merge commit was not excluded" >&2; exit 1
+  out=$(bash "$gate" HEAD~1 2>&1) && { echo "selftest FAIL: a merge commit was accepted" >&2; exit 1; }
+  case "$out" in *"MERGE COMMIT"*"rule 38"*) ;; *) echo "selftest FAIL: a merge commit was rejected, but not for rule 38:" >&2; echo "$out" >&2; exit 1 ;; esac
+  # GitHub's synthetic pull-request merge at HEAD is stepped over, the PR's own commits are not
+  trunk=$(git rev-parse HEAD)
+  git checkout -q -b pr "$trunk" && echo p > p.txt && git add -A && git commit -qm "feat: pr change"
+  git checkout -q --detach "$trunk" && git merge -q --no-ff pr -m "Merge $(git rev-parse pr) into $trunk" >/dev/null 2>&1
+  if ! bash "$gate" "$trunk" >/dev/null 2>&1; then
+    echo "selftest FAIL: GitHub's synthetic pull-request merge was counted as a merge commit" >&2; exit 1
   fi
-  echo "selftest OK: gate rejects an oversized commit, accepts a small one, excludes merges"
+  git checkout -q -b pr2 "$trunk" && echo q > q.txt && git add -A && git commit -qm "feat: pr2 change"
+  git checkout -q -b pr2side "$trunk" && echo r > r.txt && git add -A && git commit -qm "feat: pr2 side"
+  git checkout -q pr2 && git merge -q --no-ff pr2side -m "Merge branch 'pr2side' into pr2" >/dev/null 2>&1
+  git checkout -q --detach "$trunk" && git merge -q --no-ff pr2 -m "Merge $(git rev-parse pr2) into $trunk" >/dev/null 2>&1
+  out=$(bash "$gate" "$trunk" 2>&1) && { echo "selftest FAIL: a merge inside a pull request was accepted" >&2; exit 1; }
+  case "$out" in *"MERGE COMMIT"*"rule 38"*) ;; *) echo "selftest FAIL: a merge inside a pull request was rejected, but not for rule 38:" >&2; echo "$out" >&2; exit 1 ;; esac
+  echo "selftest OK: gate rejects an oversized commit and a merge commit (rule 38), accepts a small one, steps over GitHub's synthetic pull-request merge and still sees a merge inside the pull request"
   exit 0
 fi
 
@@ -57,10 +74,19 @@ MAX_LINES="${MAX_LINES:-300}"
 
 base="${1:-}"
 head="${2:-HEAD}"
+# GitHub's synthetic merge of a pull request into its base: judge the PR's own commits instead
+if [ -z "${2:-}" ] && git rev-parse -q --verify 'HEAD^2' >/dev/null \
+  && git log -1 --format=%s HEAD | grep -qE '^Merge [0-9a-f]{40} into [0-9a-f]{40}$'; then
+  head="HEAD^2"
+fi
 
+zero_sha=0000000000000000000000000000000000000000
 if [ -z "$base" ]; then
   if [ -n "${GITHUB_BASE_REF:-}" ] && git rev-parse --verify -q "origin/$GITHUB_BASE_REF" >/dev/null; then
     base="origin/$GITHUB_BASE_REF"
+  elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "$GITHUB_EVENT_BEFORE" != "$zero_sha" ] \
+    && git rev-parse --verify -q "${GITHUB_EVENT_BEFORE}^{commit}" >/dev/null; then
+    base="$GITHUB_EVENT_BEFORE"   # a push: walk every commit it added, not only the tip
   elif git rev-parse --verify -q HEAD~1 >/dev/null; then
     base="HEAD~1"
   else
@@ -81,13 +107,26 @@ for sha in $(git rev-list --no-merges "${base}..${head}"); do
   fi
 done
 
+merges=0
+for sha in $(git rev-list --merges "${base}..${head}"); do
+  printf '  ╳ MERGE COMMIT  %s  %s\n' "$(git rev-parse --short "$sha")" "$(git show -s --format=%s "$sha")" >&2
+  merges=$((merges + 1))
+done
+
 if [ "$violations" -gt 0 ]; then
   {
     echo ""
     echo "  $violations commit(s) exceed the atelier size limit (pre-commit gate 1, canon 8.1)."
     echo "  Split each into <=300-line slices; an unreviewable commit is an unreviewed commit."
   } >&2
-  exit 1
 fi
+if [ "$merges" -gt 0 ]; then
+  {
+    echo ""
+    echo "  $merges merge commit(s) in the range: hard rule 38 keeps main linear."
+    echo "  Rebase the branch onto main (git rebase origin/main) and land it by rebase or fast-forward."
+  } >&2
+fi
+[ "$violations" -eq 0 ] && [ "$merges" -eq 0 ] || exit 1
 
-echo "commit-range: every commit in ${base}..${head} is within ${MAX_FILES} files / ${MAX_LINES} lines"
+echo "commit-range: every commit in ${base}..${head} is within ${MAX_FILES} files / ${MAX_LINES} lines, and none is a merge (rule 38)"
