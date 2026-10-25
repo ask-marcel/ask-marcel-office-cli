@@ -40,11 +40,11 @@ Run these commands in the folder that you change:
 
 | Command | What it does | Folders |
 |:--|:--|:--|
-| `bun test` | The tests of the folder | all |
+| `bun run test` | The tests of the folder, in random order (`--randomize`). A red run prints its seed; `bun test --seed=<n>` runs that order again | all |
 | `bun run lint` / `bun run lint:strict` | ESLint (fast / type-aware), 0 errors and 0 warnings | all |
 | `bun run typecheck` | `tsc --noEmit` | all |
 | `bun run coverage` | 100% on every tier of `src/` | all |
-| `bun run mutate:changed` | Stryker on the changed domain and use-case files (90% or more) | all |
+| `bun run mutate:changed` | Stryker on the changed domain and use-case files (90% or more for each file) | all |
 | `bun run build` | `dist/`: the bundles with core inlined, and the declarations | auth, read, write |
 | `bun run check:packed` | Packs the package, and installs the tarball in a clean consumer | auth, read, write |
 | `bun run docs:gen` | Makes the generated tables of `COMMANDS.md` (and, in `build`, `dist/commands.json`) | auth, read, write |
