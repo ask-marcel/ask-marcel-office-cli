@@ -16,18 +16,30 @@
  * (else some files go unmutated), and the workspace step must skip read and
  * only read (else read mutates twice, or another folder not at all).
  *
+ * Each published folder checks its command reference after its build (package
+ * split, phase 7). The workspace job runs `bun run check:docs` after `bun run
+ * build`, for the published folders. The `check:docs` script of each published
+ * folder names `gen-docs.ts`, `--check` and `--commands-doc COMMANDS.md`. Else
+ * the freshness gate can go dark, and a stale COMMANDS.md passes CI.
+ *
  *   --selftest  proves a missing folder, an extra folder, a missing matrix, a
  *               missing or misplaced mutation job, a wrong shard count and a
- *               wrong skip are rejected, and a right workflow passes (rule 15.10)
+ *               wrong skip are rejected, and a right workflow passes (rule 15.10).
+ *               It also proves that no docs step, a docs step before the build,
+ *               a `check:docs` script without `--check` and a published folder
+ *               with no `check:docs` script are rejected.
  *
- * Exit codes: 0 the matrix lists exactly the workspaces and read mutates in
- * its shards only; 1 it does not.
+ * Exit codes: 0 the matrix lists exactly the workspaces, read mutates in its
+ * shards only, and each published folder checks its command reference; 1 it
+ * does not.
  */
 
-type Step = { readonly name?: string; readonly if?: string; readonly env?: Readonly<Record<string, unknown>> };
+type Step = { readonly name?: string; readonly if?: string; readonly run?: string; readonly env?: Readonly<Record<string, unknown>> };
 type Job = {
   readonly defaults?: { readonly run?: { readonly 'working-directory'?: string } };
-  readonly strategy?: { readonly matrix?: { readonly include?: ReadonlyArray<{ readonly folder?: string }>; readonly shard?: ReadonlyArray<unknown> } };
+  readonly strategy?: {
+    readonly matrix?: { readonly include?: ReadonlyArray<{ readonly folder?: string; readonly published?: boolean }>; readonly shard?: ReadonlyArray<unknown> };
+  };
   readonly steps?: ReadonlyArray<Step>;
 };
 type Workflow = { readonly jobs?: Readonly<Record<string, Job>> };
@@ -76,6 +88,29 @@ const workspaceMutationProblems = (workflow: Workflow): ReadonlyArray<string> =>
     : [`the mutation step of the ${JOB} job must skip ${SHARDED} and only ${SHARDED} (if: ${SKIP_SHARDED}), not ${step.if ?? 'run for every folder'}`];
 };
 
+const BUILD = 'bun run build';
+const CHECK_DOCS = 'bun run check:docs';
+const PUBLISHED = 'matrix.published';
+// The words of the check:docs script of a published folder: the freshness check of gen-docs on its COMMANDS.md.
+const CHECK_DOCS_WORDS = ['gen-docs.ts', '--check', '--commands-doc COMMANDS.md'];
+
+const publishedFolders = (workflow: Workflow): ReadonlyArray<string> =>
+  (workflow.jobs?.[JOB]?.strategy?.matrix?.include ?? []).flatMap((entry) => (entry.published === true && entry.folder !== undefined ? [entry.folder] : []));
+
+// The workspace job checks the docs after the build, and the check:docs script of each published folder runs the freshness check.
+const docsProblems = (workflow: Workflow, docsScripts: Readonly<Record<string, string | undefined>>): ReadonlyArray<string> => {
+  const steps = workflow.jobs?.[JOB]?.steps ?? [];
+  const build = steps.findIndex((step) => step.run === BUILD && step.if === PUBLISHED);
+  const docs = steps.findIndex((step) => step.run === CHECK_DOCS && step.if === PUBLISHED);
+  return [
+    ...(build !== -1 && docs > build ? [] : [`the ${JOB} job must run \`${CHECK_DOCS}\` after \`${BUILD}\` (if: ${PUBLISHED})`]),
+    ...publishedFolders(workflow).flatMap((folder) => {
+      const missing = CHECK_DOCS_WORDS.filter((word) => !(docsScripts[folder] ?? '').includes(word));
+      return missing.length === 0 ? [] : [`the check:docs script of ${folder} must name ${missing.join(', ')}`];
+    }),
+  ];
+};
+
 const problems = (workspaces: ReadonlyArray<string>, workflow: Workflow): ReadonlyArray<string> => [
   ...matrixProblems(workspaces, workflow),
   ...mutationJobProblems(workflow),
@@ -98,6 +133,24 @@ const selftest = (): number => {
     },
   });
   const sharded = mutationJob(SHARDED, 8, 8);
+  const docsWorkflow = (steps: ReadonlyArray<Step>): Workflow => ({
+    jobs: {
+      [JOB]: {
+        strategy: {
+          matrix: {
+            include: [
+              { folder: 'core', published: false },
+              { folder: 'read', published: true },
+            ],
+          },
+        },
+        steps,
+      },
+    },
+  });
+  const build = { run: BUILD, if: PUBLISHED };
+  const docs = { run: CHECK_DOCS, if: PUBLISHED };
+  const script = 'bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --check --commands-doc COMMANDS.md';
   const cases = [
     { name: 'a right workflow', found: problems(['core', 'auth'], workflow(['auth', 'core'], sharded, SKIP_SHARDED)).length, expected: 0 },
     { name: 'a missing folder', found: problems(['core', 'auth', 'read'], workflow(['core', 'auth'], sharded, SKIP_SHARDED)).length, expected: 1 },
@@ -108,12 +161,17 @@ const selftest = (): number => {
     { name: 'a wrong shard count', found: problems(['core'], workflow(['core'], mutationJob(SHARDED, 8, 4), SKIP_SHARDED)).length, expected: 1 },
     { name: 'an unskipped read', found: problems(['core'], workflow(['core'], sharded, undefined)).length, expected: 1 },
     { name: 'a skip of another folder', found: problems(['core'], workflow(['core'], sharded, "matrix.folder != 'write'")).length, expected: 1 },
+    { name: 'a right docs step and script', found: docsProblems(docsWorkflow([build, docs]), { read: script }).length, expected: 0 },
+    { name: 'no docs step', found: docsProblems(docsWorkflow([build]), { read: script }).length, expected: 1 },
+    { name: 'a docs step before the build', found: docsProblems(docsWorkflow([docs, build]), { read: script }).length, expected: 1 },
+    { name: 'a check:docs script without --check', found: docsProblems(docsWorkflow([build, docs]), { read: script.replace(' --check', '') }).length, expected: 1 },
+    { name: 'a published folder with no check:docs script', found: docsProblems(docsWorkflow([build, docs]), {}).length, expected: 1 },
   ];
   const wrong = cases.filter((c) => c.found !== c.expected);
   for (const c of wrong) process.stderr.write(`check-ci-matrix: SELFTEST FAILED, ${c.name} gave ${c.found} problem(s), expected ${c.expected}\n`);
   if (wrong.length === 0)
     process.stdout.write(
-      'check-ci-matrix: selftest passed (a missing folder, an extra folder, no matrix, no or a misplaced mutation job, a wrong shard count and a wrong skip are rejected).\n'
+      'check-ci-matrix: selftest passed (a missing folder, an extra folder, no matrix, no or a misplaced mutation job, a wrong shard count, a wrong skip, no docs step, a docs step before the build, a check:docs script without --check and a missing check:docs script are rejected).\n'
     );
   return wrong.length === 0 ? 0 : 1;
 };
@@ -122,11 +180,17 @@ const main = async (): Promise<number> => {
   if (process.argv.includes('--selftest')) return selftest();
   const { workspaces } = (await Bun.file('package.json').json()) as { readonly workspaces: ReadonlyArray<string> };
   const workflow = Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text()) as Workflow;
-  const found = problems(workspaces, workflow);
+  const scripts = await Promise.all(
+    publishedFolders(workflow).map(async (folder) => {
+      const manifest = (await Bun.file(`${folder}/package.json`).json()) as { readonly scripts?: Readonly<Record<string, string>> };
+      return [folder, manifest.scripts?.['check:docs']] as const;
+    })
+  );
+  const found = [...problems(workspaces, workflow), ...docsProblems(workflow, Object.fromEntries(scripts))];
   for (const problem of found) process.stderr.write(`check-ci-matrix: ${problem}\n`);
   if (found.length > 0) return 1;
   process.stdout.write(
-    `check-ci-matrix: the ${JOB} matrix covers every workspace folder (${workspaces.join(', ')}); ${SHARDED} mutates in the shards of the ${MUTATION_JOB} job only.\n`
+    `check-ci-matrix: the ${JOB} matrix covers every workspace folder (${workspaces.join(', ')}); ${SHARDED} mutates in the shards of the ${MUTATION_JOB} job only; ${publishedFolders(workflow).join(', ')} check their command reference after the build.\n`
   );
   return 0;
 };

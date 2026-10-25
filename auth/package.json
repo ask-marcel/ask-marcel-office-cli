@@ -50,6 +50,7 @@
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
     "docs:gen": "bun run ../scripts/gen-docs.ts --package src/composition/auth-package.ts --export authPackage --commands-doc COMMANDS.md",
+    "check:docs": "bun run ../scripts/gen-docs.ts --package src/composition/auth-package.ts --export authPackage --check --commands-doc COMMANDS.md",
     "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js dist/token.js && bun run ../scripts/build-types.ts",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
     "smoke": "bun ../scripts/qa-auth-bundle-smoke.ts",

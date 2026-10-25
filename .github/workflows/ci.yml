@@ -104,6 +104,21 @@ jobs:
         run: |
           bun run check:docs --selftest
           bun run check:docs
+      - name: command reference red fixture (in read, a copy of COMMANDS.md passes, and the same copy with a wrong count gives exit 1 exactly), then the gen-docs selftest
+        # Nothing is built in this job, so the fixture gives no manifest:
+        # a missing manifest would make each run stale for the wrong reason.
+        working-directory: read
+        run: |
+          check() { bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --check --commands-doc "$1"; }
+          copy="$RUNNER_TEMP/COMMANDS.md"
+          cp COMMANDS.md "$copy"
+          check "$copy" # the control: the copy as committed must pass
+          sed -E -i 's/^The ([0-9]+) commands are in/The 1\1 commands are in/' "$copy"
+          if cmp -s COMMANDS.md "$copy"; then echo "the fixture changed no count"; exit 1; fi
+          rc=0
+          check "$copy" || rc=$?
+          if [ "$rc" -ne 1 ]; then echo "a wrong count gave exit $rc, not 1"; exit 1; fi
+          bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --selftest
       - name: mutation scope selftest (a pure move mutates nothing, a sub-folder run maps its paths)
         run: bash scripts/mutation-scope-selftest.sh
       - name: dependency CVEs (fails on high)
@@ -188,7 +203,8 @@ jobs:
     # its own configs. scripts/check-ci-matrix.ts (in `gates`) fails when a
     # folder of the root package.json has no entry here. `published` folders
     # also build, pack, and install the tarball into a clean consumer (node 20 is
-    # the floor that `engines` promises). auth and write also run their bundle
+    # the floor that `engines` promises). After the build they check that their
+    # command reference is up to date. auth and write also run their bundle
     # smoke; read runs its smokes and its mutation in the `smoke` and `mutation`
     # jobs.
     runs-on: ubuntu-latest
@@ -244,6 +260,9 @@ jobs:
       - name: build (bundles with core inlined, declarations with core under dist/shared)
         if: matrix.published
         run: bun run build
+      - name: command reference (COMMANDS.md and dist/commands.json match the registry; else run `bun run docs:gen` or `bun run build`)
+        if: matrix.published
+        run: bun run check:docs
       - name: packed output (no core outside devDependencies or in a .d.ts) and a clean consumer (bin, library, deliberate type errors)
         if: matrix.published
         timeout-minutes: 10
