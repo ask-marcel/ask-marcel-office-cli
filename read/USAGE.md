@@ -241,3 +241,125 @@ field. The answer has these fields:
 
 Use it as the first call of a session that needs the ids of the user. It does
 not give your To Do lists. Use `list-todo-task-lists` for them.
+
+## MCP server
+
+`ask-marcel-office-read mcp` serves the read commands to an MCP client over
+stdio. The [README](README.md#mcp-server) gives the lines that register it.
+
+The server has three tools, not one tool for each command. A schema for each
+command fills each session, and that is the problem that this package
+prevents. Discovery takes three steps:
+
+```text
+list-commands { category? }                                → the short manifest; start here
+get-command-docs { command }                               → the full docs of one command
+run-command { command, params?, outputPath?, outputDir? }  → runs a command
+```
+
+`run-command` runs the 204 read commands. `params` are the flags of the
+command without the `--` prefix, in camelCase, and each value is a string:
+
+```jsonc
+// CLI: ask-marcel-office-read list-mail-messages --top 10
+{ "command": "list-mail-messages", "params": { "top": "10" } }
+```
+
+- `run-command` has `readOnlyHint: true`, so a client can approve it
+  automatically.
+- A write command gets a pointer to the write server
+  (`ask-marcel-office-write mcp`). `login`, `status` and `logout` get a pointer
+  to the auth package. The read server has no sign-in tool.
+- `outputPath` and `outputDir` do the work of `--output-path` and
+  `--output-dir`.
+- The results are text, the same text that the CLI prints, with the `hint:` and
+  `source:` lines. A footer `next: ask-marcel-office-read next-page --url '<link>'`
+  is the call `run-command { "command": "next-page", "params": { "url": "<link>" } }`.
+- Sign in from a terminal first, with `ask-marcel-office-auth login`. The read
+  server opens no browser.
+
+## Library
+
+The package is also a TypeScript library. Each command returns a `Result`, and
+it never throws for a Graph failure:
+
+```ts
+import { commands, createReadClient, type Result } from '@ask-marcel/office-read';
+
+const graph = createReadClient();
+const result: Result<unknown, unknown> | undefined = await commands['list-mail-messages']?.execute(graph, { top: '10' });
+if (result?.ok) console.log(result.value);
+else console.error(result?.error);
+```
+
+| Export | What it is |
+|:--|:--|
+| `commands` | Each of the 204 read commands, by name. Each one has `meta` and `execute(graph, params)`. |
+| `createReadGraph(tokens)` | The read graph over a `TokenSource`. Its POST reaches only `/search/query` and `/me/calendar/getSchedule`. |
+| `createEnvThenHelperTokenSource()` | The token source of the bin: the tier variables of the process, else the token helper of the auth package. |
+| `createReadClient()` | `createReadGraph(createEnvThenHelperTokenSource())`, the graph that the bin uses. |
+| `Command`, `ReadGraph`, `TokenSource`, `Result` | The types of the values above. |
+
+The command manifest is a JSON subpath:
+
+```ts
+import manifest from '@ask-marcel/office-read/commands.json' with { type: 'json' };
+
+console.log(manifest.commands.length);
+```
+
+`convert-local-file-to-markdown` and `extract-local-file-images` read a file on
+your disk. The library exports no file system, so run these two commands from
+the bin.
+
+## Your own token
+
+The read bin and the library get each token in this order:
+
+1. The tier variable, when it is set: `ASKMARCEL_TOKEN_BASIC`,
+   `ASKMARCEL_TOKEN_ELEVATED`, `ASKMARCEL_TOKEN_CHATSVCAGG` or
+   `ASKMARCEL_TOKEN_IC3`, with `ASKMARCEL_TEAMS_REGION` next to a chat token.
+   Each use checks the token: three base64url parts, then its expiry and its
+   audience. A token that fails gives `env_token_invalid`, which names the
+   variable and never its value. A guest token has no variable.
+2. Else the token helper: the absolute path in `ASKMARCEL_TOKEN_COMMAND`, else
+   the helper that `~/.ask-marcel/token-helper.json` names, else
+   `ask-marcel-office-auth` on PATH. On Windows, the bin reads the script of an
+   npm `.cmd` shim and runs it with the current runtime.
+
+Thus you can give a token from a vault, from CI or from a test without the auth
+package:
+
+```sh
+ASKMARCEL_TOKEN_COMMAND=/opt/vault/token-helper ask-marcel-office-read get-current-user
+```
+
+A helper runs as `<helper> --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`,
+with no shell, and it prints one JSON line (the contract is in the
+[auth usage guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/auth/USAGE.md#the-token-helper)).
+
+- The helper gets stdin only from a terminal. There it can wait up to 13
+  minutes (a held lock and a browser sign-in). Else it has 90 seconds.
+- One run serves all the calls for a tier (and a tenant) at the same time. Its
+  token stays in memory for 5 minutes at most, and never when it expires in less
+  than 5 minutes.
+- A failure gives the exit code of the helper, the length of its stdout and its
+  `errorCode`, never what it printed. A helper that does not start gives
+  `token_helper_unavailable`.
+- Graph can refuse a basic or a guest token with a 401 and the code
+  `InvalidAuthenticationToken` or `TokenExpired`. Then the bin asks the helper
+  again with `--reject`, and it sends the request one more time.
+- A 401 with another code is an answer. The bin does not send the request
+  again. It also does not send again a request with the elevated token or with
+  a token from a variable.
+
+## Configuration
+
+| Variable | What it does | Default |
+|:--|:--|:--|
+| `ASKMARCEL_LOG_LEVEL` | The log level. All logs go to stderr. | `error` (use `info` or `debug` to find a problem) |
+| `ASKMARCEL_BINARY_TIMEOUT_MS` | The time for one binary download (the bytes of a file, a PDF), in milliseconds | `300000` (5 minutes) |
+| `ASKMARCEL_TZ` | The IANA time zone of the named days (`today`, `monday`, `start-of-week`). `--tz <zone>` overrides it for one run. | the zone of the machine |
+| `ASKMARCEL_TOKEN_COMMAND` | The absolute path of a token helper | the locator file, then PATH |
+| `ASKMARCEL_TOKEN_BASIC`, `_ELEVATED`, `_CHATSVCAGG`, `_IC3`, `ASKMARCEL_TEAMS_REGION` | The token of a tier, and the region of the chat tiers | not set |
+| `HOME` / `USERPROFILE` | The folder that holds `~/.ask-marcel/` | required |
