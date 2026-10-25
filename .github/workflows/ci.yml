@@ -245,8 +245,8 @@ jobs:
         run: bun run lint:strict
       - name: typecheck
         run: bun run typecheck
-      - name: tests
-        run: bun test
+      - name: tests (random order, rule 36; a red run prints its seed, and --seed=<n> runs that order again)
+        run: bun test --randomize
       - name: coverage (every tier at 100%; the preload lists the folder's tier files itself)
         run: bun run coverage
       - name: mutation (changed files of this folder; see deviation 2 in the header; read mutates in the `mutation` job)
