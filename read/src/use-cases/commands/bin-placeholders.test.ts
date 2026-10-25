@@ -8,19 +8,16 @@ import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-
 // of that package (command-directory.ts), `{bin}` before what every package
 // has. This guard reads the source, so a hint, a remedy or an example that
 // names a command of the wrong package, or a bin by hand, fails here. It finds
-// its folder from its own path: until the move it reads the root src/, which
-// holds the read source, and after the move it reads read/src/. So the move
-// carries it with no edit.
+// its folder from its own path, so it reads read/src/ alone.
 
 // What `{bin}` may stand before: the commands and help every package has, the
 // generic words the hints use for "any command", and the `--` of
 // `claude mcp add … {bin} -- {bin} mcp`, where the bin also names the server.
 const EVERY_PACKAGE = new Set(['docs', 'help', 'help-json', 'mcp', '--help', '<command>', '<cmd>', 'subcommand', '--']);
 
-// The folder that holds src/ (the repository root until the move, read/
-// after it), from this file rather than the working directory: a run from
-// another directory would otherwise scan nothing and pass.
-const ROOT = join(import.meta.dir, '../../..');
+// The read folder, from this file rather than the working directory: a run
+// from another directory would otherwise scan nothing and pass.
+const READ = join(import.meta.dir, '../../..');
 
 type Line = { readonly where: string; readonly text: string };
 
@@ -32,9 +29,9 @@ const BIN_BY_HAND = /ask-marcel-office(-(auth|read|write))?\s/;
 
 const sourceLines = async (): Promise<ReadonlyArray<Line>> => {
   const lines: Line[] = [];
-  for await (const path of new Bun.Glob('src/**/*.ts').scan(ROOT)) {
+  for await (const path of new Bun.Glob('src/**/*.ts').scan(READ)) {
     if (path.endsWith('.test.ts') || path.startsWith('src/test-helpers/')) continue;
-    const text = await Bun.file(join(ROOT, path)).text();
+    const text = await Bun.file(join(READ, path)).text();
     text.split('\n').forEach((line, at) => {
       if (!isComment(line)) lines.push({ where: `${path}:${at + 1}`, text: line });
     });

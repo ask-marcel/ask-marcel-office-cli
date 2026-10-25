@@ -442,7 +442,7 @@ describe('buildCli command surface', () => {
     expect(out).toContain('help');
   });
 
-  it("'help-json' subcommand prints the full machine-readable manifest (same shape as docs/commands.json) to stdout", async () => {
+  it("'help-json' subcommand prints the full machine-readable manifest (same shape as the commands.json that the package ships) to stdout", async () => {
     const logger = createLoggerFake();
     const cli = buildCli({ graph: okGraph({}), logger, version: '1.0.0', fs: createFileSystemFake() });
     const out = await captureStream('stdout', () => cli.parseAsync(['node', 'ask-marcel-office', 'help-json']));

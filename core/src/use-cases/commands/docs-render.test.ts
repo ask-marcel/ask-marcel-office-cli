@@ -241,8 +241,9 @@ describe('docs-render — exact output, which is the only thing that pins the bl
   // Every `it` above asserts with toContain, so the SPACING between sections is
   // unasserted: the empty-string literals in each `lines.push('', '## X', '')`
   // can be replaced with junk and every one of those tests still passes. The
-  // rendered markdown is a product (docs/COMMANDS.md, and what `docs <cmd>`
-  // prints), so asserting it whole is the point rather than a coverage trick.
+  // rendered markdown is a product (the tables of a COMMANDS.md, and what
+  // `docs <cmd>` prints), so asserting it whole is the point rather than a
+  // coverage trick.
   const optionOnly: CommandManifestEntry = {
     name: 'list-things',
     summary: 'List the things.',

@@ -28,7 +28,7 @@ const fakeCmd = (overrides: Partial<Command['meta']> = {}): Command => ({
 
 const LIFECYCLE_NAMES = ['docs', 'help-json', 'login', 'logout', 'mcp', 'status'] as const;
 
-// A test registry with the single package's lifecycle entries, as the docs builders take it.
+// A test registry with the auth package's lifecycle entries, as the docs builders take it.
 const withLifecycle = (registry: Readonly<Record<string, Command>>, packageName = 'fake-pkg'): Pick<CommandPackage, 'registry' | 'lifecycle' | 'packageName'> => ({
   registry,
   lifecycle: LIFECYCLE_ENTRIES,

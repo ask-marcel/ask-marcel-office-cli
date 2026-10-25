@@ -6,11 +6,8 @@ import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-
 // command reference in the CLI's own text names its bin through a placeholder
 // (bin-names.ts): `{auth-bin}`, `{read-bin}` or `{write-bin}` before a command
 // of that package (command-directory.ts), `{bin}` before what every package
-// has. The `-write` name gives this file to the write package, so it moves to
-// write/ with the write files. It finds its folder from its own path: until
-// the move it reads the root src/, which holds the write source, and after the
-// move it reads write/src/ alone. So no commit leaves the write source with no
-// sweep. Write's source has no line that keeps a bin by hand.
+// has. It finds its folder from its own path, so it reads write/src/ alone.
+// Write's source has no line that keeps a bin by hand.
 
 // What `{bin}` may stand before: the commands and help every package has, the
 // generic words the hints use for "any command", and the `--` of
