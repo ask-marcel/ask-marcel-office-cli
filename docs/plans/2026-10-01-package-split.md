@@ -1,6 +1,6 @@
 # Package split: @ask-marcel/office-auth, -read, -write
 
-Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs. Phase 5 (write moved to `write/src/`, the root holds the read commands only) built on 2026-10-18, in review; see "As built in phase 5". Phase 5 exit pending: the live checks, which the maintainer runs. Phase 6 (read moved to `read/src/`, the root holds no package) built on 2026-10-24, in review; see "As built in phase 6". Phase 6 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
+Status: **planned 2026-10-01; phase 1 in progress: steps 1-16 done (step 11 on 2026-10-09: the effect class, inline scopes, the PDF converters as writes; step 12 on 2026-10-10: `ReadGraph` / `WriteGraph`, the registry views, the basic and guest 401 replay; step 13 on 2026-10-14: registry and lifecycle injection; step 14 on 2026-10-14: bin placeholders, the command directory, split remedies, per-server MCP wording; step 15 on 2026-10-15: the shared helpers in core modules, the package import check; step 16 on 2026-10-15: the tests split by package, the test-file check, the exit runbook). Not done: the live exit smoke, which the maintainer runs (runbook under Migration sequence, phase 1). Phase 2 (the workspace skeleton) built on 2026-10-15; see "As built in phase 2". Phase 2 exit pending: the first CI run of the workspace matrix and the windows-helper job. Phase 3 (core moved to `core/src/`) built on 2026-10-15, in review; see "As built in phase 3". Phase 4 (auth moved to `auth/src/`, the root signs only through auth's token helper) built on 2026-10-18, in review; see "As built in phase 4". Phase 4 exit pending: the live checks, which the maintainer runs. Phase 5 (write moved to `write/src/`, the root holds the read commands only) built on 2026-10-18, in review; see "As built in phase 5". Phase 5 exit pending: the live checks, which the maintainer runs. Phase 6 (read moved to `read/src/`, the root holds no package) built on 2026-10-24, in review; see "As built in phase 6". Phase 6 exit pending: the live checks, which the maintainer runs. Phase 7 (the docs of each package, the root README as an index, the 2.8.0 docs frozen) built on 2026-10-25, in review; see "As built in phase 7". Phase 7 exit pending: the live checks, which the maintainer runs.** Decision record: `docs/adr/0003-split-into-auth-read-write-packages.md`.
 Reviewed the same day by four adversarial passes against the code (feasibility, token protocol,
 checks and publishing, completeness); 71 of 75 findings were confirmed and are folded in below.
 
@@ -323,7 +323,7 @@ As built in step 16 (`scripts/check-package-imports.ts`, the lists `AUTH_FILES` 
 
 | Package | Exports | `./commands.json` |
 |:--|:--|:--|
-| auth | `getToken(tier, opts)`, `login(opts)`, `logout()`, `status()`, the cache-path resolver, types `Tier`, `TokenResult`, `AuthError`, `Result` | no |
+| auth | 1.0.0: the cache-path resolver `resolveAuthPaths`, types `AuthPaths`, `Result`. After 1.0.0 (a minor version adds them): `getToken(tier, opts)`, `login(opts)`, `logout()`, `status()`, types `Tier`, `TokenResult`, `AuthError` | no |
 | read | `commands`, `createReadGraph(tokenSource)`, `createEnvThenHelperTokenSource()`, a composition helper that wires them, types `Command`, `ReadGraph`, `TokenSource`, `Result` | yes |
 | write | `commands`, `createWriteGraph(tokenSource)`, `createEnvThenHelperTokenSource()`, a composition helper, types `Command`, `WriteGraph`, `TokenSource`, `Result` | yes |
 
@@ -1666,6 +1666,169 @@ their current paths until the old package is deprecated. `docs/QA-PLAYBOOK.md`, 
 skill and the shipped agent skill (`skills/`) move to the new bins, and the shipped skill states
 which packages it needs.
 
+As built in phase 7 (2026-10-25). The numbers in this note are the commit numbers of the phase 7
+design. The phase has 33 commits: the 32 of the design and one more after commit 21, called 21b
+here. Commit 27, the byte-for-byte restore of `docs/commands.json`, is the only commit with
+`--no-verify`. The hook of every other commit ran the gitleaks scan, and
+its log shows "no leaks found".
+
+- Decisions. G1: each package has its own README, USAGE and COMMANDS, written for npm, and the
+  root README is an index. G2: the root `docs/COMMANDS.md`, `docs/USAGE.md`, `docs/commands.json`
+  and `docs/demo.gif` keep the v2.8.0 bytes, because the npm page of 2.8.0 links them. Each
+  Markdown file has a banner. G3: one shipped skill for the three packages. G4: CI refuses a
+  command reference that is out of date. G5: the deferred rule-24 batch of phase 6 and a new test
+  file for `resolve-mail-link`. Open question 1 (the auth library): option A. The auth README
+  shows the library as built (`resolveAuthPaths`, `AuthPaths` and `Result`), and the auth row of
+  "Library API per package" says "after 1.0.0". Open question 17: the core texts that describe
+  the single package stay out of phase 7. Open question 20: the root `CHANGELOG.md` keeps its
+  "Unreleased" section, with one note at the top.
+- Fold-ins (1 to 3, G5). Commits 1 and 2 change comments, names and case names of 11 test files,
+  as the approved batch lists them. No assertion changed. Commit 3 adds
+  `read/src/use-cases/commands/resolve-mail-link-shapes.test.ts` (12 cases). The Stryker score of
+  `resolve-mail-link.ts` went from 83.02% (132 killed, 27 survived) to 93.08% (148 killed, 11
+  survived). The 11 survivors are the equivalent mutants of the design.
+- Per-folder command reference (4 to 8, G1). The lifecycle texts name the shipped
+  `commands.json` and the package docs, not the root docs. `renderLifecycleTable` in
+  `core/src/use-cases/commands/docs-render.ts` renders the lifecycle block (new test file, red
+  first). `gen-docs.ts` runs from each folder, takes `--export`, and writes two count sentences:
+  "The N commands are in C categories." and "`help-json` lists N entries: the M commands and the
+  L lifecycle commands below." A missing doc and a half block pair stop the run with exit 2.
+  `read/COMMANDS.md`, `write/COMMANDS.md` and `auth/COMMANDS.md` are new, and each folder has
+  `docs:gen`.
+- Freshness gate (9 and 10, G4). `gen-docs.ts --check` renders in memory and writes nothing. It
+  compares the doc, and the manifest with the `generatedAt` of the file. Exit 1 names each stale
+  file, and exit 2 is a usage error (a wrong `--package` too). With `--check`, a doc must have
+  the LIFECYCLE pair, and the COMMANDS pair when the registry has commands. The `--selftest` has
+  11 cases: each marker rule and the missing manifest have a case. Each published folder has `check:docs`, which the `workspace` job runs after the
+  build. The `gates` job runs a red fixture in `read/`: a copy of `COMMANDS.md` must pass, and
+  the same copy with a wrong count must give exit 1 exactly. `check-ci-matrix` refuses a
+  published folder with no docs step, or with a `check:docs` script without `--check`.
+- Package docs (11 to 20, G1). Each README has the install line, the bin, the sign-in through
+  `@ask-marcel/office-auth`, the MCP server (global bin, npx and the `mcpServers` JSON), the
+  library as built and absolute GitHub links to its other docs. The "Not released yet" blocks
+  are gone. Each sign-in text says: run `ask-marcel-office-auth login` with no flag, and use
+  `--force` only when a tier stays stuck after a plain `login`. Read's README has the product
+  pages of the old root README, rewritten for the read bin. `CONTRIBUTING.md` holds the repo text
+  of the old root USAGE. Each tarball ships `USAGE.md` and `COMMANDS.md`, and `check:packed`
+  refuses a tarball without them. Each package changelog lists the changes since
+  `ask-marcel-office-cli` 2.8.0.
+- Doc gate per package and the root index (21 to 24, G1 and G2). `check-doc-numbers.ts` checks
+  one package per run: the anchored count sentences of its README, USAGE and COMMANDS (auth 1
+  claim, read 7, write 7). The count sweep refuses a digit count before "commands" or "entries"
+  that no claim checks. Commit 21b says this in the `check:docs` rows of `CONTRIBUTING.md` and of
+  each package README. The root `check:docs` and `docs:gen` are gone, and so is the join of two
+  registries (`mergePackages`). The root README is an index of the three packages. It states no
+  count, and it says that the packages are not on npm yet.
+- The 2.8.0 docs (25 to 28, G2). `qa-param-matrix.ts` reads `read/dist/commands.json` and
+  `write/dist/commands.json`, and runs each command on the bin of its manifest. `docs/COMMANDS.md`
+  and `docs/USAGE.md` are the v2.8.0 bytes under a `FROZEN-2.8.0` banner, and
+  `docs/commands.json` is the v2.8.0 file. `check-frozen-docs.ts` holds the sha256 of the v2.8.0
+  bytes of the four files and hashes bytes, not text. The banner text can change; the body
+  cannot. The `gates` job runs its selftest and then the real run.
+- Skills and playbook (29 and 30, G3). The shipped skill has a "Packages and bins" table, the
+  install line of the three packages, and the bin in each command line. Write is optional: when
+  it is not installed, the skill says that a draft needs `@ask-marcel/office-write`. Two lines
+  help a user who has only 2.8.0. The QA playbook and the `qa-audit` skill name the three bins
+  and the two manifests. The dated history rows did not change.
+- Counts at the end of the phase: core 1039 tests (1035 at B0, one new file), auth 526 (526),
+  read 4602 (4590, one new file), write 280 (280). Coverage meets every tier gate in each folder.
+  The docs of each package pass `check:docs`. The one-off checks of design sections 3.3 and 3.4
+  passed at the tip: each command line of the package docs, the root README, `CONTRIBUTING.md`,
+  the package changelogs and `skills/` is in the `help-json` of its bin (232 checks, 0 failed,
+  70 full runs), the 6 `ts` blocks compile in a clean consumer of the three tarballs, and 67
+  links resolve. The docs hold no npmjs.com link. The install and npx lines resolve after the
+  publish of phase 8.
+- Differences from the phase 7 design, and why:
+  - Commit 3: Stryker ran with `--concurrency 2 --timeoutMS 60000` on the command line, and the
+    config did not change. The baseline ran again on the same tree without the new file.
+  - Commit 5: `lint:strict` refuses a nested template literal, so the row command is a local
+    variable first. The output is the same.
+  - Commits 7 and 8 link `USAGE.md`, which commits 15 and 17 add in the same push.
+  - Commit 8: the subject is `docs: generate the command references of write and auth`. The
+    commit-msg hook refuses a scope with a comma (`docs(write,auth)`).
+  - Commit 9 also changes `scripts/command-packages.ts`: a failed import of `--package` is now a
+    `Result` error, so a wrong path gives exit 2, not exit 1 (the code of a stale file). The
+    commit is 196 lines, not about 90. The selftest has more cases than the design: a changed
+    manifest entry, a missing manifest, a lone BEGIN marker, an END marker before its BEGIN
+    marker, and a doc with no COMMANDS pair. Auth has no commands, so its selftest stops with
+    exit 2.
+  - Commit 10: the red fixture fails when the `sed` changes no count, and its wrong count is "1"
+    followed by the old count, so the step holds no count literal. `check-ci-matrix` also refuses
+    a published folder with no `check:docs` script.
+  - Commit 12 lists five token tiers (`guest` too), not four: the token helper takes `guest`.
+  - Commit 14: the listings take `--select`, because only two commands have `--full`. "See it
+    work" shows the offline `convert-local-file-to-markdown` on the sample `.msg` file, because a
+    mail command needs tenant data. The verb sentence of read is in the Commands section only.
+  - Commit 15 follows the code: the text footer is
+    `--- next: ask-marcel-office-read next-page --url '<link>'`.
+  - Commit 17 also gives write's README the npx line and the `mcpServers` JSON. Commits 11, 13 and
+    17 add `docs:gen` and `check:docs` to the Develop tables. Two table rows say "Each of the N …
+    commands, by name", so the anchor of commit 21 matches them.
+  - Commit 21 is one commit (299 lines), not two. Its selftest is a table of cases, so the
+    function stays at a complexity of 10 or less (rule 35). It also changes three files that the
+    design does not name: `check-ci-matrix.ts` refuses a `check:docs` script without
+    `check-doc-numbers.ts`, and the comments of `single-package.ts` and `write-package.ts` named
+    the root `docs:gen`. The read and write USAGE files also have a "the N … commands" claim.
+    The claims take "The" or "the", and a space in an anchor matches any white space.
+  - Commit 21b is new. Commit 21 has 10 files, so the `check:docs` rows of `CONTRIBUTING.md` and
+    of the three package READMEs, which name the new count check, are a commit of their own.
+  - Commit 22 keeps `multiple: true` for `--package` and refuses a second one with exit 2,
+    because `parseArgs` keeps only the last value of a plain option. The check and the write
+    mode share one render, so one selftest row proves the LIFECYCLE rule for both. The refusal of
+    a second `--package` has no selftest case, because the argument check runs before the
+    selftest. A probe by hand gives exit 2.
+  - Commit 25: the matrix has 1,081 cases (211 commands, 290 required options), not 1,023. The
+    old and the new script give the same case list.
+  - Commit 27 has 222 insertions and 418 deletions; the design had them the other way round.
+  - Commit 28 has two more selftest cases: a banner with no BEGIN marker, and a missing file.
+  - The 2.8.0 USAGE body links `../src/index.ts`, which phase 6 deleted. It is frozen text, so it
+    stays.
+  - Commit 29 also names the write bin in the `update-mail-draft` lines of `draft-email.md`, and
+    removes the `--force` remark from the people pitfalls of `SKILL.md`. So `--force` is only in
+    the "stays stuck" text. The intro of `SKILL.md` names the write commands with no count,
+    because no gate checks a count in the skill.
+  - Commit 30 also fixes the `ls` comment of E3b (each auth run also writes
+    `token-helper.json`) and adds the Linux form of `script`.
+  - A review of the series before the merge found doc errors. The commits that wrote each text
+    carry its fix: the fields and the Graph calls of `my-quick-context` (13 and 15), the OData
+    exceptions (15), the attachment-to-PDF conversions and `--pages` (13 and 14), the passthrough
+    and image rules of the PDF conversions, and a count with no claim (17), the CI smoke of each
+    folder (18), the token tiers (11), and long sentences (12 to 18). The effect sentence of
+    `write/USAGE.md` has no digits now: the write README holds the checked counts.
+- Not in phase 7:
+  - The live checks below. Do not run them from an agent session.
+  - The auth library functions of "Library API per package" (after 1.0.0).
+  - The core texts that describe the single package (phase 5 open question 16), and
+    `MAIL_ATTACHMENT_HINT` of `convert-mail-to-markdown.ts`, which names a write command with no
+    bin.
+  - The link check and the doc-command check of design sections 3.3 and 3.4 are one-off
+    scripts, not gates.
+  - A new `docs/demo.gif`. The read README does not show the 2.8.0 recording.
+  - The items of "Not in phase 6" that phase 7 did not do: the renames, the test gaps, the
+    `bun audit` advisories, the undeclared direct imports, the `@types` packages in the root
+    (open question 28) and the Windows round trip through read's token source.
+
+Live checks of phase 7, for the maintainer (back up `~/.ask-marcel/` first, unset every
+`ASKMARCEL_*` variable, and use Node 20):
+
+1. The open live checks of phase 6, steps 1 to 10.
+2. `bun pm pack` in `auth/`, `read/` and `write/`, then `npm i -g <three tarballs>`. Run each
+   install, sign-in and quick-start line of the three package READMEs, in order.
+3. Register each MCP server as its README shows, with `npx -y --package <tarball> <bin> mcp`.
+   The auth server has `login` and `status` only. The read server has `list-commands`,
+   `get-command-docs` and `run-command`. The write server has `list-commands`,
+   `get-command-docs` and `run-write-command`. In Claude Desktop, use the `mcpServers` JSON of
+   the read README.
+4. Copy `skills/` to `~/.claude/skills/ask-marcel/`. Ask Claude Code to read one mail and to draft
+   a reply: it uses the read bin, then the write bin, and the draft is not sent. Remove the
+   write package: the skill says that a draft needs `@ask-marcel/office-write` and gives the
+   install line. Delete the drafts after.
+5. `/qa-audit` sections B and E3/E3b with the new bins (E3b needs a TTY).
+6. Open the branch on GitHub: the root index, the three package READMEs and the banners render,
+   and their links open.
+7. After the merge to `main`: the npm page of `ask-marcel-office-cli` 2.8.0 opens
+   `docs/COMMANDS.md`, `docs/USAGE.md`, `docs/commands.json` and the demo gif.
+
 **Phase 8: release** (steps marked "you" need the account owner):
 
 1. You: confirm or create the `ask-marcel` npm org.
@@ -1674,6 +1837,10 @@ which packages it needs.
 4. You: swap the global install and re-register MCP (three servers; register read and auth only on
    hosts that must not write).
 5. After confirmation: `npm deprecate ask-marcel-office-cli` with a pointer to the new packages.
+6. Docs at the deprecation: change the banners of `docs/COMMANDS.md` and `docs/USAGE.md` to
+   pointers at the deprecation (`check-frozen-docs` allows a new banner text). Remove the "not on
+   npm yet" note of the root `README.md` and the two 2.8.0 lines of `skills/SKILL.md`. Open the
+   npm page of each package and check its links.
 
 ## Risks
 
