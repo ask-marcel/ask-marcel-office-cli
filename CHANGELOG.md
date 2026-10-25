@@ -4,6 +4,12 @@ All notable changes to `ask-marcel-office-cli` are documented here.
 
 ## Unreleased
 
+> These changes are not released as `ask-marcel-office-cli`. They ship in the
+> three packages `@ask-marcel/office-auth`, `@ask-marcel/office-read` and
+> `@ask-marcel/office-write`. The changelog of each package lists the changes
+> for its users: [auth](auth/CHANGELOG.md), [read](read/CHANGELOG.md) and
+> [write](write/CHANGELOG.md).
+
 ### Fixed: PDF conversion on Node 20
 
 `unpdf` 1.9.0 (2026-10-15) needs Node 22. A new install of 2.8.0 on Node 20
