@@ -23,39 +23,33 @@
  *   auth/:  bun run ../scripts/gen-docs.ts --package src/composition/auth-package.ts --export authPackage --commands-doc COMMANDS.md
  *
  * The builds of read/ and write/ run it with `--manifest dist/commands.json`, so
- * each package ships the manifest of its own commands. The root `bun run
- * docs:gen` still joins the read and the write packages for the root docs
- * (see command-packages.ts):
- *
- *   bun run scripts/gen-docs.ts --package read/src/composition/single-package.ts \
- *     --package write/src/composition/write-package.ts \
- *     --manifest docs/commands.json --commands-doc docs/COMMANDS.md
+ * each package ships the manifest of its own commands.
  *
  * `--package` names a module that exports `commandPackage` (a CommandPackage),
- * or the export that `--export` names. It can come more than once: the
- * registries are joined, and the names come from the first package. Give
- * `--manifest`, `--commands-doc` or both. Paths are relative to the working
- * directory, and the manifest version is the one in its package.json.
+ * or the export that `--export` names. A run takes one `--package` (a second
+ * one is exit 2). Give `--manifest`, `--commands-doc` or both. Paths are
+ * relative to the working directory, and the manifest version is the one in
+ * its package.json.
  *
  * Markers: a commands doc that does not exist, a block with one marker only
- * (or with END before BEGIN), and a doc with no COMMANDS block pair when the
- * registry has commands each stop the run with exit 2. A doc with no LIFECYCLE
- * block pair is written: the root docs/COMMANDS.md has none.
+ * (or with END before BEGIN), a doc with no LIFECYCLE block pair, and a doc
+ * with no COMMANDS block pair when the registry has commands each stop the run
+ * with exit 2. So no block can go dark.
  *
  *   --check     writes nothing. It renders the files in memory and compares
  *               them with the files on disk. The manifest is compared with
  *               its `generatedAt` masked, and a missing manifest is out of
- *               date. The commands doc must have the LIFECYCLE block pair,
- *               so that no block can go dark (else exit 2). The `check:docs`
- *               script of each package folder runs it after the build.
+ *               date. The `check:docs` script of each package folder runs it
+ *               after the build.
  *   --selftest  renders a fresh doc of the package, then plants faults: a
  *               wrong count, a deleted table row, a changed lifecycle row and
  *               a changed manifest entry. Each fault must be out of date, the
  *               fresh doc and a manifest with another `generatedAt` must
  *               pass, and a missing manifest must be out of date. A doc with
- *               no LIFECYCLE pair, a lone BEGIN marker, an END marker before
- *               its BEGIN marker, and a doc with no COMMANDS pair must be
- *               refused (rule 15.10). It needs `--package` only.
+ *               no LIFECYCLE pair (in the check and in the write mode), a
+ *               lone BEGIN marker, an END marker before its BEGIN marker,
+ *               and a doc with no COMMANDS pair must be refused (rule
+ *               15.10). It needs `--package` only.
  *
  * Exit codes: 0 the files are up to date (or were written); 1 `--check`
  * found a file that is out of date, or the selftest failed; 2 a wrong
@@ -75,10 +69,10 @@ import { fillNames } from '@ask-marcel/office-core/use-cases/commands/bin-names.
 import type { CommandManifest, CommandManifestEntry } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { renderLifecycleTable, renderReadmeTables } from '@ask-marcel/office-core/use-cases/commands/docs-render.ts';
 import { buildManifest as buildHelpJsonManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
-import { loadDocumentedPackage } from './command-packages.ts';
+import { loadPackage } from './command-packages.ts';
 
 const USAGE =
-  'usage: bun run ../scripts/gen-docs.ts --package <module exporting commandPackage> [--package <another>] [--export <name>] [--manifest <commands.json>] [--commands-doc <COMMANDS.md>] [--check | --selftest]';
+  'usage: bun run ../scripts/gen-docs.ts --package <module exporting commandPackage> [--export <name>] [--manifest <commands.json>] [--commands-doc <COMMANDS.md>] [--check | --selftest]';
 
 const { values: args } = parseArgs({
   options: {
@@ -90,12 +84,14 @@ const { values: args } = parseArgs({
     selftest: { type: 'boolean' },
   },
 });
-if (args.package === undefined || (args.selftest !== true && args.manifest === undefined && args['commands-doc'] === undefined)) {
+// One package for each run: parseArgs would keep only the last of two --package.
+const [packagePath, ...extraPackages] = args.package ?? [];
+if (packagePath === undefined || extraPackages.length > 0 || (args.selftest !== true && args.manifest === undefined && args['commands-doc'] === undefined)) {
   process.stderr.write(`gen-docs: ${USAGE}\n`);
   process.exit(2);
 }
 
-const loaded = await loadDocumentedPackage(args.package, args.export);
+const loaded = await loadPackage(packagePath, args.export);
 if (!loaded.ok) {
   process.stderr.write(`gen-docs: ${loaded.error} ${USAGE}\n`);
   process.exit(2);
@@ -190,23 +186,19 @@ const hasBlock = (path: string, text: string, block: string): Result<boolean, st
 const fillBlock = (text: string, block: string, body: string): string =>
   `${text.slice(0, text.indexOf(beginMarker(block)) + beginMarker(block).length)}\n\n${body}\n\n${text.slice(text.indexOf(endMarker(block)))}`;
 
-// The commands doc as a run writes it. `needLifecycle` refuses a doc with no
-// LIFECYCLE block pair (the check does; the root docs/COMMANDS.md has none).
-const renderCommandsDoc = (path: string, rawText: string, needLifecycle: boolean): Result<string, string> => {
+// The commands doc as a run writes it. A doc with no LIFECYCLE block pair is refused.
+const renderCommandsDoc = (path: string, rawText: string): Result<string, string> => {
   const manifest = buildManifest('');
   // Keep the count sentences in sync with the registry so they can never drift
   // from the actual surface (they have before). N = registry command count; C =
   // distinct categories among them. The help-json total is derived from the real
   // manifest builder (registry + lifecycle entries), not hardcoded: it sat stale
-  // at "179-vs-184" long after the registry had moved on. The first two forms
-  // are those of the root docs/COMMANDS.md, the last two those of a package.
+  // at "179-vs-184" long after the registry had moved on.
   const total = manifest.commands.length;
   const categoryCount = new Set(manifest.commands.map((c) => c.category)).size;
   const categories = `${categoryCount} ${categoryCount === 1 ? 'category' : 'categories'}`;
   const helpJsonTotal = buildHelpJsonManifest(commandPackage, version).commands.length;
   const text = rawText
-    .replace(/All \d+ commands across \d+ categories/, `All ${total} commands across ${categoryCount} categories`)
-    .replace(/manifest total \(\d+\), so a \d+-vs-\d+ gap/, `manifest total (${helpJsonTotal}), so a ${total}-vs-${helpJsonTotal} gap`)
     .replace(/The \d+ commands are in \d+ categor(?:y|ies)\./, `The ${total} commands are in ${categories}.`)
     .replace(
       /`help-json` lists \d+ entries: the \d+ commands and the \d+ lifecycle commands below\./,
@@ -218,8 +210,8 @@ const renderCommandsDoc = (path: string, rawText: string, needLifecycle: boolean
   if (!tables.ok) return tables;
   // A package with no command (auth) has no command tables.
   if (!tables.value && total > 0) return err(`${path} has no ${beginMarker('COMMANDS')} block, and the registry has ${total} commands.`);
-  if (!lifecycle.value && needLifecycle) return err(`${path} has no ${beginMarker('LIFECYCLE')} block.`);
-  const withLifecycle = lifecycle.value ? fillBlock(text, 'LIFECYCLE', renderLifecycleTable(commandPackage.lifecycle, fill)) : text;
+  if (!lifecycle.value) return err(`${path} has no ${beginMarker('LIFECYCLE')} block.`);
+  const withLifecycle = fillBlock(text, 'LIFECYCLE', renderLifecycleTable(commandPackage.lifecycle, fill));
   return ok(total === 0 ? withLifecycle : fillBlock(withLifecycle, 'COMMANDS', renderReadmeTables(manifest)));
 };
 
@@ -230,7 +222,7 @@ const readCommandsDoc = async (path: string): Promise<string> => {
 
 const rewriteCommandsDoc = async (path: string): Promise<void> => {
   const rawText = await readCommandsDoc(path);
-  const next = renderCommandsDoc(path, rawText, false);
+  const next = renderCommandsDoc(path, rawText);
   if (!next.ok) return stop(next.error);
   if (next.value === rawText) {
     process.stderr.write(`gen-docs: ${path} already up-to-date\n`);
@@ -250,7 +242,7 @@ const staleFiles = async (manifestPath: string | undefined, docPath: string | un
   }
   if (docPath !== undefined) {
     const rawText = await readCommandsDoc(docPath);
-    const next = renderCommandsDoc(docPath, rawText, true);
+    const next = renderCommandsDoc(docPath, rawText);
     if (!next.ok) return stop(next.error);
     if (next.value !== rawText) stale.push(`${docPath} (run \`bun run docs:gen\`)`);
   }
@@ -276,10 +268,10 @@ const selftest = (): number => {
   if (total === 0) return stop('the selftest needs a package with commands.');
   const pair = (block: string): string => `${beginMarker(block)}\n${endMarker(block)}`;
   const head = 'The 0 commands are in 0 categories. `help-json` lists 0 entries: the 0 commands and the 0 lifecycle commands below.';
-  const fresh = renderCommandsDoc('fresh', `${head}\n\n${pair('LIFECYCLE')}\n\n${pair('COMMANDS')}\n`, true);
+  const fresh = renderCommandsDoc('fresh', `${head}\n\n${pair('LIFECYCLE')}\n\n${pair('COMMANDS')}\n`);
   if (!fresh.ok) return stop(fresh.error);
   const isStale = (text: string): boolean => {
-    const next = renderCommandsDoc('fault', text, true);
+    const next = renderCommandsDoc('fault', text);
     return !next.ok || next.value !== text;
   };
   const doc = fresh.value;
@@ -287,7 +279,7 @@ const selftest = (): number => {
   const tableRow = firstRow(doc, 'COMMANDS');
   const lifecycleRow = firstRow(doc, 'LIFECYCLE');
   const manifest = manifestText('2026-01-01T00:00:00.000Z');
-  const refused = (text: string): boolean => !renderCommandsDoc('fault', text, true).ok;
+  const refused = (text: string): boolean => !renderCommandsDoc('fault', text).ok;
   const withoutPair = (block: string): string => doc.replace(beginMarker(block), '').replace(endMarker(block), '');
   const swapped = doc.replace(beginMarker('COMMANDS'), '<swap>').replace(endMarker('COMMANDS'), beginMarker('COMMANDS')).replace('<swap>', endMarker('COMMANDS'));
   const cases = [
@@ -295,7 +287,7 @@ const selftest = (): number => {
     { name: 'a wrong count is stale', passed: isStale(doc.replace(`The ${total} commands`, `The ${total + 1} commands`)) },
     { name: 'a deleted table row is stale', passed: tableRow !== '' && isStale(doc.replace(`${tableRow}\n`, '')) },
     { name: 'a changed lifecycle row is stale', passed: lifecycleRow !== '' && isStale(doc.replace(lifecycleRow, `${lifecycleRow} changed`)) },
-    { name: 'a doc with no LIFECYCLE pair is refused', passed: refused(withoutPair('LIFECYCLE')) },
+    { name: 'a doc with no LIFECYCLE pair is refused (the check and the write mode share this render)', passed: refused(withoutPair('LIFECYCLE')) },
     { name: 'a lone BEGIN marker is refused', passed: refused(doc.replace(endMarker('LIFECYCLE'), '')) },
     { name: 'an END marker before its BEGIN marker is refused', passed: refused(swapped) },
     { name: 'a doc with no COMMANDS pair is refused when the registry has commands', passed: refused(withoutPair('COMMANDS')) },

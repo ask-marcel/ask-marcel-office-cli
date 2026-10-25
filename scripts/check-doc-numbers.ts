@@ -38,17 +38,14 @@
  *      count in README.md or USAGE.md has no claim, or a generated document
  *      holds a bin placeholder
  *
- *   2  an argument is missing, a --package exports no package, or two
- *      packages hold one command name with different entries
+ *   2  an argument is missing, or a --package exports no package
  *
  *   --selftest  proves the matcher rejects a wrong number and a lost anchor
  *               and finds a sentence with a line break, that a claim of an
  *               absent role does not run, that the sweep refuses a count with
  *               no claim and passes a checked one, that a placeholder is
- *               refused and a filled bin passes, and that the join of the
- *               packages keeps every command and refuses a conflict (see rule
- *               15.10: a gate only ever seen green is a hypothesis). It needs
- *               `--package` only.
+ *               refused and a filled bin passes (see rule 15.10: a gate only
+ *               ever seen green is a hypothesis). It needs `--package` only.
  *
  * The package and the three documents are arguments, not imports, so one
  * script serves every package of the split (plan "Scripts ownership"). Each
@@ -58,14 +55,14 @@
  *     --readme README.md --usage USAGE.md --commands-doc COMMANDS.md --manifest dist/commands.json
  *
  * `--package` names a module that exports `commandPackage` (a CommandPackage),
- * or the export that `--export` names (auth: `authPackage`). `--manifest` is
- * needed only when the registry has commands. Paths are relative to the
- * working directory.
+ * or the export that `--export` names (auth: `authPackage`). A run takes one
+ * `--package` (a second one is exit 2). `--manifest` is needed only when the
+ * registry has commands. Paths are relative to the working directory.
  */
 
 import { parseArgs } from 'node:util';
 import { buildManifest } from '@ask-marcel/office-core/use-cases/commands/docs-builders.ts';
-import { loadDocumentedPackage, mergePackages } from './command-packages.ts';
+import { loadPackage } from './command-packages.ts';
 
 const USAGE =
   'usage: bun run ../scripts/check-doc-numbers.ts --package <module exporting commandPackage> [--export <name>] --readme <README.md> --usage <USAGE.md> --commands-doc <COMMANDS.md> [--manifest <commands.json>] | --package <module> --selftest';
@@ -86,7 +83,9 @@ const stop = (message: string): never => {
   process.exit(2);
 };
 
-const loaded = await loadDocumentedPackage(args.package ?? stop(USAGE), args.export);
+// One package for each run: parseArgs would keep only the last of two --package.
+const [packagePath, ...extraPackages] = args.package ?? [];
+const loaded = await loadPackage(packagePath === undefined || extraPackages.length > 0 ? stop(USAGE) : packagePath, args.export);
 const commandPackage = loaded.ok ? loaded.value : stop(`${loaded.error} ${USAGE}`);
 const entries = Object.entries(commandPackage.registry);
 const missing = args.readme === undefined || args['commands-doc'] === undefined || args.usage === undefined || (entries.length > 0 && args.manifest === undefined);
@@ -229,23 +228,6 @@ const unmatchedCounts = (file: string, text: string, claims: ReadonlyArray<Claim
     .map((match) => `${file}:${lineOf(text, match.index)}  "${match[0].replaceAll(/\s+/g, ' ')}" is a count that no claim checks (use an anchored sentence, or add a claim)`);
 };
 
-// The join: the registry split in two packages (the second with other bins) must
-// come back whole with the names of the first, and a name that the second holds
-// with another summary must be refused.
-const selftestJoin = (): string | undefined => {
-  const names = Object.keys(commandPackage.registry);
-  const half = Math.ceil(names.length / 2);
-  const part = (from: number, to: number): typeof commandPackage.registry => Object.fromEntries(Object.entries(commandPackage.registry).slice(from, to));
-  const other = { ...commandPackage, binName: 'other-bin', registry: part(half - 1, names.length) };
-  const joined = mergePackages([{ ...commandPackage, registry: part(0, half) }, other]);
-  if (!joined.ok || Object.keys(joined.value.registry).length !== names.length || joined.value.binName !== commandPackage.binName) return 'the join lost a command or took the names of the second package';
-  const [name, command] = Object.entries(commandPackage.registry)[0] ?? [];
-  if (name === undefined || command === undefined) return 'the join cannot be checked on an empty registry';
-  const conflict = { ...other, registry: { [name]: { ...command, meta: { ...command.meta, summary: `${command.meta.summary} (changed)` } } } };
-  if (mergePackages([commandPackage, conflict]).ok) return 'a command with two different entries was accepted';
-  return undefined;
-};
-
 const runSelftest = (): number => {
   const claim = CLAIMS[0];
   if (claim === undefined) {
@@ -263,7 +245,6 @@ const runSelftest = (): number => {
     { name: 'the sweep refuses a count with no claim', passed: unmatchedCounts(claim.file, 'It has the 12\nmail commands.', absent).length === 1 },
     { name: 'a bin placeholder is refused', passed: checkPlaceholders('selftest.md', 'run `{read-bin} list-drives` first').length > 0 },
     { name: 'a filled bin passes', passed: checkPlaceholders('selftest.md', 'run `ask-marcel-office-read list-drives` first').length === 0 },
-    { name: 'the join keeps every command and refuses a conflict', passed: selftestJoin() === undefined },
   ];
   const failed = cases.filter((each) => !each.passed);
   for (const each of failed) console.error(`check-doc-numbers: SELFTEST FAILED — ${each.name}`);
