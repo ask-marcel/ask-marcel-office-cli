@@ -9,7 +9,7 @@ skill** — writing, editing, scaffolding, testing, refactoring, reviewing, or d
 installed at `.claude/skills/atelier` (also in `.agents/skills/atelier`) and is the **source of
 truth** for conventions: Clean Architecture (`src/{domain,use-cases,infra,presenter,composition}`),
 strict TDD (red-green-refactor), `Result<T, E>` at IO boundaries, branded types at trust boundaries,
-Bun-only toolchain, and the eight-gate pre-commit hook. Rules are non-negotiable — when in doubt,
+Bun-only toolchain, and the five-gate pre-commit hook. Rules are non-negotiable — when in doubt,
 consult the skill before acting. If the skill and any doc disagree, the skill wins.
 
 Each of `auth/ core/ read/ write/` is an atelier Bun TypeScript script repo (package split, ADR 0003):
