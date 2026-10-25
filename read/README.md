@@ -37,6 +37,179 @@ ask-marcel-office-read convert-local-file-to-markdown --path ./report.docx
 first plan and notebook, and your time zone, in one call. The last line reads a
 file on your disk. It runs offline, with no sign-in.
 
+## The difference in practice
+
+| You need | Raw Microsoft Graph | `@ask-marcel/office-read` |
+|---|---|---|
+| Access | An app registration, the consent of an admin, the rotation of a secret | `ask-marcel-office-auth login`: one browser sign-in with your own account |
+| A mail and its attachments | 6 or more round trips. You convert the HTML to text. | `convert-mail-to-markdown`: one call, markdown out |
+| A pptx, a pdf or a legacy .doc as text | Raw bytes. You bring a converter. | `download-drive-item-as-markdown`: one call |
+| A useful error | `BadRequest: Invalid filter clause` | `hint: "string literals MUST use single quotes; embed one by doubling it"` |
+| A PDF of 5 MB | Base64 that fills the context window | `--output-path` writes it to disk. The model reads 3 lines. |
+| Throttling | HTTP 429. You guess the backoff. | `retryAfterSeconds` in the error envelope |
+
+Compared with the tools that you know:
+
+| | Microsoft Graph SDKs | CLI for Microsoft 365 (PnP) | `@ask-marcel/office-read` |
+|---|---|---|---|
+| Sign-in | An Entra app registration, always. Each auth flow needs a client id. | An Entra app registration. Its `setup` command makes one, and its permissions can need the consent of an admin. | Your own account, in a browser, one time. No app registration. |
+| Made for | Backend services | Admins and scripts | LLMs that call tools: markdown out, small fields, a repair hint on each error |
+| Can it break things | It can do what the permissions of your app allow. | Yes: it creates, changes and deletes items in the tenant. | No. The read package cannot write. The mail drafts and the three attachment-to-PDF conversions are in `@ask-marcel/office-write`, which you install only where you need it. |
+
+## The three walls it removes
+
+### Sign in as a person, not as an app
+
+Microsoft Graph usually needs an Azure app registration, the consent of a
+tenant admin and client secrets before the first call. Here,
+`ask-marcel-office-auth login` opens a real browser window on the usual
+Microsoft sign-in (Playwright does this). It captures the same token that the
+Teams web client uses. A personal or an enterprise Microsoft 365 account works.
+The tokens are in `~/.ask-marcel/token-cache.json` (mode 0600), and they refresh
+without a browser. `ask-marcel-office-auth status` shows the scopes and the
+expiry of each token, with no Graph call and no browser. The read package gets
+its tokens from the auth package and keeps no token cache.
+
+### Safe for an autonomous agent
+
+None of the 204 read commands changes your tenant. The read package has no
+`send-mail`, no `create-event`, no `upload-file` and no delete command. Its graph
+sends a POST only to the search and free/busy endpoints, and refuses each other
+POST before it goes out. Thus an agent can explore a mailbox, and you do not
+have to review each call. The package sends no analytics. It talks only to
+Microsoft 365 and to npm. In Microsoft 365, it talks to Graph, and the chat
+commands also talk to the Teams chat and media services. It asks npm only for
+the latest version.
+
+### Answers sized for a context window
+
+Graph answers are made for backend services. These answers are made for
+models. A listing gives a set of selected fields, not each property of each
+item. Use `--select` to get other fields. A mail thread comes without its quoted
+reply chain, which makes real threads 78-90% smaller. An inline image becomes a
+`[inline image: logo.png]` placeholder, not kilobytes of base64. A binary answer
+goes to disk through `--output-path`. Each failure gives
+`{error, hint, source, retryAfterSeconds}`, so the model can repair its call.
+
+## See it work
+
+To read a mail and its attachments with raw Graph, you get the message, the
+list of attachments and the bytes of each attachment. Then you resolve each
+SharePoint link of the body and convert the HTML to text. That is six round
+trips or more. Here, `convert-mail-to-markdown --message-id <id>` does it in one
+call. The same converter reads an Outlook `.msg` file on your disk, with no
+sign-in. This is the output for a sample file:
+
+```console
+$ ask-marcel-office-read convert-local-file-to-markdown --path ./mail.msg
+# Quarterly Report — Q3 Summary
+
+**From:** Jordan Avery <jordan.avery@example.com>
+**Recipients:** Sam Rivera <sam.rivera@example.com>
+
+Hi Team,
+
+Please find the quarterly figures attached.
+
+Best regards,
+Jordan
+
+## Attachments
+
+### summary.txt
+
+Attachment body text — line one.
+Line two.
+```
+
+Each attachment is converted in the same answer. For a mail in your mailbox,
+the attachments come with their ids, ready for the next call:
+
+```console
+$ ask-marcel-office-read convert-mail-attachment-to-markdown --message-id "AAMkAD..." --attachment-id "AAMkAD..."
+```
+
+An xlsx comes back as one markdown table for each sheet. When the answer is in
+a deck that a person shared three weeks ago:
+
+```console
+$ ask-marcel-office-read microsoft-search-query --query "Q3 budget filetype:pptx"
+$ ask-marcel-office-read download-drive-item-as-markdown --drive-id "b!abc..." --item-id "01BYE..."
+```
+
+## What your agent can reach
+
+| Surface | In practice |
+|---|---|
+| Outlook mail | Search and read mail as markdown. Convert each attachment, also in a nested `.zip`, `.msg`, `.eml` or forwarded mail. Resolve the SharePoint links of a body. Get your signature. Find the drafts of a thread. |
+| OneDrive and SharePoint | Find each drive and site that your token can reach. Search files. Read a document as markdown or PDF. Read the version history, and the line diff between two versions or two files. Read the comments of a document, the files changed since a date and who can open a site. Resolve share links, also into partner tenants where you are a guest. |
+| Calendar | "What is on this week" with relative dates (`today`, `start-of-week`, `+7d`), the details of an event and free/busy lookups |
+| People and directory | People search, user profiles, the directory around you, and your own identity and ids in one call |
+| Teams | Your teams, channels, channel posts as JSON or as a markdown transcript, what changed since a date, members and tabs, chats, and the chat history with files, reactions and pasted screenshots |
+| Planner and To Do | Plans (also of a group) and their label names, buckets, tasks, checklists, due dates and the web link of each To Do task |
+| Excel | Live workbook reads: worksheets, used ranges and tables |
+| OneNote | Notebooks, sections and the content of pages |
+| Search and utilities | Microsoft Search across the tenant, pagination with `next-page`, and the conversion of a local file offline |
+
+[COMMANDS.md](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/read/COMMANDS.md)
+gives each command, with its parameters and its Graph endpoint.
+
+## Any file becomes markdown
+
+One conversion pipeline has four entry points: a OneDrive or SharePoint item,
+an Outlook attachment, a `.zip` archive, and a file on your disk
+(`convert-local-file-to-markdown` runs offline, with no sign-in).
+
+| Source | What comes back |
+|---|---|
+| docx, docm, dotx | Markdown. `--include-metadata true` adds the comments, the tracked changes, the hidden text and a flag for VBA macros. |
+| xlsx, xlsm, csv | One markdown table for each sheet. A sheet above 50 000 cells gives a plan to read it in bands. |
+| pptx, pptm | The text of each slide, with the speaker notes (`## Slide N`). When the layout is important, use the PDF of the deck and a vision model. |
+| pdf | The text layer. A scanned PDF gives a pointer to the vision route. |
+| odt, ods, odp | Headings, lists, tables, the text of each slide, and the comments |
+| Legacy .doc, .xls | `.xls` reads as `.xlsx`. `.doc` gives plain text. Convert a `.ppt` to PDF first. |
+| Outlook .msg, .eml | The full mail: the headers, the body without the quoted chain, and each attachment, converted. An Outlook item in a mail (a forwarded mail) reads the same way. |
+| html, htm | The page as markdown, without its head, and the embedded images as placeholders. A page above 1 MB becomes plain text. |
+| .zip | Each entry, converted in one call. GBK and CP437 entry names are decoded correctly. |
+| Loop, Whiteboard | Graph converts them on the server. |
+
+To get the pictures, not the words: `extract-drive-item-images`,
+`extract-mail-attachment-images` and `extract-local-file-images` get the
+embedded images of a docx, xlsx, pptx or pdf (also the originals at full
+resolution and the images on hidden slides), ready for a vision model. On the
+drive and mail extractors, `--pages 1-3` limits a scanned PDF. The mail
+extractor also opens the files of a forwarded mail. `extract-teams-chat-message-images` gets the pasted screenshots
+of a chat message. `--output-dir` writes the images to disk.
+
+## Made for the agent loop
+
+- **It teaches itself.** `help-json --terse` gives a small JSON manifest for the
+  first contact of a model. Add `--category mail` to get one category.
+  `docs <command>` prints the full docs of one command: the response shape, the
+  examples and the Graph endpoint.
+- **Errors that repair the call.** Each failure is
+  `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`. Hints
+  cover more than 20 frequent Graph mistakes. For example, a Teams URL that you
+  give to `resolve-mail-link` gets the name of the correct command. A wrong
+  command, flag or parameter ends with "Did you mean …?", on the CLI, over MCP
+  and in the library.
+- **Pagination with no state.** Each listing gives a cursor.
+  `next-page --url "<cursor>"` continues each of them.
+- **Relative dates.** `--start-date-time start-of-week --end-date-time +7d`. Named
+  days start at midnight in your time zone (`--tz`, else `ASKMARCEL_TZ`, else the
+  zone of the machine).
+- **For pipes.** `--output raw-json` prints the payload alone, with no envelope,
+  for `jq`.
+- **Binary control.** A binary answer of many MB never goes to stdout by
+  accident. Without `--output-path`, you get a summary of one line. With it, the
+  bytes go to disk, and the envelope has `savedTo`.
+- **Reach across the tenant.** `list-accessible-drives` joins each way in which a
+  delegated token can find a drive. These are the Teams libraries, the group
+  sites, the private channels, the files shared with you, your activity and the
+  other site libraries.
+  `search-all-accessible-sites` reads all the pages of the search index. This is
+  the most that you can reach with no tenant-admin rights.
+
 ## Commands
 
 | Command | What it does |
