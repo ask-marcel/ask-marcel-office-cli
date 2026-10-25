@@ -1,6 +1,6 @@
 # Code Smells and Anti-Patterns (class-free edition)
 
-> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>`: hard rule 16, see `references/result-type.md`.
 
 ## What are code smells?
 
@@ -86,6 +86,9 @@ export const processOrder = async (order: Order, deps: ProcessOrderDeps): Promis
   validateOrder(order);
   const total = calculateOrderTotal(order);
   await deps.repo.save(order, total);
+  // the send follows a commit, so in production it is an outbox row the save writes in the same
+  // transaction and a worker delivers, never an inline call (rule 29, references/reliability.md,
+  // Do not fire and forget); the notifier port here only shows where the responsibility split falls
   await deps.notifier.notifyConfirmation(order);
 };
 ```
@@ -122,26 +125,26 @@ export const refund = () => { /* ... */ };
 
 ```ts
 // SMELL - shipping logic lives in Order but uses only Customer data
-// src/orders/order.ts
+// src/domain/order.ts
 export const calculateShipping = (customer: Customer): Money => {
   if (customer.country === 'US') {
-    if (customer.state === 'CA') return money(10, 'USD');
-    return money(15, 'USD');
+    if (customer.state === 'CA') return money(1000, 'USD');
+    return money(1500, 'USD');
   }
-  return money(25, 'USD');
+  return money(2500, 'USD');
 };
 
 // REFACTORED - move to customer module
-// src/customers/customer-shipping.ts
+// src/domain/customer-shipping.ts
 export const customerShippingCost = (customer: Customer): Money => {
   if (customer.country === 'US') {
-    if (customer.state === 'CA') return money(10, 'USD');
-    return money(15, 'USD');
+    if (customer.state === 'CA') return money(1000, 'USD');
+    return money(1500, 'USD');
   }
-  return money(25, 'USD');
+  return money(2500, 'USD');
 };
 
-// src/orders/order.ts - now just asks the friend
+// src/domain/order.ts - now just asks the friend
 export const orderShippingCost = (order: Order): Money => customerShippingCost(order.customer);
 ```
 
@@ -157,25 +160,9 @@ export const createUser = (email: string, age: number, zipCode: string): User =>
   return { email, age, zipCode };
 };
 
-// REFACTORED - branded types catch invalid data at construction time
-export type Email = string & { readonly __brand: 'Email' };
-export const email = (value: string): Email => {
-  if (!value.includes('@')) throw new Error('invalid Email');
-  return value as Email;
-};
-
-export type Age = number & { readonly __brand: 'Age' };
-export const age = (value: number): Age => {
-  if (value < 0 || value > 150) throw new Error('invalid Age');
-  return value as Age;
-};
-
-export type ZipCode = string & { readonly __brand: 'ZipCode' };
-export const zipCode = (value: string): ZipCode => {
-  if (!/^\d{5}(-\d{4})?$/.test(value)) throw new Error('invalid ZipCode');
-  return value as ZipCode;
-};
-
+// REFACTORED - branded types with validating factories, two tiers per type (parseEmail returns
+// Result for untrusted input, email() asserts a proven value). The Email / Age / Money exemplar
+// is printed once, in references/clean-code.md, calisthenics rule 3; ZipCode follows the same shape.
 export const createUser = (e: Email, a: Age, z: ZipCode): User => ({ email: e, age: a, zipCode: z });
 ```
 

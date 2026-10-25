@@ -1,6 +1,6 @@
 # Testing infra adapters
 
-Infra adapters are the quarantine zone where thrown exceptions from third-party libraries become `Result<T, PortError>` values. Testing them is not testing the domain — it is testing the translation layer.
+Infra adapters are the quarantine zone where thrown exceptions from third-party libraries become `Result<T, PortError>` values. Testing them is not testing the domain: it is testing the translation layer.
 
 This reference is the companion to `references/testing.md`. The general "what is the unit, what is faked, no mocks" rules come from there; this file covers the patterns that apply specifically to infra-layer adapter tests.
 
@@ -13,7 +13,7 @@ There are three canonical patterns, one per dependency shape. Use the right patt
 Plus two cross-cutting bits at the end:
 
 - The production-wiring smoke test that hits `createX(realDeps)` with placeholder credentials so the wiring line is covered without any network IO
-- The fetch-mock ordering gotcha (silent failures) — most-specific-first, or `endsWith`
+- The fetch-mock ordering gotcha (silent failures): most-specific-first, or `endsWith`
 
 ---
 
@@ -21,31 +21,7 @@ Plus two cross-cutting bits at the end:
 
 For adapters that call `fetch` directly (Telegram, RSS fetcher, most HTTP-based adapters): swap `globalThis.fetch` via a helper that records every call and restores the real `fetch` in `afterEach`.
 
-```ts
-// src/test-helpers/fetch-mock.ts
-export type FetchHandler = {
-  readonly match: (url: string, init?: RequestInit) => boolean;
-  readonly respond: (url: string, init?: RequestInit) => Response | Promise<Response>;
-};
-
-export type FetchMock = {
-  readonly calls: ReadonlyArray<{ readonly url: string; readonly init?: RequestInit }>;
-  readonly restore: () => void;
-};
-
-export const installFetchMock = (handlers: ReadonlyArray<FetchHandler>): FetchMock => {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const original = globalThis.fetch;
-  globalThis.fetch = (async (input, init) => {
-    const url = typeof input === 'string' ? input : input.url;
-    calls.push({ url, init });
-    const handler = handlers.find((h) => h.match(url, init));
-    if (!handler) throw new Error(`fetch-mock: no handler for ${url}`);
-    return handler.respond(url, init);
-  }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = original; } };
-};
-```
+The helper ships as `assets/fetch-mock.ts`: copy it verbatim to `src/test-helpers/fetch-mock.ts` (the Bootstrap checklist does), never retype it. Its shape: `installFetchMock(handlers)` takes an ordered list of `{ match(url, init), respond(url, init) }` handlers (first match wins, so put the more specific matcher first), swaps `globalThis.fetch` for a stub that records every call in `calls`, throws on a request no handler matches, and returns `restore()` for `afterEach`. It derives its input types from the global `fetch` signature and reads the URL of a string, a `URL` or a `Request` alike, which is why a hand-typed copy (`typeof input === 'string' ? input : input.url`) fails typecheck on a `URL`.
 
 Used in a test:
 
@@ -58,7 +34,7 @@ describe('telegramHttp.send', () => {
     mock = installFetchMock([
       {
         match: (url) => url.endsWith('/sendMessage'),
-        respond: () => new Response(JSON.stringify({ ok: true, result: { message_id: 42 } })),
+        respond: () => Response.json({ ok: true, result: { message_id: 42 } }),
       },
     ]);
     const telegram = createTelegramHttp({ botToken: 'test' });
@@ -91,13 +67,13 @@ Assertions land on the returned `Result`, not on how `fetch` was called. The `ca
 
 ## 2. External SDK → dependency injection (three sub-patterns)
 
-For adapters that import a third-party SDK, use **dependency injection**, never `mock.module`. `mock.module` is process-global: once set in one test file, the substitution leaks into every subsequent file the runner loads. `bun:test`'s `mock` namespace is banned outright (see `references/workflow.md`).
+For adapters that import a third-party SDK, use **dependency injection**, never `mock.module`. `mock.module` is process-global: once set in one test file, the substitution leaks into every subsequent file the runner loads. `bun:test`'s mocking surface is banned outright (`references/testing.md`, No `mock` from `bun:test`).
 
 Three sub-patterns, in order of preference. Pick the first that applies.
 
 ### 2a. SDK accepts a custom `fetch` (preferred when available)
 
-Many modern SDKs accept a custom `fetch` implementation as a constructor option — Vercel AI's `createGoogleGenerativeAI({ fetch })`, the OpenAI SDK's `new OpenAI({ fetch })`, the Anthropic SDK's `new Anthropic({ fetch })`. When integrating any new SDK, **check the docs for a custom-fetch option first**. If one exists, the whole adapter becomes end-to-end testable with zero SDK mocking.
+Many modern SDKs accept a custom `fetch` implementation as a constructor option: Vercel AI's `createGoogleGenerativeAI({ fetch })`, the OpenAI SDK's `new OpenAI({ fetch })`, the Anthropic SDK's `new Anthropic({ fetch })`. When integrating any new SDK, **check the docs for a custom-fetch option first**. If one exists, the whole adapter becomes end-to-end testable with zero SDK mocking.
 
 Thread the fetch through your factory as an optional argument. Production omits it (the SDK falls back to `globalThis.fetch`); the test passes a fake fetch returning a canned response.
 
@@ -116,13 +92,13 @@ export const callGemini = (fetchImpl?: typeof globalThis.fetch): GenerateOutput 
         output: Output.object({ schema }),
       });
       return ok(result.output);
-    } catch (e) {
-      return err({ kind: 'generate-failed', message: formatError(e) });
+    } catch (error) {
+      return err({ kind: 'generate-failed', message: formatError(error) });
     }
   };
 };
 
-// Production wiring — no fetch passed; SDK uses globalThis.fetch.
+// Production wiring: no fetch passed; SDK uses globalThis.fetch.
 export const createGeminiLlm = (): Llm => ({
   summarise: (text) => callGemini()({ modelName: 'gemini-2.5-flash', prompt: `...${text}`, schema }),
 });
@@ -137,7 +113,7 @@ import { callGemini } from './gemini-llm.ts';
 describe('callGemini', () => {
   it('when the SDK returns the generated text, returns ok', async () => {
     const fakeFetch = (async () =>
-      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"summary":"ok"}' }] } }] }))
+      Response.json({ candidates: [{ content: { parts: [{ text: '{"summary":"ok"}' }] } }] })
     ) as unknown as typeof globalThis.fetch;
 
     const gen = callGemini(fakeFetch);
@@ -148,16 +124,16 @@ describe('callGemini', () => {
 });
 ```
 
-**Cast note.** `typeof globalThis.fetch` includes `preconnect` (a Bun-specific extension on `fetch`, not part of the WHATWG Fetch standard). A bare arrow function cannot be assigned directly, and `as typeof globalThis.fetch` fails TypeScript's overlap heuristic. Use `as unknown as typeof globalThis.fetch` — the double-cast is load-bearing and `@typescript-eslint/no-unnecessary-type-assertion` will **not** flag it because the conversion truly spans an incompatible gap.
+**Cast note.** `typeof globalThis.fetch` includes `preconnect` (a Bun-specific extension on `fetch`, not part of the WHATWG Fetch standard). A bare arrow function cannot be assigned directly, and `as typeof globalThis.fetch` fails TypeScript's overlap heuristic. Use `as unknown as typeof globalThis.fetch`: the double-cast is load-bearing and `@typescript-eslint/no-unnecessary-type-assertion` will **not** flag it because the conversion truly spans an incompatible gap.
 
 ### 2b. No custom-fetch hook → two-constructor pattern
 
-When the SDK has no fetch injection but its method surface is sliceable (`googleapis`, `firebase-admin`), split the SDK instantiation from the adapter logic. Every adapter exposes **two** exports from day one: `createX(realDeps)` (production wiring, one-liner) and `createXFromApi(api: XApi)` (the testable factory). `XApi` is a minimal type slice covering only the methods this adapter calls — never the full SDK type.
+When the SDK has no fetch injection but its method surface is sliceable (`googleapis`, `firebase-admin`), split the SDK instantiation from the adapter logic. Every adapter exposes **two** exports from day one: `createX(realDeps)` (production wiring, one-liner) and `createXFromApi(api: XApi)` (the testable factory). `XApi` is a minimal type slice covering only the methods this adapter calls, never the full SDK type.
 
 ```ts
 // src/infra/drive-google.ts
 
-// 1) Minimal type slice — only the SDK surface this adapter actually calls.
+// 1) Minimal type slice, only the SDK surface this adapter actually calls.
 export type DriveApi = {
   readonly files: {
     readonly copy: (params: { readonly fileId: string; readonly requestBody: { readonly name: string } }) =>
@@ -167,27 +143,27 @@ export type DriveApi = {
   };
 };
 
-// 2) The testable factory — takes the API shape directly, returns the port.
+// 2) The testable factory: takes the API shape directly, returns the port.
 export const createDriveFromApi = (api: DriveApi): Drive => ({
   copy: async (fileId, name) => {
     try {
       const res = await api.files.copy({ fileId, requestBody: { name } });
       return ok({ id: res.data.id });
-    } catch (e) {
-      return err({ kind: 'copy-failed', message: formatError(e) });
+    } catch (error) {
+      return err({ kind: 'copy-failed', message: formatError(error) });
     }
   },
   getName: async (fileId) => {
     try {
       const res = await api.files.get({ fileId });
       return ok(res.data.name);
-    } catch (e) {
-      return err({ kind: 'not-found', message: formatError(e) });
+    } catch (error) {
+      return err({ kind: 'not-found', message: formatError(error) });
     }
   },
 });
 
-// 3) The production wiring — one-liner that instantiates the real SDK.
+// 3) The production wiring: one-liner that instantiates the real SDK.
 //    `as unknown as DriveApi` is permitted HERE ONLY, because real SDK types
 //    are overloaded and rarely structurally match a hand-written slice.
 export const createGoogleDrive = (auth: GoogleAuth): Drive =>
@@ -198,7 +174,8 @@ The test imports `createDriveFromApi` and passes an in-memory object that satisf
 
 ```ts
 import { describe, expect, it } from 'bun:test';
-import { createDriveFromApi, type DriveApi } from './drive-google.ts';
+import type { DriveApi } from './drive-google.ts';
+import { createDriveFromApi } from './drive-google.ts';
 
 describe('driveGoogle.copy', () => {
   it('when the SDK returns an id, returns ok with that id', async () => {
@@ -217,13 +194,13 @@ describe('driveGoogle.copy', () => {
 });
 ```
 
-If strict lint flags the `as unknown as XApi` cast as unnecessary, the SDK's real type structurally matched the slice — drop the cast. Keep it only when the compiler genuinely needs it.
+If strict lint flags the `as unknown as XApi` cast as unnecessary, the SDK's real type structurally matched the slice: drop the cast. Keep it only when the compiler genuinely needs it.
 
 ### Anti-pattern: `XApi` shaped like the port
 
 The two-constructor pattern only buys testability when `XApi` slices the **SDK's** surface. If `XApi` is shaped like the **port**, the seam is in the wrong place and `createX` stays untestable.
 
-**Bad — `BrowserAuthApi` is a clone of the port:**
+**Bad: `BrowserAuthApi` is a clone of the port:**
 
 ```ts
 // src/infra/browser-auth.ts
@@ -235,13 +212,13 @@ export type BrowserAuthApi = {
 export const createBrowserAuthFromApi = (api: BrowserAuthApi): BrowserAuth => ({
   acquire: async (scopes) => {
     try { return ok({ token: await api.acquireToken(scopes) }); }
-    catch (e) { return err({ kind: 'acquire-failed', message: formatError(e) }); }
+    catch (error) { return err({ kind: 'acquire-failed', message: formatError(error) }); }
   },
   close: api.close,
 });
 
 // What does createBrowserAuth(realDeps) actually look like?
-// It has to call Playwright — but BrowserAuthApi doesn't say HOW.
+// It has to call Playwright, but BrowserAuthApi doesn't say HOW.
 // All the real logic (launchPersistentContext, polling for the auth callback,
 // extracting the cookie) lives inside createBrowserAuth and isn't reachable
 // from createBrowserAuthFromApi at all.
@@ -249,7 +226,7 @@ export const createBrowserAuthFromApi = (api: BrowserAuthApi): BrowserAuth => ({
 
 `createBrowserAuthFromApi` is a tautological pass-through. The test you can write against it proves nothing, and the production wiring stays a black box.
 
-**Good — `PlaywrightApi` slices the SDK's real surface:**
+**Good: `PlaywrightApi` slices the SDK's real surface:**
 
 ```ts
 // src/infra/browser-auth.ts
@@ -277,8 +254,8 @@ export const createBrowserAuthFromApi = (api: PlaywrightApi, config: BrowserAuth
       await page.waitForURL(/code=/, { timeout: config.navigationTimeoutMs });
       const cookies = await ctx.cookies();
       return ok({ token: extractTokenFromCookies(cookies) });
-    } catch (e) {
-      return err({ kind: 'acquire-failed', message: formatError(e) });
+    } catch (error) {
+      return err({ kind: 'acquire-failed', message: formatError(error) });
     }
   },
   // ...
@@ -288,9 +265,9 @@ export const createBrowserAuth = (config: BrowserAuthConfig): BrowserAuth =>
   createBrowserAuthFromApi(playwright.chromium as unknown as PlaywrightApi, config);
 ```
 
-Now the test passes a fake `PlaywrightApi` that returns a stub `ctx` with stub pages and stub cookies — and the **real** orchestration logic inside `createBrowserAuthFromApi` (build URL, wait for redirect, extract token) is exercised. `createBrowserAuth` becomes the genuine one-line wiring it should be, covered by the production-wiring smoke test below.
+Now the test passes a fake `PlaywrightApi` that returns a stub `ctx` with stub pages and stub cookies, and the **real** orchestration logic inside `createBrowserAuthFromApi` (build URL, wait for redirect, extract token) is exercised. `createBrowserAuth` becomes the genuine one-line wiring it should be, covered by the production-wiring smoke test below.
 
-**The diagnostic.** Look at your `XApi` and your port side-by-side. If the method names are nearly identical and the parameter shapes match 1:1, you've made a port clone. The right slice usually has SDK-flavoured names (`launchPersistentContext`, `files.copy`, `chat.completions.create`) and SDK-flavoured option bags — because that's what the production code actually calls.
+**The diagnostic.** Look at your `XApi` and your port side-by-side. If the method names are nearly identical and the parameter shapes match 1:1, you've made a port clone. The right slice usually has SDK-flavoured names (`launchPersistentContext`, `files.copy`, `chat.completions.create`) and SDK-flavoured option bags: because that's what the production code actually calls.
 
 ### 2c. Sync constructor → export the private builder
 
@@ -308,8 +285,8 @@ export const createTwitterApi = (creds: TwitterCreds): TwitterPort => {
       try {
         const res = await client.v2.tweet(text);
         return ok({ id: res.data.id });
-      } catch (e) {
-        return err({ kind: 'post-failed', message: formatError(e) });
+      } catch (error) {
+        return err({ kind: 'post-failed', message: formatError(error) });
       }
     },
   };
@@ -325,7 +302,7 @@ expect(client.v1).toBeDefined();
 expect(client.v2).toBeDefined();
 ```
 
-The constructor runs — the wiring line executes and covers — but no network method is called.
+The constructor runs (the wiring line executes and covers), but no network method is called.
 
 ### Production-wiring smoke test (2b and 2c)
 
@@ -334,7 +311,10 @@ The constructor runs — the wiring line executes and covers — but no network 
 ```ts
 describe('createGoogleDrive (production wiring smoke)', () => {
   it('returns a Drive port with the expected method shape', () => {
-    const drive = createGoogleDrive({ client: {} as never });
+    // a real client with no credentials: the wiring line runs and no request is sent. Never
+    // `{} as never`, the non-narrowing cast testing.md bans; the one sanctioned cast is the
+    // `as unknown as DriveApi` inside the production factory itself.
+    const drive = createGoogleDrive({ client: new google.auth.OAuth2() });
     expect(typeof drive.copy).toBe('function');
     expect(typeof drive.getName).toBe('function');
   });
@@ -344,15 +324,15 @@ describe('createGoogleDrive (production wiring smoke)', () => {
 The smoke test does **two** jobs at once:
 
 1. It exercises the wiring line (the `createXFromApi(realSdk(...))` call) so the per-tier coverage gate passes without launching the real SDK.
-2. It pins the module as reachable, satisfying the `coverage-preload.ts` invariant — every infra file must be importable from the preload chain, and every infra file must have a test that touches it. The smoke test is the cheapest way to do both.
+2. It pins the module as reachable, satisfying the `coverage-preload.ts` invariant: every infra file must be importable from the preload chain, and every infra file must have a test that touches it. The smoke test is the cheapest way to do both.
 
-Methods are asserted as `typeof === 'function'`, not invoked. Invoking would require either a real Playwright browser, a real Google Drive client, or a fake — which would defeat the point. The whole purpose is "prove the wiring compiles and produces the right shape, without doing anything else."
+Methods are asserted as `typeof === 'function'`, not invoked. Invoking would require either a real Playwright browser, a real Google Drive client, or a fake, which would defeat the point. The whole purpose is "prove the wiring compiles and produces the right shape, without doing anything else."
 
 Pattern 2a (custom-fetch DI) does not need a separate smoke test because the production wiring is itself exercised end-to-end by passing `fakeFetch`.
 
 ### Configurable durations for IO loops with deadlines
 
-Adapters that retry, poll, or wait for external state always need a deadline. In production, the deadline matches user expectations (a 5-minute auth callback window, a 30-second LLM timeout, a 2-second between-poll delay). In tests, the same deadlines would crawl the suite to a halt — and `setTimeout` global swaps only help when the duration is genuinely "fire immediately".
+Adapters that retry, poll, or wait for external state always need a deadline. In production, the deadline matches user expectations (a 5-minute auth callback window, a 30-second LLM timeout, a 2-second between-poll delay). In tests, the same deadlines would crawl the suite to a halt, and `setTimeout` global swaps only help when the duration is genuinely "fire immediately".
 
 The pattern: every duration the adapter cares about is a field on a `Config` record passed into the factory. Production wiring fills it with real values; tests pass tiny values.
 
@@ -405,7 +385,7 @@ const auth = createBrowserAuthFromApi(fakePlaywright, fastConfig);
 
 ### Sub-pattern: swapping a global (e.g. `setTimeout`) per-test
 
-When an adapter calls a global like `setTimeout` — for real retry delays, say — tests will crawl unless the global is swapped. **Do not** reach for `mock.module`. Swap the global in `beforeAll` / `afterAll`; the scope is the test file, not the whole process.
+When an adapter calls a global like `setTimeout` (for real retry delays, say), tests will crawl unless the global is swapped. **Do not** reach for `mock.module`. Swap the global in `beforeAll` / `afterAll`; the scope is the test file, not the whole process.
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -437,16 +417,16 @@ For adapters that read or write the filesystem (`token-store-fs`, `prompt-loader
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path from 'node:path';
 import { createPromptLoaderFs } from './prompt-loader-fs.ts';
 
 describe('promptLoaderFs', () => {
   let tmp: string;
-  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'prompt-loader-')); });
+  beforeEach(() => { tmp = mkdtempSync(path.join(tmpdir(), 'prompt-loader-')); });
   afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
   it('when a prompt file exists, returns ok with its content', async () => {
-    writeFileSync(join(tmp, 'summary.md'), 'hello world');
+    writeFileSync(path.join(tmp, 'summary.md'), 'hello world');
     const loader = createPromptLoaderFs({ root: tmp });
 
     const result = await loader.load('summary');
@@ -466,22 +446,22 @@ describe('promptLoaderFs', () => {
 
 ### Triggering read/write catch blocks (chmod, not a directory)
 
-To hit the `catch` branch that guards a `Bun.file(path).text()` or `Bun.write(path, ...)` call, the instinct is to pass a directory path — but `Bun.file(dir).exists()` returns **`false`** for directories, so the read routes to the `not-found` branch instead of throwing. The real way to force a thrown exception is `chmod` on a real file (or directory) and restore in `finally`.
+To hit the `catch` branch that guards a `Bun.file(path).text()` or `Bun.write(path, ...)` call, the instinct is to pass a directory path, but `Bun.file(dir).exists()` returns **`false`** for directories, so the read routes to the `not-found` branch instead of throwing. The real way to force a thrown exception is `chmod` on a real file (or directory) and restore in `finally`.
 
 ```ts
 import { chmodSync } from 'node:fs';
 
 it('when the file is unreadable (chmod 0000), returns err read-failed', async () => {
-  const path = join(tmp, 'locked.md');
-  await Bun.write(path, 'content');
-  chmodSync(path, 0o000);
+  const lockedFile = path.join(tmp, 'locked.md');
+  await Bun.write(lockedFile, 'content');
+  chmodSync(lockedFile, 0o000);
   try {
     const result = await createPromptLoaderFs({ root: tmp }).load('locked');
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('read-failed');
   } finally {
-    chmodSync(path, 0o600); // so afterEach's rmSync can clean up
+    chmodSync(lockedFile, 0o600); // so afterEach's rmSync can clean up
   }
 });
 
@@ -498,11 +478,11 @@ it('when the directory is read-only (chmod 0500), Bun.write returns err write-fa
 });
 ```
 
-The restore in `finally` is mandatory — without it, `afterEach`'s `rmSync` cannot remove the locked file and the next test starts dirty.
+The restore in `finally` is mandatory: without it, `afterEach`'s `rmSync` cannot remove the locked file and the next test starts dirty.
 
 **Platform note.** `chmod` is a Unix primitive; on Windows it is a silent no-op. These tests exercise the catch branch on Linux and macOS CI runners only. If the project ever runs Windows CI, skip these with `if (process.platform !== 'win32') { ... }`.
 
 ## Fetch-mock handler ordering (silent gotcha)
 
-Fetch-mock handlers are checked in array order, first match wins. A broad match like `url.includes('/IG123/media')` will also match `/IG123/media_publish` — Instagram tests failed with `"network-failed"` instead of `"publish-failed"` because of this. Fix: use `url.endsWith('/IG123/media')` for exact suffix matching, or put the more specific handler (`/media_publish`) **first** in the handlers array. Silent failures are the worst kind; prefer `endsWith` by default.
+Fetch-mock handlers are checked in array order, first match wins. A broad match like `url.includes('/IG123/media')` will also match `/IG123/media_publish`: Instagram tests failed with `"network-failed"` instead of `"publish-failed"` because of this. Fix: use `url.endsWith('/IG123/media')` for exact suffix matching, or put the more specific handler (`/media_publish`) **first** in the handlers array. Silent failures are the worst kind; prefer `endsWith` by default.
 

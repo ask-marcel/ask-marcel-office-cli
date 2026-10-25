@@ -4,26 +4,15 @@ Anyone with a stake in the project should be able to see its real state at any m
 
 Two ground rules first: the project has **one working language** (docs, comments, commit messages, identifiers), chosen once and kept everywhere, because a mixed-language repo taxes every reader; and **documentation drift is a defect**: if the README no longer matches how the project installs, runs, or deploys, the change is not finished even with green tests (Behavioural Guideline #5; `references/workflow.md`, README consistency).
 
-## README stays runnable (docs-check in CI, 12.1)
+## README stays runnable (docs-check in CI, canon 12.1)
 
-Drift-as-a-defect is a review duty until a gate makes it mechanical. Keep a README that actually installs and runs the project (exact, runnable commands, not prose), and **fail CI when it goes stale**: the shipped `assets/check-docs.sh` runs the fenced ```bash block under the README's `## Verify` heading, so a documented command that no longer works fails the pull request. Keep the Verify block self-contained and fast (a health curl, a smoke command, a path assertion), not the full install.
+Drift-as-a-defect is a review duty until a gate makes it mechanical. Keep a README that actually installs and runs the project (exact, runnable commands, not prose), and **fail CI when it goes stale**: the shipped `assets/check-docs.sh` runs the fenced ```bash block under the README's `## Verify` heading, so a documented command that no longer works fails the pull request. It runs only lines that name one of the repo's own entry points (`bun run <script>`, `bun test`, `bash scripts/<file>`, `./scripts/<file>`, `./mvnw` with lifecycle phases, `spotless:check` or `pmd:check`, `test -f|-d|-e <path>`), each as an argument list and never through a shell, and it refuses the whole block before anything runs when a line carries a pipe, a redirect, a quote, a variable or any other command. The README documents what the repo can do; it never becomes a second place to write code CI executes, because whoever can edit the README could otherwise run code with the runner's token (the skills.sh Socket and Gen audits flagged the earlier `bash -c` version for exactly that). A health curl or a longer smoke goes in a script under `scripts/` or in `package.json`, and the Verify line calls it. Keep the block fast, not the full install.
 
-```yaml
-# .github/workflows/docs-check.yml
-name: docs-check
-on: [pull_request]
-jobs:
-  readme-runs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bash scripts/check-docs.sh # runs the README's ## Verify commands
-```
+Every variant's shipped CI workflow (`assets/ci.yml`, `ci-next.yml`, `ci-java.yml`) runs `bash scripts/check-docs.sh` as a step after the install, so the lines run against real dependencies under the workflow's read-only permissions, and each bootstrap checklist copies the script. A README without a `## Verify` block passes with a note; add the block to make the gate bite.
 
-The atelier repo's own `scripts/smoke-test.sh` is the reference implementation: it follows this README's install steps verbatim into a scratch repo and fails if any of them break, which is exactly a docs-check for a project whose product is its instructions.
+The atelier repo's own `scripts/smoke-test.sh` is the reference implementation of the idea: it replays the Bootstrap checklist of `references/bun-typescript.md` into a scratch repo and fails if any step breaks, which is exactly a docs-check for a project whose product is its instructions.
 
-## A vendored standard is a dependency (5.3, 12.1)
+## A vendored standard is a dependency (canon 5.3, canon 12.1)
 
 A repo that vendors or pins this skill (a `skills-lock.json` hash, a copied `.claude/skills/`
 tree, a submodule) has taken a dependency on doctrine, and it goes stale exactly like a
@@ -36,19 +25,19 @@ Treat it as the dependency it is. Pin it (never float), re-check the pin on the 
 as the dependency scan, and re-sync deliberately: read what changed between the pinned
 version and current, then bring the gates and their prose across in one commit, because the
 doctrine and the assets that enforce it move together. Vendor it ONCE per repo: two copies
-of the standard in one tree is 12.1 drift with extra steps.
+of the standard in one tree is canon 12.1 drift with extra steps.
 
 The re-check is mechanical, not a memory exercise: `assets/check-skill-pin.sh` compares the
-vendored `SKILL.md` against upstream and fails when it has fallen behind, and it rides in
-`assets/audit.yml` beside the CVE scan rather than blocking commits, because upstream doctrine
-changes independently of your diff. It degrades when it cannot reach upstream, and says so:
-unverified is not the same as current.
+whole vendored tree (SKILL.md, references, assets) file by file against upstream, a repository
+URL cloned shallowly or a local checkout (`SKILL_PIN_UPSTREAM`, set in `assets/audit.yml`), and
+fails when any file is behind; it rides beside the CVE scan rather than blocking commits, since
+upstream moves independently of your diff, and degrades when it cannot check, saying so.
 
 ## Decision records (why is it like this)
 
 Two tiers, one rule: the record changes in the same commit as the code it explains, so it cannot drift.
 
-- **Every significant decision** gets a one-line `[decision]` entry in `.claude/LESSONS.md` (append-only; superseded by a newer entry when it changes). This is the index and stays the default (`references/lessons.md`).
+- **Every significant decision** gets a `[decision]` entry in `.claude/LESSONS.md` (the title line plus the few sentences `references/lessons.md` asks for) (append-only; superseded by a newer entry when it changes). This is the index and stays the default (`references/lessons.md`).
 - **Decisions with rejected alternatives and a reversal path worth keeping** (a vendor, a storage engine, a deliberate lock-in, a security tradeoff) additionally get a full decision record: `docs/adr/NNNN-title.md`, committed with the change. The atelier-grill-me interview output is the natural draft. One trap in the standard MADR template: its `Deciders` field invites a person's name into a tracked file, which rule 26 forbids. Put the accountable ROLE or team handle there (the same string CODEOWNERS uses); who typed it is already in the commit metadata, permanently and for free.
 
 ```markdown
@@ -84,7 +73,7 @@ export const createInvoiceRoute = createRoute({
 });
 ```
 
-Java: MicroProfile OpenAPI annotations on the resource render the spec from the code itself (`references/java-quarkus.md`). Either way the wire contract is also where DTO shapes stop: the internal model is mapped at the boundary (`references/architecture.md`, The internal model is yours).
+Java: MicroProfile OpenAPI annotations on the resource render the spec from the code itself (`references/java-quarkus.md`). Either way the wire contract is also where DTO shapes stop: the internal model is mapped at the boundary (`references/architecture.md`, API shape and the three model boundaries).
 
 ## Numbers, not adjectives
 
@@ -97,7 +86,7 @@ Java: MicroProfile OpenAPI annotations on the resource render the spec from the 
 - Deliberately deferred work is visible with its why, not silently absent.
 - Status is honest: "blocked, waiting on X" beats an "in progress" that has not moved in a week.
 
-## Ownership is explicit (a name next to everything)
+## Ownership is explicit (an owner next to everything)
 
 Shared ownership with no name attached is how things rot: everyone assumes someone else has it.
 
@@ -108,7 +97,7 @@ Shared ownership with no name attached is how things rot: everyone assumes someo
 /docs/adr/        @org/architecture
 ```
 
-Back it with a short RACI note (`docs/OWNERSHIP.md`): for each area, exactly **one** Accountable, any number of Responsible, who is Consulted and Informed. If two teams claim Accountable, split the area. For anything that can break, you should be able to name its owner in seconds.
+Back it with a short RACI note (`docs/OWNERSHIP.md`): for each area, exactly **one** Accountable, any number of Responsible, who is Consulted and Informed, each named by team or role handle as CODEOWNERS does (rule 26 exempts CODEOWNERS and `.mailmap` only, so a person's name in the RACI note is a finding). If two teams claim Accountable, split the area. For anything that can break, you should be able to name its owner in seconds.
 
 ## Separation of duties
 
@@ -125,11 +114,12 @@ This coexists with trunk-based development (`references/workflow.md`): small sam
 Sensitive mutations record who, what, and why, durably, in the same transaction as the change, so accountability is real rather than nominal. Approvals, exceptions, and emergency access leave a record.
 
 ```ts
-export const upgradePlan = (deps: Deps) =>
+export const createUpgradePlan = (deps: Deps) =>
   async (ctx: { actorId: ActorId; reason: string }, orgId: OrgId): Promise<Result<void, PlanError>> =>
     deps.db.transaction(async (tx) => {
       await tx.update(orgs).set({ plan: 'enterprise' }).where(eq(orgs.id, orgId));
       await tx.insert(auditLog).values({ actorId: ctx.actorId, action: 'plan.upgrade', target: orgId, reason: ctx.reason, at: new Date() });
+      return ok(undefined);
     });
 ```
 
@@ -140,7 +130,7 @@ export const upgradePlan = (deps: Deps) =>
 
 ## The platform is a product
 
-Whatever paved road the team ships (templates, gate assets, scaffolds) is run like a product: an owner in CODEOWNERS, a changelog, a support channel, a deprecation policy, and a feedback loop. A golden path nobody maintains gets quietly forked around.
+Whatever paved road the team ships (templates, gate assets, scaffolds) is run like a product: an owner in CODEOWNERS, a changelog, a support channel, a deprecation policy, and a feedback loop. A golden path nobody maintains gets quietly forked around. The profile's numbers for "maintained": a first response to an issue within four business hours, and 90 percent of the services built on it on its current major, the adoption metric the owner reports.
 
 ## Review checklist
 

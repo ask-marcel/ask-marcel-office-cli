@@ -17,7 +17,7 @@ export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'docs',
     summary:
-      'Print Markdown docs for a single command (the same per-command page that ships in `docs/commands.json`). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (docs/help-json/mcp) prints the same --help that command would.',
+      'Print Markdown docs for a single command (the same entry as in the `commands.json` that the package ships). Pass the command name as a POSITIONAL argument — there is no `--command` flag. For lifecycle commands (docs/help-json/mcp) prints the same --help that command would.',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) renders Markdown from the in-process command manifest',
@@ -49,7 +49,7 @@ export const LIFECYCLE_ENTRIES: ReadonlyArray<CommandManifestEntry> = [
   {
     name: 'mcp',
     summary:
-      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as three gateway tools (list-commands, get-command-docs, run-command). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See docs/USAGE.md (MCP server).',
+      'Start the Model Context Protocol server over stdio, exposing every command to an MCP client (Claude Code, Claude Desktop, Cursor, …) as three gateway tools (list-commands, get-command-docs, run-command). Runs in the foreground and serves until the client disconnects — a server entry point, not a one-shot command, so a shell- or MCP-driving agent never calls it directly. Register with `claude mcp add --transport stdio --scope user {bin} -- {bin} mcp`. See USAGE.md of the package (MCP server).',
     category: 'lifecycle',
     graphMethod: 'GET',
     graphPathTemplate: '(lifecycle) serves the command registry over MCP stdio; not a Graph endpoint',

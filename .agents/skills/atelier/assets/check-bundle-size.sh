@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Bundle weight budget (rule 17.7): a light interface is a light payload, so make
+# Bundle weight budget (canon 17.7): a light interface is a light payload, so make
 # it a number the pipeline enforces, not an adjective nobody measures. Fail the
 # build when the built JS crosses its gzipped ceiling.
 #
@@ -37,7 +37,7 @@ total_kb=$(( (total + 1023) / 1024 ))
 echo "check-bundle-size: ${total_kb} KB gzipped in ${dir} (budget ${budget_kb} KB)"
 
 if [ "$total_kb" -gt "$budget_kb" ]; then
-  echo "  OVER BUDGET by $((total_kb - budget_kb)) KB (rule 17.7). Trim the bundle, or raise the budget deliberately in the CI config with a reason." >&2
+  echo "  OVER BUDGET by $((total_kb - budget_kb)) KB (canon 17.7). Trim the bundle, or raise the budget deliberately in the CI config with a reason." >&2
   exit 1
 fi
 

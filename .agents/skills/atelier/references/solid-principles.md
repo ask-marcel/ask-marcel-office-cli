@@ -2,7 +2,7 @@
 
 SOLID helps structure software to be flexible, maintainable, and testable. These principles reduce coupling and increase cohesion. In a codebase with no classes or interfaces, each principle still applies. We express it through function-type aliases and modules of arrow functions.
 
-> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>`: hard rule 16, see `references/result-type.md`.
 
 ## S | Single Responsibility Principle
 
@@ -26,22 +26,22 @@ export const processOrder = async (order: Order): Promise<void> => {
 };
 
 // GOOD - one responsibility per module, composed at the use-case
-// src/orders/services/validate-order.ts
+// src/domain/validate-order.ts
 export const validateOrder = (order: Order): void => {
   if (order.items.length === 0) throw new Error('empty order');
 };
 
-// src/orders/services/calculate-total.ts
+// src/domain/calculate-order-total.ts
 export const calculateOrderTotal = (order: Order): Money =>
-  order.items.reduce((sum, i) => addMoney(sum, i.price), money(0, 'EUR'));
+  order.items.reduce((sum, i) => addMoney(sum, i.price), money(0, order.currency));
 
-// src/orders/services/save-order.ts
+// src/use-cases/ports/order-repo.ts
 export type OrderRepo = { save: (order: Order, total: Money) => Promise<void> };
 
-// src/orders/services/notify-customer.ts
+// src/use-cases/ports/order-notifier.ts
 export type OrderNotifier = { notifyConfirmation: (order: Order) => Promise<void> };
 
-// src/orders/use-cases/place-order.ts (composition)
+// src/use-cases/place-order.ts (the use-case composes the pieces)
 export const placeOrder = async (
   order: Order,
   repo: OrderRepo,
@@ -50,6 +50,9 @@ export const placeOrder = async (
   validateOrder(order);
   const total = calculateOrderTotal(order);
   await repo.save(order, total);
+  // the send follows a commit, so in production it is an outbox row the save writes in the same
+  // transaction and a worker delivers, never an inline call (rule 29, references/reliability.md,
+  // Do not fire and forget); the notifier port here only shows where the responsibility split falls
   await notifier.notifyConfirmation(order);
 };
 ```
@@ -227,17 +230,17 @@ export const createConfirmOrder = (sender: EmailSender): ConfirmOrder =>
   };
 
 // Wire any implementation at composition time
-// src/orders/infra/sendgrid-sender.ts
+// src/infra/sendgrid-sender.ts
 export const sendGridSender: EmailSender = {
   send: async (to, message) => { /* real SendGrid call */ },
 };
 
-// src/orders/infra/ses-sender.ts
+// src/infra/ses-sender.ts
 export const sesSender: EmailSender = {
   send: async (to, message) => { /* real SES call */ },
 };
 
-// src/orders/infra/in-memory-sender.ts (for tests)
+// src/test-helpers/in-memory-sender.ts (a fake lives with the fakes, never in infra/)
 export const createInMemorySender = (): EmailSender & { sent: { to: Email; message: string }[] } => {
   const sent: { to: Email; message: string }[] = [];
   return {

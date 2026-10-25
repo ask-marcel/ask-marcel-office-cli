@@ -7,7 +7,7 @@ import { commands } from './index.ts';
 // The public library of the read package. A consumer runs a command of
 // `commands` on a `ReadGraph`, and names the command with `Command`. These
 // exported types must fit each other: when `Command` asks for more graph than
-// `ReadGraph` gives, the root typecheck fails on this file.
+// `ReadGraph` gives, the typecheck of the read package fails on this file.
 
 const PROFILE = { id: 'u-1', displayName: 'Ada Lovelace' };
 

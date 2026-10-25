@@ -4,8 +4,9 @@
   "_packageManager_comment": "Stryker doesn't fully understand Bun yet; tell it npm so it doesn't probe for yarn/pnpm lockfiles.",
   "packageManager": "npm",
   "testRunner": "command",
+  "_commandRunner_comment": "The command runs once per mutant, so its cost is the whole run's. --bail stops at the first failing test, which is all a kill needs, and only the core's tests run because mutants live only there. A core with no test fails the dry run instead of passing.",
   "commandRunner": {
-    "command": "bun test"
+    "command": "bun test --randomize --bail src/domain src/use-cases"
   },
   "_mutate_comment": "Core only: src/domain + src/use-cases. Test files have no logic to mutate; ports/ files are type-only (zero mutable code).",
   "mutate": [
@@ -21,15 +22,19 @@
   },
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
-  "concurrency": 4,
+  "_concurrency_comment": "No concurrency key: Stryker's default is every core above 4 less one, else all of them (4 on a 4-core CI runner).",
   "timeoutMS": 30000,
-  "reporters": ["clear-text", "progress", "html"],
+  "_reporters_comment": "json feeds scripts/check-mutation-score.ts, which holds every file to thresholds.break: Stryker's own break judges the whole run's score.",
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
   },
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
-  "_ignorePatterns_comment": "Skip non-source dirs from the sandbox copy. .claude/ may contain a symlink Stryker cannot copy (ENOTSUP); the rest are pure noise.",
+  "_ignorePatterns_comment": "Skip non-source dirs from the sandbox copy. .claude/ may contain a symlink Stryker cannot copy (ENOTSUP); the rest are pure noise. The file globs are anchored with a leading slash: gitignore semantics make a bare *.json match at every depth, which dropped a test's src/**/fixtures/*.json from the sandbox and failed the dry run.",
   "ignorePatterns": [
     ".claude/",
     ".agents/",
@@ -43,9 +48,9 @@
     ".stryker-tmp/",
     "node_modules/",
     "coverage/",
-    "*.md",
-    "*.toml",
-    "*.lock",
-    "*.json"
+    "/*.md",
+    "/*.toml",
+    "/*.lock",
+    "/*.json"
   ]
 }

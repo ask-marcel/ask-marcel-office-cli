@@ -2,28 +2,27 @@
 #
 # atelier pre-commit hook (Java/Quarkus variant): the fast gates only
 #
-# A multi-minute hook trains `git commit --no-verify` (rule 15.1, and 15.3), so
+# A multi-minute hook trains `git commit --no-verify` (canon 15.1 and 15.3), so
 # the hook carries only the fast gates. The slow, repo-scaling gates, `./mvnw
 # verify` (compile, tests, JaCoCo tiers) and PIT mutation, run in CI, the line
 # that cannot be skipped. See assets/ci-java.yml and references/java-quarkus.md.
 #
 #   1. commit size   : <=10 files AND <=300 lines (insertions + deletions)
-#   2. pom sanity    : no version ranges, no -SNAPSHOT dependencies
-#   3. secret scan   : gitleaks protect --staged (degrades gracefully)
-#   4. format        : ./mvnw spotless:check
+#   2. pom sanity    : no version ranges, no -SNAPSHOT deps, no mock library
+#   3. suppressions  : no @SuppressWarnings / NOPMD / NOSONAR in staged lines (rule 15)
+#   4. secret scan   : gitleaks git --staged, inline allow comments ignored (degrades gracefully)
+#   5. identity      : no person, employer, or client named in file contents (rule 26)
+#   6. disciplines   : personal data channels, IO deadlines, data lifecycle (rules 27, 29, 30)
+#   7. format        : ./mvnw spotless:check
 #
 # Budget: keep the hook quick. spotless:check pays Maven startup; if that pushes
 # the hook past the budget on your machine, move it to CI too. Never add `./mvnw
 # verify` or PIT to this hook; they are CI-only by design.
 #
-# Install once per clone (alongside the shared commit-msg validator and CI):
+# Install once per clone: copy the whole block in references/java-quarkus.md
+# (Gates and hooks). Every script gates 1-6 call and every script the three
+# workflows call is in it; a partial copy fails this hook or CI's first step.
 #
-#   cp <skill>/assets/pre-commit-java        .githooks/pre-commit
-#   cp <skill>/assets/commit-msg             .githooks/commit-msg
-#   cp <skill>/assets/ci-java.yml            .github/workflows/ci.yml
-#   cp <skill>/assets/check-commit-size.sh   scripts/check-commit-size.sh
-#   cp <skill>/assets/check-pom.sh           scripts/check-pom.sh
-#   chmod +x .githooks/pre-commit .githooks/commit-msg scripts/*.sh
 #   git config core.hooksPath .githooks
 #
 # Bypass with `git commit --no-verify` is reserved for genuine big-bang changes
@@ -39,21 +38,29 @@ fi
 
 echo "pre-commit: running the fast gates..."
 
-echo "[1/4] commit size"
+echo "[1/7] commit size"
 bash scripts/check-commit-size.sh
 
-echo "[2/4] pom sanity (no ranges / -SNAPSHOT deps)"
+echo "[2/7] pom sanity (no ranges / -SNAPSHOT deps / no mock library)"
 bash scripts/check-pom.sh
 
-echo "[3/4] gitleaks protect --staged"
+echo "[3/7] no inline suppression (rule 15)"
+bash scripts/check-no-suppressions.sh
+echo "[4/7] gitleaks git --staged (inline gitleaks:allow ignored)"
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --redact --verbose --no-banner
+  gitleaks git --staged --pre-commit --ignore-gitleaks-allow --redact --verbose --no-banner
 else
   echo "  warning: 'gitleaks' not on PATH, skipping secret scan." >&2
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
 fi
 
-echo "[4/4] ./mvnw spotless:check"
+echo "[5/7] identity in file contents (rule 26)"
+bash scripts/check-identity.sh
+
+echo "[6/7] discipline tripwires (rules 27, 29, 30)"
+bash scripts/check-disciplines.sh
+
+echo "[7/7] ./mvnw spotless:check"
 ./mvnw -q spotless:check
 
 echo "pre-commit: fast gates passed. ./mvnw verify and PIT run in CI (assets/ci-java.yml)."

@@ -265,7 +265,7 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
       // `mcp` is intercepted in main.ts, not registered as a subcommand (that
       // would pull the SDK into every command's module graph), so Commander
       // cannot list it by itself. Name it here or it is undiscoverable.
-      `To serve this over MCP:      ${binName} mcp   (stdio; see README for \`claude mcp add\`)`,
+      `To serve this over MCP:      ${binName} mcp   (stdio; see the package README for \`claude mcp add\`)`,
     ].join('\n  ')
   );
 
@@ -374,7 +374,7 @@ const buildShell = <C extends RegistryCommand<never>>(deps: LifecycleCliDeps<C>,
   const docsCmd = program
     .command('docs')
     .description(
-      `Print Markdown docs for a single command (the same per-command page that ships in \`docs/commands.json\`). Lifecycle commands (${lifecycleNames.join('/')}) are also covered — they ship as manifest entries under category \`lifecycle\`.`
+      `Print Markdown docs for a single command (the same entry as in the \`commands.json\` that the package ships). Lifecycle commands (${lifecycleNames.join('/')}) are also covered — they ship as manifest entries under category \`lifecycle\`.`
     )
     .argument('<command>', `Command name to show docs for (run \`${binName} --help\` to list every command).`)
     .action(async (commandName: string) => {

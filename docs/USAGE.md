@@ -1,3 +1,9 @@
+<!-- FROZEN-2.8.0:BEGIN -->
+> This page is for `ask-marcel-office-cli` 2.8.0. npm installs this version now.
+> The project is now three packages: `@ask-marcel/office-auth`, `@ask-marcel/office-read` and `@ask-marcel/office-write`.
+> For each package, read its README, USAGE and COMMANDS: [auth](../auth/README.md), [read](../read/README.md), [write](../write/README.md).
+<!-- FROZEN-2.8.0:END -->
+
 # Usage guide
 
 Everything beyond "install and call a command" — output formats, OData passthrough, writing bytes to disk, pagination, the library API, architecture, configuration, and the quality gates the project ships under.
@@ -23,7 +29,7 @@ ask-marcel-office help-json --terse --category mail     # ~8 KB JSON for one cat
 ask-marcel-office docs list-mail-messages               # full per-command Markdown
 ```
 
-To upgrade, re-install from npm with the tool you installed with: `npm i -g ask-marcel-office-cli@latest` or `bun add -g ask-marcel-office-cli@latest`. From a clone you can keep using `bun run read/src/main.ts <command>` directly.
+`ask-marcel-office update` auto-detects whether the CLI was installed via npm or bun (based on the bin path) and reinstalls globally with the matching tool. From a clone you can keep using `bun run src/main.ts <command>` directly.
 
 The first launch prints a one-time notice if a newer version is on npm.
 
@@ -54,7 +60,6 @@ from: bob@example.com
 
 $ ask-marcel-office get-mail-message --message-id "bad-id"
 error: ErrorInvalidIdMalformed: Id is malformed.
-code: ErrorInvalidIdMalformed
 hint: The ID you passed isn't valid for this endpoint. Source IDs from a sibling `list-*` command (e.g. `list-mail-messages`, `list-folder-files`, `list-chats`) — never construct them by hand.
 source: graph
 ```
@@ -186,19 +191,18 @@ Serves every command to an MCP client over stdio. Register it:
 ```bash
 claude mcp add --transport stdio --scope user ask-marcel-office -- ask-marcel-office mcp
 # from a dev clone:
-claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/read/src/main.ts mcp
+claude mcp add --transport stdio --scope user ask-marcel-office -- bun <repo>/src/main.ts mcp
 ```
 
-Six gateway tools, not one per command (one schema per command would be ~190 per session, the
+Five gateway tools, not one per command (one schema per command would be ~190 per session, the
 bloat this CLI exists to avoid). Discovery is three hops:
 
 ```
 list-commands { category?: string }            → terse manifest, start here
 get-command-docs { command: string }           → full docs for one command
-run-command { command, params?, outputPath?, outputDir? }        → the 204 READ commands
-run-write-command { command, params?, outputPath?, outputDir? }  → the 7 WRITE commands (4 drafts, 3 PDF)
+run-command { command, params?, outputPath?, outputDir? }        → the 208 READ commands
+run-write-command { command, params?, outputPath?, outputDir? }  → the 4 mail-draft WRITE commands
 login { force?: boolean }                      → sign in / refresh
-status                                         → the four cached tokens (reads only the cache)
 ```
 
 `params` are the command's flags **without** the `--` prefix, keyed camelCase:
@@ -211,95 +215,21 @@ run-command { "command": "list-mail-messages", "params": { "top": "10" } }
 Notes:
 
 - `run-command` is annotated `readOnlyHint: true` so clients can auto-approve it. A write routed
-  through it is refused before it executes. `run-write-command` carries the 7 write commands
-  (4 mail-draft operations and 3 PDF conversions) and is marked non-destructive: a draft is
-  UNSENT, and this CLI cannot send mail; a PDF conversion uploads the attachment to a temporary
-  file in your OneDrive and tries to delete it after the conversion (a failed cleanup can leave it
-  in the `.ask-marcel-temp` folder).
+  through it is refused before it executes. `run-write-command` carries the 4 draft commands and is
+  marked non-destructive: each produces an UNSENT draft, and this CLI cannot send mail.
 - **Raise your client's tool timeout to ~5 minutes** (`MCP_TOOL_TIMEOUT=300000`, or the equivalent).
   Measured live: a browser sign-in takes **37–64 s with no MFA prompt at all** (it varies with how
   warm the persistent browser profile is), and the MCP default request timeout is **60 s** — so
   `login` times out intermittently at the default, right on the boundary. The server keeps running
   through a client-side timeout, so the sign-in has usually completed anyway: re-run your original
-  command, or call the `status` tool, before calling `login` a second time.
+  command, or check `scopes-check`, before calling `login` a second time.
 - **Log in from a terminal first** (`ask-marcel-office login`). A first-time MFA prompt adds minutes on top
   of the above. After that the `login` tool covers the hourly elevated-token refresh.
-- `logout` is deliberately CLI-only.
+- `logout` and `update` are deliberately CLI-only.
 - Results are text (the same YAML-ish rendering the CLI prints, `hint:` / `source:` remedies
   included). Two known v1 warts: paginated results print `next: ask-marcel-office next-page --url '...'`,
   which maps to `run-command { "command": "next-page", "params": { "url": "..." } }`; and
   `--output-path` rejections name the CLI flag rather than the `outputPath` param.
-
-## Token helper (`ask-marcel-office token`)
-
-Hands one bearer to another process, as one JSON line on stdout. It is the helper the coming
-`@ask-marcel/office-read` and `-write` packages call (docs/plans/2026-10-01-package-split.md); it
-is not a command, so it is not in `help-json`, `docs` or the MCP tools.
-
-```bash
-ask-marcel-office token --tier <basic|elevated|chatsvcagg|ic3|guest> [--tenant <guid>] [--reject <fingerprint>]
-# the fast path: its own small entry, no CLI loaded
-node <install>/dist/token.js --tier basic
-```
-
-| Exit | stdout |
-|:--|:--|
-| 0 | `{"accessToken":"…","expiresOn":1760000000}` (`expiresOn` is the token's `exp`, seconds since the epoch); chatsvcagg and ic3 add `"region":"emea"` |
-| 1 | `{"errorCode":"…","tier":"basic","message":"…","remedy":"…"}`: `not_authenticated`, `secondary_token_unavailable`, `auth_cancelled`, `sign_in_in_progress` or `token_cache_unwritable` |
-| 2 | the same shape with `errorCode: "invalid_arguments"` and `tier: null` when no known tier was named |
-
-- `--tenant` goes with `guest` only, which needs it.
-- `--reject` replays a token a service refused with a 401: pass the SHA-256 of that token as 64
-  lowercase hex digits, never the token. If the cache still holds it, the refresh token is redeemed
-  for a new one; if the cache holds a newer token, that one comes back. A replay never opens a
-  browser; elevated, which has no refresh token, fails with `secondary_token_unavailable`.
-- A browser opens only for `basic` and `elevated`, and only when stdin is a terminal. Every other
-  call opens no browser and fails with the error line. When another process holds the token cache
-  (a `login` in progress), a call off a terminal gives up after 20 s with `sign_in_in_progress`, so
-  an agent or an MCP server is never left waiting; a call from a terminal waits as long as a
-  sign-in may take.
-- A chatsvcagg or ic3 token is printed only with its region. If the token cache cannot be read
-  back for the region, the call fails with `secondary_token_unavailable`.
-- Every remedy names `ask-marcel-office` and `ask-marcel-office status`, except the
-  `invalid_arguments` one, which gives the call shape.
-- The token is printed in the success line and nowhere else: messages never echo an argument, and
-  the helper writes no log.
-- Every run of the CLI or the helper keeps `~/.ask-marcel/token-helper.json` current
-  (`{ "execPath", "entry", "version" }`, mode `0600`, no secret; rewritten only when it
-  changes), so a caller can run `execPath entry --tier …` without PATH.
-
-### Signing commands through the helper (`ASKMARCEL_TOKEN_COMMAND`)
-
-By default the CLI and the MCP server read the token cache in process. When `ASKMARCEL_TOKEN_COMMAND`
-names a token helper (an absolute path, for example `<install>/dist/token.js`), they get every
-bearer the way `@ask-marcel/office-read` and `-write` will:
-
-1. A tier variable, when it is set: `ASKMARCEL_TOKEN_BASIC`, `ASKMARCEL_TOKEN_ELEVATED`,
-   `ASKMARCEL_TOKEN_CHATSVCAGG` or `ASKMARCEL_TOKEN_IC3`, with `ASKMARCEL_TEAMS_REGION` beside a
-   chat token. The token is checked each time it is used: three base64url segments and nothing
-   else, then its expiry and audience. A token that fails gives `env_token_invalid`, which names the
-   variable and never its value. The helper is then not asked, and a token from a variable that
-   the service refuses with a 401 is not replayed: the call fails with `env_token_invalid`. Guest
-   tokens have no variable.
-2. The helper, run as `<helper> --tier <tier> [--tenant <guid>] [--reject <fingerprint>]`, never
-   through a shell. stdin goes to it only from a terminal, where it may wait up to 13 minutes (a held
-   lock plus a browser sign-in); otherwise it has 90 seconds. One run serves every concurrent call
-   for a tier (and tenant), and its token is kept in memory for 5 minutes at most, never closer than
-   5 minutes to its expiry. A failure gives the helper's exit code, the length of its stdout and its
-   `errorCode`, never what it printed; a helper that cannot be started gives
-   `token_helper_unavailable`.
-
-On both paths, a Graph request that Graph refuses with a 401 and the code `InvalidAuthenticationToken`
-or `TokenExpired` is sent one more time with a newer basic or guest token: from the token cache or the
-refresh token by default, from the helper with `--reject` here. It never opens a browser. A 401 with
-another code (such as `invalidAudienceUri`) is an answer and is not replayed, and neither is a request
-signed with the elevated token, which has no refresh token.
-
-The read and write packages will also find a helper with no variable: through
-`~/.ask-marcel/token-helper.json`, then `ask-marcel-office-auth` on PATH (on Windows, an npm `.cmd`
-shim is read for its script, which runs with the current runtime). The source that does this is
-`createEnvThenHelperTokenSource` in `src/composition/token-source.ts`; the library does not export it
-yet.
 
 ## Library API
 
@@ -329,7 +259,7 @@ const md = await commands['convert-local-file-to-markdown'].executeLocal?.(creat
 const images = await commands['extract-local-file-images'].executeLocal?.(createNodeFileSystem(), { path: './deck.pdf' });
 ```
 
-The full export list (registry, factories, `Result`, branded types, ports) is in [`read/src/index.ts`](../read/src/index.ts). The machine-readable manifest is also available as a JSON subpath import:
+The full export list (registry, factories, `Result`, branded types, ports) is in [`src/index.ts`](../src/index.ts). The machine-readable manifest is also available as a JSON subpath import:
 
 ```ts
 import manifest from 'ask-marcel-office-cli/commands.json' with { type: 'json' };
@@ -347,17 +277,11 @@ src/
   presenter/       — Output formatting: pure renderers (render-to-string) + the CLI's stdout shim (output)
 ```
 
-Two front ends, one execution path. `composition/cli-shell.ts` (Commander) and
-`composition/mcp-shell.ts` (MCP stdio) both call `composition/run-registry-command.ts`, which owns
-everything between "resolved command + params" and "value or failure": option-alias normalization,
-local-filesystem routing, error-source classification, and `--output-path` / `--output-dir`
-persistence. Adding a fix there reaches both surfaces.
-
-These three modules and the docs builders import no registry. They get the package (its registry,
-its lifecycle entries, its bin and its package name) as an argument. `composition/single-package.ts`
-holds the package of this CLI, and `composition/cli.ts` and `composition/mcp.ts` give it to the two
-builders together with the auth commands (`auth-cli.ts`, `auth-mcp.ts`). An ESLint rule stops these
-shared modules from importing the registry or a lifecycle command.
+Two front ends, one execution path. `composition/cli.ts` (Commander) and `composition/mcp.ts` (MCP
+stdio) both call `composition/run-registry-command.ts`, which owns everything between "resolved
+command + params" and "value or failure": option-alias normalization, local-filesystem routing,
+error-source classification, and `--output-path` / `--output-dir` persistence. Adding a fix there
+reaches both surfaces.
 
 The presenter split exists for the same reason. `render-to-string.ts` formats and returns a string;
 `output.ts` is the only sanctioned `process.stdout` writer. The MCP server cannot write to stdout —
@@ -369,14 +293,13 @@ as tool content.
 - **Scopes**: `https://graph.microsoft.com/.default openid profile offline_access`
 - **Token cache**: `~/.ask-marcel/token-cache.json`, written `0600` (overridable via `BuildDepsConfig.cachePath`)
 - **Browser profile**: `~/.ask-marcel/browser-profile` (overridable via `ASKMARCEL_BROWSER_PROFILE`)
-- **Token helper locator**: `~/.ask-marcel/token-helper.json`, where the `token` helper entry lives (no secret; see Token helper)
 - **Output**: YAML-ish text by default (LLM-readable, generally smaller than the JSON envelope on long listings, parity on small projected pages); compact JSON envelope via `--output json` for tool-chaining and `jq` pipelines
 
 ### Elevated token (historical-version downloads)
 
 `download-drive-item-version --format <original|pdf|markdown>` needs a Graph token whose `appid` is on Microsoft's ODSP allow-list — the Teams web client token returns 403 with `logicalPermissionAccessDenied` against historical-version bytes.
 
-Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used by the five commands that need it: `download-drive-item-version`, `diff-drive-item-versions`, `list-chats`, `get-chat`, and `get-user` as its fallback when a tenant refuses the basic token (help-json flags them `needsElevatedToken`). Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`status`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
+Login captures a *second* Graph token from `https://m365.cloud.microsoft/search` whose first-party identity is M365ChatClient (`c0ab8ce9-e9a0-42e7-b064-33d422df41f1`) — an app on the ODSP allow-list. It is stored alongside the Teams token (`elevated_access_token` / `elevated_expires_on` fields in the cache) and used by the five commands that need it: `download-drive-item-version`, `diff-drive-item-versions`, `list-chats`, `get-chat`, and `get-user` as its fallback when a tenant refuses the basic token (help-json flags them `needsElevatedToken`). Refresh path is re-capture via a brief Edge launch — the persistent profile cookies do silent SSO when fresh; if the federated IdP session has lapsed, interactive sign-in completes inside the popup. If the elevated capture fails at login, every other command still works. Because the elevated token carries no refresh token of its own, a cache-hit `login` does not renew it; run `ask-marcel-office login --force` to re-capture every token (basic + elevated + the chatsvcagg / ic3 substrate tokens) in one browser pass. `login` itself prints only a slim availability summary; **`scopes-check`** is the side-effect-free detailed view — per token it reports availability, seconds-to-expiry, refresh route, and that token's own granted scopes (decoded from its `scp`; the four sets are distinct) — so you can see which token is about to lapse, or lacks a required scope, before a command hits a 403.
 
 ## Configuration
 
@@ -389,38 +312,25 @@ Environment variables read at composition time:
 | `ASKMARCEL_BROWSER_PROFILE` | Override Playwright user-data-dir | _(none)_ |
 | `ASKMARCEL_BINARY_TIMEOUT_MS` | Wall-clock budget for one binary download (a file's bytes, a PDF conversion) in milliseconds; a 90 MB deck on a slow link needs more than the default | `300000` (5 min) |
 | `ASKMARCEL_TZ` | IANA time zone in which named days and boundaries resolve (`today`, `yesterday`, `monday`, `start-of-week`); `--tz <zone>` on any command overrides it for one run | _(the machine's zone)_ |
-| `ASKMARCEL_TOKEN_COMMAND` | Absolute path of a token helper; when set, commands get their bearers from the tier variables, then that helper, instead of the token cache (see Token helper) | _(none: the token cache)_ |
-| `ASKMARCEL_TOKEN_BASIC` / `_ELEVATED` / `_CHATSVCAGG` / `_IC3`, `ASKMARCEL_TEAMS_REGION` | A tier's token (and the chat tiers' region), read only when `ASKMARCEL_TOKEN_COMMAND` is set | _(none)_ |
 
 `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy` are stripped from the process environment immediately before launching Playwright (see `src/infra/browser-auth.ts`).
 
 ## Quality gates (atelier four-check loop)
 
 ```bash
-bun run test       # full suite of every folder (5,500+ tests)
+bun test           # full suite (5,500+ tests)
 bun run lint       # ESLint (0 warnings, 0 errors)
 bun run typecheck  # tsc --noEmit
-bun run coverage   # in a folder: per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
-bun run mutate:changed  # in a folder: mutation testing on changed domain/use-case files (>90% kill threshold)
-bun run check:read-bundle  # the read graph and the read commands, built alone, hold no write method
-bun run check:package-imports  # a write module imports only core and write modules; read and core never reach write; a test file imports one package besides core
+bun run coverage   # per-tier gates (100% on every tier: domain, use-cases, infra, composition, presenter)
+bun run mutate:changed  # mutation testing on changed domain/use-case files (>90% kill threshold)
 ```
-
-The repo is also a Bun workspace for the package split (`docs/plans/2026-10-01-package-split.md`):
-`core/`, `auth/`, `read/` and `write/` each hold their own `package.json`, configs, tests and gates.
-Since phase 6 the root holds no package and no `src/`: at the root, `bun run test` runs every
-folder's tests. In a folder, the same commands run that folder's gates (`bun test`, `bun run lint`,
-`bun run typecheck`, `bun run coverage`, `bun run mutate:changed`), and a published folder adds
-`bun run build` and `bun run check:packed` (the packed tarball, installed into a clean consumer).
 
 ### Pre-commit hook (fast gates; the rest run in CI)
 
-The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → staged lint → typecheck). Staged lint and typecheck run in the root and in each workspace folder with a staged change; a change under `core/` also runs them in `auth/`, `read/` and `write/`, and a moved file counts in the folder it leaves and in the folder it enters. Each is O(staged files) or O(1), so the hook stays within a few seconds. The full test suite, per-tier coverage and Stryker mutation deliberately run in CI instead (`.github/workflows/ci.yml`), which is the line that cannot be skipped — a green commit has NOT run them locally. CI also builds the bundle and smoke-tests it under Node and Bun, both from `dist/` and installed from the packed tarball into an empty directory. Install once per clone:
+The repo ships a five-gate hook at `.githooks/pre-commit` (commit size → package.json → gitleaks → staged lint → typecheck). Each is O(staged files) or O(1), so the hook stays within a few seconds. The full test suite, per-tier coverage and Stryker mutation deliberately run in CI instead (`.github/workflows/ci.yml`), which is the line that cannot be skipped — a green commit has NOT run them locally. Install once per clone:
 
 ```bash
 git config core.hooksPath .githooks
 ```
-
-The same setting wires `.githooks/commit-msg`, which rejects a commit whose header is not a Conventional Commit: `type(scope)!: subject`, the type one of `feat fix docs style refactor perf test build ci chore revert`, a lowercase scope and the `!` optional, no trailing period, at most 100 characters. Headers git writes itself (Merge, Revert, fixup!, squash!) pass. CI runs the hook against its fixtures (`scripts/commit-msg-selftest.sh`), then re-checks every pushed commit with it (`scripts/check-commit-messages.sh`), so a header that skipped the hook with `--no-verify` still turns CI red.
 
 Optional but recommended: install [gitleaks](https://github.com/gitleaks/gitleaks) (`brew install gitleaks`) to enable gate 3. The hook degrades gracefully if it's missing.

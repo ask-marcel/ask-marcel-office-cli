@@ -16,19 +16,30 @@ on:
       - pom.xml
       - '**/pom.xml'
       - .claude/skills/**       # a re-sync of the standard is a dependency change
+permissions:
+  contents: read
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: dependency CVEs (OWASP dependency-check, fails on high CVSS)
+      # The version and failBuildOnCVSS 7 come from the pom's pluginManagement
+      # (references/java-quarkus.md, canonical pom): the plugin's default of 11
+      # never fails. Add the NVD_API_KEY repository secret (a free NVD key).
+      - name: dependency CVEs (OWASP dependency-check, fails on CVSS 7 and above)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./mvnw -q org.owasp:dependency-check-maven:check
       # A vendored standard goes stale silently while every other gate stays
       # green; this fails when the pinned copy falls behind upstream.
       - name: vendored standard is current
+        env:
+          # The repository the whole vendored tree is compared against (a
+          # shallow clone); point it at your fork if you keep one.
+          SKILL_PIN_UPSTREAM: https://github.com/vdelacou/atelier
         run: bash scripts/check-skill-pin.sh

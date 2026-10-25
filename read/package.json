@@ -31,6 +31,8 @@
     "dist/",
     "CHANGELOG.md",
     "README.md",
+    "USAGE.md",
+    "COMMANDS.md",
     "LICENSE"
   ],
   "engines": {
@@ -50,6 +52,8 @@
     "mutate": "stryker run",
     "mutate:changed": "bash ../scripts/mutate-changed.sh",
     "mutate:staged": "bash ../scripts/mutate-staged.sh",
+    "docs:gen": "bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --commands-doc COMMANDS.md",
+    "check:docs": "bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --check --commands-doc COMMANDS.md --manifest dist/commands.json && bun run ../scripts/check-doc-numbers.ts --package src/composition/single-package.ts --readme README.md --usage USAGE.md --commands-doc COMMANDS.md --manifest dist/commands.json",
     "build": "rm -rf dist && bun run ../scripts/build-package.ts && bun run ../scripts/add-shebang.ts dist/cli.js && bun run ../scripts/build-types.ts && bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --manifest dist/commands.json",
     "check:packed": "bun run ../scripts/check-packed-package.ts",
     "smoke": "bun ../scripts/qa-bundle-smoke.ts",

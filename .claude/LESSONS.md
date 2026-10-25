@@ -808,3 +808,28 @@ Rule for next time: when you compare the output of two bin names, change the bin
 
 The read library picks the file system and the process runner of the runtime that loads it (`onBun() ? createBun… : createNode…`). With the Bun pick forced, all read tests, the build, `check:packed` and both smokes passed, but a node caller got `token_helper_unavailable` ("Bun is not defined"). With two exports deleted from `read/src/index.ts`, every gate passed too: `check:packed` reads the exports that exist, and the tests import only `commands` and the types. Commit 28 now loads the library by name under node and bun, checks the exact export list, and gets a token from a stub helper that `ASKMARCEL_TOKEN_COMMAND` names. The stub builds its token at run time.
 Rule for next time: when a package exports a library, its bundle smoke loads it by name under node and under bun, checks the exact export list, and calls each export that picks a runtime. A unit test under bun cannot prove a node branch.
+
+## [gotcha] 2026-10-25 | a conventional commit scope cannot hold a comma, and the commit-msg hook refuses it only after the pre-commit gates pass
+
+The phase 7 design gave commit 8 the subject `docs(write,auth): …`. The pre-commit gates ran and passed, and then the commit-msg hook refused the subject, because a scope is one word with no comma. No commit was made, and the gates had to run again with `docs: …`. `--no-verify` also skips the commit-msg hook, so commit 27 ran `scripts/check-commit-messages.sh` by hand.
+Rule for next time: a subject that names two packages has no scope. Run `bash scripts/check-commit-messages.sh` on each planned subject before the series starts, and after each commit made with `--no-verify`.
+
+## [gotcha] 2026-10-25 | a failed `import()` of `--package` crashed bun with exit 1, which is also the exit code of a stale doc
+
+`gen-docs.ts --check` gives exit 1 for a stale `COMMANDS.md` and exit 2 for a usage error. With a wrong `--package` path, the dynamic import threw and bun stopped with exit 1, so a typo looked like a stale doc. Commit 9 made the import of `scripts/command-packages.ts` return a `Result` error, and both scripts now give exit 2. The CI red fixture requires exit 1 exactly, after a control run of the same copy that must give exit 0, and it fails when the `sed` changed no count (`cmp -s`). The `gates` job builds nothing, so the fixture gives no `--manifest`: a missing manifest would make each run stale for the wrong reason.
+Rule for next time: give each failure of a gate its own exit code, and catch a crash of an import as a usage error. A red fixture requires the exact code of its fault, after a control run that passes.
+
+## [gotcha] 2026-10-25 | `parseArgs` keeps only the last value of a repeated plain option and gives no error
+
+Commit 22 made `gen-docs.ts` and `check-doc-numbers.ts` take one package per run. With `--package` as a plain string option, `node:util` `parseArgs` silently keeps the last of two `--package` values, so a run with two packages documents the second one only. The option keeps `multiple: true`, and the scripts refuse a second value with exit 2.
+Rule for next time: when a script takes an option once, declare it `multiple: true` and refuse more than one value. Do not trust `parseArgs` to refuse a repeated option.
+
+## [decision] 2026-10-25 | the 2.8.0 docs keep their v2.8.0 bytes under a banner, and the gate hashes bytes, not text
+
+The npm page of `ask-marcel-office-cli` 2.8.0 links `docs/COMMANDS.md`, `docs/USAGE.md`, `docs/commands.json` and `docs/demo.gif` on `main`. Phase 7 gave these files back the v2.8.0 bytes, and each Markdown file has a `FROZEN-2.8.0` banner on top. `scripts/check-frozen-docs.ts` holds the sha256 of the v2.8.0 bytes, and it reads each file with `arrayBuffer()`. A `text()` read decodes UTF-8 and changes each invalid byte to U+FFFD, so a changed byte of the gif could hide. Rejected: an edit of the false claims by hand, because no registry has the 2.8.0 surface to check an edit against.
+Rule for next time: change only the banner of a frozen doc. To check a file that must not change, hash its bytes, and prove in a selftest that a changed byte which a decode hides is refused.
+
+## [gotcha] 2026-10-25 | a count gate of anchored claims does not see a new count sentence, so it needs a sweep
+
+Each claim of `check-doc-numbers.ts` checks one anchored sentence. A new sentence such as "the 12 mail commands" matched no anchor, so it passed with no check. Also, a table row "The 204 read commands by name" did not match the anchor "the N … commands", and the rows were rewritten as "Each of the N … commands, by name". Commit 21 added a sweep: in a package README or USAGE, a digit count before "commands" or "entries" that no claim checks is a failure. The claims take "The" or "the", and a space in an anchor matches any white space, so a line break does not hide a sentence.
+Rule for next time: write each count of a doc in digits, in an anchored form of its own package. Add a claim for each new count sentence in the same commit. The sweep sees only the nouns that it names: the review found "the 4 mail-draft operations" in `write/USAGE.md` with no check. Write a count of another noun once, in a sentence that a claim checks.

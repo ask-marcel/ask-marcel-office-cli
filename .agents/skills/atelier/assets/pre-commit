@@ -3,7 +3,7 @@
 # atelier pre-commit hook - the fast gates only
 #
 # A pre-commit hook earns its keep by staying fast. A multi-minute hook trains
-# `git commit --no-verify` (rule 15.1, and 15.3), so the hook carries only the
+# `git commit --no-verify` (canon 15.1 and 15.3), so the hook carries only the
 # gates that are fast and stay fast as the repo grows: each is O(staged files)
 # or O(1), and the whole hook targets a few-seconds budget. The full, slow, and
 # repo-scaling gates (the whole test suite, per-tier coverage, and Stryker
@@ -12,9 +12,11 @@
 #
 #   1. commit size   - <=10 files AND <=300 lines (insertions + deletions)
 #   2. package.json  - no "latest" / "*" / bare dist-tag version strings
-#   3. secret scan   - gitleaks protect --staged (degrades gracefully)
-#   4. staged lint   - eslint on the staged TS files only (fast, not type-aware)
-#   5. typecheck     - tsc --noEmit
+#   3. secret scan   - gitleaks git --staged, inline allow comments ignored (degrades gracefully)
+#   4. identity      - no person, employer, or client named in file contents (rule 26)
+#   5. disciplines   - personal data channels, IO deadlines, data lifecycle (rules 27, 29, 30)
+#   6. staged lint   - eslint on the staged TS files only (fast, not type-aware)
+#   7. typecheck     - tsc --noEmit
 #
 # Budget: keep the hook under ~5s. A gate's home is chosen by its speed, not its
 # importance: if a gate here exceeds the budget on your repo (typecheck is the
@@ -38,24 +40,30 @@ fi
 
 echo "pre-commit: running the fast gates..."
 
-echo "[1/5] commit size"
+echo "[1/7] commit size"
 bash scripts/check-commit-size.sh
 
-echo "[2/5] package.json (no latest / *)"
+echo "[2/7] package.json (no latest / *)"
 bash scripts/check-package-json.sh
 
-echo "[3/5] gitleaks protect --staged"
+echo "[3/7] gitleaks git --staged (inline gitleaks:allow ignored)"
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --redact --verbose --no-banner
+  gitleaks git --staged --pre-commit --ignore-gitleaks-allow --redact --verbose --no-banner
 else
   echo "  warning: 'gitleaks' not on PATH - skipping secret scan." >&2
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
 fi
 
-echo "[4/5] bun run lint:staged"
+echo "[4/7] identity in file contents (rule 26)"
+bash scripts/check-identity.sh
+
+echo "[5/7] discipline tripwires (rules 27, 29, 30)"
+bash scripts/check-disciplines.sh
+
+echo "[6/7] bun run lint:staged"
 bun run lint:staged
 
-echo "[5/5] bun run typecheck"
+echo "[7/7] bun run typecheck"
 bun run typecheck
 
 echo "pre-commit: fast gates passed. The full suite, coverage, and mutation run in CI (.github/workflows/ci.yml)."

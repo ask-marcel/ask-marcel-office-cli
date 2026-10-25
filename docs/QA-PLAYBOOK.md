@@ -1,6 +1,6 @@
 # QA Audit Playbook — full-surface health check
 
-A repeatable, full-coverage audit of the `ask-marcel-office` CLI. Every run walks the **entire** command surface (all commands, all parameters, all global flags), both **offline** (gates, bundle, manifest consistency) and **live** (read-only probes against the real Microsoft 365 tenant). The output is a severity-ranked findings report — fixes happen only after the maintainer approves a plan ("report, then plan").
+A repeatable, full-coverage audit of the three bins `ask-marcel-office-auth`, `ask-marcel-office-read` and `ask-marcel-office-write`. Every run walks the **entire** command surface (all commands, all parameters, all global flags), both **offline** (gates, bundle, manifest consistency) and **live** (read-only probes against the real Microsoft 365 tenant). The output is a severity-ranked findings report — fixes happen only after the maintainer approves a plan ("report, then plan").
 
 Run it with the `/qa-audit` skill, or hand this document to a fresh session and execute phase by phase.
 
@@ -9,9 +9,9 @@ Run it with the `/qa-audit` skill, or hand this document to a fresh session and 
 ## 0. Ground rules
 
 **Prerequisites**
-- Clean working tree on `main`, with the read package freshly built (`bun run build` in `read/`; since phase 6 of the package split the root holds no package and no `dist/`). The live drivers run `read/dist/cli.js`.
-- Logged in through the auth package: run `bun run build` in `auth/`, then `node auth/dist/cli.js login` once from the repository root. Since phase 4 of the package split the root CLI has no `login`. It takes its tokens from the auth token helper, which each auth run records in `~/.ask-marcel/token-helper.json`. The token cache must be valid at `~/.ask-marcel/token-cache.json` (includes the elevated M365ChatClient token for the 3 historical-version commands).
-- `docs/commands.json` regenerated this run (`bun run docs:gen`) — every matrix below is driven from it.
+- Clean working tree on `main`, with the three packages freshly built: `bun run build` in `auth/`, `read/` and `write/`. The root holds no package and no `dist/`. The live drivers run `read/dist/cli.js`.
+- Signed in through the auth package: run `node auth/dist/cli.js login` once from the repository root. The read and write bins take their tokens from the auth token helper, which each auth run records in `~/.ask-marcel/token-helper.json`. The token cache at `~/.ask-marcel/token-cache.json` must be valid. It must include the elevated M365ChatClient token for the 5 commands that need it (`help-json` flags them `needsElevatedToken`).
+- In each of `auth/`, `read/` and `write/`, run `bun run build` and then `bun run check:docs` this run. The build writes `dist/commands.json`, and `check:docs` fails when `COMMANDS.md`, the manifest or a count in the package docs is not true. To make `COMMANDS.md` again, run `bun run docs:gen` in the folder.
 
 **Safety rules (non-negotiable)**
 1. **Read-only guarantee**: only commands whose manifest `effect` is `read` run against the tenant (GET, plus the search and free/busy POSTs). `scripts/qa-live-sweep.ts` enforces it as an allow-list and skips the mail drafts and the PDF conversions (which upload a temporary file). Stay alert for any new command that writes but declares `read`.
@@ -22,7 +22,7 @@ Run it with the `/qa-audit` skill, or hand this document to a fresh session and 
 6. **A5 measures the gate, not the codebase.** The aggregate of a full run is diluted by every well-tested file in the repo and can pass while the diff that is about to ship fails: on 2026-09-02 the full run scored **91.66% (pass)** while CI's `mutate:changed` over the same tree scored **84.31% (fail)**, because CI mutates only what the diff touched and nothing dilutes it there. Run A5 as `mutate:changed` against the last released ref; treat the full run as a rare baseline.
 7. **Run the live sweep (E1) in isolation.** A concurrent `bun run build` (which does `rm -rf dist`) or a mutation run starves the CLI subprocesses the sweep spawns, so `spawnSync` times out and the result reads as `UNPARSEABLE` — faking a mass regression (seen 2026-07-13: 132 false `ERR:UNPARSEABLE` under a concurrent rebuild+mutation, then 152 ok / zero drift when re-run alone). Never build, mutate, or launch other subprocess-heavy work while E1 runs; widespread `UNPARSEABLE`/timeout means contention, not drift — re-run it alone.
 8. **A force-push leaves CI's mutation gate blind.** CI mutates `github.event.before...HEAD`; after a history rewrite the old tip is gone from the runner's clone, so the step falls back to `HEAD~1` and mutates one commit (a docs commit: nothing). Before force-pushing a release, run A5 locally against the last released tag over the final tree: that run is the gate (2026-09-27).
-9. **Compare random-looking fixture GUIDs with the signed-in user's own ids.** A live probe's value pasted as a test fixture is a real directory id in a public repo: `[ "$(ask-marcel-office get-current-user --output json | jq -r .data.id)" = "<guid>" ]` answers match or not without printing the id (2026-09-27 found one in three chat tests; history was rewritten).
+9. **Compare random-looking fixture GUIDs with the signed-in user's own ids.** A live probe's value pasted as a test fixture is a real directory id in a public repo: `[ "$(node read/dist/cli.js get-current-user --output json | jq -r .data.id)" = "<guid>" ]` answers match or not without printing the id (2026-09-27 found one in three chat tests; history was rewritten).
 
 **Severity rubric**
 | Level | Meaning | Examples from past runs |
@@ -58,22 +58,22 @@ Since phase 6 of the package split the root holds no package: run A1 to A5 in ea
 | A7b | **Packed-install smoke** | `bun run build && bun run smoke:packed` in `read/` (`scripts/qa-packed-install-smoke.ts`; needs the registry; CI runs it in the `smoke` job) | Packs the tarball, installs it into an empty directory outside the repo, loads every package the bundle imports at run time under node and bun (the update notifier included, which no converter reaches; since phase 4, playwright is a dependency of the auth package, not of the root), checks `--version` through the bin and the `.bin` shim, loads the library by name with its `commands.json` subpath, then reruns A7 against the installed copy. Catches a dependency missing from `package.json`, which every in-repo gate misses because the repo's node_modules supplies it |
 | A7c | **Auth bundle smoke** | `bun run build && bun run smoke` in `auth/` (`scripts/qa-auth-bundle-smoke.ts`; CI runs it in the `workspace` job for `auth`) | Runs the built `auth/dist/` under node and bun. Each probe has a new temporary HOME and no `ASKMARCEL_*` variable. `dist/token.js` carries no commander, winston or update-notifier. A cached token gives one JSON line through `dist/token.js` and through `cli.js token`. A home with no session fails fast with `not_authenticated` (exit 1). Each run leaves a locator that names `auth/dist/token.js` at the auth version. `cli.js --version` answers that version. `cli.js mcp` writes only JSON-RPC frames, has exactly the tools `login` and `status`, and no tool text holds the token |
 | A7d | **Write bundle smoke** | `bun run build && bun run smoke` in `write/` (`scripts/qa-write-bundle-smoke.ts`; CI runs it in the `workspace` job for `write`) | Runs the built `write/dist/` under node and bun. Each probe has a new temporary HOME and no `ASKMARCEL_*` variable, except a bad `ASKMARCEL_TOKEN_BASIC` where a probe needs one. `dist/cli.js` and `dist/index.js` carry no converter library, no playwright and no read graph. `--version` answers the write version. `--help` lists the 7 write commands, `help-json` and `docs`; `help-json` has 10 entries. A missing flag and an unknown flag exit 1 before any token request. A full call with the bad token gives `env_token_invalid`, exit 1. `list-drives` names `@ask-marcel/office-read`, exit 1. `cli.js mcp` writes only JSON-RPC frames and has exactly the tools `list-commands`, `get-command-docs` and `run-write-command`. No probe leaves a token cache or a locator under HOME. The library loads by name |
-| A8 | Deploy parity | After the release of the split (phase 8): `cmp "$(npm root -g)/@ask-marcel/office-read/dist/cli.js" read/dist/cli.js`; `ask-marcel-office-read --version` vs `read/package.json`. Until then, skip it: the installed `ask-marcel-office-cli` 2.8.0 has no build in the repository | byte-identical, versions match |
+| A8 | Deploy parity | After the release of the split (phase 8), for each package `<pkg>` of `auth`, `read` and `write`: `cmp "$(npm root -g)/@ask-marcel/office-<pkg>/dist/cli.js" <pkg>/dist/cli.js`; `ask-marcel-office-<pkg> --version` vs `<pkg>/package.json`. Until then, skip it: the installed `ask-marcel-office-cli` 2.8.0 has no build in the repository | byte-identical, versions match |
 | A9 | Dependency hygiene | `bash scripts/check-package-json.sh` (the root and every top-level folder's manifest; bare dist-tags too); `bun outdated` (note majors, don't bump) | no `latest`/`*`; outdated list recorded in report |
 
 ## B. Surface-consistency audit (offline, manifest-driven)
 
-Drive everything from `docs/commands.json` so the checks scale to any future command count.
+Drive everything from the manifests `read/dist/commands.json` and `write/dist/commands.json` (the build of §0 writes them), so the checks scale to any future command count.
 
 | # | Check | How | Pass criteria |
 |---|---|---|---|
-| B1 | Generated-docs freshness | `bun run docs:gen` then `git diff --exit-code docs/COMMANDS.md docs/commands.json` | no diff — the generated surface matches the registry |
-| B2 | **Prose-docs truth sweep** (README.md + docs/USAGE.md + the lifecycle `--help` texts in cli.ts) — run-1 lesson: counting checks alone missed README omitting two shipped headline features and USAGE carrying four stale claims. Four sub-checks: **(a) numbers re-measured** — command counts, test count (`bun test` total), `--help` byte size, `help-json --terse` sizes, any "~N KB"/"N+ tests" claim; **(b) feature coverage** — diff the features shipped since the previous run-log row (commands added, capabilities like .msg/GBK/offline) against README's feature bullets: everything headline-worthy must appear; **(c) contract claims verified by execution** — stdout/stderr discipline, `--output-path` semantics, token-cache path+perms, exit codes: run the command, don't trust the prose; **(d) library-API section** — examples still compile against the exports of `read/src/index.ts` and `write/src/index.ts`, special cases (e.g. `executeLocal`) documented | every claim re-verified or fixed in-run (doc fixes are exempt from report-then-plan — they ARE the audit's output) |
-| B3 | **Phantom command references** | Extract every backticked `` `command-name` `` / `ask-marcel-office <name>` from all summaries, option descriptions, responseShapes, error-hint strings (grep `err({` messages in `read/src/use-cases/commands/` and `write/src/use-cases/commands/`), **and from README.md, docs/USAGE.md, and the addHelpText blocks in cli.ts**, and verify each against the registry name list — flags too (run-1 found `resolve-mail-link --link` taught downstream; the real flag is `--url`) | zero references to non-existent commands or flags (meta.test validates per-command flags only — prose and downstream docs ship typos silently) |
-| B4 | Example validity | For each manifest entry, run `ask-marcel-office <name> --help`; spot-parse each `example` string for flags that exist | all helps render; example flags all registered |
+| B1 | Generated-docs freshness | In each of `auth/`, `read/` and `write/`: `bun run build`, then `bun run check:docs` | exit 0 in each folder. The `COMMANDS.md` and the `dist/commands.json` of the package match its registry, and each count in its `README.md`, `USAGE.md` and `COMMANDS.md` is true |
+| B2 | **Prose-docs truth sweep** (the `README.md`, `USAGE.md` and `COMMANDS.md` of each package, `skills/**`, and the help texts in `core/src/composition/cli-shell.ts` and `auth/src/composition/auth-cli.ts`) — run-1 lesson: counting checks alone missed README omitting two shipped headline features and USAGE carrying four stale claims. Four sub-checks: **(a) numbers re-measured** — command counts, test count (`bun test` total), `--help` byte size, `help-json --terse` sizes, any "~N KB"/"N+ tests" claim; **(b) feature coverage** — diff the features shipped since the previous run-log row (commands added, capabilities like .msg/GBK/offline) against the feature bullets of the package READMEs: everything headline-worthy must appear; **(c) contract claims verified by execution** — stdout/stderr discipline, `--output-path` semantics, token-cache path+perms, exit codes: run the command, don't trust the prose; **(d) library-API section** — examples still compile against the exports of `auth/src/index.ts`, `read/src/index.ts` and `write/src/index.ts`, special cases (e.g. `executeLocal`) documented | every claim re-verified or fixed in-run (doc fixes are exempt from report-then-plan — they ARE the audit's output) |
+| B3 | **Phantom command references** | Extract every backticked `` `command-name` `` / `ask-marcel-office-<bin> <name>` from all summaries, option descriptions, responseShapes, error-hint strings (grep `err({` messages in `read/src/use-cases/commands/` and `write/src/use-cases/commands/`), **and from the package docs, `skills/**`, and the help texts in `core/src/composition/cli-shell.ts` and `auth/src/composition/auth-cli.ts`**, and verify each against the registry name list. The bin of each command line must match `commandRole` of the command — flags too (run-1 found `resolve-mail-link --link` taught downstream; the real flag is `--url`) | zero references to non-existent commands or flags (meta.test validates per-command flags only — prose and downstream docs ship typos silently) |
+| B4 | Example validity | For each manifest entry, run `node <pkg>/dist/cli.js <name> --help`, where `<pkg>` is the package of the manifest; spot-parse each `example` string for flags that exist | all helps render; example flags all registered |
 | B5 | Naming consistency | Group commands by family (`*-drive-item-*`, `convert-*`, `list-*`…); flag concept→name map (e.g. every message-scoped command uses `--message-id`; sole-id commands carry the `--id` alias) | inconsistencies listed (e.g. `download-onedrive-file-content` is the known odd one out — rename+alias is a standing F item) |
-| B6 | Error actionability sweep | `grep -rn "err({" read/src/use-cases/commands/ --include="*.ts" \| grep -v test` — read every message | each error names the failing thing AND the next command/flag to try; flag the ones that don't as I items |
-| B7 | help-json budget | `ask-marcel-office help-json \| wc -c` and `--terse --category <each> \| wc -c` | full manifest growth tracked run-over-run; terse per-category stays ~≤15 KB |
+| B6 | Error actionability sweep | `grep -rn "err({" read/src write/src auth/src --include="*.ts" \| grep -v test` — read every message | each error names the failing thing AND the next command/flag to try; flag the ones that don't as I items |
+| B7 | help-json budget | `node read/dist/cli.js help-json \| wc -c` (and the same for `write/` and `auth/`) and `--terse --category <each> \| wc -c` | full manifest growth tracked run-over-run; terse per-category stays ~≤15 KB |
 | B8 | Overlap / removal scan | For each pair of commands in the same category, ask: is A's output a strict subset of B's with the same inputs? List candidates under §G rubric | candidates documented with evidence, never removed in-run |
 
 ## C. Parameter matrix (every command × every option; live where needed)
@@ -82,11 +82,12 @@ Generate the worklist from the manifest (do this fresh each run):
 
 ```bash
 bun -e '
-const m = JSON.parse(await Bun.file("docs/commands.json").text());
+for (const path of ["read/dist/commands.json", "write/dist/commands.json"]) {
+const m = JSON.parse(await Bun.file(path).text());
 for (const c of m.commands) {
   const opts = (c.options ?? []).map(o => `--${o.name}${o.required ? "*" : ""}${(o.aliases??[]).map(a=>` (alias --${a.name})`).join("")}`).join(" ");
   console.log(`${c.name} :: ${opts || "(no options)"}`);
-}' > /tmp/qa-param-worklist.txt
+}}' > /tmp/qa-param-worklist.txt
 wc -l /tmp/qa-param-worklist.txt
 ```
 
@@ -110,7 +111,7 @@ For **every command**, exercise each row of this table (live against the tenant 
 | OData flags where declared (`--select/--filter/--top/--orderby/--expand`) | honored or documented-as-ignored (mailboxSettings class); `--top` >1000 rejected client-side |
 | Pagination (every `pagination: true` command) | `nextLink` hoisted to envelope top level; `next-page --url` round-trips |
 
-**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check). _As of 2026-06-15 (F-01 fix) `docs/commands.json` AND `help-json` both carry `producesBytes`/`producesMedia` (and, since package-split step 11, `effect` in place of `mutates`), so derive the leak-scan worklist straight from the manifest: `jq '[.commands[]|select(.producesBytes or .producesMedia)|.name]' docs/commands.json`._:
+**Global-flag cross-product** (run against representative commands of each shape, plus EVERY `producesBytes`/`producesMedia` command for the leak check). _As of 2026-06-15 (F-01 fix) the manifests (now `read/dist/commands.json` and `write/dist/commands.json`) AND `help-json` both carry `producesBytes`/`producesMedia` (and, since package-split step 11, `effect` in place of `mutates`), so derive the leak-scan worklist straight from the manifest: `jq '[.commands[]|select(.producesBytes or .producesMedia)|.name]' read/dist/commands.json write/dist/commands.json`._:
 
 | Flag | Check | Pass criteria |
 |---|---|---|
@@ -173,23 +174,23 @@ Microsoft moves things. Each run, re-verify the full endpoint surface AND the kn
 
 **E3 — Auth lifecycle.** `status` vs the scope map; expired-token behavior (clear re-login hint, no stack trace); `logout` → command → actionable "not logged in" error → `login` recovers.
 
-**E3b — `status` on a real TTY (added 2026-09-03).** Everything else in this playbook runs from a driver or a Bash tool, which has no TTY, and the auth layer branches on exactly that: `build-deps.ts` sets `interactive = process.stdin.isTTY`, and a non-TTY caller fails fast while a terminal user gets the interactive path (browser, and a session wipe when the persistent profile is already signed in). The 2026-08-31 audit passed E1 with `browserOpens=0` and still shipped a `scopes-check` (now `status`) that opened a browser in the user's terminal, because no check ever ran under a TTY. This one does, without touching the real cache or profile:
+**E3b — `status` on a real TTY (added 2026-09-03).** Everything else in this playbook runs from a driver or a Bash tool, which has no TTY, and the auth layer branches on exactly that: `auth/src/composition/build-auth-deps.ts` sets `interactive = process.stdin.isTTY === true`, and a non-TTY caller fails fast while a terminal user gets the interactive path (browser, and a session wipe when the persistent profile is already signed in). The 2026-08-31 audit passed E1 with `browserOpens=0` and still shipped a `scopes-check` (now `status`) that opened a browser in the user's terminal, because no check ever ran under a TTY. This one does, without touching the real cache or profile:
 
 ```bash
 T=$(mktemp -d) && mkdir -p "$T/.ask-marcel"
 # 1. empty cache: must report not-signed-in and return within seconds, no browser
-HOME="$T" script -q /dev/null ask-marcel-office status --output json
+HOME="$T" script -q /dev/null node auth/dist/cli.js status --output json
 # 2. expired cache (synthetic JWT, exp one hour ago): must decode it, expiresInSeconds < 0, no browser
 seg() { printf '%s' "$1" | base64 | tr '+/' '-_' | tr -d '=\n'; }
 PAST=$(( $(date +%s) - 3600 ))
 JWT="$(seg '{"alg":"none"}').$(seg "{\"scp\":\"Mail.Read\",\"aud\":\"https://graph.microsoft.com\",\"exp\":$PAST}").sig"
 printf '{"access_token":"%s","expires_on":%s,"refresh_token":"synthetic"}' "$JWT" "$PAST" > "$T/.ask-marcel/token-cache.json"
-HOME="$T" script -q /dev/null ask-marcel-office status --output json
-ls "$T/.ask-marcel/"   # token-cache.json only: a browser launch would have created browser-profile/
+HOME="$T" script -q /dev/null node auth/dist/cli.js status --output json
+ls "$T/.ask-marcel/"   # token-cache.json and token-helper.json only: a browser launch would have created browser-profile/
 rm -rf "$T"
 ```
 
-`script -q /dev/null` allocates a pty, so `process.stdin.isTTY` is true inside the command; a temp `HOME` isolates both the token cache and the browser profile. Pass: case 1 is `ok:false` naming `login`; case 2 is `ok:true` with a negative `basic.expiresInSeconds` and `basic.available: false`; no `browser-profile/` appears; neither case takes longer than a few seconds. Do NOT run a registry command this way unattended: those heal interactively by design and will launch a browser.
+`script -q /dev/null` allocates a pty, so `process.stdin.isTTY` is true inside the command (this is the macOS form; on Linux, give the command with `-c`: `script -q -c '<command>' /dev/null`); a temp `HOME` isolates both the token cache and the browser profile. Pass: case 1 is `ok:false` naming `login`; case 2 is `ok:true` with a negative `basic.expiresInSeconds` and `basic.available: false`; no `browser-profile/` appears; neither case takes longer than a few seconds. Do NOT run a registry command this way unattended: those heal interactively by design and will launch a browser.
  Verify no command exceeds the Teams-token scope ceiling, and re-read the ceiling itself: run `status` and diff its `basic.scopes` list against the last run, because the set Microsoft grants the Teams web client MOVES. 2026-09-09 it had gained `ChannelMessage.Read.All`, `TeamMember.ReadWrite.All`, `ChannelMember.ReadWrite.All` and `TeamsTab.ReadWrite.All` since the 2026-04 snapshot (the six `list-team-*` / `get-team-channel-message` commands ship on them, live-verified on three teams). Still absent, so commands needing them cannot ship: `Chat.Read*` (chat metadata stays elevated, chat content stays on the substrate), `Contacts.Read*`, `Mail.Read.Shared`, `Channel.Read.All`. A scope present in the JWT is not yet an access grant (the Outlook token carried `Mail.ReadWrite.Shared` and was refused): probe the endpoint before building on a new scope.
 
 **E4 — Limits & failure modes.** One throttling observation if encountered (429 → message quality); one multi-MB attachment via `--output-path` (wall-clock + stdout size); folder-as-file, malformed id, foreign-tenant id → error quality.
@@ -205,7 +206,7 @@ Walk the canonical agent journeys end-to-end with fresh eyes, counting round-tri
 5. "Who emailed me about Y last month?" (search-mail → read → resolve links in body).
 6. A Teams-chat retrieval (substrate commands).
 
-For each journey log: number of CLI calls, dead ends, which `--help`/`help-json` lookups were needed, every error encountered and whether its message self-healed the journey. Each friction point becomes an I finding. Also measure cold-start (`time ask-marcel-office --version`) — lazy-import regressions show here.
+For each journey log: number of CLI calls, dead ends, which `--help`/`help-json` lookups were needed, every error encountered and whether its message self-healed the journey. Each friction point becomes an I finding. Also measure cold-start for each bin (`time node auth/dist/cli.js --version`, and the same for `read/` and `write/`) — lazy-import regressions show here.
 
 ## G. Gap analysis & roadmap (the "missing / add / remove" bucket)
 
@@ -283,7 +284,7 @@ Precedent: the 3 `download-drive-item-version-*` commands consolidated into one 
 ## H. Report template
 
 ```markdown
-# QA report — YYYY-MM-DD (vX.Y.Z, commit <sha>)
+# QA report — YYYY-MM-DD (auth vX.Y.Z, read vX.Y.Z, write vX.Y.Z, commit <sha>)
 ## Verdict: HEALTHY / DEGRADED / AT RISK
 ## Scores (per phase A–G: pass/warn/fail + one line)
 ## P1 / P2 / P3 findings

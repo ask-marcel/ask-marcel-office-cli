@@ -1,5 +1,6 @@
 import { WRITE_EFFECTS } from './command-effect.ts';
 import type { CommandCategory, CommandMeta, PaginationStrategy } from './command-types.ts';
+import { firstSentence } from './first-sentence.ts';
 
 export type CommandManifestEntry = {
   readonly name: string;
@@ -107,6 +108,19 @@ export const renderReadmeTables = (manifest: CommandManifest): string => {
     sections.push(renderCategoryTable(category, entries));
   }
   return sections.join('\n\n');
+};
+
+/**
+ * The lifecycle table of the COMMANDS.md of a package: each lifecycle command
+ * with the bin of the package, and the first sentence of its summary, sorted by
+ * name. `fill` gives the bins of the package to the placeholders.
+ */
+export const renderLifecycleTable = (lifecycle: ReadonlyArray<CommandManifestEntry>, fill: (text: string) => string): string => {
+  const rows = lifecycle.toSorted(sortByName).map((entry) => {
+    const command = fill(`{bin} ${entry.name}`);
+    return `| \`${command}\` | ${fill(firstSentence(entry.summary))} |`;
+  });
+  return ['| Command | What it does |', '|:--|:--|', ...rows].join('\n');
 };
 
 export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {

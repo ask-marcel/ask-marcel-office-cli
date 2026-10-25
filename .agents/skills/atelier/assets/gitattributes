@@ -1,0 +1,12 @@
+# Copied to the repository root as .gitattributes by every variant's bootstrap checklist.
+#
+# Text checks out exactly as committed, LF, on every machine. Git for Windows sets
+# core.autocrlf=true system-wide, and without this file a checkout there turns every text
+# file CRLF: the formatter's endOfLine 'lf' then fails every line of every file (the
+# TypeScript variants' lint gate), and check-skill-pin.sh reads a current vendored copy of
+# the standard as stale. Binary files are detected and left alone (text=auto).
+* text=auto eol=lf
+
+# Windows batch files run under cmd.exe, which wants CRLF (the Maven wrapper's mvnw.cmd).
+*.cmd text eol=crlf
+*.bat text eol=crlf

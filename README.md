@@ -6,275 +6,76 @@
 
 **One sign-in. No Azure app registration. Every document as clean markdown.**
 
-[![npm version](https://img.shields.io/npm/v/ask-marcel-office-cli.svg?logo=npm&color=cb3837)](https://www.npmjs.com/package/ask-marcel-office-cli)
-[![license: MIT](https://img.shields.io/npm/l/ask-marcel-office-cli.svg?color=blue)](LICENSE)
-[![types included](https://img.shields.io/npm/types/ask-marcel-office-cli?logo=typescript&color=3178c6)](docs/USAGE.md)
-
 Outlook · OneDrive · SharePoint · Calendar · Excel · Teams · Planner · To Do · OneNote · People
 
-[Install](#install-in-60-seconds) · [See it work](#see-it-work) · [What it reaches](#what-your-agent-can-reach) · [Files to markdown](#any-file-becomes-markdown) · [Library](#embed-it-as-a-typescript-library) · [All 211 commands](docs/COMMANDS.md)
+[Packages](#the-three-packages) · [Install](#install) · [Agent skill](#the-agent-skill) · [Develop](#develop)
 
 </div>
 
 ---
 
-Your agent is smart enough to answer *"what did Contoso say about the Q3 budget, and what's in the attached deck?"* It just can't see your mailbox.
+ask-marcel-office gives a tool-calling agent (Claude Code, Cursor, Cline, an MCP
+host or your own loop) access to your Microsoft 365 data through Microsoft
+Graph. You sign in one time, in a browser, as yourself. You do not need an Azure
+app registration, the consent of a tenant admin or a client secret. Office
+files, PDF files and mail become clean markdown, so the agent can read them.
 
-`ask-marcel-office` gives any tool-calling LLM (Claude Code, Cursor, Cline, an MCP server, your own loop) eyes on your entire Microsoft 365:
+The project is three npm packages. Each package has its own bin, its own MCP
+server, its own library and its own docs.
 
-```bash
-npm i -g ask-marcel-office-cli
-ask-marcel-office login          # your normal Microsoft sign-in, in a browser, once
-ask-marcel-office list-mail-messages --top 5
+## The three packages
+
+| Package | Bin | What it does | Do you need it? | Docs |
+|:--|:--|:--|:--|:--|
+| `@ask-marcel/office-auth` | `ask-marcel-office-auth` | Signs you in, keeps the token cache and gives the tokens to the other two packages. | Yes | [README](auth/README.md) · [USAGE](auth/USAGE.md) · [COMMANDS](auth/COMMANDS.md) |
+| `@ask-marcel/office-read` | `ask-marcel-office-read` | Reads mail, calendar, OneDrive and SharePoint, Teams and chats, users, Excel, OneNote, To Do and Planner. Converts files and mail to markdown. It cannot change your tenant. | Yes | [README](read/README.md) · [USAGE](read/USAGE.md) · [COMMANDS](read/COMMANDS.md) |
+| `@ask-marcel/office-write` | `ask-marcel-office-write` | Writes mail drafts and never sends them. Converts mail, group post and calendar attachments to PDF through a temporary OneDrive file. | Only for drafts and PDF conversions | [README](write/README.md) · [USAGE](write/USAGE.md) · [COMMANDS](write/COMMANDS.md) |
+
+Start with the [read package README](read/README.md). It shows what an agent
+can do with your Microsoft 365 data.
+
+## Install
+
+> The three packages are not on npm yet. npm installs `ask-marcel-office-cli`
+> 2.8.0 now. Its docs are [docs/USAGE.md](docs/USAGE.md) and
+> [docs/COMMANDS.md](docs/COMMANDS.md).
+
+To read only, install auth and read, then sign in:
+
+```sh
+npm i -g @ask-marcel/office-auth @ask-marcel/office-read
+ask-marcel-office-auth login
+ask-marcel-office-read my-quick-context
 ```
 
-That is the whole setup. **No Azure app registration. No tenant-admin consent. No client secrets.** And little for a runaway agent to break: the command surface is read-mostly by design. A write leaves an unsent draft, or a temporary OneDrive file that the command tries to delete.
+To also write mail drafts and convert attachments to PDF, install the three
+packages:
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ask-marcel/ask-marcel-office-cli/main/docs/demo.gif" alt="ask-marcel-office converting an Outlook .msg file into clean markdown in one command, offline" width="880">
-</p>
-
-## The difference in practice
-
-| You need | Raw Microsoft Graph | ask-marcel-office |
-|---|---|---|
-| Access | App registration, admin consent, secret rotation | `login`: one browser sign-in with your own account |
-| An email + attachments | 6+ round trips, HTML-to-text is your problem | `convert-mail-to-markdown`: one call, markdown out |
-| A pptx / pdf / legacy .doc as text | Raw bytes, bring your own converter | `download-drive-item-as-markdown`: one call |
-| A useful error | `BadRequest: Invalid filter clause` | `hint: "string literals MUST use single quotes; embed one by doubling it"` |
-| A 5 MB PDF | Base64 flooding the context window | `--output-path` writes it to disk; the model reads 3 lines |
-| Throttling | HTTP 429, guess the backoff | `retryAfterSeconds` surfaced in the error envelope |
-
-And against the tools you already know:
-
-| | Microsoft Graph SDKs | CLI for Microsoft 365 (PnP) | ask-marcel-office |
-|---|---|---|---|
-| Sign-in | An Entra app registration, always: every auth flow needs a client id | An Entra app registration; its `setup` command creates one, and the permissions it requests can need admin consent | Your own account, in a browser, once. No app registration |
-| Built for | Backend services | Admins and scripts | Tool-calling LLMs: markdown out, lean fields, a repair hint on every error |
-| Can it break things | Whatever your app's permissions allow | Yes: it creates, changes, and deletes across the tenant | No: read-mostly by design; a write leaves an unsent draft, or a temporary OneDrive file that the command tries to delete |
-
-## The three walls it removes
-
-### 🔑 Sign in like a human, not like an app
-
-Microsoft Graph normally means registering an Azure app, chasing tenant-admin consent, and rotating client secrets before the first API call. Here, `login` drives a real browser window through the standard Microsoft sign-in (Playwright under the hood) and captures the same token the Teams web client already uses. Any Microsoft 365 account works, personal or enterprise. Tokens are cached at `~/.ask-marcel/token-cache.json` (0600) and refresh themselves headlessly; `status` reports per-token scopes and expiry without a Graph call and without ever opening a browser: an expired session is reported as expired, not re-captured. A process that needs a bearer, rather than a command, runs `ask-marcel-office token --tier basic` and reads one JSON line (see [USAGE](docs/USAGE.md#token-helper-ask-marcel-office-token)).
-
-### 🛡️ Safe to hand to an autonomous agent
-
-The 211 commands break down as 199 GET reads, 5 read-only POST (four searches and a free/busy lookup), and 7 writes: 4 mail-draft operations and 3 PDF conversions that upload an attachment to a temporary file in your OneDrive, convert it, and try to delete that file. No `send-mail`. No `create-event`. No `upload-file`. No `delete-anything`. The worst a hallucinated tool call can do is leave an unsent draft in your Drafts folder, or a temporary file in the `.ask-marcel-temp` OneDrive folder when a conversion stops before its cleanup. That is the entire blast radius, which is why you can let an agent explore a mailbox without reviewing every call. No analytics, either: the only outbound traffic is Microsoft 365 itself (Graph, plus the Teams chat and media services behind the chat commands) and a periodic npm version check.
-
-### 🧠 Responses budgeted for a context window
-
-Graph payloads are tuned for backend services. These are tuned for models. Listings return hand-picked fields instead of every property on every item (opt out with `--full true`). Email threads arrive with quoted reply chains stripped, which shrinks real threads by 78-90%. Inline images become `[inline image: logo.png]` placeholders instead of kilobytes of base64. Binaries over ~1 MB are refused inline and routed to disk via `--output-path`. And every failure returns `{error, hint, source, retryAfterSeconds}` so the model can repair its own call instead of retrying blind.
-
-## See it work
-
-Reading one email with its attachments in raw Graph: GET the message, GET the attachment list, GET each attachment's bytes, resolve every SharePoint link in the body, then run your own HTML-to-text pipeline. Six round trips minimum. Here:
-
-```console
-$ ask-marcel-office convert-mail-to-markdown --message-id "AAMkAD..."
-
-**Subject:** Q3 budget review: action needed
-**From:** Robin Chen <robin.chen@contoso.com>
-**To:** Alex Kim <alex.kim@contoso.com>
-**Date:** 2026-09-02T08:14:22Z
-
-Before Friday's review, the forecast tab still shows last quarter's
-headcount. Can you sanity-check the attached numbers?
-
-Robin
-
-\[inline image: contoso-signature.png\]
-
-_\[Quoted reply chain removed — pass --keep-quoted true to include it\]_
-
-**Attachments:**
-- Q3-forecast.xlsx (49.2 KB, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, id: AAMkAD...)
-_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._
+```sh
+npm i -g @ask-marcel/office-auth @ask-marcel/office-read @ask-marcel/office-write
 ```
 
-Those two bracketed lines are the entire cost of a 40-message thread and a signature logo. Attachments arrive with their ids ready for the follow-up call:
+The packages need Node 20 or later, or Bun 1.0 or later, on macOS, Windows or
+Linux. Each package README shows how to register its MCP server.
 
-```console
-$ ask-marcel-office convert-mail-attachment-to-markdown \
-    --message-id "AAMkAD..." --attachment-id "AAMkAD..."
-```
+## The agent skill
 
-That xlsx comes back as one markdown table per sheet. And when the answer lives in a deck someone shared three weeks ago:
+The [`skills/`](skills/SKILL.md) folder holds an agent skill: it tells an agent
+how to answer a question from your Microsoft 365 data, and how to write a reply
+as an unsent draft. No package ships it. To use it, copy `skills/` to
+`~/.claude/skills/ask-marcel/`, or to the skill folder of your agent.
 
-```console
-$ ask-marcel-office microsoft-search-query --query "Q3 budget filetype:pptx"
-$ ask-marcel-office download-drive-item-as-markdown --drive-id "b!abc..." --item-id "01BYE..."
-```
+## Develop
 
-## What your agent can reach
-
-| Surface | Commands | In practice |
-|---|---:|---|
-| 📧 Outlook Mail | 47 | Search and read mail as markdown, convert any attachment (down to nested `.zip`, `.msg`, `.eml` and forwarded mails), resolve SharePoint links in bodies, extract your signature, find existing drafts on a thread, prepare reply / forward drafts (the only writes) |
-| 📁 OneDrive + SharePoint | 54 | Discover every drive and site your token can reach, search files, read any document as markdown or PDF, version history and line diffs between versions or files, document comments, files changed since a date, who can open a site, share links resolved even into partner tenants where you're a guest |
-| 📅 Calendar | 24 | "What's on this week" via relative dates (`today`, `start-of-week`, `+7d`), event details, free/busy lookups |
-| 👥 People + directory | 16 | People search, user profiles, the directory around you, your own identity and IDs in one round trip |
-| 💬 Teams | 26 | Your teams, channels, channel posts as JSON or a markdown transcript, what changed since, members and tabs, chats, chat history with files, reactions and pasted screenshots |
-| ✅ Planner + To Do | 17 | Plans (a group's too) and their label names, buckets, tasks, checklists, due dates, the web link of every To Do task |
-| 📊 Excel | 11 | Live workbook reads: worksheets, used ranges, tables (lean values, not Graph's four redundant 2D arrays) |
-| 📓 OneNote | 11 | Notebooks, sections, page content |
-| 🔎 Search + utilities | 5 | Federated Microsoft Search across the tenant, cursor pagination (`next-page`), offline local-file conversion |
-
-Full per-command tables with required parameters and Graph endpoints: **[docs/COMMANDS.md](docs/COMMANDS.md)**.
-
-## Any file becomes markdown
-
-One conversion pipeline, four entry points: a OneDrive / SharePoint item, an Outlook attachment, a `.zip` archive, or a file on disk (`convert-local-file-to-markdown` runs fully offline, no login).
-
-| Source | What comes back |
-|---|---|
-| docx / docm / dotx | Clean markdown; `--include-metadata true` adds comments, tracked changes, hidden text, and a VBA-macro flag |
-| xlsx / xlsm / csv | One markdown table per sheet, with a 50 000-cell guard so a huge sheet becomes a band-by-band read plan instead of an OOM |
-| pptx / pptm | Per-slide text with speaker notes (`## Slide N`); switch to the PDF sibling + a vision model when layout matters |
-| pdf | Text-layer extraction; a scanned PDF answers with a pointer to the vision route instead of silence |
-| odt / ods / odp | Headings, lists, tables, per-slide text, comments folded inline |
-| Legacy .doc / .xls | `.xls` reads like `.xlsx`; `.doc` extracts as plain text (`.ppt`: convert to PDF first) |
-| Outlook .msg / .eml | The full email: headers, quote-stripped body, and every attachment converted recursively; an Outlook item attached to a mail (a forwarded mail) reads the same way |
-| html / htm | The page as markdown, its head dropped and embedded images as placeholders; a page over 1 MB is flattened to plain text |
-| .zip | Every entry converted in one call; GBK / CP437 entry names decoded, never mojibake |
-| Loop / Whiteboard | Rendered through Graph's server-side converter |
-
-Need the pictures instead of the words? `extract-drive-item-images`, `extract-mail-attachment-images`, and `extract-local-file-images` pull the embedded images out of docx / xlsx / pptx / pdf (including full-resolution originals and images on hidden slides), ready for a vision model; `--pages 1-3` narrows a scanned PDF, the mail extractor opens a forwarded mail's files too, and `extract-teams-chat-message-images` downloads a chat message's pasted screenshots. `--output-dir` writes them straight to disk.
-
-## Designed for the agent loop
-
-- **Self-teaching.** `help-json --terse` returns a slim JSON manifest built for a model's first contact; add `--category mail` to scope it. `docs <command>` prints one command's full documentation (response shape, examples, the underlying Graph endpoint). Scan, pick, read, call.
-- **Errors that repair the call.** Every failure is `{ok: false, error, errorCode?, hint?, source, retryAfterSeconds?}`, with curated hints for 20+ recurring Graph mistakes, including wrong-resolver pointers (a Teams URL passed to `resolve-mail-link` answers with the command to use instead). A mistyped command, flag or parameter ends with "Did you mean …?", on the CLI, over MCP and in the library.
-- **Pagination without state.** Every listing returns an opaque cursor; `next-page --url "<cursor>"` continues any of them.
-- **Relative dates.** `--start-date-time start-of-week --end-date-time +7d`. No timestamp math before "what's on my calendar". Named days resolve at midnight in your time zone (`--tz`, else `ASKMARCEL_TZ`, else the machine's).
-- **Pipe-friendly.** `--output raw-json` prints the payload alone, no envelope, for `jq`.
-- **Binary discipline.** Multi-MB payloads never hit stdout by accident: without `--output-path`, a binary answer is a one-line summary; with it, the bytes land on disk and the envelope carries `savedTo`.
-- **Tenant-wide reach.** `list-accessible-drives` unions every discovery vector a delegated token can hit (Teams libraries, group sites, private channels, shared-with-me, activity signals, secondary site libraries) and `search-all-accessible-sites` deep-pages the search index. Together: the practical maximum reachable without tenant-admin rights.
-
-## Install in 60 seconds
-
-```bash
-# Bun >=1.0 or Node >=20 · macOS, Windows, Linux
-npm i -g ask-marcel-office-cli
-
-ask-marcel-office login             # browser opens once, tokens cached
-ask-marcel-office my-quick-context  # who am I + my IDs, one round trip
-ask-marcel-office list-calendar-view --start-date-time today --end-date-time +7d
-ask-marcel-office search-onedrive-files --drive-id "b!abc..." --query "Q3 budget"
-```
-
-## Plug it into Claude Code, Cursor, Cline, or your own stack
-
-Any agent that can run a shell command can use the whole surface today: point it at `help-json --terse`, let it call commands with `--output json`, and the lean defaults plus structured hints let it recover from its own mistakes. No wrapper required.
-
-**No shell? Register it as an MCP server.** It speaks MCP over stdio, so any MCP client can drive it — straight off the npm registry via `npx`, nothing to clone or preinstall.
-
-**Claude Code** — one command:
-
-```bash
-claude mcp add --transport stdio --scope user ask-marcel-office -- npx -y ask-marcel-office-cli mcp
-```
-
-**Claude Desktop, Cursor, or any other MCP client** — they all take the same `mcpServers` block; only the file location differs:
-
-| Client | Config file |
-|:--|:--|
-| Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Claude Desktop (Windows) | `%AppData%\Claude\claude_desktop_config.json` |
-| Cursor, Cline, Windsurf, … | see your client's MCP docs — the block below is unchanged |
-
-```json
-{
-  "mcpServers": {
-    "ask-marcel-office": {
-      "description": "Ask Marcel Office CLI MCP server",
-      "command": "npx",
-      "args": ["-y", "ask-marcel-office-cli", "mcp"],
-      "env": {}
-    }
-  }
-}
-```
-
-> **Two things to know.** The first launch downloads the package into npx's cache, so allow it one slow start; every start after that is instant. And GUI apps don't inherit your shell's `PATH`: terminal-launched clients resolve `"npx"` fine, but a client launched from the Dock or Start menu (Claude Desktop) may not find it — if the server won't start, replace `"command": "npx"` with the absolute path `which npx` prints. Bun users: `bunx` works in place of `npx -y`.
-
-You get **six gateway tools**, not one per command — a schema per command would bloat every session, the opposite of the point:
-
-| Tool | Does |
-|:--|:--|
-| `list-commands` | The terse manifest. Start here; `category` narrows it. |
-| `get-command-docs` | Full docs for one command: options, endpoint, example. |
-| `run-command` | The 204 **read** commands. `readOnlyHint: true`, so clients can auto-approve it. |
-| `run-write-command` | The 7 **write** commands: 4 mail-draft operations and 3 PDF conversions (a temporary OneDrive upload). Separate tool so the read tool's promise stays honest. |
-| `login` | Sign in / refresh. Opens a browser on this machine. |
-| `status` | Shows the four cached tokens: available or not, time left, scopes. Reads only the cache and never opens a browser. |
-
-**Sign in from a terminal first** — `npx -y ask-marcel-office-cli login`. Do this once before wiring up any client, and the reads just work.
-
-## Embed it as a TypeScript library
-
-Every command is exported, typed, and returns `Result<T, E>` (no thrown surprises). Compose them inside your own agent or LangChain tool:
-
-```ts
-import { commands, buildDeps } from 'ask-marcel-office-cli';
-
-const { graph } = buildDeps();
-const result = await commands['list-mail-messages'].execute(graph, { top: '10' });
-if (result.ok) {
-  // result.value is the Graph payload
-}
-```
-
-**Bring your own token** (CI, MCP servers, vault-managed environments): swap the built-in browser auth for any token source via `createGraphClient`.
-
-```ts
-import { createGraphClient } from 'ask-marcel-office-cli';
-
-const cancelled = async () => ({ ok: false as const, error: { type: 'auth_cancelled' as const } });
-
-const graph = createGraphClient({
-  getAccessToken: async () => ({ ok: true, value: await fetchTokenFromYourVault() }),
-  logout: async () => ({ ok: true, value: undefined }),
-  // Decline the token tiers your source cannot mint; only the commands
-  // that need them will notice, and they fail with a clear message.
-  getElevatedAccessToken: cancelled,   // ODSP-gated: historical-version downloads
-  getGuestAccessToken: cancelled,      // partner tenants you are a guest in
-  getChatsvcaggAccessToken: cancelled, // Teams chat substrate
-  getIc3AccessToken: cancelled,        // Teams chat history
-  getChatsvcaggRegion: async () => 'emea',
-  getLastElevatedOutcome: () => null,
-  getLastChatsvcaggOutcome: () => null,
-});
-```
-
-Azure Managed Identity, an on-behalf-of flow, hand-pasted JWTs in tests: the Graph client doesn't care where the token came from. Full library guide: **[docs/USAGE.md](docs/USAGE.md)**.
-
-## Deep docs
-
-- **[All 211 commands](docs/COMMANDS.md)**: per-category tables with required params + Graph endpoint
-- **[Usage guide](docs/USAGE.md)**: output formats, OData passthrough, `--output-path`, pagination, library API, architecture, configuration
-- **[Machine-readable manifest](docs/commands.json)**: JSON for programmatic discovery, also importable via `import manifest from 'ask-marcel-office-cli/commands.json'`
-- **[QA playbook](docs/QA-PLAYBOOK.md)**: the repeatable full-surface health check run before each release
-
-## Roadmap
-
-Read-only stays the default forever. Coverage grows out of real LLM workflows as they come up: suggestions, requests, and pull requests welcome on the [issues page](https://github.com/ask-marcel/ask-marcel-office-cli/issues).
-
-## Built with
-
-- **Bun + TypeScript**: single-package install, Node >=20 fallback, `Result<T, E>` at every IO boundary, a 100% coverage gate on every tier
-- **Microsoft Graph v1.0**: the public API surface, no beta endpoints in production code
-- **Playwright**: the headed browser behind the one-time sign-in
+- [CONTRIBUTING.md](CONTRIBUTING.md): the workspace, the commands of each
+  folder, the pre-commit hook and the CI jobs.
+- [QA playbook](docs/QA-PLAYBOOK.md): the full health check of the command
+  surface before a release.
+- [The package split plan](docs/plans/2026-10-01-package-split.md) and the
+  [architecture decision records](docs/adr/).
+- Questions, requests and pull requests: the
+  [issues page](https://github.com/ask-marcel/ask-marcel-office-cli/issues).
 
 ## License
 
 MIT © Vincent Delacourt
-
----
-
-<div align="center">
-
-**If this saved your agent a few round trips, a ⭐ helps other agents' humans find it.**
-
-</div>

@@ -58,7 +58,7 @@ logger.info('search handled', { userId: user.id });
 
 React/Next.js: never build a route with personal data in it. `navigate('/search?email=...')` lands in history, referrers, and analytics; pass it in state or POST it, and keep the address bar structural.
 
-Java (Quarkus): same rule. `@QueryParam("email")` on a search endpoint is a violation; take a `@Valid SearchRequest` body, and log a pseudonymous reference through the redacting logger (`references/java-quarkus.md`, Logging).
+Java (Quarkus): same rule. `@QueryParam("email")` on a search endpoint is a violation; take a `@Valid SearchRequest` body, and log a pseudonymous reference through the redacting logger (`references/java-quarkus.md`, Ports, fakes, and the logger).
 
 ## User rights are routine endpoints
 
@@ -111,9 +111,9 @@ Seed builders live in `src/test-helpers/` next to the port fakes; make them dete
 Before an automated decision, sensitive-data processing, or a cross-border transfer, record a short impact assessment (DPIA) and gate the operation on it:
 
 ```ts
-export const autoDecide = async (deps: Deps, a: Application): Promise<Result<Decision, 'dpia_missing'>> => {
+export const autoDecide = async (deps: Deps, a: Application): Promise<Result<Decision, { readonly kind: 'dpia-missing' }>> => {
   const dpia = await deps.assessments.find('auto-credit-decision');
-  if (!dpia.ok || dpia.value.status !== 'approved') return err('dpia_missing');
+  if (!dpia.ok || dpia.value.status !== 'approved') return err({ kind: 'dpia-missing' } as const);
   return ok(score(a) < 0.4 ? 'reject' : 'review');
 };
 ```
@@ -128,7 +128,7 @@ The assessment is a committed document (like an ADR, `references/governance.md`)
 
 ## Executable tripwire
 
-The mechanical slice of rule 27 ships as a staged-diff gate: `assets/check-pii-channels.sh` blocks a natural identifier in a query string (written literally or built via `new URLSearchParams`), a logger message interpolation, or a Java `@QueryParam`, on the lines a commit adds (`--all` audits the whole tree). It is a tripwire, not a proof: this checklist remains the review duty; the script just refuses the common concrete leaks. Wire it as a pre-commit pre-flight or CI step wherever the repo holds personal data (`references/workflow.md`, Discipline tripwires).
+The mechanical slice of rule 27 ships as a staged-diff gate: `assets/check-pii-channels.sh` blocks a natural identifier (email, phone, ssn, token, password, secret, iban, card, dob, birthdate, address, first or last name, any casing or prefix) in a query string (written literally or built via `new URLSearchParams`), a logger message interpolation (the call joined with up to three following lines, so splitting it does not hide it), or a Java `@QueryParam`, on the lines a commit adds (`--all` audits the whole tree). It is a tripwire, not a proof: this checklist remains the review duty; the script just refuses the common concrete leaks. It is a core gate in every variant, already wired: `check-disciplines.sh` runs it in the shipped hook on the staged lines and in CI with `--all` (`references/workflow.md`, Discipline tripwires).
 
 ## Review checklist (changes touching personal data)
 

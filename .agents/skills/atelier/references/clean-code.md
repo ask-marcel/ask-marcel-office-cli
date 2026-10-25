@@ -140,11 +140,13 @@ export const process = (orders: Order[]): void => {
 
 // GOOD - extract
 export const shipValidOrders = (orders: Order[]): void => {
-  orders.filter(isValidOrder).forEach(processOrder);
+  const validOrders = orders.filter((order) => isValidOrder(order));
+  for (const order of validOrders) processOrder(order);
 };
 
 export const processOrder = (order: Order): void => {
-  order.items.filter((item) => item.inStock).forEach(processItem);
+  const inStockItems = order.items.filter((item) => item.inStock);
+  for (const item of inStockItems) processItem(item);
 };
 ```
 
@@ -171,7 +173,7 @@ export const getDiscount = (user: User): number => {
 
 ### 3. Wrap all primitives and strings
 
-Primitives that carry domain meaning become branded types with validating factories.
+Primitives that carry domain meaning become branded types with validating factories where they cross a trust boundary or feed a dangerous sink; inside one trust zone a plain value is honest (SKILL.md rule 12 draws the line).
 
 ```ts
 // BAD - primitive obsession
@@ -181,8 +183,12 @@ export const createUser = (email: string, age: number): User => {
   return { email, age };
 };
 
-// GOOD - branded types
+// GOOD - branded types, two tiers per type: parseX parses untrusted input into a Result
+// (rules 16-17), x() asserts a value already proven and throws, because invalid there is a bug.
 export type Email = string & { readonly __brand: 'Email' };
+export type EmailError = { readonly kind: 'invalidEmail'; readonly value: string };
+export const parseEmail = (raw: string): Result<Email, EmailError> =>
+  raw.includes('@') ? ok(raw as Email) : err({ kind: 'invalidEmail', value: raw });
 export const email = (value: string): Email => {
   if (!value.includes('@')) throw new Error('invalid Email');
   return value as Email;
@@ -225,15 +231,16 @@ export type Order = {
 };
 
 // GOOD - collection gets its own module
-// src/orders/order-items.ts
+// src/domain/order-items.ts
 export type OrderItems = { readonly items: readonly OrderItem[] };
 export const emptyOrderItems = (): OrderItems => ({ items: [] });
 export const addToOrderItems = (items: OrderItems, item: OrderItem): OrderItems => ({ items: [...items.items, item] });
-export const orderItemsTotal = (items: OrderItems): Money =>
-  items.items.reduce((sum, i) => addMoney(sum, i.price), money(0, 'EUR'));
+// the currency comes in: a hard-coded money(0, 'EUR') seed made every USD total throw
+export const orderItemsTotal = (items: OrderItems, currency: Currency): Money =>
+  items.items.reduce((sum, i) => addMoney(sum, i.price), money(0, currency));
 export const isOrderItemsEmpty = (items: OrderItems): boolean => items.items.length === 0;
 
-// src/orders/order.ts
+// src/domain/order.ts
 export type Order = {
   readonly id: OrderId;
   readonly items: OrderItems;
@@ -276,8 +283,9 @@ const order = createOrder(orderId('ord-1'));
 - Functions < 10 lines.
 - Modules < 50 lines.
 - Files < 100 lines.
+- Cyclomatic complexity at most 10 per function (rule 35, the one cap here a machine checks: ESLint `complexity`, PMD in Java).
 
-If larger, it is probably doing too much. Split it.
+If larger, it is probably doing too much. Split it. The complexity cap catches what the line count misses: a nine-line function can still carry a one-line chain of `&&`/`??`/ternaries, and the fix is the same, split it or dispatch on a map.
 
 ### 8. Small record shapes
 
@@ -396,3 +404,11 @@ const save = (order: Order, total: Money, deps: ProcessOrderDeps): ProcessResult
 ```
 
 Non-exported helpers go at the bottom or in a sibling module. Exported API stays at the top, easy to scan.
+
+### No curried arrow chains (rule 18)
+
+Never `const f = (a) => (b) => { ... }`. Use a single arrow with all parameters and wrap at the call site: `const compareByPriority = (a: X, b: X, target: number): number => { ... }`, then `arr.sort((a, b) => compareByPriority(a, b, t))`. Curried chains cause Prettier and TypeScript-formatter fights and obscure the signature.
+
+One exemption, the DI factory: `const createX = (deps: Deps): PortType => async (input) => { ... }` is sanctioned. The outer call runs once at composition and the inner arrow IS the port function the type names; that is closure over dependencies, not currying on a call path.
+
+The rule is lint: the `STYLE_BANS` selector `VariableDeclarator[id.name!=/^create[A-Z]/] > ArrowFunctionExpression > ArrowFunctionExpression.body` in `eslint.config.js` rejects an arrow whose body is another arrow unless the declarator is named `create...`. Name a factory that way because it is one, never to slip a curried helper past the gate.

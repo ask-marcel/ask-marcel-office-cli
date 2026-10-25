@@ -3,9 +3,9 @@ import { fillNames } from './bin-names.ts';
 import { PACKAGE_BINS } from './command-directory.ts';
 
 /*
- * The bin of each package of the split (package split phase 4). The auth
- * package, the single package and later read and write fill `{auth-bin}`,
- * `{read-bin}` and `{write-bin}` from this one record.
+ * The bin of each package of the split (package split phase 4). The auth,
+ * read and write packages fill `{auth-bin}`, `{read-bin}` and `{write-bin}`
+ * from this one record.
  */
 
 describe('the bin of each package of the split', () => {

@@ -49,9 +49,9 @@ describe('graph client', () => {
     if (result.ok) expect(result.value).toEqual({ value: [{ id: 'drive-1', name: 'OneDrive' }] });
   });
 
-  // The README "Bring your own token" object, member for member. It must keep
-  // compiling: a library caller gives the client only these getters.
-  it('reads Graph for a library caller that brings its own token source with only the getters the README shows', async () => {
+  // A token source of a caller, member for member. It must keep compiling: a
+  // library caller gives the client only these getters.
+  it('reads Graph for a caller that brings its own token source with only these getters', async () => {
     const cancelled = async (): Promise<{ ok: false; error: { type: 'auth_cancelled' } }> => ({ ok: false, error: { type: 'auth_cancelled' } });
     const ownTokenSource = {
       getAccessToken: async () => ok(accessTokenUnsafe('vault-token')),

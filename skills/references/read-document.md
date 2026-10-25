@@ -18,7 +18,7 @@ value:
 **From a sharing URL** (`*.sharepoint.com` or `1drv.ms` "Copy link"):
 
 ```bash
-ask-marcel-office resolve-drive-share-link --url '<sharing url>'
+ask-marcel-office-read resolve-drive-share-link --url '<sharing url>'
 ```
 
 Returns `driveId` + `itemId` + `tenantId`. If `tenantId` isn't yours (a share from another org), add `--tenant-id '<tenantId>'` to every download/convert command for that file.

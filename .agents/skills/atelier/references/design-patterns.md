@@ -2,7 +2,7 @@
 
 Reusable solutions to common design problems. A shared vocabulary for discussing design. This file translates the classic GoF patterns into modules of arrow functions and typed records.
 
-> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>` — hard rule 16, see `references/result-type.md`.
+> **Note on examples.** Port and use-case signatures in this file are sometimes elided to `Promise<T>` (or throw on business failure) for brevity where error handling is not the lesson. In real code every IO port returns `Promise<Result<T, PortError>>` and every use-case returns `Promise<Result<Summary, StepError>>`: hard rule 16, see `references/result-type.md`.
 
 ## Warning first
 
@@ -13,6 +13,52 @@ Use a pattern when:
 2. The pattern fits without bending.
 3. It simplifies, not complicates.
 4. The team understands it.
+
+---
+
+## The basic translations (before any pattern)
+
+Since `class` and `interface` are banned (hard rules 1 and 3), the everyday OO shapes are typed records and factory functions. Learn these four once; the GoF catalogue below is built from them, and `references/object-design.md` covers value objects, entities, aggregates and polymorphism-via-dispatch in depth.
+
+**Value object.** `class Money { ... }` becomes a readonly record plus operation functions, with the factory as the assertion gate and a `parseX` boundary tier returning `Result` for untrusted input. The canonical `Money` (integer cents, `parseMoney`, `addMoney`, `scaleMoney`) lives in `references/object-design.md`, Value objects; do not retype it.
+
+**Interface / contract.** `interface UserRepo { ... }` becomes a function-type alias:
+
+```ts
+export type UserRepo = {
+  save: (user: User) => Promise<void>;
+  findById: (id: UserId) => Promise<User | null>;
+};
+```
+
+**Service with injected dependencies.** `class UserService { constructor(repo) { ... } }` becomes a factory that closes over its dependencies:
+
+```ts
+export type UserService = { getUser: (id: UserId) => Promise<User | null> };
+
+export const createUserService = (repo: UserRepo): UserService => ({
+  getUser: async (id) => repo.findById(id),
+});
+```
+
+**Entity with state transitions.** `class Order` becomes an immutable record plus transform functions; every transformation takes the record in, returns a new record out, and enforces invariants in between. Aggregate roots follow the same pattern: every mutation goes through a root function that returns a new root.
+
+```ts
+export type Order = {
+  readonly id: OrderId;
+  readonly items: readonly OrderItem[];
+  readonly status: OrderStatus;
+};
+
+export const createOrder = (id: OrderId): Order => ({ id, items: [], status: 'pending' });
+
+export const addItemToOrder = (order: Order, item: OrderItem): Order => ({
+  ...order,
+  items: [...order.items, item],
+});
+
+export const payOrder = (order: Order): Order => ({ ...order, status: 'paid' });
+```
 
 ---
 
@@ -32,7 +78,7 @@ export const retryPolicy = Object.freeze({ maxAttempts: 3, backoffMs: 200 });
 
 No ceremony needed. ESM modules are singletons by default.
 
-Stateful or IO-performing singletons (loggers, clients, pools) are NOT expressed this way — they are factories in `src/infra/**` injected at composition (hard rule 4).
+Stateful or IO-performing singletons (loggers, clients, pools) are NOT expressed this way: they are factories in `src/infra/**` injected at composition (hard rule 4).
 
 ### Factory
 
@@ -144,8 +190,7 @@ export type PaymentGateway = {
 // Adapter
 export const createOldPaymentAdapter = (oldAPI: OldPaymentAPI): PaymentGateway => ({
   charge: async (amount) => {
-    const cents = Math.round(amount.amount * 100);
-    const success = oldAPI.makePayment(cents);
+    const success = oldAPI.makePayment(amount.cents);
     return success ? chargeSuccess() : chargeFailed();
   },
 });
@@ -221,26 +266,26 @@ export type Component =
   | { readonly kind: 'product'; readonly price: Money }
   | { readonly kind: 'box'; readonly children: readonly Component[] };
 
-export const componentPrice = (c: Component): Money => {
+export const componentPrice = (c: Component, currency: Currency): Money => {
   if (c.kind === 'product') return c.price;
-  return c.children.reduce((sum, child) => addMoney(sum, componentPrice(child)), money(0, 'EUR'));
+  return c.children.reduce((sum, child) => addMoney(sum, componentPrice(child, currency)), money(0, currency));
 };
 
 // usage
 const smallBox: Component = {
   kind: 'box',
   children: [
-    { kind: 'product', price: money(10, 'EUR') },
-    { kind: 'product', price: money(20, 'EUR') },
+    { kind: 'product', price: money(1000, 'EUR') },
+    { kind: 'product', price: money(2000, 'EUR') },
   ],
 };
 
 const bigBox: Component = {
   kind: 'box',
-  children: [smallBox, { kind: 'product', price: money(50, 'EUR') }],
+  children: [smallBox, { kind: 'product', price: money(5000, 'EUR') }],
 };
 
-// componentPrice(bigBox) -> 80 EUR
+// componentPrice(bigBox, 'EUR') -> 80 EUR
 ```
 
 ---
@@ -261,15 +306,15 @@ export const regularPricing: PricingStrategy = {
 };
 
 export const premiumDiscount: PricingStrategy = {
-  calculate: (basePrice) => money(basePrice.amount * 0.8, basePrice.currency),
+  calculate: (basePrice) => scaleMoney(basePrice, 0.8),
 };
 
 export const blackFriday: PricingStrategy = {
-  calculate: (basePrice) => money(basePrice.amount * 0.5, basePrice.currency),
+  calculate: (basePrice) => scaleMoney(basePrice, 0.5),
 };
 
-export const cartTotal = (items: readonly Item[], pricing: PricingStrategy): Money => {
-  const base = items.reduce((sum, i) => addMoney(sum, i.price), money(0, 'EUR'));
+export const cartTotal = (items: readonly Item[], pricing: PricingStrategy, currency: Currency): Money => {
+  const base = items.reduce((sum, i) => addMoney(sum, i.price), money(0, currency));
   return pricing.calculate(base);
 };
 ```
@@ -297,7 +342,9 @@ export const createEmitter = <T>(): Emitter<T> => {
         observers = observers.filter((o) => o !== observer);
       };
     },
-    emit: (event) => observers.forEach((o) => o(event)),
+    emit: (event) => {
+      for (const observer of observers) observer(event);
+    },
   };
 };
 
@@ -336,13 +383,17 @@ export const runExport = async (data: readonly Data[], steps: DataExporterSteps)
 
 // Variant steps
 export const csvExporterSteps: DataExporterSteps = {
-  format: (data) => data.map(dataToCsvRow).join('\n'),
-  write: async (content) => Bun.write('export.csv', content).then(() => undefined),
+  format: (data) => data.map((row) => dataToCsvRow(row)).join('\n'),
+  write: async (content) => {
+    await Bun.write('export.csv', content);
+  },
 };
 
 export const jsonExporterSteps: DataExporterSteps = {
   format: (data) => JSON.stringify(data),
-  write: async (content) => Bun.write('export.json', content).then(() => undefined),
+  write: async (content) => {
+    await Bun.write('export.json', content);
+  },
 };
 
 // usage
@@ -422,3 +473,20 @@ This lets you recognise patterns even when the code has no class in sight.
 | Premature optimisation | Optimising before measuring | YAGNI, profile first |
 | Copy-paste | Duplication everywhere | Extract on Rule of Three |
 | Pattern hunting | Applying patterns to look clever | Let patterns emerge from refactoring |
+
+---
+
+## Translation quick reference
+
+| OO concept | Class-free expression |
+|:---|:---|
+| Value object | Readonly record + validating factory (assertion tier) + `parseX` boundary tier returning `Result` |
+| Interface / contract | `type Foo = { method: (...) => ... }` |
+| Service with deps | Factory function returning the contract |
+| Strategy | Contract + exported implementation records |
+| Factory | Plain function (or dispatch record) that returns the right variant |
+| Decorator | Higher-order function wrapping the contract |
+| Observer | Closure factory over an observer array |
+| Command | Record with `execute` / `undo` functions |
+| Entity | Immutable record + transform functions |
+| Aggregate root | Root function is the only mutation path |

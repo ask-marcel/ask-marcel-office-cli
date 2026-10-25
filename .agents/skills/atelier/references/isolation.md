@@ -36,7 +36,11 @@ const rows = await db.transaction(async (tx) => {
 ```
 
 ```sql
--- migration: the second layer; a forgotten WHERE clause is caught here
+-- migration: the second layer; a forgotten WHERE clause is caught here. A policy does
+-- nothing until row-level security is enabled on the table, and FORCE applies it to the
+-- table's owner too, the role migrations and often the app run as.
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON invoices
   USING (org_id = current_setting('app.current_org')::uuid);
 ```
@@ -114,7 +118,7 @@ export const invoices = pgTable('invoices', {
 app.get('/me/invoices', requireAuth, (c) => c.json(listInvoices(c.get('claims').org_id)));
 ```
 
-## 7. No service-token backdoor for bulk reads (7.7)
+## 7. No service-token backdoor for bulk reads (canon 7.7)
 
 Every API call carries the token of the user or tenant it acts for (section 1). There is **no anonymous service-key route** that returns everyone's rows for a dashboard or an export: that one endpoint bypasses every per-owner control in the system, and one leaked key becomes total exposure.
 
@@ -134,7 +138,7 @@ The in-memory fakes in `src/test-helpers/` must model the boundary, or use-case 
 
 ## Executable tripwire
 
-`assets/check-isolation-tests.sh` refuses a newly staged route/resource file with no nearby test mentioning a 404 (globs configurable at the top of the script; `*public*`/`*health*`/`*to-response*` paths exempt by convention, the last because a response mapper is a presenter, not a route). It is deliberately the weakest of the four guards: it proves a cross-tenant test exists near the route, not that it asserts the right thing. The per-endpoint test above remains the contract; the wire just refuses the common failure of landing a route with no isolation test at all.
+`assets/check-isolation-tests.sh` refuses a newly staged route/resource file with no test named for it (the route's basename in the test's filename, `invoices.test.ts` for `invoices.ts`, `InvoiceResourceTest.java` for `InvoiceResource.java`) that asserts a 404 inside a test block, comments excluded (globs configurable at the top of the script; `*public*`/`*health*`/`*to-response*` paths exempt by convention, the last because a response mapper is a presenter, not a route). It is deliberately the weakest of the five guards: it proves a named cross-tenant test asserts a 404 somewhere, not that it asserts the right thing. The per-endpoint test above remains the contract; the wire just refuses the common failure of landing a route with no isolation test at all.
 
 ## Review checklist (changes in a multi-user code path)
 

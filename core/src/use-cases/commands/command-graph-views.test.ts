@@ -48,7 +48,7 @@ const writeGraphAnswering = (response: Response): ReturnType<typeof createWriteG
 const WRITE_GRAPH_MEMBERS = ['delete', 'fetchUrl', 'get', 'getBinary', 'patch', 'post', 'put'];
 
 describe('the read view of a graph that can also write', () => {
-  // The single package's full client: its POST would send anything.
+  // A full client, as in the 2.8.0 single package: its POST sends to any path.
   const fullGraph = (posted: string[]): ReadGraph & Record<string, unknown> => ({
     ...createReadGraph(tokens, fetchSent([])),
     post: async (path: string) => {

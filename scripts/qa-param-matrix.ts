@@ -4,10 +4,11 @@
  *
  * For EVERY command, exercises four validation cases that all fire BEFORE any
  * Graph call (strictly offline against the built bundles — the honest bundle,
- * not the source): a write command against `write/dist/cli.js`, every other
- * command against `read/dist/cli.js`, by the role in core's command directory
- * (the merged docs/commands.json lists the read and the write commands; package
- * split, phases 5 and 6). Build both first (`bun run build` in read/ and write/).
+ * not the source). Each command runs on the bin of the manifest that lists it:
+ * the commands of `read/dist/commands.json` on `read/dist/cli.js`, and those of
+ * `write/dist/commands.json` on `write/dist/cli.js`. Since phase 7 of the package
+ * split the root docs/commands.json is the 2.8.0 file, so the matrix does not
+ * read it. Build both first (`bun run build` in read/ and write/).
  *   - unknown-flag              → must reject (unknown option OR, on a command
  *                                 with required flags, the actionable
  *                                 missing-required message — both are correct)
@@ -19,33 +20,35 @@
  * real failure. Replaces .claude/qa-reports/phase-c-matrix.ts, whose unknown-flag
  * classifier false-flagged every command that also has a required option.
  */
-import { commandRole } from '@ask-marcel/office-core/use-cases/commands/command-directory.ts';
+// Each package's manifest, and the bin that runs its commands.
+const PACKAGES = [
+  { manifest: 'read/dist/commands.json', cli: 'read/dist/cli.js' },
+  { manifest: 'write/dist/commands.json', cli: 'write/dist/cli.js' },
+];
 
-const READ_CLI = 'read/dist/cli.js';
-const WRITE_CLI = 'write/dist/cli.js';
-const cliOf = (command: string): string => (commandRole(command) === 'write' ? WRITE_CLI : READ_CLI);
-const manifest = JSON.parse(await Bun.file('docs/commands.json').text());
-
-type Case = { cmd: string; kind: string; argv: string[]; expectFlag?: string };
+type Case = { cli: string; cmd: string; kind: string; argv: string[]; expectFlag?: string };
 const cases: Case[] = [];
-for (const c of manifest.commands) {
-  const req = (c.options || []).filter((o: any) => o.required);
-  // Omitting a required flag drops the WHOLE option (flag + value); a dangling
-  // `--flag` with no value would confuse commander into a wrong error.
-  const filled = (skip?: string, empty?: string): string[] =>
-    req.filter((o: any) => o.name !== skip).flatMap((o: any) => [`--${o.name}`, o.name === empty ? '' : 'x']);
-  cases.push({ cmd: c.name, kind: 'unknown', argv: [...filled(), '--definitely-not-a-real-flag', 'x'] });
-  for (const o of req) {
-    cases.push({ cmd: c.name, kind: `missing:${o.name}`, argv: filled(o.name), expectFlag: o.name });
-    cases.push({ cmd: c.name, kind: `empty:${o.name}`, argv: filled(undefined, o.name) });
-    cases.push({ cmd: c.name, kind: `dup:${o.name}`, argv: [...filled(), `--${o.name}`, 'y'] });
+for (const { manifest: path, cli } of PACKAGES) {
+  const manifest = JSON.parse(await Bun.file(path).text());
+  for (const c of manifest.commands) {
+    const req = (c.options || []).filter((o: any) => o.required);
+    // Omitting a required flag drops the WHOLE option (flag + value); a dangling
+    // `--flag` with no value would confuse commander into a wrong error.
+    const filled = (skip?: string, empty?: string): string[] =>
+      req.filter((o: any) => o.name !== skip).flatMap((o: any) => [`--${o.name}`, o.name === empty ? '' : 'x']);
+    cases.push({ cli, cmd: c.name, kind: 'unknown', argv: [...filled(), '--definitely-not-a-real-flag', 'x'] });
+    for (const o of req) {
+      cases.push({ cli, cmd: c.name, kind: `missing:${o.name}`, argv: filled(o.name), expectFlag: o.name });
+      cases.push({ cli, cmd: c.name, kind: `empty:${o.name}`, argv: filled(undefined, o.name) });
+      cases.push({ cli, cmd: c.name, kind: `dup:${o.name}`, argv: [...filled(), `--${o.name}`, 'y'] });
+    }
   }
 }
 
 // Async spawn so the worker pool genuinely parallelizes (spawnSync would block
 // each worker and serialize all 800+ cases — minutes instead of seconds).
-const run = async (argv: string[]): Promise<{ ok: boolean | null; msg: string }> => {
-  const p = Bun.spawn(['node', cliOf(argv[0] ?? ''), ...argv, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
+const run = async (cli: string, argv: string[]): Promise<{ ok: boolean | null; msg: string }> => {
+  const p = Bun.spawn(['node', cli, ...argv, '--output', 'json'], { stdout: 'pipe', stderr: 'pipe' });
   const [out, errout] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
   await p.exited;
   try { const d = JSON.parse(out); return { ok: d.ok === true, msg: String(d.error || '') }; }
@@ -55,7 +58,7 @@ const run = async (argv: string[]): Promise<{ ok: boolean | null; msg: string }>
 const POOL = 12;
 const results: (Case & { ok: boolean | null; msg: string })[] = [];
 let idx = 0;
-const worker = async (): Promise<void> => { while (idx < cases.length) { const c = cases[idx++]; results.push({ ...c, ...(await run([c.cmd, ...c.argv])) }); } };
+const worker = async (): Promise<void> => { while (idx < cases.length) { const c = cases[idx++]; results.push({ ...c, ...(await run(c.cli, [c.cmd, ...c.argv])) }); } };
 await Promise.all(Array.from({ length: POOL }, worker));
 
 const fails: typeof results = [];
