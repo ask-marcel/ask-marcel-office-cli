@@ -4,7 +4,8 @@
 # a diff to the right files, so `mutate:changed` and `mutate:staged` can neither
 # explode on a mass move nor pass having mutated nothing. Each case builds a
 # throwaway repo, so the real history is never read; stryker is replaced by a
-# fake `bunx` that records the files it was asked to mutate.
+# fake `bunx` that records the files it was asked to mutate, and writes the
+# json report that the per-file gate (check-mutation-score.ts) then reads.
 #
 # Why the cases exist:
 #   - a move with only import edits mutates nothing: the package split moves
@@ -30,7 +31,19 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/mutation-scope-selftest.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/bin"
-printf '#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do if [ "$1" = --mutate ]; then echo "$2" > "$STRYKER_ARGS"; fi; shift; done\n' > "$work/bin/bunx"
+# Each mutated file gets one mutant: killed, or survived when
+# FAKE_STRYKER_SURVIVED is set (a score of 0, below the break of 90).
+cat > "$work/bin/bunx" <<'FAKE'
+#!/usr/bin/env bash
+mutate=""
+while [ $# -gt 0 ]; do if [ "$1" = --mutate ]; then mutate=$2; echo "$2" > "$STRYKER_ARGS"; fi; shift; done
+status=Killed
+if [ -n "${FAKE_STRYKER_SURVIVED:-}" ]; then status=Survived; fi
+mkdir -p reports/mutation
+files=""
+for f in $(echo "$mutate" | tr ',' ' '); do files="${files:+$files,}\"$f\":{\"mutants\":[{\"status\":\"$status\"}]}"; done
+printf '{"thresholds":{"break":90},"config":{"mutate":"%s"},"files":{%s}}\n' "$mutate" "$files" > reports/mutation/mutation.json
+FAKE
 chmod +x "$work/bin/bunx"
 
 expect() {
@@ -137,6 +150,9 @@ export STRYKER_ARGS="$work/stryker-args"
 rm -f "$STRYKER_ARGS"
 PATH="$work/bin:$PATH" MUTATE_NO_FETCH=1 BASE=HEAD~1 bash "$here/mutate-changed.sh" > /dev/null
 expect 'mutate:changed hands stryker the changed file' 'src/use-cases/y.ts' "$(cat "$STRYKER_ARGS" 2>/dev/null || true)"
+status=0
+FAKE_STRYKER_SURVIVED=1 PATH="$work/bin:$PATH" MUTATE_NO_FETCH=1 BASE=HEAD~1 bash "$here/mutate-changed.sh" > /dev/null 2>&1 || status=$?
+expect 'mutate:changed fails on a changed file below the break score' 'failed' "$([ "$status" -ne 0 ] && echo failed || echo passed)"
 printf "export const u = (): number => 1;\n" > src/domain/u.ts
 PATH="$work/bin:$PATH" MUTATE_NO_FETCH=1 BASE=HEAD bash "$here/mutate-changed.sh" > /dev/null
 expect 'mutate:changed hands stryker an untracked file' 'src/domain/u.ts' "$(cat "$STRYKER_ARGS" 2>/dev/null || true)"
@@ -154,6 +170,9 @@ edit_commit src/domain/d.ts 's/4/5/'
 git reset -q --soft HEAD~1
 PATH="$work/bin:$PATH" bash "$here/mutate-staged.sh" > /dev/null
 expect 'mutate:staged hands stryker the staged file' 'src/domain/d.ts' "$(cat "$STRYKER_ARGS" 2>/dev/null || true)"
+status=0
+FAKE_STRYKER_SURVIVED=1 PATH="$work/bin:$PATH" bash "$here/mutate-staged.sh" > /dev/null 2>&1 || status=$?
+expect 'mutate:staged fails on a staged file below the break score' 'failed' "$([ "$status" -ne 0 ] && echo failed || echo passed)"
 
 # Shards: CI divides a large scope over parallel jobs. Each file goes to
 # exactly one shard, every file goes to one, and no shard setting keeps all.

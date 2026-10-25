@@ -20,9 +20,13 @@
   "incrementalFile": "reports/stryker-incremental.json",
   "concurrency": 4,
   "timeoutMS": 10000,
-  "reporters": ["clear-text", "progress", "html"],
+  "_reporters_comment": "json: scripts/check-mutation-score.ts reads this report and holds each mutated file to the break score (mutate-changed.sh and mutate-staged.sh run it).",
+  "reporters": ["clear-text", "progress", "html", "json"],
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
   },
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,

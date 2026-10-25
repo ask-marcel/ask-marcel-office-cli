@@ -50,3 +50,11 @@ incremental_dir=$(mktemp -d "${TMPDIR:-/tmp}/stryker-inc.XXXXXX")
 trap 'rm -rf "$incremental_dir"' EXIT
 
 bunx stryker run --incrementalFile "$incremental_dir/incremental.json" --mutate "$mutate_arg"
+
+# Stryker's break judges the score of the whole run, so one weak file passes
+# beside strong ones. The per-file gate holds each file that this run mutated
+# to the same break (a file below 90 fails). It reads the json report of the
+# run, reports/mutation/mutation.json in this folder.
+set --
+while IFS= read -r f; do set -- "$@" "$f"; done <<<"$files"
+bun run "$(dirname "$0")/check-mutation-score.ts" "$@"

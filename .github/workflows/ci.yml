@@ -127,6 +127,8 @@ jobs:
           bun run ../scripts/gen-docs.ts --package src/composition/single-package.ts --selftest
       - name: mutation scope selftest (a pure move mutates nothing, a sub-folder run maps its paths)
         run: bash scripts/mutation-scope-selftest.sh
+      - name: per-file mutation gate selftest (a file below the break score and a file the run did not mutate are rejected)
+        run: bun scripts/check-mutation-score.ts --selftest
       - name: dependency CVEs (fails on high)
         run: bun audit --audit-level=high
   mutation:
@@ -154,7 +156,7 @@ jobs:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
         working-directory: .
-      - name: mutation (read's changed files, shard ${{ matrix.shard }} of 8; see deviation 2 in the header)
+      - name: mutation (read's changed files, shard ${{ matrix.shard }} of 8, each file at the break score or more; see deviation 2 in the header)
         env:
           # The branch tip BEFORE this push. Read via env rather than inlined,
           # so the shell never interpolates a ref name into its own source.
@@ -249,7 +251,7 @@ jobs:
         run: bun test --randomize
       - name: coverage (every tier at 100%; the preload lists the folder's tier files itself)
         run: bun run coverage
-      - name: mutation (changed files of this folder; see deviation 2 in the header; read mutates in the `mutation` job)
+      - name: mutation (changed files of this folder, each file at the break score or more; see deviation 2 in the header; read mutates in the `mutation` job)
         if: matrix.folder != 'read'
         env:
           PUSHED_FROM: ${{ github.event.before }}
