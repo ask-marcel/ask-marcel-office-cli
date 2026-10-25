@@ -38,6 +38,9 @@ if [ -z "$files" ]; then
 fi
 
 # Non-type-aware lint only (LINT_STRICT unset), so this stays fast. The
-# type-aware pass is CI's job. eslint exits non-zero on any error, blocking
-# the commit.
-echo "$files" | xargs bun x eslint
+# type-aware pass is CI's job. --max-warnings=0 makes a warning block the
+# commit the way it blocks CI (prettier/prettier is a warning; without the flag
+# the hook let it pass, rule 15: zero warnings). --no-warn-ignored stops a
+# staged file under an ignored path (the root config ignores scripts/**) from
+# failing on the "File ignored" warning of ESLint.
+echo "$files" | xargs bun x eslint --max-warnings=0 --no-warn-ignored
