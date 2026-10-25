@@ -4,8 +4,9 @@
  * commands are in @ask-marcel/office-write (`write-package.ts`). The shells
  * (CLI builder, MCP gateway, run-registry-command, docs builders) import no
  * registry; this module and `build-deps.ts` are where the real one is wired in.
- * `bun run docs:gen`, `bun run check:docs` and read's build read it through
- * `--package` (the name `commandPackage`).
+ * Read's `bun run docs:gen` (it writes read/COMMANDS.md), read's build, and the
+ * root `bun run docs:gen` and `bun run check:docs` read it through `--package`
+ * (the name `commandPackage`).
  */
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { CommandPackage } from '@ask-marcel/office-core/use-cases/commands/command-package.ts';
