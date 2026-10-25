@@ -46,7 +46,7 @@
     "lint:staged": "bash ../scripts/lint-staged.sh",
     "lint:strict": "LINT_STRICT=1 eslint --max-warnings=0",
     "typecheck": "bun --bun x tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --randomize",
     "coverage": "bun run ../scripts/check-coverage.ts --preload ../scripts/coverage-preload-tiers.ts",
     "mutate": "stryker run",
     "mutate:changed": "bash ../scripts/mutate-changed.sh",

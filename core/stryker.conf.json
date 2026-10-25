@@ -4,9 +4,9 @@
   "_packageManager_comment": "Stryker does not fully understand Bun yet; tell it npm so it does not probe for yarn or pnpm lockfiles.",
   "packageManager": "npm",
   "testRunner": "command",
-  "_commandRunner_comment": "Only the summary reaches Stryker. It keeps every killed mutant's whole process output as its status reason and serialises all of them into one report; on GitHub Actions bun test lists every test (1.2 MB a run on 2026-09-03), so a thousand killed mutants pushed JSON.stringify past V8's string limit (RangeError: Invalid string length) after the score had already passed. pipefail keeps bun's exit code, which is what decides killed vs survived.",
+  "_commandRunner_comment": "Only the summary reaches Stryker. It keeps every killed mutant's whole process output as its status reason and serialises all of them into one report; on GitHub Actions bun test lists every test (1.2 MB a run on 2026-09-03), so a thousand killed mutants pushed JSON.stringify past V8's string limit (RangeError: Invalid string length) after the score had already passed. pipefail keeps bun's exit code, which is what decides killed vs survived. --randomize: the tests run in random order here too (rule 36).",
   "commandRunner": {
-    "command": "bash -o pipefail -c 'bun test 2>&1 | tail -n 20'"
+    "command": "bash -o pipefail -c 'bun test --randomize 2>&1 | tail -n 20'"
   },
   "_mutate_comment": "src/domain and src/use-cases only. Test files have no logic to mutate; ports/ files are type-only (zero mutable code).",
   "mutate": ["src/domain/**/*.ts", "src/use-cases/**/*.ts", "!**/*.test.ts", "!**/ports/**"],
