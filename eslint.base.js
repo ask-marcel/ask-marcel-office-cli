@@ -17,12 +17,26 @@ import tsPlugin from 'typescript-eslint';
  * (LINT_STRICT) reads; pass `import.meta.dirname` of the spreading config.
  */
 
+// Rule 13: the whole mocking surface of bun:test. `mock` is process-global once
+// installed and leaks into every other test file; `spyOn`, `jest` and `vi` are
+// the same machinery under other names.
 const MOCK_BAN = {
   name: 'bun:test',
-  importNames: ['mock'],
+  importNames: ['mock', 'spyOn', 'jest', 'vi'],
   message:
-    '`mock` from bun:test is forbidden — it leaks across test files. Use dependency injection: refactor the production code to accept the SDK as a parameter, then pass a fake at construction.',
+    '`mock`, `spyOn`, `jest` and `vi` from bun:test are forbidden: mocks leak across test files. Use dependency injection: refactor the production code to accept the SDK as a parameter, then pass a fake at construction (hard rule 13).',
 };
+
+// Rule 13, the other half: a call-recording assertion, whatever built the spy.
+// ESLint replaces the options of `no-restricted-syntax` when a second block
+// matches the same file, so a config with its own `no-restricted-syntax` block
+// (core) spreads this list into it.
+export const CALL_ASSERTION_BANS = [
+  {
+    selector: 'MemberExpression[property.name=/^(toHaveBeen(Last|Nth)?Called|toBeCalled|toHave(Last|Nth)?Returned)/]',
+    message: 'No call-recording assertions: a hand-written fake records what it received and the test asserts on that record (hard rule 13).',
+  },
+];
 
 // The shared test fakes (core/src/test-helpers, reached through core's dev-only
 // `./test-helpers/*` export, and each folder's own src/test-helpers) are for
@@ -38,6 +52,13 @@ export const baseConfig = (tsconfigRootDir) => [
   ...tsPlugin.configs.recommended,
   securityPlugin.configs.recommended,
   {
+    // Rule 15: no inline ignore, ever. A directive comment (eslint-disable*,
+    // eslint-enable, global, exported) has no effect, and ESLint reports each
+    // one, so --max-warnings=0 fails on the comment, and the finding that it
+    // tried to hide shows beside it.
+    linterOptions: { noInlineConfig: true },
+  },
+  {
     languageOptions: { globals: globals.node },
   },
   {
@@ -48,6 +69,31 @@ export const baseConfig = (tsconfigRootDir) => [
       'prefer-template': 'error',
       quotes: ['error', 'single', { avoidEscape: true }],
       'no-restricted-imports': ['error', { paths: [MOCK_BAN] }],
+      'no-restricted-syntax': ['error', ...CALL_ASSERTION_BANS],
+      // Rule 15, the ignores of other tools: every @ts- form (the recommended
+      // preset allows a @ts-expect-error with a description), and the markers
+      // that other tools read, anywhere in a comment.
+      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-expect-error': true, 'ts-ignore': true, 'ts-nocheck': true, 'ts-check': false }],
+      'no-warning-comments': [
+        'error',
+        {
+          terms: [
+            'prettier-ignore',
+            'stryker disable',
+            'nosonar',
+            'sonar-ignore',
+            'snyk-ignore',
+            'deepcode ignore',
+            'biome-ignore',
+            'oxlint-disable',
+            'c8 ignore',
+            'v8 ignore',
+            'istanbul ignore',
+            'gitleaks:allow',
+          ],
+          location: 'anywhere',
+        },
+      ],
       '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // The rule ships no default argsIgnorePattern, so it flags deliberately-unused
