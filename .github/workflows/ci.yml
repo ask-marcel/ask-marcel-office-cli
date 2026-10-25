@@ -103,6 +103,10 @@ jobs:
       - name: doc numbers selftest (a wrong count, a lost anchor, an unmatched count and a placeholder are refused; the check:docs script of each published folder runs the gate on its docs)
         working-directory: read
         run: bun run ../scripts/check-doc-numbers.ts --package src/composition/single-package.ts --selftest
+      - name: frozen 2.8.0 docs (docs/COMMANDS.md and docs/USAGE.md under their banners, docs/commands.json and docs/demo.gif keep the v2.8.0 bytes that the npm page of 2.8.0 links; selftest first)
+        run: |
+          bun scripts/check-frozen-docs.ts --selftest
+          bun scripts/check-frozen-docs.ts
       - name: command reference red fixture (in read, a copy of COMMANDS.md passes, and the same copy with a wrong count gives exit 1 exactly), then the gen-docs selftest
         # Nothing is built in this job, so the fixture gives no manifest:
         # a missing manifest would make each run stale for the wrong reason.
