@@ -12,7 +12,8 @@
 #
 #   1. commit size   - <=10 files AND <=300 lines (insertions + deletions)
 #   2. package.json  - no "latest" / "*" / bare dist-tag version strings
-#   3. secret scan   - gitleaks protect --staged (degrades gracefully)
+#   3. secret scan   - gitleaks git --staged, inline allow comments ignored
+#                      (degrades gracefully)
 #   4. staged lint   - eslint on the staged TS files only (fast, not type-aware)
 #   5. typecheck     - tsc --noEmit
 #
@@ -49,9 +50,13 @@ bash scripts/check-commit-size.sh
 echo "[2/5] package.json (no latest / *)"
 bash scripts/check-package-json.sh
 
-echo "[3/5] gitleaks protect --staged"
+# `protect` is the old name of `git --staged`, deprecated since gitleaks 8.19.
+# --ignore-gitleaks-allow: an inline `gitleaks:allow` comment does not hide a
+# finding (rule 15, no inline ignores). A real false positive goes in
+# .gitleaksignore by fingerprint, with its reason.
+echo "[3/5] gitleaks git --staged (inline gitleaks:allow ignored)"
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --redact --verbose --no-banner
+  gitleaks git --staged --pre-commit --ignore-gitleaks-allow --redact --verbose --no-banner
 else
   echo "  warning: 'gitleaks' not on PATH - skipping secret scan." >&2
   echo "  install: brew install gitleaks (or https://github.com/gitleaks/gitleaks/releases)" >&2
