@@ -26,11 +26,23 @@ type DocumentedPackage = CommandPackage<Command<never>>;
 const isCommandPackage = (value: unknown): value is DocumentedPackage =>
   typeof value === 'object' && value !== null && 'registry' in value && 'lifecycle' in value && 'packageName' in value && 'binName' in value && 'bins' in value;
 
+// A module that cannot be imported (a wrong path, a syntax error) is an error of
+// the arguments, so the scripts exit 2 and not with the exit 1 of a crash.
+const importModule = async (path: string): Promise<Result<Readonly<Record<string, unknown>>, string>> => {
+  try {
+    return ok((await import(pathToFileURL(resolve(path)).href)) as Readonly<Record<string, unknown>>);
+  } catch (error) {
+    return err(`${path} cannot be imported (${error instanceof Error ? error.message : String(error)}).`);
+  }
+};
+
 /** Imports each path (relative to the working directory) and takes its export `exportName` (by default `commandPackage`). */
 export const loadPackages = async (paths: ReadonlyArray<string>, exportName = 'commandPackage'): Promise<Result<ReadonlyArray<DocumentedPackage>, string>> => {
   const packages: DocumentedPackage[] = [];
   for (const path of paths) {
-    const loaded: unknown = (await import(pathToFileURL(resolve(path)).href))[exportName];
+    const imported = await importModule(path);
+    if (!imported.ok) return imported;
+    const loaded: unknown = imported.value[exportName];
     if (!isCommandPackage(loaded)) return err(`${path} exports no \`${exportName}\`.`);
     packages.push(loaded);
   }
