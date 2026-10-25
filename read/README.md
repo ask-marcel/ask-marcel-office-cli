@@ -344,6 +344,9 @@ bin. To give the library your own token, set a tier variable or
 
 ## Develop
 
+The [contributor guide](https://github.com/ask-marcel/ask-marcel-office-cli/blob/main/CONTRIBUTING.md)
+tells how the workspace, the pre-commit hook and CI work.
+
 This folder is one Bun workspace of the repository. Run `bun install` at the
 repository root once. In a new checkout, run the auth bin once
 (`bun run src/main.ts status` in `auth/`), so that the locator names a token
