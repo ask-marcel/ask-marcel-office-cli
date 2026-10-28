@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { odataQueryOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
-import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
+import { createOnenote5kExecute } from './onenote-5k-limit.ts';
 
 const baseSchema = z.object({ siteId: z.string().min(1) });
 const inner = buildListCommand((p) => `/sites/${p.siteId}/onenote/notebooks`, baseSchema);
-const execute = wrapOnenote5kLimit(inner.execute);
+const execute = createOnenote5kExecute(inner.execute);
 const { schema } = inner;
 
 const meta: ReadCommandMeta = {
