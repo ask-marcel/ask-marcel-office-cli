@@ -458,7 +458,7 @@ const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void 
       // Audit round-7 B6: every single-value flag rejects repeated occurrences.
       // Commander.js by default last-wins on `--filter A --filter B` — surprising
       // for an LLM consumer that constructed two filters expecting both to apply.
-      const noRepeatParser =
+      const createNoRepeatParser =
         (flagName: string) =>
         (value: string, previous: unknown): string => {
           if (typeof previous === 'string') {
@@ -473,9 +473,9 @@ const addRegistryCommands = <G>(parts: ShellParts, deps: CliShellDeps<G>): void 
       // on aliased canonicals) went with the alias system.
       for (const opt of cmd.meta.options) {
         if (opt.required) {
-          commandDef.requiredOption(`--${opt.name} <value>`, fill(opt.description), noRepeatParser(opt.name));
+          commandDef.requiredOption(`--${opt.name} <value>`, fill(opt.description), createNoRepeatParser(opt.name));
         } else {
-          commandDef.option(`--${opt.name} <value>`, fill(opt.description), noRepeatParser(opt.name));
+          commandDef.option(`--${opt.name} <value>`, fill(opt.description), createNoRepeatParser(opt.name));
         }
       }
       commandDef.exitOverride((err) => onCommanderError(err, [...cmd.meta.options.map((o) => `--${o.name}`), ...globalFlags()], commandDef.args));

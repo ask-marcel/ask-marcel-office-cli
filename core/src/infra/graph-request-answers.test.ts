@@ -123,15 +123,15 @@ describe('a Graph error, as an agent reads it', () => {
   });
 
   it('gives the seconds Graph asks to wait before a retry, when it names a whole number', async () => {
-    const throttled = (retryAfter: string) => (): Response => graphError(429, { code: 'TooManyRequests', message: 'Slow down.' }, { 'retry-after': retryAfter });
-    expect(await getAnswering(throttled(' 7 '))).toEqual(
+    const createThrottledAnswer = (retryAfter: string) => (): Response => graphError(429, { code: 'TooManyRequests', message: 'Slow down.' }, { 'retry-after': retryAfter });
+    expect(await getAnswering(createThrottledAnswer(' 7 '))).toEqual(
       err({ type: 'api_error', status: 429, message: 'TooManyRequests: Slow down.', code: 'TooManyRequests', retryAfterSeconds: 7 })
     );
-    expect(await getAnswering(throttled('0'))).toEqual(err(expect.objectContaining({ retryAfterSeconds: 0 })));
-    expect(await getAnswering(throttled('Wed, 21 Oct 2026 07:28:00 GMT'))).toEqual(
+    expect(await getAnswering(createThrottledAnswer('0'))).toEqual(err(expect.objectContaining({ retryAfterSeconds: 0 })));
+    expect(await getAnswering(createThrottledAnswer('Wed, 21 Oct 2026 07:28:00 GMT'))).toEqual(
       err({ type: 'api_error', status: 429, message: 'TooManyRequests: Slow down.', code: 'TooManyRequests' })
     );
-    expect(await getAnswering(throttled('1.5'))).toEqual(err(expect.not.objectContaining({ retryAfterSeconds: expect.anything() })));
+    expect(await getAnswering(createThrottledAnswer('1.5'))).toEqual(err(expect.not.objectContaining({ retryAfterSeconds: expect.anything() })));
     const unknown = await getAnswering(() => graphError(503, { code: 'UnknownError' }, { 'retry-after': '3' }));
     expect(unknown).toEqual(err(expect.objectContaining({ code: 'UnknownError', retryAfterSeconds: 3 })));
     const bare = await getAnswering(() => new Response(null, { status: 503, headers: { 'retry-after': '4' } }), '/me/events');

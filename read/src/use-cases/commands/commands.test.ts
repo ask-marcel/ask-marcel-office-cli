@@ -3658,14 +3658,14 @@ describe('calendar event attachments', () => {
 });
 
 describe('convert-drive-item-zip-to-markdown', () => {
-  const zipResponse =
+  const createZipFetch =
     (bytes: Uint8Array): FetchFn =>
     async () =>
       new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/zip' } });
 
   it('converts every Office/text entry, notes a malformed entry, and skips non-convertible ones', async () => {
     const archive = await buildSampleZipArchive();
-    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(archive)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; files: ReadonlyArray<{ path: string; contentType?: string; text?: string; note?: string }> };
@@ -3716,7 +3716,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
 
   it('appends each Office file’s metadata block when --include-metadata true (and accepts an explicit false)', async () => {
     const archive = await buildSampleZipArchive();
-    const withMeta = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), {
+    const withMeta = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(archive)), {
       driveId: 'd1',
       itemId: 'i1',
       includeMetadata: 'true',
@@ -3729,7 +3729,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
     expect(files.find((f) => f.path === 'deck.pptx')?.text).toContain('## PPTX metadata');
     expect(files.find((f) => f.path === 'plan.odt')?.text).toContain('## OpenDocument metadata');
     // `false` is an accepted enum value and must omit the metadata blocks
-    const explicitFalse = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(await buildSampleZipArchive())), {
+    const explicitFalse = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(await buildSampleZipArchive())), {
       driveId: 'd1',
       itemId: 'i1',
       includeMetadata: 'false',
@@ -3743,7 +3743,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
 
   it('caps at 100 entries and flags truncation', async () => {
     const archive = await buildOversizedZipArchive();
-    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(archive)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(archive)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { count: number; truncated?: boolean; totalEntries?: number };
@@ -3753,7 +3753,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
   });
 
   it('propagates a zip-parse error for non-zip bytes', async () => {
-    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), zipResponse(new Uint8Array([1, 2, 3]))), {
+    const result = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(new Uint8Array([1, 2, 3]))), {
       driveId: 'd1',
       itemId: 'i1',
     });
@@ -3786,7 +3786,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
 describe('extract-sharepoint-links-in-documents', () => {
   // Serve the document bytes for the `/content` fetch and a resolved driveItem
   // (or a caller-supplied response) for each `/shares/{token}/driveItem` resolve.
-  const docResponse =
+  const createDocFetch =
     (bytes: Uint8Array, shareResolver?: () => Response): FetchFn =>
     async (url) => {
       if (url.includes('/items/i1/content'))
@@ -3800,7 +3800,7 @@ describe('extract-sharepoint-links-in-documents', () => {
 
   it('extracts and resolves SharePoint links from a docx, dedupes, and filters non-SharePoint externals', async () => {
     const bytes = await buildDocxWithSharepointLinks();
-    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), createDocFetch(bytes)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as {
@@ -3825,7 +3825,7 @@ describe('extract-sharepoint-links-in-documents', () => {
 
   it('extracts and resolves SharePoint links from an OpenDocument (.odt) via content.xml xlink:href, dedupes, and filters non-SharePoint', async () => {
     const bytes = await buildOdtWithSharepointLinks();
-    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), createDocFetch(bytes)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { links: ReadonlyArray<{ url: string; driveId?: string }> };
@@ -3837,13 +3837,13 @@ describe('extract-sharepoint-links-in-documents', () => {
 
   it('returns an empty links array for a valid Office doc with no external SharePoint links', async () => {
     const bytes = await buildSampleDocx();
-    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(bytes)), { driveId: 'd1', itemId: 'i1' });
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), createDocFetch(bytes)), { driveId: 'd1', itemId: 'i1' });
     expect(result?.ok).toBe(true);
     if (result?.ok) expect((result.value as { links: ReadonlyArray<unknown> }).links).toHaveLength(0);
   });
 
   it('returns an api_error 400 when the item is not a zip-based Office document', async () => {
-    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), docResponse(new Uint8Array([0x25, 0x50, 0x44, 0x46]))), {
+    const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(createGraphClient(fakeAuth(), createDocFetch(new Uint8Array([0x25, 0x50, 0x44, 0x46]))), {
       driveId: 'd1',
       itemId: 'i1',
     });
@@ -3860,7 +3860,7 @@ describe('extract-sharepoint-links-in-documents', () => {
     const result = await cmdMap['extract-sharepoint-links-in-documents']?.execute(
       createGraphClient(
         fakeAuth(),
-        docResponse(
+        createDocFetch(
           bytes,
           () => new Response(JSON.stringify({ error: { code: 'itemNotFound', message: 'gone' } }), { status: 404, headers: { 'content-type': 'application/json' } })
         )
@@ -4242,34 +4242,34 @@ describe('convert-mail-to-markdown — quoted-text stripping', () => {
 describe('onenote-resource-embedder', () => {
   const RES = 'https://graph.microsoft.com/v1.0/users/u1/onenote/resources/r1/$value';
   // Strict on the exact resource URL so a broken base-strip (wrong getBinary path) → 404 → no embed.
-  const imageFetch =
+  const createImageFetch =
     (contentType: string, bytes: Uint8Array): FetchFn =>
     async (url) =>
       url === RES ? new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': contentType } }) : new Response('no', { status: 404 });
 
   it('embeds a OneNote resource image as a base64 data URI (fetching the base-stripped resource path)', async () => {
-    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array([1, 2, 3]))), `<p>see <img src="${RES}" alt="x"></p>`);
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), createImageFetch('image/png', new Uint8Array([1, 2, 3]))), `<p>see <img src="${RES}" alt="x"></p>`);
     expect(out).toContain('data:image/png;base64,AQID');
     expect(out).not.toContain(RES);
   });
 
   it('matches the image content-type case-insensitively (IMAGE/PNG embeds)', async () => {
-    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('IMAGE/PNG', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), createImageFetch('IMAGE/PNG', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
     expect(out).toContain('data:IMAGE/PNG;base64,AQID');
   });
 
   it('leaves the URL in place when the resource is not an image', async () => {
-    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('application/pdf', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
+    const out = await embedOnenoteResources(createGraphClient(fakeAuth(), createImageFetch('application/pdf', new Uint8Array([1, 2, 3]))), `<img src="${RES}">`);
     expect(out).toContain(RES);
     expect(out).not.toContain('data:');
   });
 
   it('embeds at exactly the size limit but leaves the URL one byte over (boundary)', async () => {
-    const atLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array(2_000_000))), `<img src="${RES}">`);
+    const atLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), createImageFetch('image/png', new Uint8Array(2_000_000))), `<img src="${RES}">`);
     expect(atLimit).toContain('data:image/png;base64,'); // 2_000_000 is NOT over the limit → embedded
     expect(atLimit).not.toContain(RES);
 
-    const overLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), imageFetch('image/png', new Uint8Array(2_000_001))), `<img src="${RES}">`);
+    const overLimit = await embedOnenoteResources(createGraphClient(fakeAuth(), createImageFetch('image/png', new Uint8Array(2_000_001))), `<img src="${RES}">`);
     expect(overLimit).toContain(RES); // one byte over → left as URL
     expect(overLimit).not.toContain('data:image');
   });
@@ -4391,7 +4391,7 @@ describe('onenote-metadata', () => {
 describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   const RES = 'https://graph.microsoft.com/v1.0/me/onenote/resources/r1/$value';
   const pageHtml = `<html><body><p>Notes.</p><img src="${RES}"></body></html>`;
-  const onenoteFetch = (): FetchFn => async (url) => {
+  const createOnenoteFetch = (): FetchFn => async (url) => {
     if (url.endsWith('/onenote/pages/p1/content')) return new Response(pageHtml, { status: 200, headers: { 'content-type': 'text/html' } });
     if (url === RES) return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } });
     if (url.includes('/onenote/pages/p1?')) {
@@ -4407,7 +4407,7 @@ describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   };
 
   it('embeds inline resource images by default', async () => {
-    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1' });
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), createOnenoteFetch()), { onenotePageId: 'p1' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { text: string };
@@ -4417,7 +4417,7 @@ describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   });
 
   it('keeps the raw resource URL with --inline-images false', async () => {
-    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', inlineImages: 'false' });
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), createOnenoteFetch()), { onenotePageId: 'p1', inlineImages: 'false' });
     expect(result?.ok).toBe(true);
     if (!result?.ok) return;
     const v = result.value as { text: string };
@@ -4426,7 +4426,7 @@ describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   });
 
   it('embeds inline resource images when --inline-images true is passed explicitly', async () => {
-    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', inlineImages: 'true' });
+    const result = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), createOnenoteFetch()), { onenotePageId: 'p1', inlineImages: 'true' });
     expect(result?.ok).toBe(true);
     if (result?.ok) expect((result.value as { text: string }).text).toContain('data:image/png;base64,AQID');
   });
@@ -4463,11 +4463,14 @@ describe('get-onenote-page-as-markdown — inline images + metadata', () => {
   });
 
   it('omits the metadata block by default and when --include-metadata false is passed explicitly', async () => {
-    const def = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1' });
+    const def = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), createOnenoteFetch()), { onenotePageId: 'p1' });
     expect(def?.ok).toBe(true);
     if (def?.ok) expect((def.value as { text: string }).text).not.toContain('## OneNote metadata');
 
-    const explicitFalse = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), onenoteFetch()), { onenotePageId: 'p1', includeMetadata: 'false' });
+    const explicitFalse = await cmdMap['get-onenote-page-as-markdown']?.execute(createGraphClient(fakeAuth(), createOnenoteFetch()), {
+      onenotePageId: 'p1',
+      includeMetadata: 'false',
+    });
     expect(explicitFalse?.ok).toBe(true);
     if (explicitFalse?.ok) expect((explicitFalse.value as { text: string }).text).not.toContain('## OneNote metadata');
   });
