@@ -1,3 +1,5 @@
+import { decodeUtf8 } from '../../domain/utf8.ts';
+
 /**
  * Microsoft Graph's `?format=pdf` / `?format=html` conversion accepts a
  * fixed set of source extensions. For anything outside that whitelist
@@ -40,15 +42,11 @@ const isPdfSource = (name: string): boolean => extensionOf(name) === 'pdf';
  * a binary file named `.txt` triggered). Non-UTF-8-encoded text (UTF-16, etc.)
  * is reported as binary, which is faithful (base64) rather than lossy.
  *
- * `{ fatal: true }` makes `decode` throw on the first invalid sequence; the
- * try/catch is a pure-domain fallback around a native synchronous thrower.
+ * The strict decode and its catch live in the domain (`decodeUtf8`).
  */
 const decodeUtf8Text = (bytes: Uint8Array): string | undefined => {
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return undefined;
-  }
+  const decoded = decodeUtf8(bytes);
+  return decoded.ok ? decoded.value : undefined;
 };
 
 export { decodeUtf8Text, extensionOf, isPdfSource, isPlainTextFilename };
