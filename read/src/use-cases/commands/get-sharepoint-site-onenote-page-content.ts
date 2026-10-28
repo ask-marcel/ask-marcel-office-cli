@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
-import { wrapOnenote5kLimit } from './onenote-5k-limit.ts';
+import { createOnenote5kExecute } from './onenote-5k-limit.ts';
 
 const schema = z.object({ siteId: z.string().min(1), onenotePageId: z.string().min(1) });
 
@@ -17,7 +17,7 @@ const innerExecute: ReadCommand['execute'] = async (graph, params) => {
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   return graph.getBinary(`/sites/${parsed.data.siteId}/onenote/pages/${parsed.data.onenotePageId}/content`);
 };
-const execute = wrapOnenote5kLimit(innerExecute);
+const execute = createOnenote5kExecute(innerExecute);
 
 const meta: ReadCommandMeta = {
   summary:

@@ -14,7 +14,7 @@ import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 
 const ONENOTE_5K_NEEDLE = '10008';
 
-const wrapOnenote5kLimit =
+const createOnenote5kExecute =
   (inner: ReadCommand['execute']): ReadCommand['execute'] =>
   async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
     const result = await inner(graph, params);
@@ -31,4 +31,4 @@ const wrapOnenote5kLimit =
     return result;
   };
 
-export { wrapOnenote5kLimit };
+export { createOnenote5kExecute };
