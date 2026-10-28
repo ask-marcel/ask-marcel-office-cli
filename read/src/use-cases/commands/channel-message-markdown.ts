@@ -1,4 +1,5 @@
-import { bodyMarkdown, isChannelPost, nonEmpty, type ChannelMessage } from './channel-message-html.ts';
+import { bodyMarkdown, isChannelPost, nonEmpty } from './channel-message-html.ts';
+import type { ChannelMessage } from './channel-message-html.ts';
 
 /**
  * A Teams channel post with its replies as a markdown thread, or a page of
