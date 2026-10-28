@@ -6,7 +6,7 @@ import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { type ChannelMessage } from './channel-message-html.ts';
 import { fetchHostedImages, hostedImageSources } from './channel-message-images.ts';
 import { renderTranscript } from './channel-message-markdown.ts';
-import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, markdownEnvelope, relativeGraphPath, withChannelMessagesTopCap } from './channel-message-page.ts';
+import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, markdownEnvelope, relativeGraphPath, createTopCappedExecute } from './channel-message-page.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
@@ -57,7 +57,7 @@ const channelNameOf = async (graph: ReadGraph, channelPath: string): Promise<str
   return typeof name === 'string' ? name : undefined;
 };
 
-const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => {
+const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { teamId, channelId, since } = parsed.data;
