@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
-import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople, type SubstrateMessage } from './substrate-message.ts';
+import { enrichSubstrateMessage, filterSubstrateMessages, SUBSTRATE_FILTER_OPTIONS, substrateFilterFor, substratePeople } from './substrate-message.ts';
+import type { SubstrateMessage } from './substrate-message.ts';
 
 // Per-chat message history via the Microsoft Teams chat substrate. Same
 // chatsvcagg-audience bearer as `list-teams-chats-with-messages`. Returns

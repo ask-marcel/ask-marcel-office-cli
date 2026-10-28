@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { err, ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { execute } from './download-drive-item-version.ts';

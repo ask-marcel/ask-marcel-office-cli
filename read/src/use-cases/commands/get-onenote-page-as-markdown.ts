@@ -5,7 +5,8 @@ import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { convertToMarkdown } from './markdown-pipeline.ts';
-import { formatOnenoteMetadata, type OnenotePage } from './onenote-metadata.ts';
+import { formatOnenoteMetadata } from './onenote-metadata.ts';
+import type { OnenotePage } from './onenote-metadata.ts';
 import { embedOnenoteResources } from './onenote-resource-embedder.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 

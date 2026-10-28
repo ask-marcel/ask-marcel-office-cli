@@ -3,7 +3,8 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
-import { embedInlineImages, type InlineAttachment } from './inline-image-embedder.ts';
+import { embedInlineImages } from './inline-image-embedder.ts';
+import type { InlineAttachment } from './inline-image-embedder.ts';
 
 /**
  * Orchestrate the four steps that turn a Graph `?format=html` content
