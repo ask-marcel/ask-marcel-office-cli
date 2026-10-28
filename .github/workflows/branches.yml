@@ -2,7 +2,11 @@
 # references/workflow.md, Branch lifecycle). Not a merge gate: a branch goes
 # stale while nobody pushes to it, so this runs on a schedule and fails when a
 # branch whose work already landed is still on the remote, or one has stayed off
-# the trunk for more than a day. Delete or land what it lists.
+# the trunk for more than a day. Delete or land what it lists. The second step
+# checks the host itself: main the default branch and protected against deletion,
+# force pushes and merge commits, merges by rebase only, head branches deleted on
+# merge (check-host.py; the owner sets them by hand, CONTRIBUTING.md, Landing a
+# branch).
 #
 # Adapted from the atelier asset: actions/checkout stays on v4, as in ci.yml.
 name: branches
@@ -23,3 +27,11 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
         run: bash scripts/check-branches.sh
+      - name: main is the default branch and protected, merges rebase only (rule 38)
+        if: ${{ !cancelled() }}
+        env:
+          # The default token first. If GitHub hides a setting from it, the check fails with
+          # exit 2 and names the setting; then a read-only fine-grained token goes here.
+          GH_TOKEN: ${{ github.token }}
+          RULESET: scripts/host-ruleset.json
+        run: python3 scripts/check-host.py

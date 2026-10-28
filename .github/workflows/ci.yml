@@ -83,8 +83,10 @@ jobs:
           # The left side of a push range, as above. Empty on a pull request: the base ref wins.
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: bash scripts/check-commit-range.sh
-      - name: branch watchdog selftest (a landed or day-old branch is rejected; branches.yml runs it daily)
-        run: bash scripts/check-branches.sh --selftest
+      - name: branch watchdog selftests (a landed or day-old branch and each host drift are rejected; branches.yml runs them daily)
+        run: |
+          bash scripts/check-branches.sh --selftest
+          python3 scripts/check-host.py --selftest
       - name: install gitleaks (pinned and checksum-verified)
         env:
           GITLEAKS_VERSION: 8.30.1
