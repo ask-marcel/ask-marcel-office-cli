@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
-import { CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
+import { CHANNEL_MESSAGES_TOP_OPTION, createTopCappedExecute } from './channel-message-page.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
@@ -12,7 +12,7 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 // list is not proof the post exists.
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages/${p.messageId}/replies`, baseSchema, ['top', 'select']);
 
-const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
+const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
 const { schema } = inner;
 
 const meta: ReadCommandMeta = {

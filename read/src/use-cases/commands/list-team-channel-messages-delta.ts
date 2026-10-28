@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
-import { CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
+import { CHANNEL_MESSAGES_TOP_OPTION, createTopCappedExecute } from './channel-message-page.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
 import { channelScopeOf, rewriteChannelScopedError } from './team-channel-errors.ts';
@@ -13,7 +13,7 @@ const baseSchema = z.object({ teamId: z.string().min(1), channelId: z.string().m
 const sinceFilter = (since: string | undefined): string => (since === undefined ? '' : `?$filter=lastModifiedDateTime%20gt%20${since}`);
 const inner = buildPickODataListCommand((p) => `/teams/${p.teamId}/channels/${p.channelId}/messages/delta${sinceFilter(p.since)}`, baseSchema, ['top', 'expand']);
 
-const execute: ReadCommand['execute'] = withChannelMessagesTopCap(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
+const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, params) => rewriteChannelScopedError(await inner.execute(graph, params), channelScopeOf(params)));
 const { schema } = inner;
 
 const meta: ReadCommandMeta = {

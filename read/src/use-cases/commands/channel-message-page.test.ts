@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap } from './channel-message-page.ts';
+import { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, createTopCappedExecute } from './channel-message-page.ts';
 
 const graph = fakeGraphClient();
 
@@ -18,14 +18,14 @@ const spy = (): { calls: number; execute: ReadCommand['execute'] } => {
 describe('the 50-message page cap on channel message reads', () => {
   it('lets a page of exactly the cap through to Graph', async () => {
     const inner = spy();
-    const result = await withChannelMessagesTopCap(inner.execute)(graph, { top: String(CHANNEL_MESSAGES_TOP_CAP) });
+    const result = await createTopCappedExecute(inner.execute)(graph, { top: String(CHANNEL_MESSAGES_TOP_CAP) });
     expect(result.ok).toBe(true);
     expect(inner.calls).toBe(1);
   });
 
   it('refuses a page one above the cap before calling Graph, naming the cap', async () => {
     const inner = spy();
-    const result = await withChannelMessagesTopCap(inner.execute)(graph, { top: '51' });
+    const result = await createTopCappedExecute(inner.execute)(graph, { top: '51' });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.type).toBe('validation_error');
@@ -37,13 +37,13 @@ describe('the 50-message page cap on channel message reads', () => {
 
   it('is silent when no --top is passed', async () => {
     const inner = spy();
-    await withChannelMessagesTopCap(inner.execute)(graph, {});
+    await createTopCappedExecute(inner.execute)(graph, {});
     expect(inner.calls).toBe(1);
   });
 
   it('leaves a non-numeric --top to the schema validation behind it', async () => {
     const inner = spy();
-    await withChannelMessagesTopCap(inner.execute)(graph, { top: 'many' });
+    await createTopCappedExecute(inner.execute)(graph, { top: 'many' });
     expect(inner.calls).toBe(1);
   });
 

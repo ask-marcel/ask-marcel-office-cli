@@ -18,7 +18,7 @@ const CHANNEL_MESSAGES_TOP_OPTION: CommandOptionMeta = {
 };
 
 /** Wraps an execute so a `--top` above the cap is refused before Graph is called. */
-const withChannelMessagesTopCap =
+const createTopCappedExecute =
   (inner: ReadCommand['execute']): ReadCommand['execute'] =>
   async (graph, params) => {
     if (Number(params['top']) > CHANNEL_MESSAGES_TOP_CAP) {
@@ -30,7 +30,7 @@ const withChannelMessagesTopCap =
     return inner(graph, params);
   };
 
-export { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, withChannelMessagesTopCap };
+export { CHANNEL_MESSAGES_TOP_CAP, CHANNEL_MESSAGES_TOP_OPTION, createTopCappedExecute };
 
 /** A Graph `@odata.nextLink` as the relative path the client takes; `undefined` when there is no next page. */
 const relativeGraphPath = (link: string | undefined): string | undefined => (link === undefined ? undefined : link.replace(/^https:\/\/graph\.microsoft\.com\/v1\.0/, ''));
