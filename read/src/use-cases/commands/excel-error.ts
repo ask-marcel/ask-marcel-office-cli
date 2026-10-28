@@ -36,6 +36,3 @@ const createExcelErrorExecute =
   };
 
 export { mapWacError, createExcelErrorExecute };
-
-// The old name, until its last two callers move (the next commit removes it).
-export const wrapExcelExecute = createExcelErrorExecute;

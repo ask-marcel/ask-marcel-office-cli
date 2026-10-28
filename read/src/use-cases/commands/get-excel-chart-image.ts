@@ -4,7 +4,7 @@ import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { wrapExcelExecute } from './excel-error.ts';
+import { createExcelErrorExecute } from './excel-error.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
@@ -39,7 +39,7 @@ const run = async (graph: ReadGraph, params: Record<string, string>): Promise<Re
   return ok({ contentType: 'image/png', size: base64ByteLength(value), base64: value });
 };
 
-const execute = wrapExcelExecute(run);
+const execute = createExcelErrorExecute(run);
 
 const meta: ReadCommandMeta = {
   summary:
