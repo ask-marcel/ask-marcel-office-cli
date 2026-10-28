@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { isoDateTimeUnsafe, parseIsoDateTime, type IsoDateTime } from './iso-datetime.ts';
+import { isoDateTimeUnsafe, parseIsoDateTime } from './iso-datetime.ts';
+import type { IsoDateTime } from './iso-datetime.ts';
 
 // Wednesday, 2026-05-20 at 14:30:00 UTC. ISO weekday 3.
 const NOW = new Date('2026-05-20T14:30:00.000Z');
