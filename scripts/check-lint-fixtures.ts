@@ -82,6 +82,11 @@ const PLAIN_COMMENT = '// A plain comment names no tool.\nexport const n = 1;\n'
 const SPY_IMPORT = "import { spyOn } from 'bun:test';\nexport const f = (): unknown => spyOn;\n";
 const TEST_IMPORT = "import { expect, test } from 'bun:test';\ntest('t', () => {\n  expect(1).toBe(1);\n});\n";
 const CALL_ASSERTION = "import { expect, test } from 'bun:test';\ntest('t', () => {\n  const fake = { calls: 0 };\n  expect(fake).toHaveBeenCalledWith(1);\n});\n";
+const CLASS_DECLARATION = 'export class Box {\n  readonly n = 1;\n}\n';
+const INLINE_TYPE_IMPORT = "import { ok, type Result } from './result.ts';\nexport const f = (): Result<number, string> => ok(1);\n";
+const CURRIED_ARROW = 'export const add = (a: number) => (b: number): number => a + b;\n';
+const CREATE_FACTORY = 'export const createAdder = (a: number) => (b: number): number => a + b;\n';
+const TRY_CATCH = "export const f = (raw: string): unknown => {\n  try {\n    return JSON.parse(raw);\n  } catch {\n    return undefined;\n  }\n};\n";
 const CALL_ASSERTION_IN_SOURCE = "export const f = (e: { toHaveBeenCalled: () => void }): void => {\n  e.toHaveBeenCalled();\n};\n";
 
 // With linterOptions.noInlineConfig, ESLint reports each directive comment
@@ -114,6 +119,23 @@ const baseBanFixtures = ([cwd, path]: readonly [string, string], [, testPath]: r
   { name: `${cwd}: a test never imports spyOn`, path: testPath, source: SPY_IMPORT, rule: 'no-restricted-imports', fires: true, strict: false, cwd },
   { name: `control: ${cwd}: a test imports expect and test`, path: testPath, source: TEST_IMPORT, rule: 'no-restricted-imports', fires: false, strict: false, cwd },
   { name: `${cwd}: a test never asserts on recorded calls`, path: testPath, source: CALL_ASSERTION, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
+  { name: `${cwd}: a class is rejected`, path, source: CLASS_DECLARATION, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
+  { name: `${cwd}: an inline type specifier is rejected`, path, source: INLINE_TYPE_IMPORT, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
+  { name: `${cwd}: a curried arrow is rejected`, path, source: CURRIED_ARROW, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
+  { name: `control: ${cwd}: a createX factory may return a function`, path, source: CREATE_FACTORY, rule: 'no-restricted-syntax', fires: false, strict: false, cwd },
+];
+
+// Rule 17: a try in a use-case, one file of each folder. Core's own blocks
+// replace the base's options, so core's file is one that a core block covers.
+const USE_CASE_FILES: ReadonlyArray<readonly [string, string]> = [
+  ['core', 'src/use-cases/commands/docs-builders.ts'],
+  ['auth', 'src/use-cases/commands/status.ts'],
+  ['read', 'src/use-cases/commands/list-drives.ts'],
+  ['write', 'src/use-cases/commands/draft-response.ts'],
+];
+
+const tryBanFixtures = ([cwd, path]: readonly [string, string]): ReadonlyArray<Fixture> => [
+  { name: `${cwd}: a use-case never catches`, path, source: TRY_CATCH, rule: 'no-restricted-syntax', fires: true, strict: false, cwd },
 ];
 
 const FIXTURES: ReadonlyArray<Fixture> = [
@@ -170,6 +192,8 @@ const FIXTURES: ReadonlyArray<Fixture> = [
   ...WORKSPACE_FILES.map(([cwd, path]): Fixture => ({ name: `${cwd}: strict lint rejects a needless assertion`, path, source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: true, strict: true, cwd })),
   { name: 'control: core: plain lint leaves type-aware rules off', path: 'src/domain/result.ts', source: NEEDLESS_ASSERTION, rule: '@typescript-eslint/no-unnecessary-type-assertion', fires: false, strict: false, cwd: 'core' },
   ...WORKSPACE_FILES.flatMap((file, i) => baseBanFixtures(file, WORKSPACE_TESTS[i] ?? file)),
+  ...USE_CASE_FILES.flatMap(tryBanFixtures),
+  { name: 'control: read: an infra adapter may catch', path: 'src/infra/mammoth-adapter.ts', source: TRY_CATCH, rule: 'no-restricted-syntax', fires: false, strict: false, cwd: 'read' },
   // Core's own no-restricted-syntax blocks replace the base's options, so they
   // repeat the call-assertion ban: one file of each block.
   { name: 'core: a core file keeps the call-assertion ban', path: 'src/composition/cli-shell.ts', source: CALL_ASSERTION_IN_SOURCE, rule: 'no-restricted-syntax', fires: true, strict: false, cwd: 'core' },

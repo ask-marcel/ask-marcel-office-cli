@@ -27,16 +27,32 @@ const MOCK_BAN = {
     '`mock`, `spyOn`, `jest` and `vi` from bun:test are forbidden: mocks leak across test files. Use dependency injection: refactor the production code to accept the SDK as a parameter, then pass a fake at construction (hard rule 13).',
 };
 
-// Rule 13, the other half: a call-recording assertion, whatever built the spy.
-// ESLint replaces the options of `no-restricted-syntax` when a second block
-// matches the same file, so a config with its own `no-restricted-syntax` block
-// (core) spreads this list into it.
-export const CALL_ASSERTION_BANS = [
+// The style rules of the atelier STYLE_BANS: no class (hard rules 1 and 10), no
+// inline `type` specifier (7), and no curried arrow chain, the `create[A-Z]`
+// factory exempt (18). Rule 13, the other half: a call-recording assertion,
+// whatever built the spy. ESLint replaces the options of `no-restricted-syntax`
+// when a second block matches the same file, so a config with its own
+// `no-restricted-syntax` block (core) spreads this list into it.
+export const SYNTAX_BANS = [
+  { selector: 'ClassDeclaration', message: 'No class keyword (hard rule 1; rule 10 for error classes): a module of arrow functions and typed records.' },
+  { selector: 'ClassExpression', message: 'No class keyword (hard rule 1): a module of arrow functions and typed records.' },
+  { selector: 'ImportSpecifier[importKind="type"]', message: 'Type-only imports on their own line: `import type { Foo } from ...` (hard rule 7).' },
+  {
+    selector: 'VariableDeclarator[id.name!=/^create[A-Z]/] > ArrowFunctionExpression > ArrowFunctionExpression.body',
+    message: 'No curried arrow chains: one arrow with all its parameters; a factory that builds a function is named `createX` (hard rule 18).',
+  },
   {
     selector: 'MemberExpression[property.name=/^(toHaveBeen(Last|Nth)?Called|toBeCalled|toHave(Last|Nth)?Returned)/]',
     message: 'No call-recording assertions: a hand-written fake records what it received and the test asserts on that record (hard rule 13).',
   },
 ];
+
+// Rule 17: a use-case returns a Result and never catches. A native thrower is
+// wrapped in the domain (parseJson, decodeUtf8) or in an infra adapter.
+export const TRY_BAN = {
+  selector: 'TryStatement',
+  message: 'No try/catch in a use-case (hard rule 17): wrap the thrower in the domain as a Result, or in an infra adapter.',
+};
 
 // The shared test fakes (core/src/test-helpers, reached through core's dev-only
 // `./test-helpers/*` export, and each folder's own src/test-helpers) are for
@@ -69,7 +85,7 @@ export const baseConfig = (tsconfigRootDir) => [
       'prefer-template': 'error',
       quotes: ['error', 'single', { avoidEscape: true }],
       'no-restricted-imports': ['error', { paths: [MOCK_BAN] }],
-      'no-restricted-syntax': ['error', ...CALL_ASSERTION_BANS],
+      'no-restricted-syntax': ['error', ...SYNTAX_BANS],
       // Rule 15, the ignores of other tools: every @ts- form (the recommended
       // preset allows a @ts-expect-error with a description), and the markers
       // that other tools read, anywhere in a comment.
@@ -111,6 +127,14 @@ export const baseConfig = (tsconfigRootDir) => [
     ignores: ['**/*.test.ts', 'src/test-helpers/**'],
     rules: {
       'no-restricted-imports': ['error', { paths: [MOCK_BAN], patterns: [TEST_HELPERS_BAN] }],
+    },
+  },
+  {
+    // The same rule with the try ban added (rule 17), for the same reason.
+    files: ['src/use-cases/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...SYNTAX_BANS, TRY_BAN],
     },
   },
   ...(process.env['LINT_STRICT']
