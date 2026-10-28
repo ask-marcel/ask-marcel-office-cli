@@ -76,6 +76,13 @@ jobs:
           else
             bash scripts/check-commit-messages.sh "${PUSHED_FROM}..HEAD"
           fi
+      - name: commit-range selftest (an oversized commit and a merge commit are rejected)
+        run: bash scripts/check-commit-range.sh --selftest
+      - name: commit range (each commit within 10 files / 300 lines, no merge commit, rule 38; --no-verify included)
+        env:
+          # The left side of a push range, as above. Empty on a pull request: the base ref wins.
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: bash scripts/check-commit-range.sh
       - name: install gitleaks (pinned and checksum-verified)
         env:
           GITLEAKS_VERSION: 8.30.1
