@@ -4,7 +4,8 @@ import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { formatAddress, nonEmpty, renderMessageAsMarkdown, type MailLikeResource } from './convert-mail-to-markdown.ts';
+import { formatAddress, nonEmpty, renderMessageAsMarkdown } from './convert-mail-to-markdown.ts';
+import type { MailLikeResource } from './convert-mail-to-markdown.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 
 const schema = z.object({

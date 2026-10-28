@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { bodyMarkdown, type ChannelMessage } from './channel-message-html.ts';
+import { bodyMarkdown } from './channel-message-html.ts';
+import type { ChannelMessage } from './channel-message-html.ts';
 
 const NO_IMAGES: ReadonlyMap<string, string> = new Map();
 const HOSTED = 'https://graph.microsoft.com/v1.0/teams/t1/channels/c1/messages/1/hostedContents/h1/$value';

@@ -1,5 +1,6 @@
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
-import { nonEmpty, type ChannelMessage } from './channel-message-html.ts';
+import { nonEmpty } from './channel-message-html.ts';
+import type { ChannelMessage } from './channel-message-html.ts';
 
 /**
  * Pasted images in a channel message are `<img src="https://graph.microsoft.com/v1.0/teams/.../hostedContents/{id}/$value">`,
