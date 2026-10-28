@@ -3,18 +3,8 @@ import { err } from '../../domain/result.ts';
 import type { ReadCommand } from './command-types.ts';
 import { formatZodError } from './format-zod-error.ts';
 import { routeGet } from './tenant-option.ts';
-import {
-  appendOData,
-  filterSelectSchema,
-  noSkipShape,
-  odataQuerySchema,
-  pickODataShape,
-  selectExpandSchema,
-  type FilterSelectParams,
-  type ODataKey,
-  type ODataQueryParams,
-  type SelectExpandParams,
-} from './odata-query.ts';
+import { appendOData, filterSelectSchema, noSkipShape, odataQuerySchema, pickODataShape, selectExpandSchema } from './odata-query.ts';
+import type { FilterSelectParams, ODataKey, ODataQueryParams, SelectExpandParams } from './odata-query.ts';
 
 type NoSkipParams = Omit<ODataQueryParams, 'skip'>;
 

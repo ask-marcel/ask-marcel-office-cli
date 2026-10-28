@@ -3,7 +3,8 @@ import type { AccessToken } from '@ask-marcel/office-core/domain/access-token.ts
 import { accessTokenUnsafe } from '@ask-marcel/office-core/domain/access-token.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import { tenantIdUnsafe } from '@ask-marcel/office-core/domain/tenant-id.ts';
-import { installFetchMock, type FetchMockCall } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
+import { installFetchMock } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
+import type { FetchMockCall } from '@ask-marcel/office-core/test-helpers/fetch-mock.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { jwtSegment } from '@ask-marcel/office-core/test-helpers/jwt.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';

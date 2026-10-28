@@ -1,4 +1,5 @@
-import { ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
+import { ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '@ask-marcel/office-core/infra/graph-request.ts';
 
 /**
