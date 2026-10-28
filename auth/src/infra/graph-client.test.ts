@@ -1063,7 +1063,7 @@ describe('graph client', () => {
   // chat command 401s, and `login` cannot fix it because the token is not
   // missing, only dead. Observed live 2026-08-31. A 401 is therefore treated as
   // proof the cached token is dead rather than as an answer to return.
-  const revocationFetch =
+  const createRevocationFetch =
     (freshToken: string, seen: Array<string | undefined>): FetchFn =>
     async (_url, init) => {
       const auth = (init?.headers as Record<string, string> | undefined)?.['Authorization'];
@@ -1081,7 +1081,7 @@ describe('graph client', () => {
       },
     });
 
-    const result = await createGraphClient(auth, revocationFetch('fresh', seen)).teamsChat('/api/v2/users/me/chats');
+    const result = await createGraphClient(auth, createRevocationFetch('fresh', seen)).teamsChat('/api/v2/users/me/chats');
 
     expect(result.ok).toBe(true);
     expect(seen).toEqual(['Bearer revoked', 'Bearer fresh']);
@@ -1095,7 +1095,7 @@ describe('graph client', () => {
       getIc3AccessToken: async (options?: { ignoreCache?: boolean }) => ok(accessTokenUnsafe(options?.ignoreCache === true ? 'fresh-ic3' : 'revoked-ic3')),
     });
 
-    const result = await createGraphClient(auth, revocationFetch('fresh-ic3', seen)).teamsChatIc3('/v1/users/ME/conversations');
+    const result = await createGraphClient(auth, createRevocationFetch('fresh-ic3', seen)).teamsChatIc3('/v1/users/ME/conversations');
 
     expect(result.ok).toBe(true);
     expect(seen).toEqual(['Bearer revoked-ic3', 'Bearer fresh-ic3']);
