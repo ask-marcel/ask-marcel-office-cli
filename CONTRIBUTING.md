@@ -104,7 +104,7 @@ Run them in the folder before you commit. CI runs them all.
 
 | Job | What it runs |
 |:--|:--|
-| `gates` | The scripts and their selftests, the commit messages, the secret scan of the full history, the root lint and typecheck, the package borders, the red fixture of the command reference and the dependency audit |
+| `gates` | The scripts and their selftests, the commit messages, the size of each commit and no merge commit in the range, the secret scan of the full history, the root lint and typecheck, the package borders, the red fixture of the command reference and the dependency audit |
 | `workspace` | One job for each folder: `lint:strict`, typecheck, tests, coverage, the mutation of the changed files (not in `read/`), and for a published folder `build`, `check:docs` and `check:packed`. Auth and write also run their bundle smoke here. |
 | `mutation` | The mutation of the changed files of `read/`, in 8 shards |
 | `smoke` | The build of `read/`, its bundle smoke and its packed-install smoke |
@@ -112,6 +112,37 @@ Run them in the folder before you commit. CI runs them all.
 
 `gates` fails when the `workspace` matrix misses a folder
 (`scripts/check-ci-matrix.ts`).
+
+`.github/workflows/branches.yml` runs each day. It is not a merge gate.
+`scripts/check-branches.sh` fails on a branch that has landed but is still on
+the remote, or on a branch that is more than one day old.
+`scripts/check-host.py` fails when the settings of the repository change (see
+[Landing a branch](#landing-a-branch)).
+
+## Landing a branch
+
+`main` stays linear (atelier hard rule 38).
+
+1. Start a branch from a fetched `main`, and land it on the same day.
+2. To keep the branch current, rebase it onto `main`. Do not merge `main`
+   into it.
+3. Land the pull request with "Rebase and merge" when CI is green, and only on
+   the go of the maintainer. Do not use a merge commit or a squash.
+   `scripts/check-commit-range.sh` fails a pull request or a push that holds a
+   merge commit, or a commit of more than 10 files or 300 lines. Thus
+   `git commit --no-verify` does not get past the size limit.
+4. GitHub deletes the branch when it lands. Start the next work from the new
+   `main`.
+
+The maintainer sets these repository settings by hand, one time.
+`check-host.py` reads them each day:
+
+- The default branch is `main`.
+- Merge commits and squash merges are off, and rebase merges are on.
+- "Automatically delete head branches" is on.
+- A ruleset named `main` on the default branch, with no bypass, holds the
+  rules of `scripts/host-ruleset.json`: restrict deletions, block force pushes
+  and require linear history.
 
 ## The docs
 
