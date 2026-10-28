@@ -1,0 +1,25 @@
+# .github/workflows/branches.yml - the branch watchdog (hard rule 38; atelier
+# references/workflow.md, Branch lifecycle). Not a merge gate: a branch goes
+# stale while nobody pushes to it, so this runs on a schedule and fails when a
+# branch whose work already landed is still on the remote, or one has stayed off
+# the trunk for more than a day. Delete or land what it lists.
+#
+# Adapted from the atelier asset: actions/checkout stays on v4, as in ci.yml.
+name: branches
+on:
+  schedule:
+    - cron: "30 6 * * *" # daily
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  branches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # every branch and its history: landed is judged by content
+      - name: no landed or day-old branch (rule 38)
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || github.ref_name }}
+        run: bash scripts/check-branches.sh
