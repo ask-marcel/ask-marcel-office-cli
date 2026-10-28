@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { err, ok, type Result } from '@ask-marcel/office-core/domain/result.ts';
+import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';

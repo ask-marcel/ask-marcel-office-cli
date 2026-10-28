@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
-import { enrichSubstrateMessage, type SubstrateMessage } from './substrate-message.ts';
+import { enrichSubstrateMessage } from './substrate-message.ts';
+import type { SubstrateMessage } from './substrate-message.ts';
 
 const schema = z.object({
   chatId: z.string().min(1),
