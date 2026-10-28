@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { buildListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { wrapExcelExecute } from './excel-error.ts';
+import { createExcelErrorExecute } from './excel-error.ts';
 import { odataQueryOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const inner = buildListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/names`, baseSchema);
-const execute = wrapExcelExecute(inner.execute);
+const execute = createExcelErrorExecute(inner.execute);
 const { schema } = inner;
 
 const meta: ReadCommandMeta = {

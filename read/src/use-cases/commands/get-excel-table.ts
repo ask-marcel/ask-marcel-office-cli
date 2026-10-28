@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { buildCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { wrapExcelExecute } from './excel-error.ts';
+import { createExcelErrorExecute } from './excel-error.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), tableId: z.string().min(1) });
 const inner = buildCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables/${p.tableId}`, schema);
-const execute = wrapExcelExecute(inner.execute);
+const execute = createExcelErrorExecute(inner.execute);
 
 const meta: ReadCommandMeta = {
   summary: 'Get the metadata (style, header row, total row) of a single named Excel table.',

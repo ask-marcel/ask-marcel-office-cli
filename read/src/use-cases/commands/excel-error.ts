@@ -27,7 +27,7 @@ const mapWacError = (e: GraphError): GraphError => {
 
 type ExecuteFn = (graph: ReadGraph, params: Record<string, string>) => Promise<Result<unknown, GraphError>>;
 
-const wrapExcelExecute =
+const createExcelErrorExecute =
   (inner: ExecuteFn): ExecuteFn =>
   async (graph, params) => {
     const result = await inner(graph, params);
@@ -35,4 +35,7 @@ const wrapExcelExecute =
     return err(mapWacError(result.error));
   };
 
-export { mapWacError, wrapExcelExecute };
+export { mapWacError, createExcelErrorExecute };
+
+// The old name, until its last two callers move (the next commit removes it).
+export const wrapExcelExecute = createExcelErrorExecute;
