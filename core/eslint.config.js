@@ -1,4 +1,4 @@
-import { baseConfig, CALL_ASSERTION_BANS } from '../eslint.base.js';
+import { baseConfig, SYNTAX_BANS, TRY_BAN } from '../eslint.base.js';
 import { CORE_DYNAMIC_IMPORT_BANS, CORE_FILES, CORE_IMPORT_BANS, CORE_READ_ONLY_FILES, READ_ONLY_IMPORT_BANS, STDOUT_BAN } from '../eslint.ownership.js';
 
 /*
@@ -22,13 +22,13 @@ export default [
   },
   {
     // Core never knows which package it serves. Each no-restricted-syntax block
-    // here repeats the call-assertion ban of the base: ESLint replaces a rule's
-    // options when two blocks match a file.
+    // here repeats the syntax bans of the base: ESLint replaces a rule's options
+    // when two blocks match a file.
     files: CORE_FILES,
     ignores: ['**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: CORE_IMPORT_BANS }],
-      'no-restricted-syntax': ['error', ...CALL_ASSERTION_BANS, ...CORE_DYNAMIC_IMPORT_BANS],
+      'no-restricted-syntax': ['error', ...SYNTAX_BANS, ...CORE_DYNAMIC_IMPORT_BANS],
     },
   },
   {
@@ -36,7 +36,16 @@ export default [
     files: CORE_READ_ONLY_FILES,
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...READ_ONLY_IMPORT_BANS, ...CORE_IMPORT_BANS] }],
-      'no-restricted-syntax': ['error', ...CALL_ASSERTION_BANS, ...CORE_DYNAMIC_IMPORT_BANS],
+      'no-restricted-syntax': ['error', ...SYNTAX_BANS, ...CORE_DYNAMIC_IMPORT_BANS],
+    },
+  },
+  {
+    // The core blocks above replace the base's try ban (rule 17) on core's use-cases,
+    // so it comes back here. Every core use-case is in a core list.
+    files: ['src/use-cases/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...SYNTAX_BANS, ...CORE_DYNAMIC_IMPORT_BANS, TRY_BAN],
     },
   },
   {
