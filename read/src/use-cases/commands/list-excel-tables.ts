@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { buildPickODataListCommand } from '@ask-marcel/office-core/use-cases/commands/build-command.ts';
 import type { ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { wrapExcelExecute } from './excel-error.ts';
+import { createExcelErrorExecute } from './excel-error.ts';
 import { pickODataOptions } from '@ask-marcel/office-core/use-cases/commands/odata-query.ts';
 import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 
@@ -11,7 +11,7 @@ import { WORKBOOK_DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
 const TABLES_ODATA_KEYS = ['top', 'skip', 'select', 'expand'] as const;
 const baseSchema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1) });
 const inner = buildPickODataListCommand((p) => `/drives/${p.driveId}/items/${p.itemId}/workbook/tables`, baseSchema, TABLES_ODATA_KEYS);
-const execute = wrapExcelExecute(inner.execute);
+const execute = createExcelErrorExecute(inner.execute);
 const { schema } = inner;
 
 const meta: ReadCommandMeta = {

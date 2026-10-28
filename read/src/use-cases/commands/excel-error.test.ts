@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphClient, GraphError } from '../../infra/graph-client.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { mapWacError, wrapExcelExecute } from './excel-error.ts';
+import { mapWacError, createExcelErrorExecute } from './excel-error.ts';
 
 describe('mapWacError', () => {
   it('rewrites the "Could not obtain a WAC access token" Graph error into a clear "not a workbook" hint', () => {
@@ -27,17 +27,17 @@ describe('mapWacError', () => {
   });
 });
 
-describe('wrapExcelExecute', () => {
+describe('createExcelErrorExecute', () => {
   const stubGraph: GraphClient = fakeGraphClient();
 
   it('forwards the inner ok value unchanged', async () => {
-    const wrapped = wrapExcelExecute(async () => ok({ value: [{ name: 'Sheet1' }] }));
+    const wrapped = createExcelErrorExecute(async () => ok({ value: [{ name: 'Sheet1' }] }));
     const result = await wrapped(stubGraph, {});
     expect(result).toEqual(ok({ value: [{ name: 'Sheet1' }] }));
   });
 
   it('rewrites the WAC error when the inner result is err', async () => {
-    const wrapped = wrapExcelExecute(async () => err({ type: 'api_error', status: 403, message: 'AccessDenied: Could not obtain a WAC access token.' }));
+    const wrapped = createExcelErrorExecute(async () => err({ type: 'api_error', status: 403, message: 'AccessDenied: Could not obtain a WAC access token.' }));
     const result = await wrapped(stubGraph, {});
     expect(result.ok).toBe(false);
     if (!result.ok && result.error.type === 'api_error') expect(result.error.message).toContain('not an accessible Excel workbook');
@@ -45,7 +45,7 @@ describe('wrapExcelExecute', () => {
 
   it('passes through non-WAC errors unchanged', async () => {
     const original: GraphError = { type: 'api_error', status: 404, message: 'itemNotFound' };
-    const wrapped = wrapExcelExecute(async () => err(original));
+    const wrapped = createExcelErrorExecute(async () => err(original));
     const result = await wrapped(stubGraph, {});
     expect(result).toEqual(err(original));
   });
