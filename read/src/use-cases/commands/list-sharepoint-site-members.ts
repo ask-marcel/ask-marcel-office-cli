@@ -33,6 +33,25 @@ const accessOf = (grants: ReadonlyArray<Grant>): Record<string, unknown> => ({
   sharingLinks: grants.flatMap((g) => (g.link?.scope === undefined ? [] : [{ scope: g.link.scope, roles: g.roles ?? [] }])),
 });
 
+// The owners and members of the group that owns the site, beside the site's access.
+const groupPeople = async (
+  graph: ReadGraph,
+  group: { readonly id: string; readonly displayName: string | undefined; readonly mail: string | undefined },
+  access: Record<string, unknown>
+): Promise<Result<unknown, GraphError>> => {
+  const [owners, members] = await Promise.all([graph.get(`/groups/${group.id}/owners?${PEOPLE}`), graph.get(`/groups/${group.id}/members?${PEOPLE}`)]);
+  if (!owners.ok) return owners;
+  if (!members.ok) return members;
+  const more = (members.value as Listing)['@odata.nextLink'] === undefined ? '' : TRUNCATED;
+  return ok({
+    group,
+    owners: (owners.value as Listing).value ?? [],
+    members: (members.value as Listing).value ?? [],
+    ...access,
+    note: `${LOWER_BOUND}${more}`,
+  });
+};
+
 const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -47,17 +66,7 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const access = accessOf(((permissions.value as Listing).value ?? []) as ReadonlyArray<Grant>);
   const group = owner?.group;
   if (group?.id === undefined) return ok({ group: null, owners: [], members: [], ...access, note: NO_GROUP });
-  const [owners, members] = await Promise.all([graph.get(`/groups/${group.id}/owners?${PEOPLE}`), graph.get(`/groups/${group.id}/members?${PEOPLE}`)]);
-  if (!owners.ok) return owners;
-  if (!members.ok) return members;
-  const more = (members.value as Listing)['@odata.nextLink'] === undefined ? '' : TRUNCATED;
-  return ok({
-    group: { id: group.id, displayName: group.displayName, mail: group.email },
-    owners: (owners.value as Listing).value ?? [],
-    members: (members.value as Listing).value ?? [],
-    ...access,
-    note: `${LOWER_BOUND}${more}`,
-  });
+  return groupPeople(graph, { id: group.id, displayName: group.displayName, mail: group.email }, access);
 };
 
 const meta: ReadCommandMeta = {

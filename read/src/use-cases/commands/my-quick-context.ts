@@ -11,6 +11,23 @@ type MaybeId = { id?: string };
 
 const valueOrUndefined = <T>(r: Result<unknown, GraphError>): T | undefined => (r.ok ? (r.value as T) : undefined);
 
+type Listing<T> = { value?: ReadonlyArray<T> };
+type Mailbox = { timeZone?: string; language?: { locale?: string }; workingHours?: { startTime?: string; endTime?: string; timeZone?: { name?: string } } };
+
+const firstId = (listing: Listing<MaybeId> | undefined): string | undefined => listing?.value?.[0]?.id;
+
+const defaultNotebookId = (notebooks: Listing<{ id?: string; isDefault?: boolean }> | undefined): string | undefined =>
+  notebooks?.value?.find((n) => n.isDefault === true)?.id ?? firstId(notebooks);
+
+const mailboxFields = (mailbox: Mailbox | undefined): Record<string, unknown> => ({
+  tenantTimeZone: mailbox?.timeZone,
+  tenantLocale: mailbox?.language?.locale,
+  tenantWorkingHours:
+    mailbox?.workingHours?.startTime !== undefined && mailbox.workingHours.endTime !== undefined
+      ? { start: mailbox.workingHours.startTime, end: mailbox.workingHours.endTime, timeZone: mailbox.workingHours.timeZone?.name }
+      : undefined,
+});
+
 // partial-result mode. The previous all-or-nothing
 // failure (any single Graph call failing aborts the whole command) made
 // cold-start unusable in tenants with quirky scopes — e.g. a user with
@@ -55,9 +72,7 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
   const notebooks = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; displayName?: string; isDefault?: boolean }> }>(notebooksRes);
   const teams = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; displayName?: string }> }>(teamsRes);
   const recent = valueOrUndefined<{ value?: ReadonlyArray<{ id?: string; name?: string; lastModifiedDateTime?: string }> }>(recentRes);
-  const mailbox = valueOrUndefined<{ timeZone?: string; language?: { locale?: string }; workingHours?: { startTime?: string; endTime?: string; timeZone?: { name?: string } } }>(
-    mailboxRes
-  );
+  const mailbox = valueOrUndefined<Mailbox>(mailboxRes);
 
   return ok({
     // `jobTitle` added on user request — surfaces the user's role on first
@@ -67,16 +82,11 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
     primaryDriveId: drive?.id,
     inboxId: inbox?.id,
     primaryCalendarId: calendar?.id,
-    primaryPlannerPlanId: planner?.value?.[0]?.id,
-    defaultNotebookId: notebooks?.value?.find((n) => n.isDefault === true)?.id ?? notebooks?.value?.[0]?.id,
-    firstJoinedTeamId: teams?.value?.[0]?.id,
-    recentDriveItemId: recent?.value?.[0]?.id,
-    tenantTimeZone: mailbox?.timeZone,
-    tenantLocale: mailbox?.language?.locale,
-    tenantWorkingHours:
-      mailbox?.workingHours?.startTime !== undefined && mailbox.workingHours.endTime !== undefined
-        ? { start: mailbox.workingHours.startTime, end: mailbox.workingHours.endTime, timeZone: mailbox.workingHours.timeZone?.name }
-        : undefined,
+    primaryPlannerPlanId: firstId(planner),
+    defaultNotebookId: defaultNotebookId(notebooks),
+    firstJoinedTeamId: firstId(teams),
+    recentDriveItemId: firstId(recent),
+    ...mailboxFields(mailbox),
   });
 };
 
