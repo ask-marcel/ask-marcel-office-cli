@@ -147,6 +147,16 @@ const confirmedContainerIndex = (html: string): number => {
 // wrote:" attribution line, and the first `>`-quoted line.
 const PLAINTEXT_BOUNDARIES: ReadonlyArray<RegExp> = [/^-{2,}\s*Original Message\s*-{2,}\s*$/im, /^_{5,}\s*$/m, /^On\b.+\bwrote:\s*$/im, /^>.*$/m];
 
+// The earlier of two cuts, where -1 means "no cut".
+const earlier = (cut: number, candidate: number): number => (candidate !== -1 && (cut === -1 || candidate < cut) ? candidate : cut);
+
+// The earliest index where any of the patterns matches, or -1.
+const earliestMatch = (text: string, patterns: ReadonlyArray<RegExp>): number =>
+  patterns.reduce((cut, pattern) => {
+    const match = pattern.exec(text);
+    return match === null ? cut : earlier(cut, match.index);
+  }, -1);
+
 /**
  * Index where the quoted history begins in an HTML body, or -1 when the body
  * quotes nothing. Earliest of the structural markers merged with the widened
@@ -154,29 +164,12 @@ const PLAINTEXT_BOUNDARIES: ReadonlyArray<RegExp> = [/^-{2,}\s*Original Message\
  * reply ABOVE the quote without disturbing it.
  */
 const findQuoteBoundary = (html: string): number => {
-  let cut = -1;
-  for (const boundary of QUOTE_BOUNDARIES) {
-    const match = boundary.exec(html);
-    if (match !== null && (cut === -1 || match.index < cut)) cut = match.index;
-  }
   const headerCut = confirmedHeaderIndex(html, HTML_FROM_LABEL, HTML_SENT_LABEL);
   const widenedHeaderCut = headerCut === -1 ? -1 : widenToBlockStart(html, headerCut);
-  if (widenedHeaderCut !== -1 && (cut === -1 || widenedHeaderCut < cut)) cut = widenedHeaderCut;
-  const containerCut = confirmedContainerIndex(html);
-  if (containerCut !== -1 && (cut === -1 || containerCut < cut)) cut = containerCut;
-  return cut;
+  return earlier(earlier(earliestMatch(html, QUOTE_BOUNDARIES), widenedHeaderCut), confirmedContainerIndex(html));
 };
 
 /** The plain-text counterpart of `findQuoteBoundary`, for `contentType === 'text'` bodies. */
-const findPlainTextQuoteBoundary = (text: string): number => {
-  let cut = -1;
-  for (const boundary of PLAINTEXT_BOUNDARIES) {
-    const match = boundary.exec(text);
-    if (match !== null && (cut === -1 || match.index < cut)) cut = match.index;
-  }
-  const headerCut = confirmedHeaderIndex(text, TEXT_FROM_LABEL, TEXT_SENT_LABEL);
-  if (headerCut !== -1 && (cut === -1 || headerCut < cut)) cut = headerCut;
-  return cut;
-};
+const findPlainTextQuoteBoundary = (text: string): number => earlier(earliestMatch(text, PLAINTEXT_BOUNDARIES), confirmedHeaderIndex(text, TEXT_FROM_LABEL, TEXT_SENT_LABEL));
 
 export { findPlainTextQuoteBoundary, findQuoteBoundary };
