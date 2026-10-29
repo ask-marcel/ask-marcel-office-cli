@@ -97,43 +97,39 @@ const guardQuotedHistory = async (graph: WriteGraph, messageId: string): Promise
   return err(quotedHistoryRefusal(messageId));
 };
 
-const execute: WriteCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, subject, bodyContent, comment, replaceQuotedHistory, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance } = parsed.data;
+type UpdateParams = z.infer<typeof schema>;
 
+// The combinations refused before any Graph call.
+const refuseUpdate = ({ subject, bodyContent, comment, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance }: UpdateParams): GraphError | undefined => {
   // At least one field must be provided for the update. Keyed on presence, not
   // truthiness: an empty string is a real instruction (clear this list), and a
   // truthiness gate would silently read it as "flag absent" and refuse.
   if ([subject, bodyContent, comment, toRecipients, ccRecipients, bccRecipients, importance].every((v) => v === undefined)) {
-    return err({
+    return {
       type: 'validation_error',
       message:
         'At least one field must be provided to update (--subject, --body-content, --comment, --to-recipients, --cc-recipients, --bcc-recipients, or --importance). Pass an empty string to a recipient flag to clear that list.',
-    });
+    };
   }
 
   // They mean opposite things - revise the text above the quote, vs replace the
   // whole body - so the CLI must not guess which was meant.
   if (comment !== undefined && bodyContent !== undefined) {
-    return err({
+    return {
       type: 'validation_error',
       message:
         '--comment and --body-content are mutually exclusive. --comment rewrites only the reply text ABOVE the quoted history and keeps the quote; --body-content replaces the entire body, quote included. Pass whichever one you meant.',
-    });
+    };
   }
 
   if (comment !== undefined && bodyContentType === 'HTML' && commentCarriesQuoteBoundary(comment)) {
-    return err({ type: 'validation_error', message: boundaryMarkerRefusal('--comment') });
+    return { type: 'validation_error', message: boundaryMarkerRefusal('--comment') };
   }
+  return undefined;
+};
 
-  // Costs one read, skipped when the caller states the intent explicitly - the
-  // deliberate "strip the thread but keep the threading" case stays free.
-  if (bodyContent !== undefined && replaceQuotedHistory !== 'true') {
-    const guarded = await guardQuotedHistory(graph, messageId);
-    if (!guarded.ok) return guarded;
-  }
-
+// The PATCH payload of the fields the caller passed.
+const patchFields = ({ subject, bodyContent, bodyContentType, toRecipients, ccRecipients, bccRecipients, importance }: UpdateParams): Record<string, unknown> => {
   const body: Record<string, unknown> = {};
   if (subject !== undefined) body.subject = subject;
   if (bodyContent !== undefined) body.body = { contentType: bodyContentType ?? 'Text', content: bodyContent };
@@ -143,7 +139,25 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   if (ccRecipients !== undefined) body.ccRecipients = parseRecipients(ccRecipients);
   if (bccRecipients !== undefined) body.bccRecipients = parseRecipients(bccRecipients);
   if (importance !== undefined) body.importance = importance;
+  return body;
+};
 
+const execute: WriteCommand['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const { messageId, bodyContent, comment, replaceQuotedHistory, bodyContentType } = parsed.data;
+
+  const refusal = refuseUpdate(parsed.data);
+  if (refusal) return err(refusal);
+
+  // Costs one read, skipped when the caller states the intent explicitly - the
+  // deliberate "strip the thread but keep the threading" case stays free.
+  if (bodyContent !== undefined && replaceQuotedHistory !== 'true') {
+    const guarded = await guardQuotedHistory(graph, messageId);
+    if (!guarded.ok) return guarded;
+  }
+
+  const body = patchFields(parsed.data);
   if (comment === undefined) return slimDraftResult(await graph.patch(`/me/messages/${messageId}`, body));
 
   // The comment path costs one read: the reply text can only be replaced in
