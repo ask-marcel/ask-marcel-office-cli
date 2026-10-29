@@ -30,6 +30,17 @@ const dedupKey = (hit: Hit): string | undefined => {
   return typeof id === 'string' ? id : undefined;
 };
 
+// Keeps each hit's resource the first time its key is seen.
+const addUnseen = (hits: ReadonlyArray<Hit>, seen: Set<string>, value: Array<unknown>): void => {
+  for (const hit of hits) {
+    const key = dedupKey(hit);
+    if (key !== undefined && !seen.has(key)) {
+      seen.add(key);
+      value.push(hit.resource);
+    }
+  }
+};
+
 const searchDriveItems = async (graph: ReadGraph, queryString: string, maxPages: number): Promise<Result<DriveItemSweep, GraphError>> => {
   const seen = new Set<string>();
   const value: Array<unknown> = [];
@@ -42,13 +53,7 @@ const searchDriveItems = async (graph: ReadGraph, queryString: string, maxPages:
       break;
     }
     const container = firstContainer(r.value);
-    for (const hit of container?.hits ?? []) {
-      const key = dedupKey(hit);
-      if (key !== undefined && !seen.has(key)) {
-        seen.add(key);
-        value.push(hit.resource);
-      }
-    }
+    addUnseen(container?.hits ?? [], seen, value);
     if (container?.moreResultsAvailable !== true) break;
     if (page === maxPages - 1) truncated = true;
   }

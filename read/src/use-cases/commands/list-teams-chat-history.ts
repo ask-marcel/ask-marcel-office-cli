@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { isoDateTimeField, RELATIVE_DATE_DESCRIPTION } from './iso-datetime-schema.ts';
@@ -103,27 +106,22 @@ const toRelativePath = (absoluteUrl: string): string => {
   return m[1];
 };
 
-const execute: ReadCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { chatId } = parsed.data;
-  const pageSize = parsed.data.pageSize ?? '200';
-  const maxPages = Number(parsed.data.maxPages ?? '20');
-  const fullMode = parsed.data.full === 'true';
-  const maxContentChars = Number(parsed.data.maxContentChars ?? String(DEFAULT_MAX_CONTENT_CHARS));
-  const filter = await substrateFilterFor(graph, parsed.data);
-  if (!filter.ok) return filter;
-
-  const accumulated: Array<Ic3MessageRaw> = [];
+// The first page: where a passed `--sync-state` left off, else the start of the window.
+const firstPagePath = (chatId: string, pageSize: string, options: { readonly since?: string; readonly syncState?: string }): string => {
+  if (options.syncState !== undefined) return toRelativePath(options.syncState);
   // `startTime` is the substrate's own lower bound in epoch milliseconds
   // (probed 2026-09-20: 7 messages back instead of 33 for a ten-day bound);
   // `1` means the beginning of the chat.
-  const startTime = parsed.data.since === undefined ? '1' : String(Date.parse(parsed.data.since));
-  let nextRelativePath: string =
-    parsed.data.syncState !== undefined
-      ? toRelativePath(parsed.data.syncState)
-      : `/v1/users/ME/conversations/${encodeURIComponent(chatId)}/messages?startTime=${startTime}&pageSize=${pageSize}&view=msnp24Equivalent|supportsMessageProperties`;
+  const startTime = options.since === undefined ? '1' : String(Date.parse(options.since));
+  return `/v1/users/ME/conversations/${encodeURIComponent(chatId)}/messages?startTime=${startTime}&pageSize=${pageSize}&view=msnp24Equivalent|supportsMessageProperties`;
+};
 
+type HistoryWalk = { readonly accumulated: ReadonlyArray<Ic3MessageRaw>; readonly nextSyncState: string | undefined; readonly pagesFetched: number };
+
+// Follows the syncState links backward through the history, up to `maxPages` pages.
+const walkHistory = async (graph: ReadGraph, firstPath: string, maxPages: number): Promise<Result<HistoryWalk, GraphError>> => {
+  const accumulated: Array<Ic3MessageRaw> = [];
+  let nextRelativePath = firstPath;
   let nextSyncState: string | undefined;
   let pagesFetched = 0;
   for (let page = 0; page < maxPages; page += 1) {
@@ -142,6 +140,23 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
     nextRelativePath = toRelativePath(syncStateUrl);
     nextSyncState = syncStateUrl;
   }
+  return ok({ accumulated, nextSyncState, pagesFetched });
+};
+
+const execute: ReadCommand['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const { chatId } = parsed.data;
+  const pageSize = parsed.data.pageSize ?? '200';
+  const maxPages = Number(parsed.data.maxPages ?? '20');
+  const fullMode = parsed.data.full === 'true';
+  const maxContentChars = Number(parsed.data.maxContentChars ?? String(DEFAULT_MAX_CONTENT_CHARS));
+  const filter = await substrateFilterFor(graph, parsed.data);
+  if (!filter.ok) return filter;
+
+  const walked = await walkHistory(graph, firstPagePath(chatId, pageSize, parsed.data), maxPages);
+  if (!walked.ok) return walked;
+  const { accumulated, nextSyncState, pagesFetched } = walked.value;
 
   const people = substratePeople(accumulated);
   const enriched = accumulated.map((m) => enrichSubstrateMessage(chatId, m, people));

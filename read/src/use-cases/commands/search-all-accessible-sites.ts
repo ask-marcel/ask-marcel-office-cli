@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
+import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { GraphError } from '../../infra/graph-client.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
 import type { ReadCommand, ReadCommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { addEstimatedFileCounts } from './file-counts.ts';
 import { filterOutArchivedSites } from './filter-archived-sites.ts';
@@ -40,11 +43,19 @@ const siteWebUrl = (resource: unknown): string | undefined => {
   return typeof url === 'string' ? url : undefined;
 };
 
-const execute: ReadCommand['execute'] = async (graph, params) => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const queryString = parsed.data.query ?? '*';
+// Keeps each hit's site the first time its id is seen.
+const addUnseenSites = (hits: ReadonlyArray<Hit>, seen: Set<string>, value: Array<unknown>): void => {
+  for (const hit of hits) {
+    const id = siteId(hit.resource);
+    if (id !== undefined && !seen.has(id)) {
+      seen.add(id);
+      value.push(hit.resource);
+    }
+  }
+};
 
+// Deep-pages the site index, deduped by id. A failure past the first page truncates.
+const searchSites = async (graph: ReadGraph, queryString: string): Promise<Result<{ readonly value: ReadonlyArray<unknown>; readonly truncated: boolean }, GraphError>> => {
   const seen = new Set<string>();
   const value: Array<unknown> = [];
   let truncated = false;
@@ -56,16 +67,34 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
       break;
     }
     const container = firstContainer(r.value);
-    for (const hit of container?.hits ?? []) {
-      const id = siteId(hit.resource);
-      if (id !== undefined && !seen.has(id)) {
-        seen.add(id);
-        value.push(hit.resource);
-      }
-    }
+    addUnseenSites(container?.hits ?? [], seen, value);
     if (container?.moreResultsAvailable !== true) break;
     if (page === MAX_PAGES - 1) truncated = true;
   }
+  return ok({ value, truncated });
+};
+
+// The counters of the sites the filter dropped, each present only when it is not zero.
+const exclusionCounts = (filtered: {
+  readonly archivedExcluded: number;
+  readonly nonNavigableExcluded: number;
+  readonly notFoundExcluded: number;
+  readonly probeErrors: number;
+  readonly probeTruncated: boolean;
+}): Record<string, unknown> => ({
+  ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
+  ...(filtered.nonNavigableExcluded > 0 ? { nonNavigableExcluded: filtered.nonNavigableExcluded } : {}),
+  ...(filtered.notFoundExcluded > 0 ? { notFoundExcluded: filtered.notFoundExcluded } : {}),
+  ...(filtered.probeErrors > 0 ? { archiveProbeErrors: filtered.probeErrors } : {}),
+  ...(filtered.probeTruncated ? { archiveProbeTruncated: true } : {}),
+});
+
+const execute: ReadCommand['execute'] = async (graph, params) => {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+  const searched = await searchSites(graph, parsed.data.query ?? '*');
+  if (!searched.ok) return searched;
+  const { value, truncated } = searched.value;
 
   // Drop sites the user cannot open: archived (auto-archived OneDrives surface as
   // `423 resourceLocked`), non-navigable URL shapes (add-in app domains,
@@ -81,11 +110,7 @@ const execute: ReadCommand['execute'] = async (graph, params) => {
   return ok({
     value: sites,
     count: sites.length,
-    ...(filtered.archivedExcluded > 0 ? { archivedExcluded: filtered.archivedExcluded } : {}),
-    ...(filtered.nonNavigableExcluded > 0 ? { nonNavigableExcluded: filtered.nonNavigableExcluded } : {}),
-    ...(filtered.notFoundExcluded > 0 ? { notFoundExcluded: filtered.notFoundExcluded } : {}),
-    ...(filtered.probeErrors > 0 ? { archiveProbeErrors: filtered.probeErrors } : {}),
-    ...(filtered.probeTruncated ? { archiveProbeTruncated: true } : {}),
+    ...exclusionCounts(filtered),
     ...(fileEstimate !== undefined ? { fileEstimate } : {}),
     ...(truncated ? { truncated: true } : {}),
   });
