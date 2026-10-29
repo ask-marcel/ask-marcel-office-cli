@@ -233,6 +233,74 @@ type MarkdownRenderOptions = {
   readonly renderHeaders: (m: MailLikeResource) => string;
 };
 
+// The attachments of the message, with a note when they could not be listed.
+// None, without a call, when the message has none and its body names no cid: image.
+const listAttachments = async (
+  graph: ReadGraph,
+  resourcePath: string,
+  mayHaveAttachments: boolean
+): Promise<{ readonly attachments: ReadonlyArray<AttachmentMeta>; readonly note: string | undefined }> => {
+  if (!mayHaveAttachments) return { attachments: [], note: undefined };
+  const listed = await graph.get(`${resourcePath}/attachments?${ATTACHMENT_METADATA_SELECT}`);
+  if (!listed.ok) {
+    return { attachments: [], note: `attachments-list fetch failed (${listed.error.type}: ${listed.error.message}) — markdown body returned without attachment metadata` };
+  }
+  const parsed = attachmentsListSchema.safeParse(listed.value);
+  if (parsed.success) return { attachments: parsed.data.value ?? [], note: undefined };
+  return { attachments: [], note: `attachments-list returned a malformed shape (${formatZodError(parsed.error)}) — markdown body returned without attachment metadata` };
+};
+
+const labelsByContentId = (attachments: ReadonlyArray<AttachmentMeta>): ReadonlyMap<string, string> => {
+  const labels = new Map<string, string>();
+  for (const a of attachments) {
+    if (nonEmpty(a.contentId) && nonEmpty(a.name)) labels.set(a.contentId, a.name);
+  }
+  return labels;
+};
+
+type RenderedBody = { readonly bodyMd: string; readonly quotedStripped: boolean; readonly quotedBoundary: number };
+
+// The removed share is measured from the boundary, never from the stripped
+// output: that output carries the strip marker, whose own text would make a
+// short body look like it had GROWN. Locating the boundary a second time is a
+// regex scan over a string already in memory, cheaper than widening the
+// strippers' return type for this one caller.
+const renderBody = (isHtml: boolean, inlined: string, keepQuoted: boolean): Result<RenderedBody, GraphError> => {
+  if (isHtml) {
+    // Strip quoted reply chains before turndown (the Outlook / Gmail markers
+    // are still HTML at this point). v1 covers HTML bodies only — plain-text
+    // reply detection is a separate heuristic.
+    const stripped = keepQuoted ? { html: inlined, stripped: false } : stripQuotedReplies(inlined);
+    const converted = htmlToMarkdown(stripped.html);
+    if (!converted.ok) return converted;
+    return ok({ bodyMd: converted.value, quotedStripped: stripped.stripped, quotedBoundary: findQuoteBoundary(inlined) });
+  }
+  // Plain-text body: strip the quoted reply chain with the line-anchored
+  // plain-text markers (Original Message / "On … wrote:" / leading `>`).
+  const stripped = keepQuoted ? { text: inlined, stripped: false } : stripQuotedPlainText(inlined);
+  return ok({ bodyMd: stripped.text, quotedStripped: stripped.stripped, quotedBoundary: findPlainTextQuoteBoundary(inlined) });
+};
+
+// When inline-image embedding is disabled, skip the per-image bytes
+// fetch AND the oversize-placeholder pass — the body keeps its raw
+// `cid:<contentId>` references, and the file-attachments list (rendered
+// below) still surfaces the inline images by name + id so the caller
+// knows they exist. The caller passes no attachments then.
+const embedImages = async (graph: ReadGraph, resourcePath: string, rawHtml: string, attachments: ReadonlyArray<AttachmentMeta>): Promise<string> => {
+  const embedResults = await Promise.all(attachments.filter(isInlineImage).map((meta) => fetchInlineImageBytes(graph, resourcePath, meta)));
+  const inlineImages = embedResults.flatMap((r) => (r.inline ? [r.inline] : []));
+  const withPlaceholders = renderOversizePlaceholders(rawHtml, embedResults);
+  return inlineImages.length > 0 ? embedInlineImages(withPlaceholders, inlineImages) : withPlaceholders;
+};
+
+// The envelope's note: the attachments-list failure, and the share of the body a strip removed.
+const envelopeNote = (attachmentsListNote: string | undefined, strippedPercent: number | undefined): string | undefined => {
+  const notes: string[] = [];
+  if (attachmentsListNote !== undefined) notes.push(attachmentsListNote);
+  if (strippedPercent !== undefined) notes.push(`quoted reply chain stripped (removed ${strippedPercent}% of the body text) — pass --keep-quoted true to include it`);
+  return notes.length > 0 ? notes.join('; ') : undefined;
+};
+
 // The pipeline behind `convert-mail-to-markdown` and
 // `convert-group-post-to-markdown`. `resourcePath` is the message or post
 // (`/me/messages/{id}`, `/groups/{g}/threads/{t}/posts/{p}`) and its attachments
@@ -247,69 +315,18 @@ const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, o
   const m = fetched.value as MailLikeResource;
 
   const rawHtml = m.body?.content ?? '';
-  let attachments: ReadonlyArray<AttachmentMeta> = [];
-  let attachmentsListNote: string | undefined;
-  if (m.hasAttachments === true || referencesCidImage(rawHtml)) {
-    const listed = await graph.get(`${resourcePath}/attachments?${ATTACHMENT_METADATA_SELECT}`);
-    if (!listed.ok) {
-      attachmentsListNote = `attachments-list fetch failed (${listed.error.type}: ${listed.error.message}) — markdown body returned without attachment metadata`;
-    } else {
-      const parsed = attachmentsListSchema.safeParse(listed.value);
-      if (parsed.success) {
-        attachments = parsed.data.value ?? [];
-      } else {
-        attachmentsListNote = `attachments-list returned a malformed shape (${formatZodError(parsed.error)}) — markdown body returned without attachment metadata`;
-      }
-    }
-  }
+  const { attachments, note: attachmentsListNote } = await listAttachments(graph, resourcePath, m.hasAttachments === true || referencesCidImage(rawHtml));
 
-  // When inline-image embedding is disabled, skip the per-image bytes
-  // fetch AND the oversize-placeholder pass — the body keeps its raw
-  // `cid:<contentId>` references, and the file-attachments list (rendered
-  // below) still surfaces the inline images by name + id so the caller
-  // knows they exist.
-  const inlineImageCandidates = embedInlineImagesEnabled ? attachments.filter(isInlineImage) : [];
-  const embedResults = await Promise.all(inlineImageCandidates.map((meta) => fetchInlineImageBytes(graph, resourcePath, meta)));
-  const inlineImages = embedResults.flatMap((r) => (r.inline ? [r.inline] : []));
-
+  const embedded = await embedImages(graph, resourcePath, rawHtml, embedInlineImagesEnabled ? attachments : []);
   const headers = options.renderHeaders(m);
-  const withPlaceholders = renderOversizePlaceholders(rawHtml, embedResults);
-  const embedded = inlineImages.length > 0 ? embedInlineImages(withPlaceholders, inlineImages) : withPlaceholders;
   // Whatever the embed pass left as a raw cid: reference (embedding
   // disabled, an individual fetch failure, a non-image inline attachment, a
   // cid with no matching attachment) becomes a readable placeholder so the
   // markdown never carries a broken cid: link.
-  const labelByContentId = new Map<string, string>();
-  for (const a of attachments) {
-    if (nonEmpty(a.contentId) && nonEmpty(a.name)) labelByContentId.set(a.contentId, a.name);
-  }
-  const inlined = replaceUnresolvedCidImages(embedded, labelByContentId);
-  let bodyMd: string;
-  let quotedStripped = false;
-  // The removed share is measured from the boundary, never from the stripped
-  // output: that output carries the strip marker, whose own text would make a
-  // short body look like it had GROWN. Locating the boundary a second time is a
-  // regex scan over a string already in memory, cheaper than widening the
-  // strippers' return type for this one caller.
-  let quotedBoundary: number;
-  if (m.body?.contentType === 'html') {
-    // Strip quoted reply chains before turndown (the Outlook / Gmail markers
-    // are still HTML at this point). v1 covers HTML bodies only — plain-text
-    // reply detection is a separate heuristic.
-    const stripped = keepQuoted ? { html: inlined, stripped: false } : stripQuotedReplies(inlined);
-    quotedStripped = stripped.stripped;
-    quotedBoundary = findQuoteBoundary(inlined);
-    const converted = htmlToMarkdown(stripped.html);
-    if (!converted.ok) return converted;
-    bodyMd = converted.value;
-  } else {
-    // Plain-text body: strip the quoted reply chain with the line-anchored
-    // plain-text markers (Original Message / "On … wrote:" / leading `>`).
-    const stripped = keepQuoted ? { text: inlined, stripped: false } : stripQuotedPlainText(inlined);
-    quotedStripped = stripped.stripped;
-    quotedBoundary = findPlainTextQuoteBoundary(inlined);
-    bodyMd = stripped.text;
-  }
+  const inlined = replaceUnresolvedCidImages(embedded, labelsByContentId(attachments));
+  const body = renderBody(m.body?.contentType === 'html', inlined, keepQuoted);
+  if (!body.ok) return body;
+  const { bodyMd, quotedStripped, quotedBoundary } = body.value;
   const fileList = renderFileAttachmentsList(attachments, !embedInlineImagesEnabled, options.attachmentHint);
   const text = [headers, bodyMd, fileList].filter((s) => s !== '').join('\n\n');
 
@@ -319,11 +336,8 @@ const renderMessageAsMarkdown = async (graph: ReadGraph, resourcePath: string, o
     size: new TextEncoder().encode(text).byteLength,
     text,
   };
-  const notes: string[] = [];
-  if (attachmentsListNote !== undefined) notes.push(attachmentsListNote);
-  if (quotedStripped) notes.push(`quoted reply chain stripped (removed ${removedSharePercent(inlined, quotedBoundary)}% of the body text) — pass --keep-quoted true to include it`);
-  if (notes.length > 0) envelope.note = notes.join('; ');
-  return ok(envelope);
+  const note = envelopeNote(attachmentsListNote, quotedStripped ? removedSharePercent(inlined, quotedBoundary) : undefined);
+  return ok(note === undefined ? envelope : { ...envelope, note });
 };
 
 const MAIL_ATTACHMENT_HINT = '_Use `convert-mail-attachment-to-pdf` or `get-mail-attachment` with the attachment id to fetch._';
