@@ -222,6 +222,38 @@ const renderToString = (data: unknown, format: OutputFormat, context?: RenderCon
  * lookup is shared with the CLI so an MCP consumer sees the same curated
  * remedies (`error-hints.ts`) the terminal does.
  */
+// What an error envelope carries, each optional field present only when set.
+type ErrorFields = {
+  readonly error: string;
+  readonly errorCode: string | undefined;
+  readonly hint: string | undefined;
+  readonly source: ErrorSource | undefined;
+  readonly retryAfterSeconds: number | undefined;
+};
+
+const renderErrorJson = ({ error, errorCode, hint, source, retryAfterSeconds }: ErrorFields): string => {
+  const payload = {
+    ok: false,
+    error,
+    ...(errorCode ? { errorCode } : {}),
+    ...(hint ? { hint } : {}),
+    ...(source ? { source } : {}),
+    ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+  };
+  return `${JSON.stringify(payload)}\n`;
+};
+
+// `code:` gives the text reader the `errorCode` that the JSON envelope
+// gives. Without it, an MCP client cannot see `not_authenticated`.
+const renderErrorText = ({ error, errorCode, hint, source, retryAfterSeconds }: ErrorFields): string => {
+  const lines = [`error: ${error}`];
+  if (errorCode) lines.push(`code: ${errorCode}`);
+  if (hint) lines.push(`hint: ${hint}`);
+  if (source) lines.push(`source: ${source}`);
+  if (retryAfterSeconds !== undefined) lines.push(`retryAfter: ${retryAfterSeconds}s`);
+  return `${lines.join('\n')}\n`;
+};
+
 const renderErrorToString = (message: string, format: OutputFormat, errorCode?: string, explicitSource?: ErrorSource, retryAfterSeconds?: number, names?: NameSource): string => {
   // `errorCode` is an additive field — old consumers
   // keying on `error: string` continue to work; new consumers can branch on
@@ -250,27 +282,8 @@ const renderErrorToString = (message: string, format: OutputFormat, errorCode?: 
   // (the actionable-advice check reads them); both are filled after.
   const found = findErrorHint(message, errorCode);
   const hint = found === undefined ? undefined : { ...found, hint: fillNamesOrKeep(found.hint, names) };
-  const source = hint?.source ?? explicitSource;
-  const filled = fillNamesOrKeep(message, names);
-  if (format !== 'text') {
-    const payload = {
-      ok: false,
-      error: filled,
-      ...(errorCode ? { errorCode } : {}),
-      ...(hint ? { hint: hint.hint } : {}),
-      ...(source ? { source } : {}),
-      ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
-    };
-    return `${JSON.stringify(payload)}\n`;
-  }
-  // `code:` gives the text reader the `errorCode` that the JSON envelope
-  // gives. Without it, an MCP client cannot see `not_authenticated`.
-  const lines = [`error: ${filled}`];
-  if (errorCode) lines.push(`code: ${errorCode}`);
-  if (hint) lines.push(`hint: ${hint.hint}`);
-  if (source) lines.push(`source: ${source}`);
-  if (retryAfterSeconds !== undefined) lines.push(`retryAfter: ${retryAfterSeconds}s`);
-  return `${lines.join('\n')}\n`;
+  const fields: ErrorFields = { error: fillNamesOrKeep(message, names), errorCode, hint: hint?.hint, source: hint?.source ?? explicitSource, retryAfterSeconds };
+  return format === 'text' ? renderErrorText(fields) : renderErrorJson(fields);
 };
 
 export { renderErrorToString, renderToString };

@@ -163,20 +163,38 @@ const parseRetryAfter = (header: string | null): number | undefined => {
   return Number(trimmed);
 };
 
-const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphError> => {
+// The `retryAfterSeconds` field, present only when the header names a whole number.
+const retryField = (res: Response): { readonly retryAfterSeconds?: number } => {
   const retryAfterSeconds = parseRetryAfter(res.headers.get('retry-after'));
-  const retry = retryAfterSeconds === undefined ? {} : { retryAfterSeconds };
+  return retryAfterSeconds === undefined ? {} : { retryAfterSeconds };
+};
+
+// The most specific code of the error body: the inner code, in either casing, else the outer one.
+const errorTag = (body: GraphErrorBody): string | undefined => body.error?.innererror?.code ?? body.error?.innerError?.code ?? body.error?.code;
+
+// The message of an error with no tag: Graph's message, else the status text, else a synthesized line.
+const fallbackMessage = (message: string | undefined, res: Response, url: string): string => {
+  if (typeof message === 'string' && message !== '') return message;
+  if (res.statusText !== '') return res.statusText;
+  return synthesizeEmptyBodyMessage(res.status, url);
+};
+
+const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphError> => {
+  const retry = retryField(res);
   const errBody = (await res.json().catch(emptyOnJsonFailure)) as GraphErrorBody;
-  const tag = errBody.error?.innererror?.code ?? errBody.error?.innerError?.code ?? errBody.error?.code;
+  const tag = errorTag(errBody);
   const message = errBody.error?.message;
   // surface the Graph error code as a structured field
   // so LLM consumers can branch on `errorCode === "itemNotFound"` etc.
   // instead of substring-matching the human message.
   const rawCode = typeof tag === 'string' && tag !== '' ? tag : undefined;
-  const effectiveUrlForCode = res.url !== '' ? res.url : fallbackUrl;
-  const code = contextualizeCode(rawCode, effectiveUrlForCode);
+  // `res.url` is empty when the Response was constructed manually (Bun's
+  // fakeFetch test pattern) — fall back to the URL the caller just hit.
+  const effectiveUrl = res.url !== '' ? res.url : fallbackUrl;
+  const code = contextualizeCode(rawCode, effectiveUrl);
+  const codeField = code ? { code } : {};
 
-  if (typeof tag === 'string' && tag === 'UnknownError' && looksEmpty(message)) {
+  if (rawCode === 'UnknownError' && looksEmpty(message)) {
     return {
       type: 'api_error',
       status: res.status,
@@ -192,18 +210,10 @@ const apiErrorFrom = async (res: Response, fallbackUrl: string): Promise<GraphEr
   // that as `: <message>` — leading colon, no prefix — which the v1.0.0 audit
   // §2.7 flagged as malformed. Only prepend the tag if it's actually a
   // non-empty string.
-  if (typeof tag === 'string' && tag !== '' && typeof message === 'string') {
-    return { type: 'api_error', status: res.status, message: truncateScopeDump(`${tag}: ${message}`), ...(code ? { code } : {}), ...retry };
+  if (rawCode !== undefined && typeof message === 'string') {
+    return { type: 'api_error', status: res.status, message: truncateScopeDump(`${rawCode}: ${message}`), ...codeField, ...retry };
   }
-  // `res.url` is empty when the Response was constructed manually (Bun's
-  // fakeFetch test pattern) — fall back to the URL the caller just hit.
-  const effectiveUrl = res.url !== '' ? res.url : fallbackUrl;
-  const pickFallback = (): string => {
-    if (typeof message === 'string' && message !== '') return message;
-    if (res.statusText !== '') return res.statusText;
-    return synthesizeEmptyBodyMessage(res.status, effectiveUrl);
-  };
-  return { type: 'api_error', status: res.status, message: truncateScopeDump(pickFallback()), ...(code ? { code } : {}), ...retry };
+  return { type: 'api_error', status: res.status, message: truncateScopeDump(fallbackMessage(message, res, effectiveUrl)), ...codeField, ...retry };
 };
 
 // Carry the auth layer's machine-readable code (e.g. the secondary-token
