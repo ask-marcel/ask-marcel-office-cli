@@ -8,7 +8,7 @@ import { commentsFromBytes } from './document-comments.ts';
 import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-raw-bytes.ts';
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
@@ -16,9 +16,9 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
-  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
-  if (tenant !== undefined && !tenant.ok) return tenant;
-  const tenantId = tenant?.ok === true ? tenant.value : undefined;
+  const tenant = brandOptionalTenantId(parsed.data.tenantId);
+  if (!tenant.ok) return tenant;
+  const tenantId = tenant.value;
 
   // The name decides the reader, and a folder has no comments to read.
   const metaPath = `/drives/${driveId}/items/${itemId}`;

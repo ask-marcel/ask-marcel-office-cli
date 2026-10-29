@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
+import type { TenantId } from '@ask-marcel/office-core/domain/tenant-id.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from '../../infra/graph-client.ts';
 import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
@@ -8,17 +9,49 @@ import { fetchRawBytes, inlineBinary, tagPdfPassthrough } from '@ask-marcel/offi
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { isPdfSource, isPlainTextFilename } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
+
+// The sources that skip Graph's conversion: plain text, returned as text, and
+// PDF, returned as it is. Undefined for any other source.
+const passthroughSource = async (graph: ReadGraph, contentPath: string, name: string, tenantId: TenantId | undefined): Promise<Result<unknown, GraphError> | undefined> => {
+  // Audit round-7 B5: parity with `download-drive-item-content`. Decode
+  // plain-text source bytes as UTF-8 and return `{contentType: "text/plain",
+  // size, text}` instead of base64 — sibling commands now share the same
+  // envelope shape for the same input.
+  if (isPlainTextFilename(name)) {
+    const bytes = await fetchRawBytes(graph, contentPath, { tenantId });
+    if (!bytes.ok) return bytes;
+    const text = new TextDecoder().decode(bytes.value);
+    return ok({
+      contentType: 'text/plain',
+      size: bytes.value.byteLength,
+      text,
+      passthrough: true,
+      note: `source is plain-text (${name}); raw text returned without Graph format=pdf conversion`,
+    });
+  }
+  if (isPdfSource(name)) {
+    const raw = await inlineBinary(graph, contentPath, { tenantId });
+    if (!raw.ok) return raw;
+    const payload = raw.value as { contentType: string; size: number; base64: string };
+    return ok({
+      ...payload,
+      passthrough: true,
+      note: `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`,
+    });
+  }
+  return undefined;
+};
 
 const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
-  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
-  if (tenant !== undefined && !tenant.ok) return tenant;
-  const tenantId = tenant?.ok === true ? tenant.value : undefined;
+  const tenant = brandOptionalTenantId(parsed.data.tenantId);
+  if (!tenant.ok) return tenant;
+  const tenantId = tenant.value;
 
   // Pre-fetch the driveItem metadata to read its filename.
   //
@@ -52,32 +85,8 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
     });
   }
 
-  // Audit round-7 B5: parity with `download-drive-item-content`. Decode
-  // plain-text source bytes as UTF-8 and return `{contentType: "text/plain",
-  // size, text}` instead of base64 — sibling commands now share the same
-  // envelope shape for the same input.
-  if (isPlainTextFilename(name)) {
-    const bytes = await fetchRawBytes(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
-    if (!bytes.ok) return bytes;
-    const text = new TextDecoder().decode(bytes.value);
-    return ok({
-      contentType: 'text/plain',
-      size: bytes.value.byteLength,
-      text,
-      passthrough: true,
-      note: `source is plain-text (${name}); raw text returned without Graph format=pdf conversion`,
-    });
-  }
-  if (isPdfSource(name)) {
-    const raw = await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content`, { tenantId });
-    if (!raw.ok) return raw;
-    const payload = raw.value as { contentType: string; size: number; base64: string };
-    return ok({
-      ...payload,
-      passthrough: true,
-      note: `source is already PDF (${name}); raw bytes returned without Graph format=pdf conversion`,
-    });
-  }
+  const passthrough = await passthroughSource(graph, `/drives/${driveId}/items/${itemId}/content`, name, tenantId);
+  if (passthrough !== undefined) return passthrough;
   return tagPdfPassthrough(await inlineBinary(graph, `/drives/${driveId}/items/${itemId}/content?format=pdf`, { tenantId }), name);
 };
 

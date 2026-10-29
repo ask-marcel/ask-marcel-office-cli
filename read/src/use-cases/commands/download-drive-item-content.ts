@@ -8,7 +8,7 @@ import { base64ToBytes, inlineBinary } from '@ask-marcel/office-core/use-cases/c
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { decodeUtf8Text } from '@ask-marcel/office-core/use-cases/commands/text-passthrough.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), ...tenantIdShape });
 
@@ -18,9 +18,9 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const { driveId, itemId } = parsed.data;
   // Brand once, up front: a bad `--tenant-id` must fail before any Graph call,
   // not after the metadata round-trip.
-  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
-  if (tenant !== undefined && !tenant.ok) return tenant;
-  const tenantId = tenant?.ok === true ? tenant.value : undefined;
+  const tenant = brandOptionalTenantId(parsed.data.tenantId);
+  if (!tenant.ok) return tenant;
+  const tenantId = tenant.value;
 
   // Pre-fetch metadata only to detect a folder target (the /content endpoint
   // returns 200 + empty bytes for a folder); the name is NOT used to decide

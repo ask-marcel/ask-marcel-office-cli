@@ -8,7 +8,7 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { officeToMarkdown } from './office-to-markdown.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 import { SHEET_OPTION } from './xlsx-to-markdown.ts';
 
 const schema = z.object({
@@ -33,9 +33,9 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const inlineImages = parsed.data.inlineImages === 'true';
   const keepQuoted = parsed.data.keepQuoted === 'true';
   const maxCells = parsed.data.maxCells === undefined ? undefined : Number(parsed.data.maxCells);
-  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
-  if (tenant !== undefined && !tenant.ok) return tenant;
-  const tenantId = tenant?.ok === true ? tenant.value : undefined;
+  const tenant = brandOptionalTenantId(parsed.data.tenantId);
+  if (!tenant.ok) return tenant;
+  const tenantId = tenant.value;
 
   const metaPath = `/drives/${driveId}/items/${itemId}`;
   const meta = tenantId === undefined ? await graph.get(metaPath) : await graph.getGuest(metaPath, tenantId);
