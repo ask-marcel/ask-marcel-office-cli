@@ -123,16 +123,9 @@ export const renderLifecycleTable = (lifecycle: ReadonlyArray<CommandManifestEnt
   return ['| Command | What it does |', '|:--|:--|', ...rows].join('\n');
 };
 
-export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
-  const lines = [
-    `# \`${entry.name}\``,
-    '',
-    entry.summary,
-    '',
-    `- **Category:** ${CATEGORY_LABELS[entry.category]}`,
-    `- **Graph endpoint:** \`${entry.graphMethod} ${entry.graphPathTemplate}\``,
-    `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
-  ];
+// The bullet facts below the header: the write effect, the response, paging, scopes, tokens, stability.
+const factLines = (entry: CommandManifestEntry): string[] => {
+  const lines: string[] = [];
   if (entry.effect !== undefined && entry.effect !== 'read') lines.push(`- **Writes to Microsoft 365** (\`${entry.effect}\`): ${WRITE_EFFECTS[entry.effect].action}.`);
   if (entry.responseShape) lines.push(`- **Response:** ${entry.responseShape}`);
   if (entry.pagination) lines.push(`- **Pagination:** ${paginationHintFor(entry.paginationStrategy)}`);
@@ -150,6 +143,12 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
       '- **Stability:** `experimental` — rides a Microsoft-internal substrate that is not in the public Graph API and can break without notice on a Teams web-client update. Prefer a `stable` sibling when one exists.'
     );
   }
+  return lines;
+};
+
+// The sections after the facts: positional arguments, options and the request body.
+const sectionLines = (entry: CommandManifestEntry): string[] => {
+  const lines: string[] = [];
   if (entry.positionalArguments !== undefined && entry.positionalArguments.length > 0) {
     lines.push('', '## Positional arguments', '');
     lines.push('| Argument | Required | Description |', '|----------|----------|-------------|');
@@ -161,8 +160,26 @@ export const renderCommandMarkdown = (entry: CommandManifestEntry): string => {
     for (const o of entry.options) lines.push(`| \`--${o.name}\` | ${o.description} |`);
   }
   if (entry.bodyTemplate) lines.push('', '## Request body', '', '```json', entry.bodyTemplate, '```');
-  lines.push('', '## Example', '', '```bash', entry.example, '```');
-  return lines.join('\n');
+  return lines;
 };
+
+export const renderCommandMarkdown = (entry: CommandManifestEntry): string =>
+  [
+    `# \`${entry.name}\``,
+    '',
+    entry.summary,
+    '',
+    `- **Category:** ${CATEGORY_LABELS[entry.category]}`,
+    `- **Graph endpoint:** \`${entry.graphMethod} ${entry.graphPathTemplate}\``,
+    `- **Microsoft Learn:** ${entry.graphDocsUrl}`,
+    ...factLines(entry),
+    ...sectionLines(entry),
+    '',
+    '## Example',
+    '',
+    '```bash',
+    entry.example,
+    '```',
+  ].join('\n');
 
 export { CATEGORY_LABELS, CATEGORY_ORDER };

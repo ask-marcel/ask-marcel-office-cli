@@ -39,39 +39,53 @@ export type TerseManifest = {
 
 export type ManifestFilterError = { readonly type: 'unknown_category'; readonly category: string; readonly available: ReadonlyArray<string> };
 
-const toEntry = (name: string, cmd: Command<never>): CommandManifestEntry => {
+type Meta = Command<never>['meta'];
+
+// The optional fields that describe the request and the answer, in manifest order.
+const shapeFields = (meta: Meta): Partial<CommandManifestEntry> => {
   // Default every `pagination: true` command to `nextLink` strategy when the
   // command file doesn't specify one — that's the standard $top + nextLink
   // shape, true of ~80% of paginated commands. Audit-makes
   // the manifest field always populated on paginated commands so LLM
   // consumers don't need to read prose to learn the cursor mechanism.
-  const paginationStrategy = cmd.meta.paginationStrategy ?? (cmd.meta.pagination ? 'nextLink' : undefined);
-  // Each command declares its own scopes (the central graph-scopes.ts map was
-  // dissolved into the command files at package-split step 11).
-  const scopesRequired = cmd.meta.scopesRequired;
+  const paginationStrategy = meta.paginationStrategy ?? (meta.pagination ? 'nextLink' : undefined);
   return {
-    name,
-    summary: cmd.meta.summary,
-    category: cmd.meta.category,
-    graphMethod: cmd.meta.graphMethod,
-    graphPathTemplate: cmd.meta.graphPathTemplate,
-    graphDocsUrl: cmd.meta.graphDocsUrl,
-    options: cmd.meta.options,
-    example: cmd.meta.example,
-    ...(cmd.meta.positionalArguments ? { positionalArguments: cmd.meta.positionalArguments } : {}),
-    ...(cmd.meta.responseShape ? { responseShape: cmd.meta.responseShape } : {}),
-    ...(cmd.meta.bodyTemplate ? { bodyTemplate: cmd.meta.bodyTemplate } : {}),
-    ...(cmd.meta.pagination ? { pagination: cmd.meta.pagination } : {}),
+    ...(meta.positionalArguments ? { positionalArguments: meta.positionalArguments } : {}),
+    ...(meta.responseShape ? { responseShape: meta.responseShape } : {}),
+    ...(meta.bodyTemplate ? { bodyTemplate: meta.bodyTemplate } : {}),
+    ...(meta.pagination ? { pagination: meta.pagination } : {}),
     ...(paginationStrategy ? { paginationStrategy } : {}),
-    ...(scopesRequired && scopesRequired.length > 0 ? { scopesRequired } : {}),
-    ...(cmd.meta.needsElevatedToken ? { needsElevatedToken: cmd.meta.needsElevatedToken } : {}),
-    ...(cmd.meta.needsSubstrateToken ? { needsSubstrateToken: cmd.meta.needsSubstrateToken } : {}),
-    ...(cmd.meta.producesBytes ? { producesBytes: cmd.meta.producesBytes } : {}),
-    ...(cmd.meta.producesMedia ? { producesMedia: cmd.meta.producesMedia } : {}),
-    effect: cmd.meta.effect,
-    ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
   };
 };
+
+// The optional fields that name what the command needs and makes, in manifest order.
+const capabilityFields = (meta: Meta): Partial<CommandManifestEntry> => {
+  // Each command declares its own scopes (the central graph-scopes.ts map was
+  // dissolved into the command files at package-split step 11).
+  const scopesRequired = meta.scopesRequired;
+  return {
+    ...(scopesRequired && scopesRequired.length > 0 ? { scopesRequired } : {}),
+    ...(meta.needsElevatedToken ? { needsElevatedToken: meta.needsElevatedToken } : {}),
+    ...(meta.needsSubstrateToken ? { needsSubstrateToken: meta.needsSubstrateToken } : {}),
+    ...(meta.producesBytes ? { producesBytes: meta.producesBytes } : {}),
+    ...(meta.producesMedia ? { producesMedia: meta.producesMedia } : {}),
+  };
+};
+
+const toEntry = (name: string, cmd: Command<never>): CommandManifestEntry => ({
+  name,
+  summary: cmd.meta.summary,
+  category: cmd.meta.category,
+  graphMethod: cmd.meta.graphMethod,
+  graphPathTemplate: cmd.meta.graphPathTemplate,
+  graphDocsUrl: cmd.meta.graphDocsUrl,
+  options: cmd.meta.options,
+  example: cmd.meta.example,
+  ...shapeFields(cmd.meta),
+  ...capabilityFields(cmd.meta),
+  effect: cmd.meta.effect,
+  ...(cmd.meta.stability ? { stability: cmd.meta.stability } : {}),
+});
 
 /** What a manifest is built from: the package's registry, its lifecycle entries and its npm name. */
 type ManifestSource = Pick<CommandPackage<Command<never>>, 'registry' | 'lifecycle' | 'packageName'>;
