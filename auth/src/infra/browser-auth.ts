@@ -1109,70 +1109,39 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     let captured: AccessToken | null = null;
     let capturedRegion: string | null = null;
 
-    let ctx: ContextLike;
-    let p: PageLike;
-    try {
-      ctx = await withLaunchTimeout(launchContext(true), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] ${kind} capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info(`${kind}_token_launch_timeout`, { ms: elevatedLaunchTimeoutMs });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
-    }
-    try {
-      p = await withLaunchTimeout(ctx.newPage(), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      try {
-        await ctx.close();
-      } catch {
-        // ignore
-      }
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] ${kind} capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info(`${kind}_token_launch_timeout`, { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
-    }
+    const session = await openSession(true, (phase) => {
+      trace(`[DEBUG] ${kind} capture: ${phase === 'launch' ? 'launchContext' : 'newPage'} timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+      logger.info(`${kind}_token_launch_timeout`, phase === 'launch' ? { ms: elevatedLaunchTimeoutMs } : { ms: elevatedLaunchTimeoutMs, phase });
+    });
+    if (!session) return { ok: false, reason: 'launch_timeout' };
+    const { ctx, page: p } = session;
 
+    // Substrate-audience tokens can't use the Graph-audience validator
+    // (audience is intentionally NOT graph.microsoft.com).
+    const takeToken = (raw: string): void => {
+      if (captured || !raw.startsWith('eyJ') || !isTokenFresh(raw)) return;
+      captured = accessTokenUnsafe(raw);
+      logger.info(`${kind}_token_captured`, { len: raw.length });
+      trace(`[DEBUG] ${kind} token captured len=${raw.length}\n`);
+    };
+    const takeRegion = (url: string): void => {
+      const region = capturedRegion ? null : parseChatsvcaggRegion(url);
+      if (region === null) return;
+      capturedRegion = region;
+      logger.info(`${kind}_region_captured`, { region });
+      trace(`[DEBUG] ${kind} region captured: ${region}\n`);
+    };
     p.on('request', (req) => {
       if (captured && capturedRegion) return;
-      const auth = req.headers()['authorization'];
-      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
-      const raw = auth.slice('Bearer '.length);
-      const claims = decodeJwtPayload(raw);
-      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
-      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
-      if (appid !== BASIC_TEAMS_APP_ID || aud !== targetAud) return;
-      // Substrate-audience tokens can't use the Graph-audience validator
-      // (audience is intentionally NOT graph.microsoft.com).
-      if (!captured && raw.startsWith('eyJ') && isTokenFresh(raw)) {
-        captured = accessTokenUnsafe(raw);
-        logger.info(`${kind}_token_captured`, { len: raw.length });
-        trace(`[DEBUG] ${kind} token captured len=${raw.length}\n`);
-      }
-      if (!capturedRegion) {
-        const region = parseChatsvcaggRegion(req.url());
-        if (region !== null) {
-          capturedRegion = region;
-          logger.info(`${kind}_region_captured`, { region });
-          trace(`[DEBUG] ${kind} region captured: ${region}\n`);
-        }
-      }
+      const bearer = bearerOf(req);
+      if (bearer?.appid !== BASIC_TEAMS_APP_ID || bearer.aud !== targetAud) return;
+      takeToken(bearer.raw);
+      takeRegion(req.url());
     });
 
     logger.info('browser_navigating', { url: TEAMS_WEB_URL, purpose: kind });
     trace(`[DEBUG] ${kind} capture: navigating to ${TEAMS_WEB_URL}\n`);
-    let navigationFailed = false;
-    try {
-      await p.goto(TEAMS_WEB_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] ${kind} nav error: ${msg}\n`);
-      navigationFailed = true;
-    }
+    const navigationFailed = !(await navigateTo(p, TEAMS_WEB_URL, `${kind} nav error`));
 
     const deadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < deadline) {
