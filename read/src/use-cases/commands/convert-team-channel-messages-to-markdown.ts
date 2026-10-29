@@ -57,6 +57,23 @@ const channelNameOf = async (graph: ReadGraph, channelPath: string): Promise<str
   return typeof name === 'string' ? name : undefined;
 };
 
+// The note lines: what was read, the system events left out, and a truncated walk.
+const transcriptNotes = (
+  rendered: { readonly posts: number; readonly systemEventsOmitted: number },
+  walked: { readonly pages: number; readonly truncated: boolean },
+  since: string | undefined,
+  maxPages: number
+): string[] => {
+  const notes = [
+    since === undefined
+      ? `${plural(rendered.posts, 'post')} on the newest page`
+      : `${plural(rendered.posts, 'post')} touched since ${since}, read in ${plural(walked.pages, 'page')}`,
+  ];
+  if (rendered.systemEventsOmitted > 0) notes.push(`${plural(rendered.systemEventsOmitted, 'system event')} omitted`);
+  if (since !== undefined && walked.truncated) notes.push(`truncated at --max-pages ${maxPages}, older posts remain: raise --max-pages or narrow --since`);
+  return notes;
+};
+
 const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -74,14 +91,7 @@ const execute: ReadCommand['execute'] = createTopCappedExecute(async (graph, par
   const inline = parsed.data.inlineImages === 'true';
   const images = inline ? await fetchHostedImages(graph, hostedImageSources(walked.value.messages)) : new Map<string, string>();
   const rendered = renderTranscript(walked.value.messages, { channelName, images, inline });
-  const notes = [
-    since === undefined
-      ? `${plural(rendered.posts, 'post')} on the newest page`
-      : `${plural(rendered.posts, 'post')} touched since ${since}, read in ${plural(walked.value.pages, 'page')}`,
-  ];
-  if (rendered.systemEventsOmitted > 0) notes.push(`${plural(rendered.systemEventsOmitted, 'system event')} omitted`);
-  if (since !== undefined && walked.value.truncated) notes.push(`truncated at --max-pages ${maxPages}, older posts remain: raise --max-pages or narrow --since`);
-  return ok(markdownEnvelope(rendered.text, notes));
+  return ok(markdownEnvelope(rendered.text, transcriptNotes(rendered, walked.value, since, maxPages)));
 });
 
 const meta: ReadCommandMeta = {

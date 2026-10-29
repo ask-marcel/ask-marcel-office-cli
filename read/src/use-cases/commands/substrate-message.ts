@@ -21,6 +21,15 @@ const CHAT_DEEP_LINK = 'https://teams.microsoft.com/l/message';
 
 const typeOf = (m: SubstrateMessage): string => String(m['messageType'] ?? m['messagetype'] ?? '');
 
+// The thread activities with a name of their own; any other keeps its kind.
+const THREAD_ACTIVITY_EVENTS: ReadonlyMap<string, string> = new Map([
+  ['MemberJoined', 'member-added'],
+  ['AddMember', 'member-added'],
+  ['MemberLeft', 'member-removed'],
+  ['DeleteMember', 'member-removed'],
+  ['TopicUpdate', 'topic-changed'],
+]);
+
 /** The event a system entry stands for, or `undefined` for a message somebody wrote. */
 const eventOf = (m: SubstrateMessage): string | undefined => {
   const type = typeOf(m);
@@ -29,10 +38,7 @@ const eventOf = (m: SubstrateMessage): string | undefined => {
   if (type === 'RichText/Media_CallTranscript') return 'transcript-posted';
   if (!type.startsWith('ThreadActivity/')) return undefined;
   const kind = type.slice('ThreadActivity/'.length);
-  if (kind === 'MemberJoined' || kind === 'AddMember') return 'member-added';
-  if (kind === 'MemberLeft' || kind === 'DeleteMember') return 'member-removed';
-  if (kind === 'TopicUpdate') return 'topic-changed';
-  return `thread-activity:${kind}`;
+  return THREAD_ACTIVITY_EVENTS.get(kind) ?? `thread-activity:${kind}`;
 };
 
 /** The Teams deep link of a message, the shape the Teams client itself copies. */
