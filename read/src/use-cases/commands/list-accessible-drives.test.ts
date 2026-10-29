@@ -43,6 +43,15 @@ const twoSharedOnlyRoutes: Route = (path) => {
   return emptyActivity(path);
 };
 
+// A Route from [path or test, answer] pairs tried in order, else `fallback`.
+type RoutePair = readonly [string | ((path: string) => boolean), Result<unknown, GraphError>];
+const createRoutes =
+  (pairs: ReadonlyArray<RoutePair>, fallback: Route): Route =>
+  (path) => {
+    const hit = pairs.find(([test]) => (typeof test === 'string' ? path === test : test(path)));
+    return hit === undefined ? fallback(path) : hit[1];
+  };
+
 // The activity vector (recent/following/insights) hits five fixed endpoints. Scenarios that
 // predate it return empty for those so their assertions stay unchanged; activity tests below
 // override these explicitly. A distinct throw message keeps it out of the replace below.
@@ -468,27 +477,31 @@ describe('list-accessible-drives', () => {
   it('surfaces private/shared channel files-folder drives tagged "channel", skipping standard channels and non-team groups', async () => {
     // t1 is a joined team with a standard + a private + a shared channel; m1 is a member-only
     // group (not a team) that must NOT be enumerated for channels.
-    const routes: Route = (path) => {
-      if (path === '/me/drives') return ok({ value: [] });
-      if (path === '/me/joinedTeams') return ok({ value: [{ id: 't1' }] });
-      if (path.startsWith('/me/memberOf')) return ok({ value: [{ id: 'm1', groupTypes: ['Unified'] }] });
-      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
-      if (path === '/groups/t1/drive') return ok({ id: 'team-default', name: 'Team', driveType: 'documentLibrary', webUrl: 'ut' });
-      if (path === '/groups/m1/drive') return ok({ id: 'mem-drive', name: 'Mem', driveType: 'documentLibrary', webUrl: 'um' });
-      if (path.startsWith('/teams/t1/channels?'))
-        return ok({
-          value: [
-            { id: 'std', membershipType: 'standard' },
-            { id: 'priv', membershipType: 'private' },
-            { id: 'shar', membershipType: 'shared' },
-          ],
-        });
-      if (path === '/teams/t1/channels/priv/filesFolder') return ok({ parentReference: { driveId: 'priv-drive' } });
-      if (path === '/teams/t1/channels/shar/filesFolder') return ok({ parentReference: { driveId: 'shar-drive' } });
-      if (path === '/drives/priv-drive') return ok({ id: 'priv-drive', name: 'Priv', driveType: 'documentLibrary', webUrl: 'up' });
-      if (path === '/drives/shar-drive') return ok({ id: 'shar-drive', name: 'Shar', driveType: 'documentLibrary', webUrl: 'ush' });
-      return emptyActivity(path); // /teams/m1/* and /teams/t1/channels/std/filesFolder must never be hit
-    };
+    const routes = createRoutes(
+      [
+        ['/me/drives', ok({ value: [] })],
+        ['/me/joinedTeams', ok({ value: [{ id: 't1' }] })],
+        [(path) => path.startsWith('/me/memberOf'), ok({ value: [{ id: 'm1', groupTypes: ['Unified'] }] })],
+        ['/me/drive/sharedWithMe', ok({ value: [] })],
+        ['/groups/t1/drive', ok({ id: 'team-default', name: 'Team', driveType: 'documentLibrary', webUrl: 'ut' })],
+        ['/groups/m1/drive', ok({ id: 'mem-drive', name: 'Mem', driveType: 'documentLibrary', webUrl: 'um' })],
+        [
+          (path) => path.startsWith('/teams/t1/channels?'),
+          ok({
+            value: [
+              { id: 'std', membershipType: 'standard' },
+              { id: 'priv', membershipType: 'private' },
+              { id: 'shar', membershipType: 'shared' },
+            ],
+          }),
+        ],
+        ['/teams/t1/channels/priv/filesFolder', ok({ parentReference: { driveId: 'priv-drive' } })],
+        ['/teams/t1/channels/shar/filesFolder', ok({ parentReference: { driveId: 'shar-drive' } })],
+        ['/drives/priv-drive', ok({ id: 'priv-drive', name: 'Priv', driveType: 'documentLibrary', webUrl: 'up' })],
+        ['/drives/shar-drive', ok({ id: 'shar-drive', name: 'Shar', driveType: 'documentLibrary', webUrl: 'ush' })],
+      ],
+      emptyActivity
+    ); // /teams/m1/* and /teams/t1/channels/std/filesFolder must never be hit
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -518,19 +531,21 @@ describe('list-accessible-drives', () => {
   });
 
   it('drops benign channel failures (403 access-denied list, 404 folder) and surfaces only the actionable (5xx) files-folder failure', async () => {
-    const routes: Route = (path) => {
-      if (path === '/me/drives') return ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] });
-      if (path === '/me/joinedTeams') return ok({ value: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] });
-      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
-      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
-      if (path === '/groups/t1/drive' || path === '/groups/t2/drive' || path === '/groups/t3/drive') return err({ type: 'api_error', status: 404, message: 'no team drive' });
-      if (path.startsWith('/teams/t1/channels?')) return err({ type: 'api_error', status: 403, message: 'AccessDenied' }); // benign → dropped
-      if (path.startsWith('/teams/t2/channels?')) return ok({ value: [{ id: 'c2', membershipType: 'private' }] });
-      if (path.startsWith('/teams/t3/channels?')) return ok({ value: [{ id: 'c3', membershipType: 'private' }] });
-      if (path === '/teams/t2/channels/c2/filesFolder') return err({ type: 'api_error', status: 403, message: 'not a channel member' }); // benign → dropped
-      if (path === '/teams/t3/channels/c3/filesFolder') return err({ type: 'api_error', status: 500, message: 'boom' }); // actionable → surfaced
-      return emptyActivity(path);
-    };
+    const routes = createRoutes(
+      [
+        ['/me/drives', ok({ value: [{ id: 'p1', name: 'OD', driveType: 'business', webUrl: 'u' }] })],
+        ['/me/joinedTeams', ok({ value: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] })],
+        [(path) => path.startsWith('/me/memberOf'), ok({ value: [] })],
+        ['/me/drive/sharedWithMe', ok({ value: [] })],
+        [(path) => path === '/groups/t1/drive' || path === '/groups/t2/drive' || path === '/groups/t3/drive', err({ type: 'api_error', status: 404, message: 'no team drive' })],
+        [(path) => path.startsWith('/teams/t1/channels?'), err({ type: 'api_error', status: 403, message: 'AccessDenied' })], // benign → dropped
+        [(path) => path.startsWith('/teams/t2/channels?'), ok({ value: [{ id: 'c2', membershipType: 'private' }] })],
+        [(path) => path.startsWith('/teams/t3/channels?'), ok({ value: [{ id: 'c3', membershipType: 'private' }] })],
+        ['/teams/t2/channels/c2/filesFolder', err({ type: 'api_error', status: 403, message: 'not a channel member' })], // benign → dropped
+        ['/teams/t3/channels/c3/filesFolder', err({ type: 'api_error', status: 500, message: 'boom' })], // actionable → surfaced
+      ],
+      emptyActivity
+    );
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -566,23 +581,25 @@ describe('list-accessible-drives', () => {
   });
 
   it('surfaces drives behind recent / followed / trending items tagged "activity", ignoring malformed items', async () => {
-    const routes: Route = (path) => {
-      if (path === '/me/drives') return ok({ value: [] });
-      if (path === '/me/joinedTeams') return ok({ value: [] });
-      if (path.startsWith('/me/memberOf')) return ok({ value: [] });
-      if (path === '/me/drive/sharedWithMe') return ok({ value: [] });
-      // recent: driveItems via parentReference.driveId, mixed with malformed entries
-      if (path === '/me/drive/recent') return ok({ value: [null, 'x', { parentReference: {} }, { parentReference: { driveId: 5 } }, { parentReference: { driveId: 'rec1' } }] });
-      if (path === '/me/drive/following') return ok({ value: [{ parentReference: { driveId: 'fol1' } }] });
-      // insights: driveId encoded in resourceReference.id = "drives/<id>/items/…"; a non-drive ref is ignored
-      if (path === '/me/insights/trending') return ok({ value: [{ resourceReference: { id: 'sites/foo' } }, { resourceReference: { id: 'drives/b!tre1/items/x' } }] });
-      if (path === '/me/insights/used') return ok({ value: [] });
-      if (path === '/me/insights/shared') return ok({ value: [] });
-      if (path === '/drives/rec1') return ok({ id: 'rec1', name: 'Recent', driveType: 'documentLibrary', webUrl: 'ur' });
-      if (path === '/drives/fol1') return ok({ id: 'fol1', name: 'Followed', driveType: 'documentLibrary', webUrl: 'uf' });
-      if (path === '/drives/b!tre1') return ok({ id: 'b!tre1', name: 'Trending', driveType: 'documentLibrary', webUrl: 'ut' });
-      return emptyActivity(path);
-    };
+    const routes = createRoutes(
+      [
+        ['/me/drives', ok({ value: [] })],
+        ['/me/joinedTeams', ok({ value: [] })],
+        [(path) => path.startsWith('/me/memberOf'), ok({ value: [] })],
+        ['/me/drive/sharedWithMe', ok({ value: [] })],
+        // recent: driveItems via parentReference.driveId, mixed with malformed entries
+        ['/me/drive/recent', ok({ value: [null, 'x', { parentReference: {} }, { parentReference: { driveId: 5 } }, { parentReference: { driveId: 'rec1' } }] })],
+        ['/me/drive/following', ok({ value: [{ parentReference: { driveId: 'fol1' } }] })],
+        // insights: driveId encoded in resourceReference.id = "drives/<id>/items/…"; a non-drive ref is ignored
+        ['/me/insights/trending', ok({ value: [{ resourceReference: { id: 'sites/foo' } }, { resourceReference: { id: 'drives/b!tre1/items/x' } }] })],
+        ['/me/insights/used', ok({ value: [] })],
+        ['/me/insights/shared', ok({ value: [] })],
+        ['/drives/rec1', ok({ id: 'rec1', name: 'Recent', driveType: 'documentLibrary', webUrl: 'ur' })],
+        ['/drives/fol1', ok({ id: 'fol1', name: 'Followed', driveType: 'documentLibrary', webUrl: 'uf' })],
+        ['/drives/b!tre1', ok({ id: 'b!tre1', name: 'Trending', driveType: 'documentLibrary', webUrl: 'ut' })],
+      ],
+      emptyActivity
+    );
     const result = await execute(routeGraph(routes), {});
     expect(result.ok).toBe(true);
     if (!result.ok) return;
