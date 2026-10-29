@@ -193,18 +193,46 @@ const endOfMonth = (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => {
 const startOfYear = (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => toIso(zoneMidnight({ y: civilToday(now, clock).y, m: 1, d: 1 }, clock));
 const endOfYear = (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => toIso(new Date(zoneMidnight({ y: civilToday(now, clock).y + 1, m: 1, d: 1 }, clock).getTime() - 1));
 
-const namedSimple = (now: Date, name: string, clock: Intl.DateTimeFormat): IsoDateTime | undefined => {
-  if (name === 'now') return toIso(now);
-  if (name === 'today') return toIso(zoneMidnight(civilToday(now, clock), clock));
-  if (name === 'yesterday') return toIso(zoneMidnight(shiftDays(civilToday(now, clock), -1), clock));
-  if (name === 'tomorrow') return toIso(zoneMidnight(shiftDays(civilToday(now, clock), 1), clock));
-  if (name === 'start-of-week') return startOfWeek(now, clock);
-  if (name === 'end-of-week') return endOfWeek(now, clock);
-  if (name === 'start-of-month') return startOfMonth(now, clock);
-  if (name === 'end-of-month') return endOfMonth(now, clock);
-  if (name === 'start-of-year') return startOfYear(now, clock);
-  if (name === 'end-of-year') return endOfYear(now, clock);
+// The named days and boundaries. A Map, so a name such as `constructor` finds nothing.
+const NAMED_SIMPLE: ReadonlyMap<string, (now: Date, clock: Intl.DateTimeFormat) => IsoDateTime> = new Map([
+  ['now', (now: Date): IsoDateTime => toIso(now)],
+  ['today', (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => toIso(zoneMidnight(civilToday(now, clock), clock))],
+  ['yesterday', (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => toIso(zoneMidnight(shiftDays(civilToday(now, clock), -1), clock))],
+  ['tomorrow', (now: Date, clock: Intl.DateTimeFormat): IsoDateTime => toIso(zoneMidnight(shiftDays(civilToday(now, clock), 1), clock))],
+  ['start-of-week', startOfWeek],
+  ['end-of-week', endOfWeek],
+  ['start-of-month', startOfMonth],
+  ['end-of-month', endOfMonth],
+  ['start-of-year', startOfYear],
+  ['end-of-year', endOfYear],
+]);
+
+const namedSimple = (now: Date, name: string, clock: Intl.DateTimeFormat): IsoDateTime | undefined => NAMED_SIMPLE.get(name)?.(now, clock);
+
+// A weekday name, alone or after `last-` or `next-`.
+const namedWeekday = (now: Date, lower: string, clock: Intl.DateTimeFormat): IsoDateTime | undefined => {
+  const weekdayIdx = WEEKDAY_INDEX[lower];
+  if (weekdayIdx !== undefined) return findWeekday(now, weekdayIdx, 'this', clock);
+  for (const which of ['last', 'next'] as const) {
+    const prefix = `${which}-`;
+    const w = lower.startsWith(prefix) ? WEEKDAY_INDEX[lower.slice(prefix.length)] : undefined;
+    if (w !== undefined) return findWeekday(now, w, which, clock);
+  }
   return undefined;
+};
+
+// A relative offset such as `7d` or `+2w`; undefined when the input is not one.
+const parseOffset = (lower: string, rawInput: string, now: Date): Result<IsoDateTime, DateParseError> | undefined => {
+  const offsetMatch = OFFSET_RE.exec(lower);
+  if (offsetMatch === null) return undefined;
+  const [, signStr, countStr, unitStr] = offsetMatch;
+  if (countStr === undefined || unitStr === undefined) return err(invalid(rawInput));
+  const count = Number.parseInt(countStr, 10);
+  if (Number.isNaN(count) || count < 0) return err(invalid(rawInput));
+  // Default (no sign): treat as PAST offset, matching the "--since 7d" intent.
+  const sign: 1 | -1 = signStr === '+' ? 1 : -1;
+  const unit = unitStr as 'd' | 'w' | 'h' | 'm';
+  return ok(applyOffset(now, sign, count, unit));
 };
 
 /**
@@ -227,32 +255,8 @@ export const parseIsoDateTime = (rawInput: string, now: Date = new Date(), zone:
 
   const lower = input.toLowerCase();
 
-  const simple = namedSimple(now, lower, clock.value);
-  if (simple !== undefined) return ok(simple);
+  const named = namedSimple(now, lower, clock.value) ?? namedWeekday(now, lower, clock.value);
+  if (named !== undefined) return ok(named);
 
-  const weekdayIdx = WEEKDAY_INDEX[lower];
-  if (weekdayIdx !== undefined) return ok(findWeekday(now, weekdayIdx, 'this', clock.value));
-
-  if (lower.startsWith('last-')) {
-    const w = WEEKDAY_INDEX[lower.slice('last-'.length)];
-    if (w !== undefined) return ok(findWeekday(now, w, 'last', clock.value));
-  }
-  if (lower.startsWith('next-')) {
-    const w = WEEKDAY_INDEX[lower.slice('next-'.length)];
-    if (w !== undefined) return ok(findWeekday(now, w, 'next', clock.value));
-  }
-
-  const offsetMatch = OFFSET_RE.exec(lower);
-  if (offsetMatch !== null) {
-    const [, signStr, countStr, unitStr] = offsetMatch;
-    if (countStr === undefined || unitStr === undefined) return err(invalid(rawInput));
-    const count = Number.parseInt(countStr, 10);
-    if (Number.isNaN(count) || count < 0) return err(invalid(rawInput));
-    // Default (no sign): treat as PAST offset, matching the "--since 7d" intent.
-    const sign: 1 | -1 = signStr === '+' ? 1 : -1;
-    const unit = unitStr as 'd' | 'w' | 'h' | 'm';
-    return ok(applyOffset(now, sign, count, unit));
-  }
-
-  return err(invalid(rawInput));
+  return parseOffset(lower, rawInput, now) ?? err(invalid(rawInput));
 };
