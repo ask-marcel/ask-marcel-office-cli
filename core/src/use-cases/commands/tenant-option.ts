@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Result } from '../../domain/result.ts';
-import { err } from '../../domain/result.ts';
+import { err, ok } from '../../domain/result.ts';
 import { tenantId } from '../../domain/tenant-id.ts';
 import type { TenantId } from '../../domain/tenant-id.ts';
 import type { GraphError } from '../../infra/graph-request.ts';
@@ -65,4 +65,7 @@ const brandTenantId = (raw: string): Result<TenantId, GraphError> => {
   });
 };
 
-export { TENANT_ID_OPTION, brandTenantId, routeGet, tenantIdSchema, tenantIdShape };
+/** The optional `--tenant-id`: no tenant when the flag is absent, else branded as above. */
+const brandOptionalTenantId = (raw: string | undefined): Result<TenantId | undefined, GraphError> => (raw === undefined ? ok(undefined) : brandTenantId(raw));
+
+export { TENANT_ID_OPTION, brandOptionalTenantId, brandTenantId, routeGet, tenantIdSchema, tenantIdShape };
