@@ -43,6 +43,44 @@ const readDraftBody = async (graph: WriteGraph, created: unknown, draftId: strin
   return ok(parsed.data.body);
 };
 
+// The HTML path: the reply text is spliced into the draft's own body, above the quote.
+const spliceHtmlComment = async (graph: WriteGraph, created: { id: string }, comment: string, extra: Record<string, unknown>): Promise<Result<unknown, GraphError>> => {
+  const draftId = created.id;
+  const draftBody = await readDraftBody(graph, created, draftId);
+  if (!draftBody.ok) return draftBody;
+
+  // A text-bodied thread cannot take HTML: splicing markup in would show it as
+  // literal characters, and converting the body to HTML would rewrite the quote.
+  if (draftBody.value.contentType.toLowerCase() !== 'html') {
+    return err({
+      type: 'validation_error',
+      message: `The thread's draft body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above its quoted history without rewriting the quote. Draft ${draftId} was already created - revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
+    });
+  }
+
+  // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
+  // never PATCH body WITHOUT the quote in it. Subject merges into the same call.
+  const spliced = insertCommentAboveQuote(draftBody.value.content, comment);
+  return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, { body: { contentType: 'HTML', content: spliced.html }, ...extra }));
+};
+
+const createUnsentDraft = async (graph: WriteGraph, replyToMessageId: string, action: string, comment: string): Promise<Result<{ id: string }, GraphError>> => {
+  const created = await graph.post(`/me/messages/${replyToMessageId}/${action}`, { comment });
+  if (!created.ok) return created;
+
+  // Defense in depth: both reply actions are documented to return an UNSENT
+  // draft. If Graph ever hands back anything else, stop before writing into it.
+  if (!isUnsentDraft(created.value)) {
+    return err({
+      type: 'api_error',
+      status: 500,
+      code: 'not_an_unsent_draft',
+      message: `${action} did not return an unsent draft for message ${replyToMessageId} - refusing to patch. Inspect the message id and retry.`,
+    });
+  }
+  return ok(created.value);
+};
+
 const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -67,50 +105,16 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
   // whole draft body and drops the quoted thread (fixed 2026-07-13). The HTML
   // path posts an EMPTY comment (Graph HTML-escapes what `comment` carries) and
   // splices the markup in below, keeping the quote inside the body it patches.
-  const created = await graph.post(`/me/messages/${replyToMessageId}/${action}`, { comment: asHtml ? '' : comment });
+  const created = await createUnsentDraft(graph, replyToMessageId, action, asHtml ? '' : comment);
   if (!created.ok) return created;
 
-  // Defense in depth: both reply actions are documented to return an UNSENT
-  // draft. If Graph ever hands back anything else, stop before writing into it.
-  if (!isUnsentDraft(created.value)) {
-    return err({
-      type: 'api_error',
-      status: 500,
-      code: 'not_an_unsent_draft',
-      message: `${action} did not return an unsent draft for message ${replyToMessageId} - refusing to patch. Inspect the message id and retry.`,
-    });
-  }
-
-  const draftId = created.value.id;
+  if (asHtml) return spliceHtmlComment(graph, created.value, comment, subject ? { subject } : {});
 
   // Text path, unchanged: optional subject override PATCHes ONLY the subject -
   // never `body`, which carries the reply text + quoted history. No override ->
   // return the draft as Graph made it.
-  if (!asHtml) {
-    const patch: Record<string, unknown> = {};
-    if (subject) patch.subject = subject;
-    if (Object.keys(patch).length === 0) return slimDraftResult(created);
-    return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
-  }
-
-  const draftBody = await readDraftBody(graph, created.value, draftId);
-  if (!draftBody.ok) return draftBody;
-
-  // A text-bodied thread cannot take HTML: splicing markup in would show it as
-  // literal characters, and converting the body to HTML would rewrite the quote.
-  if (draftBody.value.contentType.toLowerCase() !== 'html') {
-    return err({
-      type: 'validation_error',
-      message: `The thread's draft body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above its quoted history without rewriting the quote. Draft ${draftId} was already created - revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
-    });
-  }
-
-  // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
-  // never PATCH body WITHOUT the quote in it. Subject merges into the same call.
-  const spliced = insertCommentAboveQuote(draftBody.value.content, comment);
-  const patch: Record<string, unknown> = { body: { contentType: 'HTML', content: spliced.html } };
-  if (subject) patch.subject = subject;
-  return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
+  if (!subject) return slimDraftResult(created);
+  return slimDraftResult(await graph.patch(`/me/messages/${created.value.id}`, { subject }));
 };
 
 const meta: WriteCommandMeta = {
