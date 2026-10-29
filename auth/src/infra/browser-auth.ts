@@ -458,24 +458,67 @@ const createPlaywrightApi = (loader: PlaywrightLoader): BrowserAuthApi => ({
   },
 });
 
+// Settable from the environment so a slow launch can be told from a blocked
+// one without shipping a build: 15s is measured against a warm macOS launch,
+// and a cold Windows first run pays profile creation and AV scanning on top.
+const envLaunchTimeoutMs = (): number => {
+  const fromEnv = Number(process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS']);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 15_000;
+};
+
+type Timings = {
+  readonly initialSettleMs: number;
+  readonly postReloginSettleMs: number;
+  readonly pollIntervalMs: number;
+  readonly pollDeadlineMs: number;
+  readonly navigationTimeoutMs: number;
+  readonly elevatedRecaptureTimeoutMs: number;
+  readonly elevatedPreferenceGraceMs: number;
+  readonly elevatedLaunchTimeoutMs: number;
+};
+
+// The waits of the browser flows: the config's, or the defaults.
+const resolveTimings = (config: BrowserAuthConfig): Timings => ({
+  initialSettleMs: config.initialSettleMs ?? 5000,
+  postReloginSettleMs: config.postReloginSettleMs ?? 3000,
+  pollIntervalMs: config.pollIntervalMs ?? 2000,
+  pollDeadlineMs: config.pollDeadlineMs ?? 5 * 60 * 1000,
+  navigationTimeoutMs: config.navigationTimeoutMs ?? 30_000,
+  elevatedRecaptureTimeoutMs: config.elevatedRecaptureTimeoutMs ?? 20_000,
+  elevatedPreferenceGraceMs: config.elevatedPreferenceGraceMs ?? 3000,
+  elevatedLaunchTimeoutMs: config.elevatedLaunchTimeoutMs ?? envLaunchTimeoutMs(),
+});
+
+// The bearer token of an outgoing request, with the two claims every listener
+// sorts on. Undefined when the request carries no bearer, or a token without them.
+type Bearer = { readonly raw: string; readonly appid: string; readonly aud: string };
+const bearerOf = (req: RequestLike): Bearer | undefined => {
+  const auth = req.headers()['authorization'];
+  if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return undefined;
+  const raw = auth.slice('Bearer '.length);
+  const claims = decodeJwtPayload(raw);
+  const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
+  const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
+  if (!appid || !aud) return undefined;
+  return { raw, appid, aud };
+};
+
 const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig): BrowserAuth => {
   const { logger, fs } = config;
   // Default to no-op so the CLI is silent on success. Pass an explicit
   // trace (e.g., `(m) => process.stderr.write(m)`) for verbose debugging.
   const trace: TraceFn = config.trace ?? (() => {});
   const profileDir = config.profileDir ?? defaultProfileDir();
-  const initialSettleMs = config.initialSettleMs ?? 5000;
-  const postReloginSettleMs = config.postReloginSettleMs ?? 3000;
-  const pollIntervalMs = config.pollIntervalMs ?? 2000;
-  const pollDeadlineMs = config.pollDeadlineMs ?? 5 * 60 * 1000;
-  const navigationTimeoutMs = config.navigationTimeoutMs ?? 30_000;
-  const elevatedRecaptureTimeoutMs = config.elevatedRecaptureTimeoutMs ?? 20_000;
-  const elevatedPreferenceGraceMs = config.elevatedPreferenceGraceMs ?? 3000;
-  // Settable from the environment so a slow launch can be told from a blocked
-  // one without shipping a build: 15s is measured against a warm macOS launch,
-  // and a cold Windows first run pays profile creation and AV scanning on top.
-  const envLaunchTimeout = Number(process.env['ASKMARCEL_LAUNCH_TIMEOUT_MS']);
-  const elevatedLaunchTimeoutMs = config.elevatedLaunchTimeoutMs ?? (Number.isFinite(envLaunchTimeout) && envLaunchTimeout > 0 ? envLaunchTimeout : 15_000);
+  const {
+    initialSettleMs,
+    postReloginSettleMs,
+    pollIntervalMs,
+    pollDeadlineMs,
+    navigationTimeoutMs,
+    elevatedRecaptureTimeoutMs,
+    elevatedPreferenceGraceMs,
+    elevatedLaunchTimeoutMs,
+  } = resolveTimings(config);
   const freshCachedToken = config.freshCachedToken ?? (async () => null);
   const onProgress = config.onProgress ?? (() => {});
 
@@ -577,78 +620,49 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     }
   };
 
-  const acquireElevatedToken = async (options?: { readonly awaitSignIn?: boolean }): Promise<ElevatedTokenResult> => {
-    await cleanupSingletonLocks(profileDir, fs);
+  type Session = { readonly ctx: ContextLike; readonly page: PageLike };
 
-    const picker = createElevatedPicker(elevatedPreferenceGraceMs);
-
-    // Headless flakiness with Microsoft anti-automation has been
-    // observed on m365.cloud.microsoft — the SPA sometimes refuses to
-    // run its OAuth dance in headless mode. Visible launch is the
-    // safer default. The window opens and closes within seconds; user
-    // sees a brief flash but no interaction is required.
-    //
-    // wrap launch + newPage in a hard timeout
-    // so a hung Playwright doesn't block the whole command. Previously
-    // unguarded — a corrupt profile with stale Singleton locks would
-    // hang indefinitely.
-    let elevatedCtx: ContextLike;
-    let elevatedPage: PageLike;
+  // Launch a browser and open a page, each under the launch deadline. Undefined
+  // on a timeout, after `onTimeout` names the phase; any other failure throws.
+  const openSession = async (headless: boolean, onTimeout: (phase: 'launch' | 'newPage') => void): Promise<Session | undefined> => {
+    let ctx: ContextLike;
     try {
-      elevatedCtx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
+      ctx = await withLaunchTimeout(launchContext(headless), elevatedLaunchTimeoutMs);
     } catch (e) {
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] elevated capture: launchContext timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
+      if (!isLaunchTimeout(e)) throw e;
+      onTimeout('launch');
+      return undefined;
     }
     try {
-      elevatedPage = await withLaunchTimeout(elevatedCtx.newPage(), elevatedLaunchTimeoutMs);
+      return { ctx, page: await withLaunchTimeout(ctx.newPage(), elevatedLaunchTimeoutMs) };
     } catch (e) {
       try {
-        await elevatedCtx.close();
+        await ctx.close();
       } catch {
         // ignore
       }
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] elevated capture: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        logger.info('elevated_token_launch_timeout', { ms: elevatedLaunchTimeoutMs, phase: 'newPage' });
-        return { ok: false, reason: 'launch_timeout' };
-      }
-      throw e;
+      if (!isLaunchTimeout(e)) throw e;
+      onTimeout('newPage');
+      return undefined;
     }
+  };
 
-    elevatedPage.on('request', (req) => {
-      if (picker.settled()) return;
-      const auth = req.headers()['authorization'];
-      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
-      const raw = auth.slice('Bearer '.length);
-      const claims = decodeJwtPayload(raw);
-      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
-      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
-      if (!appid || !aud) return;
-      if (!ELEVATED_APP_IDS.includes(appid)) return;
-      if (aud !== 'https://graph.microsoft.com') return;
-      const validated = accessToken(raw);
-      if (!validated.ok) return;
-      picker.offer(appid, validated.value);
-      logger.info('elevated_token_captured', { appid, len: validated.value.length });
-      trace(`[DEBUG] elevated token captured  appid=${appid}  len=${validated.value.length}\n`);
-    });
-
-    logger.info('browser_navigating', { url: M365_CLOUD_URL, purpose: 'elevated' });
-    trace(`[DEBUG] elevated capture: navigating to ${M365_CLOUD_URL}\n`);
-    let navigationFailed = false;
+  // Navigate without throwing: the capture may still succeed from what the page
+  // loaded. False on a failure, which `label` traces.
+  const navigateTo = async (target: PageLike, url: string, label: string): Promise<boolean> => {
     try {
-      await elevatedPage.goto(M365_CLOUD_URL, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
+      await target.goto(url, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] elevated nav error: ${msg}\n`);
-      navigationFailed = true;
+      trace(`[DEBUG] ${label}: ${msg}\n`);
+      return false;
     }
+  };
 
+  // Polls for the elevated token until its deadline, then closes the browser and reports.
+  const finishElevatedCapture = async (picker: ElevatedPicker, session: Session, awaitSignIn: boolean, navigationFailed: boolean): Promise<ElevatedTokenResult> => {
+    const { ctx: elevatedCtx, page: elevatedPage } = session;
     // Settle: silent SSO capture happens within 3-8s when cookies are warm.
     // The elevated path is non-interactive — the popup is opened with the
     // persistent profile and either silent SSO completes (token captured) or
@@ -669,7 +683,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // about whether a human is needed. Acting on it closed a capture that was
     // about to succeed.
     const shortDeadline = Date.now() + elevatedRecaptureTimeoutMs;
-    const elevatedDeadline = options?.awaitSignIn === true ? Date.now() + pollDeadlineMs : shortDeadline;
+    const elevatedDeadline = awaitSignIn ? Date.now() + pollDeadlineMs : shortDeadline;
     let announced = false;
     while (Date.now() < elevatedDeadline) {
       const settled = picker.settled();
@@ -680,7 +694,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       }
       // Silence until the silent route has plainly not worked; past that the
       // window is probably showing a sign-in form and the user needs telling.
-      if (options?.awaitSignIn === true && !announced && Date.now() >= shortDeadline) {
+      if (awaitSignIn && !announced && Date.now() >= shortDeadline) {
         announced = true;
         onProgress(
           `Elevated token is taking longer than usual — if a sign-in screen is showing, complete it in the browser window (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`
@@ -707,6 +721,47 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     trace('[DEBUG] elevated capture: deadline expired, no elevated token captured\n');
     logger.info('elevated_token_capture_timeout');
     return { ok: false, reason: 'sso_timeout' };
+  };
+
+  const acquireElevatedToken = async (options?: { readonly awaitSignIn?: boolean }): Promise<ElevatedTokenResult> => {
+    await cleanupSingletonLocks(profileDir, fs);
+
+    const picker = createElevatedPicker(elevatedPreferenceGraceMs);
+
+    // Headless flakiness with Microsoft anti-automation has been
+    // observed on m365.cloud.microsoft — the SPA sometimes refuses to
+    // run its OAuth dance in headless mode. Visible launch is the
+    // safer default. The window opens and closes within seconds; user
+    // sees a brief flash but no interaction is required.
+    //
+    // wrap launch + newPage in a hard timeout
+    // so a hung Playwright doesn't block the whole command. Previously
+    // unguarded — a corrupt profile with stale Singleton locks would
+    // hang indefinitely.
+    const session = await openSession(false, (phase) => {
+      trace(`[DEBUG] elevated capture: ${phase === 'launch' ? 'launchContext' : 'newPage'} timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+      logger.info('elevated_token_launch_timeout', phase === 'launch' ? { ms: elevatedLaunchTimeoutMs } : { ms: elevatedLaunchTimeoutMs, phase });
+    });
+    if (!session) return { ok: false, reason: 'launch_timeout' };
+    const elevatedPage = session.page;
+
+    elevatedPage.on('request', (req) => {
+      if (picker.settled()) return;
+      const bearer = bearerOf(req);
+      if (!bearer || !ELEVATED_APP_IDS.includes(bearer.appid)) return;
+      if (bearer.aud !== 'https://graph.microsoft.com') return;
+      const validated = accessToken(bearer.raw);
+      if (!validated.ok) return;
+      picker.offer(bearer.appid, validated.value);
+      logger.info('elevated_token_captured', { appid: bearer.appid, len: validated.value.length });
+      trace(`[DEBUG] elevated token captured  appid=${bearer.appid}  len=${validated.value.length}\n`);
+    });
+
+    logger.info('browser_navigating', { url: M365_CLOUD_URL, purpose: 'elevated' });
+    trace(`[DEBUG] elevated capture: navigating to ${M365_CLOUD_URL}\n`);
+    const navigationFailed = !(await navigateTo(elevatedPage, M365_CLOUD_URL, 'elevated nav error'));
+
+    return finishElevatedCapture(picker, session, options?.awaitSignIn === true, navigationFailed);
   };
 
   /**
