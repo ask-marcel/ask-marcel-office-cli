@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import type { Result } from '../../domain/result.ts';
 import { err, ok } from '../../domain/result.ts';
-import type { FileSystem } from '../ports/filesystem.ts';
+import type { FileSystem, FileSystemError } from '../ports/filesystem.ts';
 import { base64ToBytes } from './fetch-raw-bytes.ts';
 import { DOCX_FAMILY, ODF_FAMILY, PPTX_FAMILY, XLSX_FAMILY } from './office-extensions.ts';
 import { extensionOf } from './text-passthrough.ts';
@@ -71,17 +71,55 @@ const BINARY_SAVE_EXTENSIONS: ReadonlySet<string> = new Set([
 // the image-extraction `media` arrays go through persistMediaIfRequested.
 const INLINE_BASE64_LIMIT = 1_000_000;
 
+// No --output-path: the value goes to stdout, unless its base64 would flood the context.
+const checkInlineSize = (data: unknown): Result<unknown, OutputPathError> => {
+  const inline = isPlainRecord(data) ? data['base64'] : undefined;
+  if (typeof inline === 'string' && inline.length > INLINE_BASE64_LIMIT) return err({ type: 'inline_too_large', base64Length: inline.length });
+  return ok(data);
+};
+
+const writeFailed = (error: FileSystemError): OutputPathError => ({ type: 'write_failed', message: error.type === 'io_failed' ? error.message : error.type });
+
+const saveBytes = async (fs: FileSystem, outputPath: string, data: Record<string, unknown>, base64: string): Promise<Result<unknown, OutputPathError>> => {
+  const passthrough = data['passthrough'];
+  const contentType = data['contentType'];
+  if (passthrough === true && typeof contentType === 'string' && isPdfExtension(outputPath) && !isPdfContentType(contentType)) {
+    return err({ type: 'passthrough_extension_mismatch', contentType, requestedExtension: '.pdf' });
+  }
+  const written = await fs.writeBytes(outputPath, base64ToBytes(base64));
+  if (!written.ok) return err(writeFailed(written.error));
+  // Audit 2026-06 §P1: get-mail-attachment surfaces Graph's raw `contentBytes`
+  // AND a `base64` mirror of it. Stripping only `base64` left the multi-MB
+  // `contentBytes` in stdout (13 MB observed for two PDFs already on disk).
+  // Drop both raw-byte fields once the bytes are landed — `contentBytes` is
+  // always a base64 mirror in these envelopes, so removing it is safe.
+  return ok({ ...withoutKeys(data, ['base64', 'contentBytes']), savedTo: outputPath });
+};
+
+const saveText = async (
+  fs: FileSystem,
+  outputPath: string,
+  data: Record<string, unknown>,
+  text: string,
+  sourceText: boolean | undefined
+): Promise<Result<unknown, OutputPathError>> => {
+  const extension = extensionOf(outputPath);
+  if (sourceText !== true && BINARY_SAVE_EXTENSIONS.has(extension)) {
+    const contentType = typeof data['contentType'] === 'string' ? data['contentType'] : 'text/plain';
+    return err({ type: 'text_under_binary_extension', contentType, requestedExtension: `.${extension}` });
+  }
+  const written = await fs.writeText(outputPath, text);
+  if (!written.ok) return err(writeFailed(written.error));
+  return ok({ ...withoutKey(data, 'text'), savedTo: outputPath });
+};
+
 export const persistIfRequested = async (
   fs: FileSystem,
   outputPath: string | undefined,
   data: unknown,
   opts: { readonly sourceText?: boolean } = {}
 ): Promise<Result<unknown, OutputPathError>> => {
-  if (outputPath === undefined) {
-    const inline = isPlainRecord(data) ? data['base64'] : undefined;
-    if (typeof inline === 'string' && inline.length > INLINE_BASE64_LIMIT) return err({ type: 'inline_too_large', base64Length: inline.length });
-    return ok(data);
-  }
+  if (outputPath === undefined) return checkInlineSize(data);
   // -5: `--output-path ""` was silently treated as
   // "no flag", which masked shell-quoting mistakes (`--output-path "$VAR"`
   // where VAR is empty). Reject with a clear error instead.
@@ -93,34 +131,9 @@ export const persistIfRequested = async (
   if (!isPlainRecord(data)) return err({ type: 'no_inlined_bytes' });
 
   const base64 = data['base64'];
-  if (typeof base64 === 'string') {
-    const passthrough = data['passthrough'];
-    const contentType = data['contentType'];
-    if (passthrough === true && typeof contentType === 'string' && isPdfExtension(outputPath) && !isPdfContentType(contentType)) {
-      return err({ type: 'passthrough_extension_mismatch', contentType, requestedExtension: '.pdf' });
-    }
-    const written = await fs.writeBytes(outputPath, base64ToBytes(base64));
-    if (!written.ok) return err({ type: 'write_failed', message: written.error.type === 'io_failed' ? written.error.message : written.error.type });
-    // Audit 2026-06 §P1: get-mail-attachment surfaces Graph's raw `contentBytes`
-    // AND a `base64` mirror of it. Stripping only `base64` left the multi-MB
-    // `contentBytes` in stdout (13 MB observed for two PDFs already on disk).
-    // Drop both raw-byte fields once the bytes are landed — `contentBytes` is
-    // always a base64 mirror in these envelopes, so removing it is safe.
-    return ok({ ...withoutKeys(data, ['base64', 'contentBytes']), savedTo: outputPath });
-  }
-
+  if (typeof base64 === 'string') return saveBytes(fs, outputPath, data, base64);
   const text = data['text'];
-  if (typeof text === 'string') {
-    const extension = extensionOf(outputPath);
-    if (opts.sourceText !== true && BINARY_SAVE_EXTENSIONS.has(extension)) {
-      const contentType = typeof data['contentType'] === 'string' ? data['contentType'] : 'text/plain';
-      return err({ type: 'text_under_binary_extension', contentType, requestedExtension: `.${extension}` });
-    }
-    const written = await fs.writeText(outputPath, text);
-    if (!written.ok) return err({ type: 'write_failed', message: written.error.type === 'io_failed' ? written.error.message : written.error.type });
-    return ok({ ...withoutKey(data, 'text'), savedTo: outputPath });
-  }
-
+  if (typeof text === 'string') return saveText(fs, outputPath, data, text, opts.sourceText);
   return err({ type: 'no_inlined_bytes' });
 };
 
