@@ -37,32 +37,26 @@ const extensionOf = (name: string): string => {
   return name.slice(dot + 1).toLowerCase();
 };
 
-const convertFileAttachment = async (graph: WriteGraph, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
-  const name = attachment.name ?? 'unnamed';
-  const contentBytes = attachment.contentBytes ?? '';
-  const bytes = base64ToBytes(contentBytes);
+// Plain-text source OR pdf source: skip the upload-convert dance, return raw
+// bytes. PDF is not in Graph's `format=pdf` input list (CDN responds 406
+// InputFormatNotSupported on pdf → pdf), and the user already has what they
+// want — the raw PDF bytes.
+const rawSourceResult = (name: string, contentBytes: string, size: number): Result<unknown, GraphError> => {
+  const pdf = isPdfSource(name);
+  return ok({
+    contentType: pdf ? 'application/pdf' : 'text/plain',
+    size,
+    base64: contentBytes,
+    // A non-pdf body is a passthrough (raw source bytes, not a real PDF conversion),
+    // so output-path's guard blocks writing e.g. a .txt body into a `.pdf`.
+    // Mirrors tagPdfPassthrough on the reference path, which also only tags non-pdf.
+    ...(pdf ? {} : { passthrough: true }),
+    note: `pre-checked source (${name}); raw bytes returned without Graph conversion`,
+  });
+};
 
-  // Plain-text source OR pdf source: skip the upload-convert dance,
-  // return raw bytes. PDF is not in Graph's `format=pdf` input list
-  // (CDN responds 406 InputFormatNotSupported on pdf → pdf), and the
-  // user already has what they want — the raw PDF bytes.
-  if (isPlainTextFilename(name) || isPdfSource(name)) {
-    const pdf = isPdfSource(name);
-    return ok({
-      contentType: pdf ? 'application/pdf' : 'text/plain',
-      size: bytes.byteLength,
-      base64: contentBytes,
-      // A non-pdf body is a passthrough (raw source bytes, not a real PDF conversion),
-      // so output-path's guard blocks writing e.g. a .txt body into a `.pdf`.
-      // Mirrors tagPdfPassthrough on the reference path, which also only tags non-pdf.
-      ...(pdf ? {} : { passthrough: true }),
-      note: `pre-checked source (${name}); raw bytes returned without Graph conversion`,
-    });
-  }
-
-  const lowerExt = extensionOf(name);
-  if (IMAGE_EXTENSIONS.has(lowerExt)) return err({ type: 'api_error', status: 415, message: imageHint(lowerExt) });
-
+// Uploads the bytes to a temp OneDrive file, converts it there, and removes it.
+const uploadAndConvert = async (graph: WriteGraph, name: string, bytes: Uint8Array): Promise<Result<unknown, GraphError>> => {
   // Hardening #2: UUID-only temp file name; never the attacker filename.
   const ext = safeExtension(name);
   const tempName = `${crypto.randomUUID()}.${ext}`;
@@ -103,6 +97,17 @@ const convertFileAttachment = async (graph: WriteGraph, attachment: { name?: str
   return converted;
 };
 
+const convertFileAttachment = async (graph: WriteGraph, attachment: { name?: string; contentBytes?: string }): Promise<Result<unknown, GraphError>> => {
+  const name = attachment.name ?? 'unnamed';
+  const contentBytes = attachment.contentBytes ?? '';
+  const bytes = base64ToBytes(contentBytes);
+  if (isPlainTextFilename(name) || isPdfSource(name)) return rawSourceResult(name, contentBytes, bytes.byteLength);
+
+  const lowerExt = extensionOf(name);
+  if (IMAGE_EXTENSIONS.has(lowerExt)) return err({ type: 'api_error', status: 415, message: imageHint(lowerExt) });
+  return uploadAndConvert(graph, name, bytes);
+};
+
 const cleanupTempFolderIfEmpty = async (graph: WriteGraph): Promise<void> => {
   // pre-rename versions used an un-dotted `ask-marcel-temp` folder and
   // never removed it — QA run-1 found one orphaned (empty) at a real tenant's
@@ -116,6 +121,24 @@ const cleanupTempFolderIfEmpty = async (graph: WriteGraph): Promise<void> => {
   }
 };
 
+// The drive item a reference attachment's share link points at.
+const resolveSharedItem = async (graph: WriteGraph, sourceUrl: string): Promise<Result<{ driveId: string; itemId: string; name: string }, GraphError>> => {
+  const resolved = await graph.get(`/shares/${buildShareToken(sourceUrl)}/driveItem`);
+  if (!resolved.ok) return resolved;
+  const item = resolved.value as { id?: string; name?: string; parentReference?: { driveId?: string } };
+  const driveId = item.parentReference?.driveId;
+  const itemId = item.id;
+  if (typeof driveId !== 'string' || typeof itemId !== 'string') {
+    return err({
+      type: 'api_error',
+      status: 500,
+      message:
+        'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.',
+    });
+  }
+  return ok({ driveId, itemId, name: item.name ?? '' });
+};
+
 const convertReferenceAttachment = async (graph: WriteGraph, attachment: { sourceUrl?: string }): Promise<Result<unknown, GraphError>> => {
   const sourceUrl = attachment.sourceUrl;
   if (typeof sourceUrl !== 'string' || sourceUrl === '') {
@@ -126,20 +149,9 @@ const convertReferenceAttachment = async (graph: WriteGraph, attachment: { sourc
         'referenceAttachment missing sourceUrl — Graph returned incomplete link metadata (the linked file may have been deleted or the share revoked). Inspect the raw attachment with `get-mail-attachment --select id,name,contentType`, or open the message in Outlook.',
     });
   }
-  const resolved = await graph.get(`/shares/${buildShareToken(sourceUrl)}/driveItem`);
+  const resolved = await resolveSharedItem(graph, sourceUrl);
   if (!resolved.ok) return resolved;
-  const item = resolved.value as { id?: string; name?: string; parentReference?: { driveId?: string } };
-  const driveId = item.parentReference?.driveId;
-  const itemId = item.id;
-  const name = item.name ?? '';
-  if (typeof driveId !== 'string' || typeof itemId !== 'string') {
-    return err({
-      type: 'api_error',
-      status: 500,
-      message:
-        'resolved driveItem missing id or driveId — the share link target may live in an external tenant this account cannot address through Graph. Open the attachment in Outlook / the browser instead.',
-    });
-  }
+  const { driveId, itemId, name } = resolved.value;
   if (isPlainTextFilename(name) || isPdfSource(name)) {
     // tagPdfPassthrough marks a non-pdf body as passthrough so output-path's guard
     // blocks writing it into a `.pdf` — same protection as the fileAttachment path.
