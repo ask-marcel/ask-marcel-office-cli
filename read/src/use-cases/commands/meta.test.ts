@@ -336,9 +336,9 @@ describe('command meta — invariants on every registered command', () => {
     ]);
     for (const [name] of populated) valid.add(name);
     const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
-    const phantom: string[] = [];
-    for (const [name, cmd] of populated) {
-      const prose = [cmd.meta.summary, cmd.meta.example, cmd.meta.responseShape ?? '', cmd.meta.bodyTemplate ?? '', ...cmd.meta.options.map((o) => o.description)].join('\n');
+    // The phantom references in one command's prose.
+    const phantomsIn = (name: string, prose: string): string[] => {
+      const phantom: string[] = [];
       // (a) explicit `{<package>-bin} <name>` invocations — unambiguous. The
       // directory must place <name> in that package; `{bin}` (the bin of the
       // package rendering the text) is only for what every package has.
@@ -351,7 +351,11 @@ describe('command meta — invariants on every registered command', () => {
         const tok = m[1] ?? '';
         if (verbKebab.test(tok) && !valid.has(tok)) phantom.push(`${name}: \`${tok}\``);
       }
-    }
+      return phantom;
+    };
+    const phantom = populated.flatMap(([name, cmd]) =>
+      phantomsIn(name, [cmd.meta.summary, cmd.meta.example, cmd.meta.responseShape ?? '', cmd.meta.bodyTemplate ?? '', ...cmd.meta.options.map((o) => o.description)].join('\n'))
+    );
     expect(phantom).toEqual([]);
   });
 });

@@ -209,15 +209,19 @@ describe('search-all-accessible-sites', () => {
     expect(v.archivedExcluded).toBeUndefined();
   });
 
+  type SearchRequest = { entityTypes?: ReadonlyArray<string>; from?: number; query?: { queryString?: string } };
+  // The file count the index answers: 321 for a query scoped to site A, 0 for any other.
+  const fileCountOfSiteA = (req: SearchRequest): Result<unknown, GraphError> => {
+    const qs = req.query?.queryString ?? '';
+    return ok({ value: [{ hitsContainers: [{ total: qs.includes('path:"https://x/sites/A"') ? 321 : 0 }] }] });
+  };
+
   it('adds estimatedFileCount to each kept site when --count-files true (one path-scoped search each)', async () => {
     const graph: GraphClient = {
       ...graphWith(() => page([], false, 0)),
       post: async (_p, body) => {
-        const req = (body as { requests: ReadonlyArray<{ entityTypes?: ReadonlyArray<string>; from?: number; query?: { queryString?: string } }> }).requests[0];
-        if (req?.entityTypes?.[0] === 'driveItem') {
-          const qs = req?.query?.queryString ?? '';
-          return ok({ value: [{ hitsContainers: [{ total: qs.includes('path:"https://x/sites/A"') ? 321 : 0 }] }] });
-        }
+        const req = (body as { requests: ReadonlyArray<SearchRequest> }).requests[0];
+        if (req?.entityTypes?.[0] === 'driveItem') return fileCountOfSiteA(req);
         const from = req?.from ?? 0;
         return from === 0 ? page([{ id: 's1', webUrl: 'https://x/sites/A' }], false, 1) : page([], false, 1);
       },
