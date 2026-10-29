@@ -22,34 +22,50 @@ const DEFAULT_MAX_CELLS = 50_000;
 // embedded newline (Excel Alt+Enter) stays one cell instead of splitting the row.
 // Fast path when there are no quotes at all: no field can contain a separator, so
 // a plain comma/line split is exact AND allocation-light for the huge-sheet case.
+type CsvState = { readonly records: string[][]; row: string[]; cell: string; inQuotes: boolean };
+
+// One character inside a quoted cell: a doubled quote is a literal quote, a
+// single one closes the cell. Returns how many characters it consumed.
+const readQuoted = (csv: string, i: number, state: CsvState): number => {
+  const ch = csv[i];
+  if (ch === '"' && csv[i + 1] === '"') {
+    state.cell += '"';
+    return 2;
+  }
+  if (ch === '"') state.inQuotes = false;
+  else state.cell += ch;
+  return 1;
+};
+
+// One character outside quotes: a quote opens a cell, a comma ends one, a newline ends the row.
+const readPlain = (ch: string | undefined, state: CsvState): void => {
+  if (ch === '"') state.inQuotes = true;
+  else if (ch === ',') {
+    state.row.push(state.cell);
+    state.cell = '';
+  } else if (ch === '\n') {
+    state.row.push(state.cell);
+    state.records.push(state.row);
+    state.row = [];
+    state.cell = '';
+  } else if (ch !== '\r') state.cell += ch;
+};
+
 const parseCsvRecords = (csv: string): string[][] => {
   if (!csv.includes('"')) return csv.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line).split(','));
-  const records: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let inQuotes = false;
-  for (let i = 0; i < csv.length; i += 1) {
-    const ch = csv[i];
-    if (inQuotes) {
-      if (ch === '"' && csv[i + 1] === '"') {
-        cell += '"';
-        i += 1;
-      } else if (ch === '"') inQuotes = false;
-      else cell += ch;
-    } else if (ch === '"') inQuotes = true;
-    else if (ch === ',') {
-      row.push(cell);
-      cell = '';
-    } else if (ch === '\n') {
-      row.push(cell);
-      records.push(row);
-      row = [];
-      cell = '';
-    } else if (ch !== '\r') cell += ch;
+  const state: CsvState = { records: [], row: [], cell: '', inQuotes: false };
+  let i = 0;
+  while (i < csv.length) {
+    if (state.inQuotes) {
+      i += readQuoted(csv, i, state);
+    } else {
+      readPlain(csv[i], state);
+      i += 1;
+    }
   }
-  row.push(cell);
-  records.push(row);
-  return records;
+  state.row.push(state.cell);
+  state.records.push(state.row);
+  return state.records;
 };
 
 // Drop blank records (a lone empty cell from a blank line / trailing newline).

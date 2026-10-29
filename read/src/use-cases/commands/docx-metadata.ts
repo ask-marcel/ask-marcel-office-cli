@@ -250,7 +250,8 @@ const halvesOf = (from: MoveHalf | undefined, to: MoveHalf | undefined): Move['h
   return from === undefined ? 'to-only' : 'from-only';
 };
 
-const extractMoves = (documentXml: string | undefined): ReadonlyArray<Move> => {
+// Each move half, keyed by the range name that opens around it.
+const collectMoveHalves = (documentXml: string | undefined): { readonly froms: ReadonlyMap<string, MoveHalf>; readonly tos: ReadonlyMap<string, MoveHalf> } => {
   const froms = new Map<string, MoveHalf>();
   const tos = new Map<string, MoveHalf>();
   let openFrom: string | undefined;
@@ -263,6 +264,11 @@ const extractMoves = (documentXml: string | undefined): ReadonlyArray<Move> => {
     else if (element.tag === 'w:moveFrom' && openFrom !== undefined) froms.set(openFrom, moveHalfOf(element.node, 'w:delText'));
     else if (element.tag === 'w:moveTo' && openTo !== undefined) tos.set(openTo, moveHalfOf(element.node, 'w:t'));
   }
+  return { froms, tos };
+};
+
+const extractMoves = (documentXml: string | undefined): ReadonlyArray<Move> => {
+  const { froms, tos } = collectMoveHalves(documentXml);
   const names = [...new Set([...froms.keys(), ...tos.keys()])];
   const moves: Array<Move> = [];
   for (const name of names) {

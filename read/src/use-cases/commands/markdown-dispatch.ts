@@ -99,9 +99,8 @@ const htmlEnvelope = (bytes: Uint8Array, inlineImages: boolean | undefined): Res
  * `hints` carry the caller-specific messages; a non-text result is an `err` the caller
  * surfaces (a 415, or a zip note).
  */
-const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
-  const ext = extensionOf(filename);
-  if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
+// The current document formats and PDF. Undefined for any other extension.
+const documentToMarkdown = async (ext: string, bytes: Uint8Array, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError> | undefined> => {
   if (ext === 'csv') return csvEnvelope(bytes, opts.maxCells);
   if (HTML_EXTENSIONS.has(ext)) return htmlEnvelope(bytes, opts.inlineImages);
   if (DOCX_FAMILY.has(ext)) return docxToMarkdown(bytes, { includeMetadata: opts.includeMetadata, inlineImages: opts.inlineImages });
@@ -109,19 +108,39 @@ const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesT
   if (PPTX_FAMILY.has(ext)) return pptxToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
   if (ODF_FAMILY.has(ext)) return odfToMarkdown(bytes, { includeMetadata: opts.includeMetadata });
   if (ext === 'pdf') return pdfToMarkdown(bytes, hints.pdfNoText);
+  return undefined;
+};
+
+// The Office 97-2003 formats. Undefined for any other extension.
+const legacyToMarkdown = async (ext: string, bytes: Uint8Array, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError> | undefined> => {
   if (ext === 'xls') return xlsxToMarkdown(bytes, { maxCells: opts.maxCells, sheet: opts.sheet }); // legacy Excel — no OOXML side-channel
   if (ext === 'doc') return docToMarkdown(bytes); // legacy Word — text only
   if (ext === 'ppt') return err({ type: 'api_error', status: 415, code: 'unsupported_legacy_office', message: hints.legacyPpt });
-  if (ext === 'msg' || ext === 'eml') {
-    // An Outlook .msg or a raw RFC 822 .eml: render headers + body and recurse each
-    // attachment through this same dispatch (the zip pattern), incrementing depth
-    // so a message inside a message can't loop. Attachments are NESTED files —
-    // container-neutral hints, not the caller's (a png inside a .msg must not
-    // point at drive-item commands).
-    const depth = opts.depth ?? 0;
-    const render = ext === 'msg' ? msgToMarkdown : emlToMarkdown;
-    return render(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
-  }
+  return undefined;
+};
+
+const bytesToMarkdown = async (bytes: Uint8Array, filename: string, opts: BytesToMarkdownOptions, hints: ConversionHints): Promise<Result<unknown, GraphError>> => {
+  const ext = extensionOf(filename);
+  if (opts.sheet !== undefined && !XLSX_FAMILY.has(ext) && ext !== 'xls') return refuseSheet(`this file is a .${ext}`);
+  const document = (await documentToMarkdown(ext, bytes, opts, hints)) ?? (await legacyToMarkdown(ext, bytes, opts, hints));
+  if (document !== undefined) return document;
+  if (ext === 'msg' || ext === 'eml') return messageToMarkdown(ext, bytes, opts);
+  return otherToMarkdown(ext, bytes, hints);
+};
+
+// An Outlook .msg or a raw RFC 822 .eml: render headers + body and recurse each
+// attachment through this same dispatch (the zip pattern), incrementing depth
+// so a message inside a message can't loop. Attachments are NESTED files —
+// container-neutral hints, not the caller's (a png inside a .msg must not
+// point at drive-item commands).
+const messageToMarkdown = async (ext: 'msg' | 'eml', bytes: Uint8Array, opts: BytesToMarkdownOptions): Promise<Result<unknown, GraphError>> => {
+  const depth = opts.depth ?? 0;
+  const render = ext === 'msg' ? msgToMarkdown : emlToMarkdown;
+  return render(bytes, { depth, keepQuoted: opts.keepQuoted }, (childBytes, childName) => bytesToMarkdown(childBytes, childName, { ...opts, depth: depth + 1 }, NESTED_HINTS));
+};
+
+// An image is refused, text of any extension passes through, anything else is unsupported.
+const otherToMarkdown = (ext: string, bytes: Uint8Array, hints: ConversionHints): Result<unknown, GraphError> => {
   if (IMAGE_EXTENSIONS.has(ext)) return err({ type: 'api_error', status: 415, code: 'unsupported_image', message: hints.image(ext) });
   const text = decodeUtf8Text(bytes);
   if (text !== undefined) return ok({ contentType: 'text/plain', size: bytes.byteLength, text });

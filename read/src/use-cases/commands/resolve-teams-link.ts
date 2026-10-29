@@ -29,6 +29,20 @@ type Resolved = {
   readonly context?: string;
 };
 
+// The query parameters the link may carry, each present only when it does.
+const optionalFields = (query: URLSearchParams): { tenantId?: string; groupId?: string; parentMessageId?: string; context?: string } => {
+  const optional: { tenantId?: string; groupId?: string; parentMessageId?: string; context?: string } = {};
+  const tenantId = query.get('tenantId');
+  if (tenantId !== null) optional.tenantId = tenantId;
+  const groupId = query.get('groupId');
+  if (groupId !== null) optional.groupId = groupId;
+  const parentMessageId = query.get('parentMessageId');
+  if (parentMessageId !== null) optional.parentMessageId = parentMessageId;
+  const context = query.get('ctx');
+  if (context !== null) optional.context = context;
+  return optional;
+};
+
 const parse = (raw: string): Resolved | null => {
   if (!raw.startsWith(PREFIX)) return null;
   const remainder = raw.slice(PREFIX.length);
@@ -39,20 +53,10 @@ const parse = (raw: string): Resolved | null => {
   const chatIdRaw = segments[0];
   const messageIdRaw = segments[1];
   if (chatIdRaw === undefined || messageIdRaw === undefined || chatIdRaw === '' || messageIdRaw === '') return null;
-  const query = new URLSearchParams(queryPart);
-  const optional: { tenantId?: string; groupId?: string; parentMessageId?: string; context?: string } = {};
-  const tenantId = query.get('tenantId');
-  if (tenantId !== null) optional.tenantId = tenantId;
-  const groupId = query.get('groupId');
-  if (groupId !== null) optional.groupId = groupId;
-  const parentMessageId = query.get('parentMessageId');
-  if (parentMessageId !== null) optional.parentMessageId = parentMessageId;
-  const context = query.get('ctx');
-  if (context !== null) optional.context = context;
   return {
     chatId: decodeURIComponent(chatIdRaw),
     messageId: decodeURIComponent(messageIdRaw),
-    ...optional,
+    ...optionalFields(new URLSearchParams(queryPart)),
   };
 };
 

@@ -15,18 +15,18 @@ const IMG_TAG = /<img\b([^>]*)>/gi;
 const SRC_ATTR = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 
 /** Every distinct hosted-image URL across the posts and their inlined replies, in order of appearance. */
+// The `src` of each `<img>` tag of one body, in order.
+const imageSources = (html: string): ReadonlyArray<string> =>
+  Array.from(html.matchAll(IMG_TAG), (tag) => {
+    const match = tag[1] === undefined ? null : SRC_ATTR.exec(tag[1]);
+    return match === null ? undefined : (match[1] ?? match[2]);
+  }).filter((src): src is string => src !== undefined);
+
 const hostedImageSources = (messages: ReadonlyArray<ChannelMessage>): ReadonlyArray<string> => {
   const found: string[] = [];
   const visit = (m: ChannelMessage): void => {
-    const html = m.body?.content;
-    if (html !== undefined) {
-      for (const tag of html.matchAll(IMG_TAG)) {
-        const attrs = tag[1];
-        if (attrs === undefined) continue;
-        const match = SRC_ATTR.exec(attrs);
-        const src = match === null ? undefined : (match[1] ?? match[2]);
-        if (src !== undefined && src.includes('/hostedContents/') && !found.includes(src)) found.push(src);
-      }
+    for (const src of imageSources(m.body?.content ?? '')) {
+      if (src.includes('/hostedContents/') && !found.includes(src)) found.push(src);
     }
     if (m.replies !== undefined) for (const r of m.replies) visit(r);
   };

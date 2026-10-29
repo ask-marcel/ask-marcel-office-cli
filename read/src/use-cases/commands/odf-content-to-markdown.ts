@@ -188,12 +188,7 @@ const renderBlock = (node: Node, tag: string): ReadonlyArray<string> => {
   if (tag === 'text:tracked-changes') return [];
   const kids = kidsOf(node, tag);
   if (tag === 'text:h') return [renderHeading(node, kids)];
-  if (tag === 'text:p') {
-    const text = inlineText(kids).trim();
-    const notes = collectAnnotations(kids).map(renderAnnotation);
-    // text === '' && notes empty → returns notes (= []), so no separate guard needed.
-    return text === '' ? notes : [text, ...notes];
-  }
+  if (tag === 'text:p') return renderParagraph(kids);
   if (tag === 'text:list') {
     const lines = renderListLines(kids, 0);
     return lines.length === 0 ? [] : [lines.join('\n')];
@@ -202,12 +197,21 @@ const renderBlock = (node: Node, tag: string): ReadonlyArray<string> => {
     const table = renderTable(kids);
     return table === '' ? [] : [table];
   }
-  if (tag === 'text:section') {
-    const blocks = renderBlocks(kids);
-    if (blocks.length === 0) return [];
-    return attr(node, 'text:display') === 'none' ? ['> _(hidden section — not shown in the rendered document)_', ...blocks] : blocks;
-  }
+  if (tag === 'text:section') return renderSection(node, kids);
   return renderBlocks(kids);
+};
+
+const renderParagraph = (kids: ReadonlyArray<Node>): ReadonlyArray<string> => {
+  const text = inlineText(kids).trim();
+  const notes = collectAnnotations(kids).map(renderAnnotation);
+  // text === '' && notes empty → returns notes (= []), so no separate guard needed.
+  return text === '' ? notes : [text, ...notes];
+};
+
+const renderSection = (node: Node, kids: ReadonlyArray<Node>): ReadonlyArray<string> => {
+  const blocks = renderBlocks(kids);
+  if (blocks.length === 0) return [];
+  return attr(node, 'text:display') === 'none' ? ['> _(hidden section — not shown in the rendered document)_', ...blocks] : blocks;
 };
 
 const renderBlocks = (children: ReadonlyArray<Node>): ReadonlyArray<string> => {

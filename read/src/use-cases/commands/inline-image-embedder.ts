@@ -35,6 +35,14 @@ const IMG_TAG = /<img\b[^>]*>/gi;
 const SRC_ATTR = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 const ALT_ATTR = /\balt\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 
+// The value of one attribute of a tag, double- or single-quoted.
+const attrValue = (attr: RegExp, tag: string): string | undefined => {
+  const match = attr.exec(tag);
+  return match?.[1] ?? match?.[2];
+};
+
+const nonEmptyOr = <T>(value: string | undefined, fallback: T): string | T => (value !== undefined && value !== '' ? value : fallback);
+
 // A `cid:` ref that survives the embed pass (embedding disabled, an
 // individual fetch failed, a non-image inline attachment, or a cid with no
 // matching attachment) would render as a broken `![…](cid:…)` markdown link.
@@ -43,15 +51,10 @@ const ALT_ATTR = /\balt\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 // filename-ish prefix before the `@`.
 const replaceUnresolvedCidImages = (html: string, labelByContentId: ReadonlyMap<string, string>): string =>
   html.replace(IMG_TAG, (tag) => {
-    const src = SRC_ATTR.exec(tag);
-    const srcValue = src?.[1] ?? src?.[2];
+    const srcValue = attrValue(SRC_ATTR, tag);
     if (srcValue === undefined || !srcValue.startsWith('cid:')) return tag;
     const cid = srcValue.slice('cid:'.length);
-    const alt = ALT_ATTR.exec(tag);
-    const altText = alt?.[1] ?? alt?.[2];
-    const cidPrefix = cid.split('@')[0];
-    const label = labelByContentId.get(cid) ?? (altText !== undefined && altText !== '' ? altText : undefined) ?? (cidPrefix !== undefined && cidPrefix !== '' ? cidPrefix : cid);
-    return `[inline image: ${label}]`;
+    return `[inline image: ${labelByContentId.get(cid) ?? nonEmptyOr(attrValue(ALT_ATTR, tag), undefined) ?? nonEmptyOr(cid.split('@')[0], cid)}]`;
   });
 
 export { embedInlineImages, replaceUnresolvedCidImages };
