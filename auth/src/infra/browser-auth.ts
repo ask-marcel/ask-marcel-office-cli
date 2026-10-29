@@ -822,24 +822,6 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
    * prompt. With this method, the elevated step runs on the same
    * already-authenticated page.
    */
-  /**
-   * single-session capture of BOTH tokens.
-   *
-   * Opens ONE browser context, attaches both response (Teams token) and
-   * request (elevated token) listeners up front, navigates the page
-   * through the Teams sign-in, then — without closing — navigates the
-   * same page to the elevated URL so the cookie chain that the user
-   * just authenticated against is still live in memory. Closes the
-   * browser exactly once at the end.
-   *
-   * Fixes the user-visible "loop of browser open/close" symptom on
-   * federated tenants (ExampleCorp / a third-party IdP): the old two-session flow opened a
-   * separate browser for the elevated step and silent SSO couldn't
-   * re-establish the federated cookie chain quickly enough — the
-   * second browser would flash through what looked like a fresh login
-   * prompt. With this method, the elevated step runs on the same
-   * already-authenticated page.
-   */
   const acquireBothTokens = async (teamsUrl: string, options?: { skipCacheProbe?: boolean }): Promise<BothTokensResult> => {
     const elevatedUrl = M365_CLOUD_URL;
     trace('[DEBUG] acquireBothTokens: ENTER\n');
@@ -852,34 +834,14 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     let capturedChatsvcaggRegion: string | null = null;
     let capturedIc3: AccessToken | null = null;
 
-    let elevatedCtx: ContextLike;
-    let elevatedPage: PageLike;
-    try {
-      elevatedCtx = await withLaunchTimeout(launchContext(false), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] acquireBothTokens: launch timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return launchTimedOut();
-      }
-      throw e;
-    }
-    try {
-      elevatedPage = await withLaunchTimeout(elevatedCtx.newPage(), elevatedLaunchTimeoutMs);
-    } catch (e) {
-      try {
-        await elevatedCtx.close();
-      } catch {
-        // ignore
-      }
-      if (isLaunchTimeout(e)) {
-        trace(`[DEBUG] acquireBothTokens: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return launchTimedOut();
-      }
-      throw e;
-    }
-    context = elevatedCtx;
-    page = elevatedPage;
-    const activePage = elevatedPage;
+    const session = await openSession(false, (phase) => {
+      trace(`[DEBUG] acquireBothTokens: ${phase === 'launch' ? 'launch' : 'newPage'} timed out after ${elevatedLaunchTimeoutMs}ms\n`);
+    });
+    if (!session) return launchTimedOut();
+    context = session.ctx;
+    page = session.page;
+    const activeCtx = session.ctx;
+    const activePage = session.page;
 
     // Teams response listener — captures the Graph token grant response.
     const handleTeamsResponse = async (r: ResponseLike): Promise<void> => {
@@ -923,81 +885,68 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // Also emits a `chatsvcagg_request` trace per unique URL the bearer
     // rides on so the next substrate migration is self-diagnosable.
     const seenChatsvcaggRoutes = new Set<string>();
+    const takeRegion = (url: string, traceLabel: string): void => {
+      const region = capturedChatsvcaggRegion ? null : parseChatsvcaggRegion(url);
+      if (region === null) return;
+      capturedChatsvcaggRegion = region;
+      logger.info('chatsvcagg_region_captured', { region });
+      trace(`[DEBUG] ${traceLabel}: ${region}\n`);
+    };
+    const offerElevated = ({ raw, appid, aud }: Bearer): void => {
+      if (!ELEVATED_APP_IDS.includes(appid) || aud !== 'https://graph.microsoft.com') return;
+      const validated = accessToken(raw);
+      if (!validated.ok) return;
+      elevatedPicker.offer(appid, validated.value);
+      logger.info('elevated_token_captured', { appid, len: validated.value.length });
+      trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
+    };
+    const takeChatsvcagg = (req: RequestLike, raw: string): void => {
+      // chatsvcagg tokens have aud=chatsvcagg, not Graph — can't go
+      // through `accessToken()`'s Graph-audience validator. Validate
+      // freshness directly and skip malformed payloads.
+      if (!capturedChatsvcagg && raw.startsWith('eyJ') && isTokenFresh(raw)) {
+        capturedChatsvcagg = accessTokenUnsafe(raw);
+        logger.info('chatsvcagg_token_captured', { len: raw.length });
+        trace(`[DEBUG] acquireBothTokens: chatsvcagg token captured len=${raw.length}\n`);
+      }
+      const url = req.url();
+      if (!seenChatsvcaggRoutes.has(url)) {
+        seenChatsvcaggRoutes.add(url);
+        logger.info('chatsvcagg_request', { url });
+        trace(`[DEBUG] chatsvcagg_request: ${url}\n`);
+      }
+      takeRegion(url, 'chatsvcagg region captured');
+    };
+    const takeIc3 = (req: RequestLike, raw: string): void => {
+      // IC3 bearer — same identity as chatsvcagg, different audience.
+      // Used by Teams web for `/api/chatsvc/<region>/v1/...` calls which
+      // include the paginated chat-history endpoint. Same JWT-validator
+      // skip rationale as chatsvcagg (aud is not Graph).
+      if (raw.startsWith('eyJ') && isTokenFresh(raw)) {
+        capturedIc3 = accessTokenUnsafe(raw);
+        logger.info('ic3_token_captured', { len: raw.length });
+        trace(`[DEBUG] acquireBothTokens: ic3 token captured len=${raw.length}\n`);
+      }
+      // Region also resolvable from `/api/chatsvc/<region>/` URLs the IC3
+      // bearer rides on — feeds the same `capturedChatsvcaggRegion` slot
+      // (regions match per tenant; the parser handles both prefixes).
+      takeRegion(req.url(), 'region captured via ic3 url');
+    };
+    const companionsCaptured = (): boolean => Boolean(capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3);
     activePage.on('request', (req) => {
-      if (elevatedPicker.settled() && capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3) return;
-      const auth = req.headers()['authorization'];
-      if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return;
-      const raw = auth.slice('Bearer '.length);
-      const claims = decodeJwtPayload(raw);
-      const appid = typeof claims['appid'] === 'string' ? claims['appid'] : undefined;
-      const aud = typeof claims['aud'] === 'string' ? claims['aud'] : undefined;
-      if (!appid || !aud) return;
-      if (ELEVATED_APP_IDS.includes(appid) && aud === 'https://graph.microsoft.com') {
-        const validated = accessToken(raw);
-        if (validated.ok) {
-          elevatedPicker.offer(appid, validated.value);
-          logger.info('elevated_token_captured', { appid, len: validated.value.length });
-          trace(`[DEBUG] acquireBothTokens: elevated token captured appid=${appid}\n`);
-        }
-      }
-      if (appid === BASIC_TEAMS_APP_ID && aud === CHATSVCAGG_AUD) {
-        // chatsvcagg tokens have aud=chatsvcagg, not Graph — can't go
-        // through `accessToken()`'s Graph-audience validator. Validate
-        // freshness directly and skip malformed payloads.
-        if (!capturedChatsvcagg && raw.startsWith('eyJ') && isTokenFresh(raw)) {
-          capturedChatsvcagg = accessTokenUnsafe(raw);
-          logger.info('chatsvcagg_token_captured', { len: raw.length });
-          trace(`[DEBUG] acquireBothTokens: chatsvcagg token captured len=${raw.length}\n`);
-        }
-        const url = req.url();
-        if (!seenChatsvcaggRoutes.has(url)) {
-          seenChatsvcaggRoutes.add(url);
-          logger.info('chatsvcagg_request', { url });
-          trace(`[DEBUG] chatsvcagg_request: ${url}\n`);
-        }
-        if (!capturedChatsvcaggRegion) {
-          const region = parseChatsvcaggRegion(url);
-          if (region !== null) {
-            capturedChatsvcaggRegion = region;
-            logger.info('chatsvcagg_region_captured', { region });
-            trace(`[DEBUG] chatsvcagg region captured: ${region}\n`);
-          }
-        }
-      }
-      if (appid === BASIC_TEAMS_APP_ID && aud === IC3_AUD && !capturedIc3) {
-        // IC3 bearer — same identity as chatsvcagg, different audience.
-        // Used by Teams web for `/api/chatsvc/<region>/v1/...` calls which
-        // include the paginated chat-history endpoint. Same JWT-validator
-        // skip rationale as chatsvcagg (aud is not Graph).
-        if (raw.startsWith('eyJ') && isTokenFresh(raw)) {
-          capturedIc3 = accessTokenUnsafe(raw);
-          logger.info('ic3_token_captured', { len: raw.length });
-          trace(`[DEBUG] acquireBothTokens: ic3 token captured len=${raw.length}\n`);
-        }
-        // Region also resolvable from `/api/chatsvc/<region>/` URLs the IC3
-        // bearer rides on — feeds the same `capturedChatsvcaggRegion` slot
-        // (regions match per tenant; the parser handles both prefixes).
-        if (!capturedChatsvcaggRegion) {
-          const region = parseChatsvcaggRegion(req.url());
-          if (region !== null) {
-            capturedChatsvcaggRegion = region;
-            logger.info('chatsvcagg_region_captured', { region });
-            trace(`[DEBUG] region captured via ic3 url: ${region}\n`);
-          }
-        }
-      }
+      if (elevatedPicker.settled() && companionsCaptured()) return;
+      const bearer = bearerOf(req);
+      if (!bearer) return;
+      offerElevated(bearer);
+      if (bearer.appid !== BASIC_TEAMS_APP_ID) return;
+      if (bearer.aud === CHATSVCAGG_AUD) takeChatsvcagg(req, bearer.raw);
+      if (bearer.aud === IC3_AUD && !capturedIc3) takeIc3(req, bearer.raw);
     });
 
     // Navigate to teamsUrl and wait for sign-in to complete.
     trace(`[DEBUG] acquireBothTokens: navigating to ${teamsUrl}\n`);
     logger.info('browser_navigating', { url: teamsUrl });
-    try {
-      await activePage.goto(teamsUrl, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-      logger.info('browser_navigated', { url: teamsUrl });
-    } catch (navError) {
-      const navMsg = navError instanceof Error ? navError.message : String(navError);
-      trace(`[DEBUG] acquireBothTokens: navigation error (non-fatal): ${navMsg}\n`);
-    }
+    if (await navigateTo(activePage, teamsUrl, 'acquireBothTokens: navigation error (non-fatal)')) logger.info('browser_navigated', { url: teamsUrl });
 
     trace(`[DEBUG] acquireBothTokens: initial settle for ${initialSettleMs}ms\n`);
     await sleep(initialSettleMs);
@@ -1005,9 +954,10 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // Force re-login if the persistent profile dropped us into an
     // already-signed-in session — the old token grant happened before
     // our listener was attached, so we need to redo the OAuth dance.
-    const currentUrl = activePage.url();
-    trace(`[DEBUG] acquireBothTokens: after settle, currentUrl = ${currentUrl}\n`);
-    if (!capturedAccess && !currentUrl.includes('login.microsoftonline.com') && !currentUrl.includes('login.live.com')) {
+    const forceFreshLoginIfSignedIn = async (): Promise<void> => {
+      const currentUrl = activePage.url();
+      trace(`[DEBUG] acquireBothTokens: after settle, currentUrl = ${currentUrl}\n`);
+      if (capturedAccess || currentUrl.includes('login.microsoftonline.com') || currentUrl.includes('login.live.com')) return;
       trace('[DEBUG] acquireBothTokens: already signed in — clearing session to force fresh login\n');
       logger.info('browser_force_relogin', { url: currentUrl });
       // Said out loud because it is expensive and invisible. The wipe is needed
@@ -1022,7 +972,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       onProgress(
         'Clearing the browser session so the sign-in can be re-captured — this deletes the 90-day "Stay signed in" cookie, so you may be asked for your password. A plain `ask-marcel-office-auth login` refreshes the elevated token without clearing it.'
       );
-      await context.clearCookies();
+      await activeCtx.clearCookies();
       try {
         await activePage.evaluate(() => {
           localStorage.clear();
@@ -1037,40 +987,44 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
         // non-fatal
       }
       await sleep(postReloginSettleMs);
-    }
+    };
+    await forceFreshLoginIfSignedIn();
 
     // Poll until Teams token captured OR poll-deadline expires (5 min) OR a
-    // concurrent process lands a fresh token in the cache.
-    trace(`[DEBUG] acquireBothTokens: polling for Teams token, ${pollDeadlineMs / 1000}s deadline\n`);
-    onProgress(`Browser window open — if a sign-in screen appears, complete it there (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`);
-    const teamsDeadline = Date.now() + pollDeadlineMs;
-    let pollCount = 0;
-    while (Date.now() < teamsDeadline && !capturedAccess) {
-      // `login --force` (skipCacheProbe) wants a full re-capture, so the
-      // concurrent-refresh short-circuit must NOT fire — otherwise the still-valid
-      // cached basic token closes the browser before the elevated/ic3 legs run.
-      const concurrent = options?.skipCacheProbe === true ? null : await freshCachedToken();
-      if (concurrent !== null) {
-        const validated = accessToken(concurrent);
-        if (validated.ok) {
-          trace('[DEBUG] acquireBothTokens: fresh cache token appeared mid-poll — short-circuiting\n');
-          logger.info('browser_poll_cache_short_circuit');
-          onProgress('Token was refreshed by another process — closing the browser.');
-          await cleanup();
-          return {
-            teams: { accessToken: validated.value, refreshToken: null },
-            fromCache: true,
-            elevated: { ok: false, reason: 'sso_timeout' },
-            chatsvcagg: { ok: false, reason: 'sso_timeout' },
-            ic3: { ok: false, reason: 'sso_timeout' },
-          };
+    // concurrent process lands a fresh token in the cache, which it returns.
+    const pollForTeamsToken = async (): Promise<AccessToken | undefined> => {
+      trace(`[DEBUG] acquireBothTokens: polling for Teams token, ${pollDeadlineMs / 1000}s deadline\n`);
+      onProgress(`Browser window open — if a sign-in screen appears, complete it there (waiting up to ${Math.round(pollDeadlineMs / 60000)} min)…`);
+      const teamsDeadline = Date.now() + pollDeadlineMs;
+      let pollCount = 0;
+      while (Date.now() < teamsDeadline && !capturedAccess) {
+        // `login --force` (skipCacheProbe) wants a full re-capture, so the
+        // concurrent-refresh short-circuit must NOT fire — otherwise the still-valid
+        // cached basic token closes the browser before the elevated/ic3 legs run.
+        const concurrent = options?.skipCacheProbe === true ? null : await freshCachedToken();
+        const validated = concurrent === null ? undefined : accessToken(concurrent);
+        if (validated?.ok) return validated.value;
+        pollCount += 1;
+        if (pollCount % 10 === 0) {
+          trace(`[DEBUG] acquireBothTokens: still polling for Teams token, url=${activePage.url()}\n`);
         }
+        await sleep(pollIntervalMs);
       }
-      pollCount += 1;
-      if (pollCount % 10 === 0) {
-        trace(`[DEBUG] acquireBothTokens: still polling for Teams token, url=${activePage.url()}\n`);
-      }
-      await sleep(pollIntervalMs);
+      return undefined;
+    };
+    const fromCache = await pollForTeamsToken();
+    if (fromCache !== undefined) {
+      trace('[DEBUG] acquireBothTokens: fresh cache token appeared mid-poll — short-circuiting\n');
+      logger.info('browser_poll_cache_short_circuit');
+      onProgress('Token was refreshed by another process — closing the browser.');
+      await cleanup();
+      return {
+        teams: { accessToken: fromCache, refreshToken: null },
+        fromCache: true,
+        elevated: { ok: false, reason: 'sso_timeout' },
+        chatsvcagg: { ok: false, reason: 'sso_timeout' },
+        ic3: { ok: false, reason: 'sso_timeout' },
+      };
     }
 
     if (!capturedAccess) {
@@ -1088,21 +1042,14 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     // token mint, so a token-only exit would persist with the fallback
     // region — worse for AMER/APAC tenants.
     const chatsvcaggSettleDeadline = Date.now() + postReloginSettleMs;
-    while (Date.now() < chatsvcaggSettleDeadline && !(capturedChatsvcagg && capturedChatsvcaggRegion && capturedIc3)) {
+    while (Date.now() < chatsvcaggSettleDeadline && !companionsCaptured()) {
       await sleep(pollIntervalMs);
     }
 
     onProgress('Signed in — capturing companion tokens (Teams chat / elevated; up to ~30 s)…');
     trace(`[DEBUG] acquireBothTokens: Teams captured; navigating to elevated ${elevatedUrl}\n`);
     logger.info('browser_navigating', { url: elevatedUrl, purpose: 'elevated_same_session' });
-    let navigationFailed = false;
-    try {
-      await activePage.goto(elevatedUrl, { waitUntil: 'domcontentloaded', timeout: navigationTimeoutMs });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      trace(`[DEBUG] acquireBothTokens: elevated navigation error: ${msg}\n`);
-      navigationFailed = true;
-    }
+    const navigationFailed = !(await navigateTo(activePage, elevatedUrl, 'acquireBothTokens: elevated navigation error'));
 
     const elevatedDeadline = Date.now() + elevatedRecaptureTimeoutMs;
     while (Date.now() < elevatedDeadline && !elevatedPicker.settled()) {
