@@ -3714,6 +3714,10 @@ describe('convert-drive-item-zip-to-markdown', () => {
     expect(at('rawblob').text).toBeUndefined();
   });
 
+  // The converted text of one zip entry.
+  const zipFileText = (value: unknown, path: string): string | undefined =>
+    (value as { files: ReadonlyArray<{ path: string; text?: string }> }).files.find((f) => f.path === path)?.text;
+
   it('appends each Office file’s metadata block when --include-metadata true (and accepts an explicit false)', async () => {
     const archive = await buildSampleZipArchive();
     const withMeta = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(archive)), {
@@ -3723,11 +3727,10 @@ describe('convert-drive-item-zip-to-markdown', () => {
     });
     expect(withMeta?.ok).toBe(true);
     if (!withMeta?.ok) return;
-    const files = (withMeta.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files;
-    expect(files.find((f) => f.path === 'report.docx')?.text).toContain('## DOCX metadata');
-    expect(files.find((f) => f.path === 'data.xlsx')?.text).toContain('## Workbook metadata');
-    expect(files.find((f) => f.path === 'deck.pptx')?.text).toContain('## PPTX metadata');
-    expect(files.find((f) => f.path === 'plan.odt')?.text).toContain('## OpenDocument metadata');
+    expect(zipFileText(withMeta.value, 'report.docx')).toContain('## DOCX metadata');
+    expect(zipFileText(withMeta.value, 'data.xlsx')).toContain('## Workbook metadata');
+    expect(zipFileText(withMeta.value, 'deck.pptx')).toContain('## PPTX metadata');
+    expect(zipFileText(withMeta.value, 'plan.odt')).toContain('## OpenDocument metadata');
     // `false` is an accepted enum value and must omit the metadata blocks
     const explicitFalse = await cmdMap['convert-drive-item-zip-to-markdown']?.execute(createGraphClient(fakeAuth(), createZipFetch(await buildSampleZipArchive())), {
       driveId: 'd1',
@@ -3735,10 +3738,7 @@ describe('convert-drive-item-zip-to-markdown', () => {
       includeMetadata: 'false',
     });
     expect(explicitFalse?.ok).toBe(true);
-    if (explicitFalse?.ok)
-      expect((explicitFalse.value as { files: ReadonlyArray<{ path: string; text?: string }> }).files.find((f) => f.path === 'report.docx')?.text).not.toContain(
-        '## DOCX metadata'
-      );
+    if (explicitFalse?.ok) expect(zipFileText(explicitFalse.value, 'report.docx')).not.toContain('## DOCX metadata');
   });
 
   it('caps at 100 entries and flags truncation', async () => {
