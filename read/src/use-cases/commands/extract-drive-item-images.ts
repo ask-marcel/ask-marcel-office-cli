@@ -8,7 +8,7 @@ import { fetchRawBytes } from '@ask-marcel/office-core/use-cases/commands/fetch-
 import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/format-zod-error.ts';
 import { extractImagesFromBytes, PAGES_OPTION, pagesField } from './image-extraction.ts';
 import { DRIVE_ID_DESCRIPTION } from './option-descriptions.ts';
-import { TENANT_ID_OPTION, brandTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
+import { TENANT_ID_OPTION, brandOptionalTenantId, tenantIdShape } from '@ask-marcel/office-core/use-cases/commands/tenant-option.ts';
 
 const schema = z.object({ driveId: z.string().min(1), itemId: z.string().min(1), pages: pagesField.optional(), ...tenantIdShape });
 
@@ -18,9 +18,9 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
   const { driveId, itemId } = parsed.data;
-  const tenant = parsed.data.tenantId === undefined ? undefined : brandTenantId(parsed.data.tenantId);
-  if (tenant !== undefined && !tenant.ok) return tenant;
-  const tenantId = tenant?.ok === true ? tenant.value : undefined;
+  const tenant = brandOptionalTenantId(parsed.data.tenantId);
+  if (!tenant.ok) return tenant;
+  const tenantId = tenant.value;
 
   // Route the metadata read too, not just the bytes below: for a partner-tenant
   // file this is the FIRST call, so leaving it on the home token fails before the
