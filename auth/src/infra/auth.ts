@@ -626,6 +626,14 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // observable here (we never hit the substrate URL) — reuse the last-known
   // region from cache; a mismatch surfaces later as a clean 404, never a wrong
   // read. Callers guard on `cached.refresh_token` being present.
+  // AAD rotates the refresh token on each redemption and single-uses it, so a
+  // new one goes into the shared slot of the LATEST cache.
+  const saveRotatedRefreshToken = async (previous: string, rotated: string | undefined): Promise<Result<void, AuthError>> => {
+    if (!rotated || rotated === previous) return ok(undefined);
+    const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
+    return writeCache({ ...latest, refresh_token: rotated });
+  };
+
   const refreshSubstrateToken = async (
     cached: CachedToken,
     resource: string,
@@ -642,11 +650,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     const substrateToken = accessTokenUnsafe(raw);
     const saved = await persist(substrateToken, cached.chatsvcagg_region ?? DEFAULT_CHATSVCAGG_REGION);
     if (!saved.ok) return saved;
-    if (json.refresh_token && json.refresh_token !== cached.refresh_token) {
-      const latest = (await readCache()) ?? { access_token: '', expires_on: 0, refresh_token: '' };
-      const savedRefresh = await writeCache({ ...latest, refresh_token: json.refresh_token });
-      if (!savedRefresh.ok) return savedRefresh;
-    }
+    const savedRefresh = await saveRotatedRefreshToken(cached.refresh_token, json.refresh_token);
+    if (!savedRefresh.ok) return savedRefresh;
     logger.info('auth.ladder.rung', { rung });
     return ok(substrateToken);
   };
@@ -699,23 +704,26 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // The rungs that need a browser, when this session may open one.
   const browser = deps.browserRungs?.({ underLock, persistTeams, persistElevated, persistChatsvcagg, persistIc3, redeemMissedSubstrateAtLogin });
 
+  // The cache rung, then the refresh rung. Undefined when neither settles the call.
+  const cachedOrRefreshedBasic = async (): Promise<Result<AccessToken, AuthError> | undefined> => {
+    const cached = await readCache();
+    const validated = accessToken(cached?.access_token ?? '');
+    if (validated.ok) {
+      logger.info('auth.ladder.rung', { rung: 'cache' });
+      return ok(validated.value);
+    }
+    if (!cached?.refresh_token) return undefined;
+    const refreshed = await refreshBasicInTurn();
+    return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
+  };
+
   const getAccessToken = async (options?: { force?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // `login --force` skips the cache + refresh rungs so a warm session still
     // re-captures every token via the browser (elevated carries no refresh_token,
     // so a cache-hit login would otherwise never refresh it).
     if (!options?.force) {
-      const cached = await readCache();
-      if (cached) {
-        const validated = accessToken(cached.access_token);
-        if (validated.ok) {
-          logger.info('auth.ladder.rung', { rung: 'cache' });
-          return ok(validated.value);
-        }
-      }
-      if (cached?.refresh_token) {
-        const refreshed = await refreshBasicInTurn();
-        if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
-      }
+      const settled = await cachedOrRefreshedBasic();
+      if (settled !== undefined) return settled;
     }
     // Command path: never launch an interactive browser for the basic token —
     // fail fast with a single-line "run login" error instead of the 5-minute
@@ -772,24 +780,26 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // Runs in its turn, so it reads the cache again: a guest token or a rotated
   // refresh token saved while it waited is the one to use, unless it is the one
   // the caller found dead.
+  // Naming the tenant matters: the caller passed a `--tenant-id` (or resolved
+  // one from a sharing URL) and needs to know WHICH tenant refused, not that
+  // "a refresh failed". A partner tenant refuses when the user is not a guest
+  // there, or when the Teams client is not consented in it (AADSTS65001).
+  const guestRefusal = (tenant: TenantId, error: AuthError): Result<never, AuthError> => {
+    const detail = error.type === 'auth_failed' ? error.message : 'cancelled';
+    return err({
+      type: 'auth_failed',
+      message: `tenant ${tenant} refused a guest token (${detail}) — you may not be a guest in that tenant, or its administrator has not consented to this client`,
+      code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
+    });
+  };
+
   const redeemGuestToken = async (tenant: TenantId, dead?: string): Promise<Result<AccessToken, AuthError>> => {
     const current = await readCache();
     const savedMeanwhile = freshGuestToken(current, tenant);
     if (savedMeanwhile !== undefined && savedMeanwhile !== dead) return ok(accessTokenUnsafe(savedMeanwhile));
     if (!current?.refresh_token) return noGuestCredentials(tenant);
     const redeemed = await redeemRefreshToken(current.refresh_token, tenant, SCOPES);
-    if (!redeemed.ok) {
-      // Naming the tenant matters: the caller passed a `--tenant-id` (or resolved
-      // one from a sharing URL) and needs to know WHICH tenant refused, not that
-      // "a refresh failed". A partner tenant refuses when the user is not a guest
-      // there, or when the Teams client is not consented in it (AADSTS65001).
-      const detail = redeemed.error.type === 'auth_failed' ? redeemed.error.message : 'cancelled';
-      return err({
-        type: 'auth_failed',
-        message: `tenant ${tenant} refused a guest token (${detail}) — you may not be a guest in that tenant, or its administrator has not consented to this client`,
-        code: SECONDARY_TOKEN_UNAVAILABLE_CODE,
-      });
-    }
+    if (!redeemed.ok) return guestRefusal(tenant, redeemed.error);
     const validated = accessToken(redeemed.value.accessToken);
     if (!validated.ok) return err({ type: 'auth_failed', message: `tenant ${tenant} returned an unusable guest token` });
 
@@ -886,6 +896,15 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
   // 401 to force a redemption from the shared refresh token. Observed live
   // 2026-08-31: a token minted at 07:18 was rejected at 13:47 with hours of
   // stated life left, while a freshly redeemed one worked instantly.
+  // The headless rung of a substrate token: a redemption from the shared refresh
+  // token, past the dead token when the caller found one. Undefined when it does
+  // not settle the call, so the browser rung is next.
+  const redeemSubstrate = async (tier: SubstrateTier, cached: CachedToken | null, dead: string | undefined): Promise<Result<AccessToken, AuthError> | undefined> => {
+    if (!cached?.refresh_token) return undefined;
+    const refreshed = await refreshSubstrateInTurn(tier, dead);
+    return refreshed.ok || mustReportAsIs(refreshed) ? refreshed : undefined;
+  };
+
   const getChatsvcaggAccessToken = async (options?: { readonly ignoreCache?: boolean }): Promise<Result<AccessToken, AuthError>> => {
     // chatsvcagg tokens carry `aud=https://chatsvcagg.teams.microsoft.com`,
     // not Graph — the `accessToken()` validator's `isGraphToken` check
@@ -893,7 +912,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // every call. `freshChatsvcaggToken` already validates expiry from the
     // JWT payload, which is the only thing we need at this boundary.
     const cached = await readCache();
-    const fresh = options?.ignoreCache === true ? undefined : freshChatsvcaggToken(cached);
+    const ignoreCache = options?.ignoreCache === true;
+    const fresh = ignoreCache ? undefined : freshChatsvcaggToken(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.chatsvcagg.cache_hit');
       return ok(accessTokenUnsafe(fresh));
@@ -902,10 +922,8 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // HTTP, so a browser is never the cheaper route; when this sat inside the
     // fail-fast branch below, a manager that was ALLOWED a browser skipped the
     // refresh entirely and opened a window for a token an HTTP call could mint.
-    if (cached?.refresh_token) {
-      const refreshed = await refreshSubstrateInTurn(chatsvcaggTier, options?.ignoreCache === true ? cached.chatsvcagg_access_token : undefined);
-      if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
-    }
+    const redeemed = await redeemSubstrate(chatsvcaggTier, cached, ignoreCache ? cached?.chatsvcagg_access_token : undefined);
+    if (redeemed !== undefined) return redeemed;
     const recapture = browser?.recaptureChatsvcagg;
     if (!recapture) return chatsvcaggUnavailable();
     return recapture();
@@ -968,16 +986,15 @@ const createAuthLadder = (deps: AuthLadderDeps): TokenLadder => {
     // validates expiry from the JWT payload, which is the only thing we
     // need at this boundary.
     const cached = await readCache();
-    const fresh = options?.ignoreCache === true ? undefined : freshIc3Token(cached);
+    const ignoreCache = options?.ignoreCache === true;
+    const fresh = ignoreCache ? undefined : freshIc3Token(cached);
     if (fresh !== undefined && fresh.startsWith('eyJ')) {
       logger.info('auth.ic3.cache_hit');
       return ok(accessTokenUnsafe(fresh));
     }
     // Headless first, same reasoning as chatsvcagg above.
-    if (cached?.refresh_token) {
-      const refreshed = await refreshSubstrateInTurn(ic3Tier, options?.ignoreCache === true ? cached.ic3_access_token : undefined);
-      if (refreshed.ok || mustReportAsIs(refreshed)) return refreshed;
-    }
+    const redeemed = await redeemSubstrate(ic3Tier, cached, ignoreCache ? cached?.ic3_access_token : undefined);
+    if (redeemed !== undefined) return redeemed;
     const recapture = browser?.recaptureIc3;
     if (!recapture) return ic3Unavailable();
     return recapture();
