@@ -34,6 +34,11 @@ type FakePageOpts = {
 
 type FakePageState = { closed: boolean; evaluated: boolean; gotoCount: number };
 
+// Hands each queued event of a goto to every listener of its kind.
+const replay = <T>(events: ReadonlyArray<T> | undefined, handlers: ReadonlyArray<(event: T) => void>): void => {
+  for (const event of events ?? []) for (const handler of handlers) handler(event);
+};
+
 const makeFakePage = (opts: FakePageOpts): { page: PageLike; state: FakePageState } => {
   const state: FakePageState = { closed: false, evaluated: false, gotoCount: 0 };
   let currentUrl = 'about:blank';
@@ -48,10 +53,8 @@ const makeFakePage = (opts: FakePageOpts): { page: PageLike; state: FakePageStat
     goto: async (url) => {
       const idx = state.gotoCount;
       state.gotoCount += 1;
-      const queuedResponses = opts.responsesPerGoto?.[idx] ?? [];
-      for (const r of queuedResponses) for (const h of responseHandlers) h(r);
-      const queuedRequests = opts.requestsPerGoto?.[idx] ?? [];
-      for (const r of queuedRequests) for (const h of requestHandlers) h(r);
+      replay(opts.responsesPerGoto?.[idx], responseHandlers);
+      replay(opts.requestsPerGoto?.[idx], requestHandlers);
       currentUrl = opts.urlsAfterGoto?.[idx] ?? url;
       const err = opts.gotoErrors?.[idx];
       if (err !== undefined) throw err;

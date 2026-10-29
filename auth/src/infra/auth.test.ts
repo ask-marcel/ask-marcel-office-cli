@@ -104,12 +104,16 @@ const fakeBrowserAuth = (config?: {
 }): BrowserAuth => {
   let elevatedCallCount = 0;
   let chatsvcaggCallCount = 0;
-  const chatsvcaggResult = (): { ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason } => {
-    if (config?.chatsvcaggSequence !== undefined) {
-      const value = config.chatsvcaggSequence[chatsvcaggCallCount] ?? config.chatsvcaggSequence[config.chatsvcaggSequence.length - 1];
-      chatsvcaggCallCount += 1;
-      return value ?? { ok: false as const, reason: 'sso_timeout' };
-    }
+  // The scripted answer of the Nth call: the last one repeats once the script runs out.
+  const nthOf = <T>(sequence: ReadonlyArray<T>, n: number): T | undefined => sequence[n] ?? sequence[sequence.length - 1];
+  type SubstrateAnswer = { ok: true; token: AccessToken; region: string } | { ok: false; reason: ElevatedFailureReason };
+  const nextChatsvcagg = (sequence: ReadonlyArray<SubstrateAnswer>): SubstrateAnswer => {
+    const value = nthOf(sequence, chatsvcaggCallCount);
+    chatsvcaggCallCount += 1;
+    return value ?? { ok: false as const, reason: 'sso_timeout' };
+  };
+  const chatsvcaggResult = (): SubstrateAnswer => {
+    if (config?.chatsvcaggSequence !== undefined) return nextChatsvcagg(config.chatsvcaggSequence);
     if (config?.chatsvcaggFailure !== undefined) return { ok: false as const, reason: config.chatsvcaggFailure };
     const v = config?.chatsvcaggResult;
     if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
@@ -121,17 +125,20 @@ const fakeBrowserAuth = (config?: {
     if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
     return { ok: true as const, token: v, region: config?.ic3Region ?? 'emea' };
   };
+  const elevatedResult = (): { ok: true; token: AccessToken } | { ok: false; reason: ElevatedFailureReason } => {
+    if (config?.elevatedFailure !== undefined) return { ok: false as const, reason: config.elevatedFailure };
+    const v = config?.elevatedResult;
+    if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
+    return { ok: true as const, token: v };
+  };
   return {
     acquireElevatedToken: async () => {
       if (config?.elevatedSequence !== undefined) {
-        const value = config.elevatedSequence[elevatedCallCount] ?? config.elevatedSequence[config.elevatedSequence.length - 1];
+        const value = nthOf(config.elevatedSequence, elevatedCallCount);
         elevatedCallCount += 1;
         return value ?? { ok: false as const, reason: 'sso_timeout' };
       }
-      if (config?.elevatedFailure !== undefined) return { ok: false as const, reason: config.elevatedFailure };
-      const v = config?.elevatedResult;
-      if (v === undefined || v === null) return { ok: false as const, reason: 'sso_timeout' };
-      return { ok: true as const, token: v };
+      return elevatedResult();
     },
     // fake composes acquireToken + acquireElevatedToken
     // results into the single-session shape. Tests that want to assert the
@@ -151,14 +158,7 @@ const fakeBrowserAuth = (config?: {
         };
       }
       if (!teams) return { teams: null, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
-      const v = config?.elevatedResult;
-      if (config?.elevatedFailure !== undefined) {
-        return { teams, elevated: { ok: false as const, reason: config.elevatedFailure }, chatsvcagg: chatsvcaggResult(), ic3 };
-      }
-      if (v === undefined || v === null) {
-        return { teams, elevated: { ok: false as const, reason: 'sso_timeout' as const }, chatsvcagg: chatsvcaggResult(), ic3 };
-      }
-      return { teams, elevated: { ok: true as const, token: v }, chatsvcagg: chatsvcaggResult(), ic3 };
+      return { teams, elevated: elevatedResult(), chatsvcagg: chatsvcaggResult(), ic3 };
     },
     acquireChatsvcaggToken: async () => {
       if (config?.chatsvcaggError) throw config.chatsvcaggError;
