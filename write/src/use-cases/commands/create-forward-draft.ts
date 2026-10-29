@@ -45,6 +45,36 @@ const readDraftBody = async (graph: WriteGraph, created: unknown, draftId: strin
   return ok(parsed.data.body);
 };
 
+// The fields besides the body that the caller set: cc and the subject override.
+const extraFields = (ccRecipients: string | undefined, subject: string | undefined): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
+  if (subject) patch.subject = subject;
+  return patch;
+};
+
+// The HTML path: the comment is spliced into the draft's own body, above the quote.
+const spliceHtmlComment = async (graph: WriteGraph, created: { id: string }, comment: string, extra: Record<string, unknown>): Promise<Result<unknown, GraphError>> => {
+  const draftId = created.id;
+  const draftBody = await readDraftBody(graph, created, draftId);
+  if (!draftBody.ok) return draftBody;
+
+  // A text-bodied original cannot take HTML: splicing markup in would show it as
+  // literal characters, and converting the body to HTML would rewrite the quote.
+  if (draftBody.value.contentType.toLowerCase() !== 'html') {
+    return err({
+      type: 'validation_error',
+      message: `The forwarded draft's body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above the quoted original without rewriting it. Draft ${draftId} was already created - revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
+    });
+  }
+
+  // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
+  // never PATCH body WITHOUT the quote in it. Cc and subject merge into the same
+  // call rather than costing a second round trip.
+  const spliced = insertCommentAboveQuote(draftBody.value.content, comment);
+  return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, { body: { contentType: 'HTML', content: spliced.html }, ...extra }));
+};
+
 const execute: WriteCommand['execute'] = async (graph, params) => {
   const parsed = schema.safeParse(params);
   if (!parsed.success)
@@ -87,39 +117,14 @@ const execute: WriteCommand['execute'] = async (graph, params) => {
     });
   }
 
-  const draftId = created.value.id;
+  const extra = extraFields(ccRecipients, subject);
+  if (asHtml) return spliceHtmlComment(graph, created.value, comment, extra);
 
   // Text path, unchanged: optional cc / subject override PATCHes ONLY those -
   // never `body`, which carries the comment + quoted original. Nothing to set ->
   // the draft is already complete, return it as-is.
-  if (!asHtml) {
-    const patch: Record<string, unknown> = {};
-    if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
-    if (subject) patch.subject = subject;
-    if (Object.keys(patch).length === 0) return slimDraftResult(created);
-    return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
-  }
-
-  const draftBody = await readDraftBody(graph, created.value, draftId);
-  if (!draftBody.ok) return draftBody;
-
-  // A text-bodied original cannot take HTML: splicing markup in would show it as
-  // literal characters, and converting the body to HTML would rewrite the quote.
-  if (draftBody.value.contentType.toLowerCase() !== 'html') {
-    return err({
-      type: 'validation_error',
-      message: `The forwarded draft's body is ${draftBody.value.contentType}, not HTML, so HTML cannot be placed above the quoted original without rewriting it. Draft ${draftId} was already created - revise it with \`update-mail-draft --message-id ${draftId}\` in comment mode, or delete it in Outlook Drafts and retry without --body-content-type HTML.`,
-    });
-  }
-
-  // The quote rides along inside `content`, so this PATCH is the sanctioned kind:
-  // never PATCH body WITHOUT the quote in it. Cc and subject merge into the same
-  // call rather than costing a second round trip.
-  const spliced = insertCommentAboveQuote(draftBody.value.content, comment);
-  const patch: Record<string, unknown> = { body: { contentType: 'HTML', content: spliced.html } };
-  if (ccRecipients) patch.ccRecipients = parseRecipients(ccRecipients);
-  if (subject) patch.subject = subject;
-  return slimDraftResult(await graph.patch(`/me/messages/${draftId}`, patch));
+  if (Object.keys(extra).length === 0) return slimDraftResult(created);
+  return slimDraftResult(await graph.patch(`/me/messages/${created.value.id}`, extra));
 };
 
 const meta: WriteCommandMeta = {
