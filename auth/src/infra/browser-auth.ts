@@ -764,6 +764,64 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     return finishElevatedCapture(picker, session, options?.awaitSignIn === true, navigationFailed);
   };
 
+  // What the single session captured besides the Teams token.
+  type Captures = { readonly elevated: AccessToken | null; readonly chatsvcagg: AccessToken | null; readonly ic3: AccessToken | null; readonly region: string | null };
+
+  // The result of a session that captured the Teams token, and the logs of what it missed.
+  const reportBoth = (teams: BrowserTokenResult, captures: Captures, navigationFailed: boolean): BothTokensResult => {
+    const elevatedFailureReason: ElevatedFailureReason = navigationFailed ? 'navigation_failed' : 'sso_timeout';
+    const elevatedResult: ElevatedTokenResult = captures.elevated ? { ok: true, token: captures.elevated } : { ok: false, reason: elevatedFailureReason };
+    // Region defaults to `DEFAULT_CHATSVCAGG_REGION` ('emea') when we captured a
+    // bearer but never saw a substrate URL — a partial capture. Better than
+    // dropping the token: European tenants (the dominant case during 2026-05
+    // probing) keep working; other-region tenants get a clear HTTP 404 from
+    // the use-case rather than a silent failure. The region is logged at
+    // `chatsvcagg_region_captured` when it's parsed; absence in the trace is
+    // the signal that the fallback was used.
+    const region = captures.region ?? DEFAULT_CHATSVCAGG_REGION;
+    const chatsvcaggResult: ChatsvcaggTokenResult = captures.chatsvcagg ? { ok: true, token: captures.chatsvcagg, region } : { ok: false, reason: 'sso_timeout' };
+    const ic3Result: Ic3TokenResult = captures.ic3 ? { ok: true, token: captures.ic3, region } : { ok: false, reason: 'sso_timeout' };
+    if (!captures.elevated) {
+      trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
+      logger.info('elevated_token_capture_timeout');
+    }
+    if (!captures.chatsvcagg) {
+      trace('[DEBUG] acquireBothTokens: chatsvcagg settle expired, Teams kept\n');
+      logger.info('chatsvcagg_token_capture_timeout');
+    }
+    if (!captures.ic3) {
+      trace('[DEBUG] acquireBothTokens: ic3 settle expired, Teams kept\n');
+      logger.info('ic3_token_capture_timeout');
+    }
+    return { teams, elevated: elevatedResult, chatsvcagg: chatsvcaggResult, ic3: ic3Result };
+  };
+
+  // Every token timed out with the browser, which could not even open a page.
+  const launchTimedOut = (): BothTokensResult => ({
+    teams: null,
+    elevated: { ok: false, reason: 'launch_timeout' },
+    chatsvcagg: { ok: false, reason: 'launch_timeout' },
+    ic3: { ok: false, reason: 'launch_timeout' },
+  });
+
+  /**
+   * single-session capture of BOTH tokens.
+   *
+   * Opens ONE browser context, attaches both response (Teams token) and
+   * request (elevated token) listeners up front, navigates the page
+   * through the Teams sign-in, then — without closing — navigates the
+   * same page to the elevated URL so the cookie chain that the user
+   * just authenticated against is still live in memory. Closes the
+   * browser exactly once at the end.
+   *
+   * Fixes the user-visible "loop of browser open/close" symptom on
+   * federated tenants (ExampleCorp / a third-party IdP): the old two-session flow opened a
+   * separate browser for the elevated step and silent SSO couldn't
+   * re-establish the federated cookie chain quickly enough — the
+   * second browser would flash through what looked like a fresh login
+   * prompt. With this method, the elevated step runs on the same
+   * already-authenticated page.
+   */
   /**
    * single-session capture of BOTH tokens.
    *
@@ -801,12 +859,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     } catch (e) {
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: launch timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return {
-          teams: null,
-          elevated: { ok: false, reason: 'launch_timeout' },
-          chatsvcagg: { ok: false, reason: 'launch_timeout' },
-          ic3: { ok: false, reason: 'launch_timeout' },
-        };
+        return launchTimedOut();
       }
       throw e;
     }
@@ -820,12 +873,7 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
       }
       if (isLaunchTimeout(e)) {
         trace(`[DEBUG] acquireBothTokens: newPage timed out after ${elevatedLaunchTimeoutMs}ms\n`);
-        return {
-          teams: null,
-          elevated: { ok: false, reason: 'launch_timeout' },
-          chatsvcagg: { ok: false, reason: 'launch_timeout' },
-          ic3: { ok: false, reason: 'launch_timeout' },
-        };
+        return launchTimedOut();
       }
       throw e;
     }
@@ -1067,35 +1115,8 @@ const createBrowserAuthFromApi = (api: BrowserAuthApi, config: BrowserAuthConfig
     await cleanup();
     onProgress('Sign-in complete — browser closed.');
 
-    const teamsResult: BrowserTokenResult = { accessToken: capturedAccess, refreshToken: capturedRefresh };
-    const elevatedFailureReason: ElevatedFailureReason = navigationFailed ? 'navigation_failed' : 'sso_timeout';
-    const elevatedResult: ElevatedTokenResult = capturedElevated ? { ok: true, token: capturedElevated } : { ok: false, reason: elevatedFailureReason };
-    // Region defaults to `DEFAULT_CHATSVCAGG_REGION` ('emea') when we captured a
-    // bearer but never saw a substrate URL — a partial capture. Better than
-    // dropping the token: European tenants (the dominant case during 2026-05
-    // probing) keep working; other-region tenants get a clear HTTP 404 from
-    // the use-case rather than a silent failure. The region is logged at
-    // `chatsvcagg_region_captured` when it's parsed; absence in the trace is
-    // the signal that the fallback was used.
-    const chatsvcaggResult: ChatsvcaggTokenResult = capturedChatsvcagg
-      ? { ok: true, token: capturedChatsvcagg, region: capturedChatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION }
-      : { ok: false, reason: 'sso_timeout' };
-    const ic3Result: Ic3TokenResult = capturedIc3
-      ? { ok: true, token: capturedIc3, region: capturedChatsvcaggRegion ?? DEFAULT_CHATSVCAGG_REGION }
-      : { ok: false, reason: 'sso_timeout' };
-    if (!capturedElevated) {
-      trace('[DEBUG] acquireBothTokens: elevated deadline expired, Teams kept\n');
-      logger.info('elevated_token_capture_timeout');
-    }
-    if (!capturedChatsvcagg) {
-      trace('[DEBUG] acquireBothTokens: chatsvcagg settle expired, Teams kept\n');
-      logger.info('chatsvcagg_token_capture_timeout');
-    }
-    if (!capturedIc3) {
-      trace('[DEBUG] acquireBothTokens: ic3 settle expired, Teams kept\n');
-      logger.info('ic3_token_capture_timeout');
-    }
-    return { teams: teamsResult, elevated: elevatedResult, chatsvcagg: chatsvcaggResult, ic3: ic3Result };
+    const captures: Captures = { elevated: capturedElevated, chatsvcagg: capturedChatsvcagg, ic3: capturedIc3, region: capturedChatsvcaggRegion };
+    return reportBoth({ accessToken: capturedAccess, refreshToken: capturedRefresh }, captures, navigationFailed);
   };
 
   // Shared standalone-recapture path for chatsvcagg/IC3 — both ride on the
