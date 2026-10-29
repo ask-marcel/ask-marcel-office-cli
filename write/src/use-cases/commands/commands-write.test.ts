@@ -57,30 +57,35 @@ const capturedUrl = async (name: string, params: Record<string, string>): Promis
   return fetchFn.lastUrl ?? '';
 };
 
+// A fake Graph that records each call and answers from the first route whose test
+// matches. An unmatched call throws, as the hand-written routers did.
+type Call = { url: string; method?: string };
+type Route = readonly [(url: string, method: string | undefined) => boolean, () => Response];
+const createRoutedFetch = (calls: Call[], routes: ReadonlyArray<Route>): FetchFn => {
+  const routed: FetchFn = async (url, init) => {
+    calls.push({ url, method: init?.method });
+    const route = routes.find(([matches]) => matches(url, init?.method));
+    if (!route) throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
+    return route[1]();
+  };
+  return routed;
+};
+
 type CommandFixture = { readonly name: string; readonly params: Record<string, string>; readonly responseBody?: unknown };
 
 describe('commands', () => {
   it('convert-mail-attachment-to-pdf uploads a fileAttachment, converts via ?format=pdf, follows the CDN redirect internally to inline the PDF bytes, then deletes the temp item', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/a1')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx-bytes') });
-      }
-      if (url.includes(':/content') && init?.method === 'PUT') {
-        return Response.json({ id: 'temp-i1', name: 'plan-temp' });
-      }
-      if (url.endsWith('/content?format=pdf')) {
-        return Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/plan.pdf' });
-      }
-      if (url === 'https://contoso.sharepoint.com/cdn/plan.pdf') {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } });
-      }
-      if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') {
-        return new Response(null, { status: 204 });
-      }
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
+    const calls: Call[] = [];
+    const fetchFn = createRoutedFetch(calls, [
+      [(url) => url.endsWith('/attachments/a1'), () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx-bytes') })],
+      [(url, method) => url.includes(':/content') && method === 'PUT', () => Response.json({ id: 'temp-i1', name: 'plan-temp' })],
+      [(url) => url.endsWith('/content?format=pdf'), () => Response.json({ '@microsoft.graph.downloadUrl': 'https://contoso.sharepoint.com/cdn/plan.pdf' })],
+      [
+        (url) => url === 'https://contoso.sharepoint.com/cdn/plan.pdf',
+        () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), { status: 200, headers: { 'content-type': 'application/pdf' } }),
+      ],
+      [(url, method) => url.endsWith('/items/temp-i1') && method === 'DELETE', () => new Response(null, { status: 204 })],
+    ]);
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];
     if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
@@ -96,15 +101,13 @@ describe('commands', () => {
   });
 
   it('convert-mail-attachment-to-pdf turns a 406 from the format=pdf transform (an input it refuses — xlsx observed live) into an actionable error pointing at the markdown fallback, NOT the misleading "endpoint may have moved" text, and still cleans up the temp item', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/a1')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'budget.xlsx', contentBytes: btoa('xlsx-bytes') });
-      if (url.includes(':/content') && init?.method === 'PUT') return Response.json({ id: 'temp-i1' });
-      if (url.endsWith('/content?format=pdf')) return new Response(null, { status: 406 });
-      if (url.endsWith('/items/temp-i1') && init?.method === 'DELETE') return new Response(null, { status: 204 });
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
+    const calls: Call[] = [];
+    const fetchFn = createRoutedFetch(calls, [
+      [(url) => url.endsWith('/attachments/a1'), () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'budget.xlsx', contentBytes: btoa('xlsx-bytes') })],
+      [(url, method) => url.includes(':/content') && method === 'PUT', () => Response.json({ id: 'temp-i1' })],
+      [(url) => url.endsWith('/content?format=pdf'), () => new Response(null, { status: 406 })],
+      [(url, method) => url.endsWith('/items/temp-i1') && method === 'DELETE', () => new Response(null, { status: 204 })],
+    ]);
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];
     if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
@@ -120,30 +123,16 @@ describe('commands', () => {
   });
 
   it('convert-mail-attachment-to-pdf deletes the empty `.ask-marcel-temp` parent folder after a successful upload-convert-delete cycle (folder used to linger at OneDrive root)', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/aPdf')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') });
-      }
-      if (url.includes(':/content') && init?.method === 'PUT') {
-        return Response.json({ id: 'temp-i7', name: 'plan-temp' });
-      }
-      if (url.endsWith('/content?format=pdf')) {
-        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
-      }
-      if (url.endsWith('/items/temp-i7') && init?.method === 'DELETE') {
-        return new Response(null, { status: 204 });
-      }
+    const calls: Call[] = [];
+    const fetchFn = createRoutedFetch(calls, [
+      [(url) => url.endsWith('/attachments/aPdf'), () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') })],
+      [(url, method) => url.includes(':/content') && method === 'PUT', () => Response.json({ id: 'temp-i7', name: 'plan-temp' })],
+      [(url) => url.endsWith('/content?format=pdf'), () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } })],
+      [(url, method) => url.endsWith('/items/temp-i7') && method === 'DELETE', () => new Response(null, { status: 204 })],
       // Cleanup: children GET returns empty → folder delete fires.
-      if (url.includes('/.ask-marcel-temp:/children')) {
-        return Response.json({ value: [] });
-      }
-      if (url.endsWith('/.ask-marcel-temp') && init?.method === 'DELETE') {
-        return new Response(null, { status: 204 });
-      }
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
+      [(url) => url.includes('/.ask-marcel-temp:/children'), () => Response.json({ value: [] })],
+      [(url, method) => url.endsWith('/.ask-marcel-temp') && method === 'DELETE', () => new Response(null, { status: 204 })],
+    ]);
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];
     if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
@@ -157,20 +146,16 @@ describe('commands', () => {
   });
 
   it('convert-mail-attachment-to-pdf also sweeps the legacy un-dotted `ask-marcel-temp` folder when empty (pre-rename orphan found at a real tenant root)', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/aPdf')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') });
-      }
-      if (url.includes(':/content') && init?.method === 'PUT') return Response.json({ id: 'temp-i8', name: 'plan-temp' });
-      if (url.endsWith('/content?format=pdf')) return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
-      if (url.endsWith('/items/temp-i8') && init?.method === 'DELETE') return new Response(null, { status: 204 });
+    const calls: Call[] = [];
+    const fetchFn = createRoutedFetch(calls, [
+      [(url) => url.endsWith('/attachments/aPdf'), () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'plan.docx', contentBytes: btoa('docx') })],
+      [(url, method) => url.includes(':/content') && method === 'PUT', () => Response.json({ id: 'temp-i8', name: 'plan-temp' })],
+      [(url) => url.endsWith('/content?format=pdf'), () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } })],
+      [(url, method) => url.endsWith('/items/temp-i8') && method === 'DELETE', () => new Response(null, { status: 204 })],
       // BOTH temp folders report empty → both get the best-effort delete.
-      if (url.includes('-temp:/children')) return Response.json({ value: [] });
-      if (url.endsWith('-temp') && init?.method === 'DELETE') return new Response(null, { status: 204 });
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
+      [(url) => url.includes('-temp:/children'), () => Response.json({ value: [] })],
+      [(url, method) => url.endsWith('-temp') && method === 'DELETE', () => new Response(null, { status: 204 })],
+    ]);
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];
     if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
     const result = await cmd.execute(createGraphClient(fakeAuth(), fetchFn), { messageId: 'm8', attachmentId: 'aPdf' });
@@ -180,27 +165,15 @@ describe('commands', () => {
   });
 
   it('convert-mail-attachment-to-pdf does NOT delete the parent folder when it still contains other files (concurrent invocation safety)', async () => {
-    const calls: Array<{ url: string; method?: string }> = [];
-    const fetchFn: FetchFn = async (url, init) => {
-      calls.push({ url, method: init?.method });
-      if (url.endsWith('/attachments/aPdf2')) {
-        return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'b.docx', contentBytes: btoa('docx') });
-      }
-      if (url.includes(':/content') && init?.method === 'PUT') {
-        return Response.json({ id: 'temp-i8', name: 'b-temp' });
-      }
-      if (url.endsWith('/content?format=pdf')) {
-        return new Response(new Uint8Array([0x25, 0x50]), { status: 200, headers: { 'content-type': 'application/pdf' } });
-      }
-      if (url.endsWith('/items/temp-i8') && init?.method === 'DELETE') {
-        return new Response(null, { status: 204 });
-      }
+    const calls: Call[] = [];
+    const fetchFn = createRoutedFetch(calls, [
+      [(url) => url.endsWith('/attachments/aPdf2'), () => Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'b.docx', contentBytes: btoa('docx') })],
+      [(url, method) => url.includes(':/content') && method === 'PUT', () => Response.json({ id: 'temp-i8', name: 'b-temp' })],
+      [(url) => url.endsWith('/content?format=pdf'), () => new Response(new Uint8Array([0x25, 0x50]), { status: 200, headers: { 'content-type': 'application/pdf' } })],
+      [(url, method) => url.endsWith('/items/temp-i8') && method === 'DELETE', () => new Response(null, { status: 204 })],
       // Cleanup: children GET returns one other file → folder delete must NOT fire.
-      if (url.includes('/.ask-marcel-temp:/children')) {
-        return Response.json({ value: [{ id: 'other-concurrent-upload' }] });
-      }
-      throw new Error(`unexpected fetch: ${init?.method ?? 'GET'} ${url}`);
-    };
+      [(url) => url.includes('/.ask-marcel-temp:/children'), () => Response.json({ value: [{ id: 'other-concurrent-upload' }] })],
+    ]);
     const cmd = cmdMap['convert-mail-attachment-to-pdf'];
     if (!cmd) throw new Error('convert-mail-attachment-to-pdf not registered');
     const graph = createGraphClient(fakeAuth(), fetchFn);
@@ -440,25 +413,40 @@ describe('commands', () => {
   // cleanup probe body so the `(value ?? [])` default is observable; `putStatus`
   // forces an upload failure.
   type PutRecord = { readonly url: string; readonly body: string; readonly contentType: string };
+  type RecorderOptions = { puts?: PutRecord[]; deletes?: string[]; children?: unknown; putStatus?: number };
+  const recordPut = (url: string, init: RequestInit | undefined, opts: RecorderOptions): Response => {
+    const decoded = init?.body instanceof Uint8Array ? new TextDecoder().decode(init.body) : String(init?.body);
+    const ct = (init?.headers as Record<string, string> | undefined)?.['content-type'] ?? '';
+    opts.puts?.push({ url, body: decoded, contentType: ct });
+    if (opts.putStatus !== undefined && opts.putStatus >= 400) return new Response('nope', { status: opts.putStatus });
+    return Response.json({ id: 'temp-h1' });
+  };
   const createUploadRecorder =
-    (name: string, opts: { puts?: PutRecord[]; deletes?: string[]; children?: unknown; putStatus?: number }): FetchFn =>
+    (name: string, opts: RecorderOptions): FetchFn =>
     async (url, init) => {
+      const method = init?.method ?? 'GET';
       if (url.includes('/attachments/')) return Response.json({ '@odata.type': '#microsoft.graph.fileAttachment', name, contentBytes: btoa('PDFDATA') });
-      if (init?.method === 'PUT') {
-        const decoded = init.body instanceof Uint8Array ? new TextDecoder().decode(init.body) : String(init.body);
-        const ct = (init.headers as Record<string, string> | undefined)?.['content-type'] ?? '';
-        opts.puts?.push({ url, body: decoded, contentType: ct });
-        if (opts.putStatus !== undefined && opts.putStatus >= 400) return new Response('nope', { status: opts.putStatus });
-        return Response.json({ id: 'temp-h1' });
-      }
+      if (method === 'PUT') return recordPut(url, init, opts);
       if (url.endsWith('/content?format=pdf')) return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'content-type': 'application/pdf' } });
       if (url.includes('/.ask-marcel-temp:/children')) return Response.json(opts.children ?? { value: [] });
-      if (init?.method === 'DELETE') {
+      if (method === 'DELETE') {
         opts.deletes?.push(url);
         return new Response(null, { status: 204 });
       }
-      throw new Error(`unexpected ${init?.method ?? 'GET'} ${url}`);
+      throw new Error(`unexpected ${method} ${url}`);
     };
+
+  // The checks each failing case of the reference path makes: an api_error with its message and status.
+  const expectApiError = (result: Result<unknown, GraphError>, message: string, status: number): void => {
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('api_error');
+    expect(result.error.message).toContain(message);
+    if (result.error.type === 'api_error') expect(result.error.status).toBe(status);
+  };
+
+  // The temp file name ends in the extension, or carries it before Graph's `:` path suffix.
+  const hasTempExtension = (put: PutRecord | undefined, ext: string): boolean => put !== undefined && (put.url.endsWith(ext) || put.url.includes(`${ext}:`));
 
   it('convert-mail-attachment-to-pdf rejects every IMAGE_EXTENSIONS member with a 415 image hint', async () => {
     for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico', 'heic', 'heif']) {
@@ -475,20 +463,20 @@ describe('commands', () => {
     const docxPuts: PutRecord[] = [];
     await pdfCmd().execute(createGraphClient(fakeAuth(), createUploadRecorder('report.docx', { puts: docxPuts })), { messageId: 'm1', attachmentId: 'a1' });
     expect(docxPuts[0]?.url).toContain('.ask-marcel-temp/');
-    expect(docxPuts[0]?.url.endsWith('.docx') || (docxPuts[0]?.url.includes('.docx:') ?? false)).toBe(true);
+    expect(hasTempExtension(docxPuts[0], '.docx')).toBe(true);
     expect(docxPuts[0]?.url).not.toContain('report.docx'); // never the attacker filename
     expect(docxPuts[0]?.body).toBe('PDFDATA'); // decodeBase64 round-trips the payload exactly (kills the loop mutants)
     expect(docxPuts[0]?.contentType).toBe('application/octet-stream'); // kills the L72 content-type literal
 
     const weirdPuts: PutRecord[] = [];
     await pdfCmd().execute(createGraphClient(fakeAuth(), createUploadRecorder('archive.spreadsheet', { puts: weirdPuts })), { messageId: 'm1', attachmentId: 'a1' });
-    expect(weirdPuts[0]?.url.endsWith('.bin') || (weirdPuts[0]?.url.includes('.bin:') ?? false)).toBe(true); // ext > 8 chars → bin
+    expect(hasTempExtension(weirdPuts[0], '.bin')).toBe(true); // ext > 8 chars → bin
 
     const noExtPuts: PutRecord[] = [];
     await pdfCmd().execute(createGraphClient(fakeAuth(), createUploadRecorder('README', { puts: noExtPuts })), { messageId: 'm1', attachmentId: 'a1' });
     // 'README' is ≤8 alnum chars: a broken no-dot guard would slice the whole
     // name → '.readme'. The correct guard returns 'bin'.
-    expect(noExtPuts[0]?.url.endsWith('.bin') || (noExtPuts[0]?.url.includes('.bin:') ?? false)).toBe(true);
+    expect(hasTempExtension(noExtPuts[0], '.bin')).toBe(true);
   });
 
   it('convert-mail-attachment-to-pdf returns an empty raw-bytes envelope for a plain-text attachment with no contentBytes', async () => {
@@ -572,12 +560,7 @@ describe('commands', () => {
       createGraphClient(fakeAuth(), async () => Response.json({ '@odata.type': '#microsoft.graph.referenceAttachment' })),
       { messageId: 'm1', attachmentId: 'a1' }
     );
-    expect(noUrl.ok).toBe(false);
-    if (!noUrl.ok) {
-      expect(noUrl.error.type).toBe('api_error');
-      expect(noUrl.error.message).toContain('referenceAttachment missing sourceUrl');
-      if (noUrl.error.type === 'api_error') expect(noUrl.error.status).toBe(400);
-    }
+    expectApiError(noUrl, 'referenceAttachment missing sourceUrl', 400);
 
     // empty-string sourceUrl exercises the `=== ''` operand specifically
     const emptyUrl = await pdfCmd().execute(
@@ -608,12 +591,7 @@ describe('commands', () => {
       return Response.json({ id: 'i1', name: 'q.docx' });
     };
     const dim = await pdfCmd().execute(createGraphClient(fakeAuth(), driveIdMissing), { messageId: 'm1', attachmentId: 'a1' });
-    expect(dim.ok).toBe(false);
-    if (!dim.ok) {
-      expect(dim.error.type).toBe('api_error');
-      expect(dim.error.message).toContain('resolved driveItem missing id or driveId');
-      if (dim.error.type === 'api_error') expect(dim.error.status).toBe(500);
-    }
+    expectApiError(dim, 'resolved driveItem missing id or driveId', 500);
 
     // resolved driveItem that is an image → 415 (reference-side image guard)
     const refImage: FetchFn = async (url) => {
@@ -621,12 +599,7 @@ describe('commands', () => {
       return Response.json({ id: 'i1', name: 'photo.png', parentReference: { driveId: 'd1' } });
     };
     const ri = await pdfCmd().execute(createGraphClient(fakeAuth(), refImage), { messageId: 'm1', attachmentId: 'a1' });
-    expect(ri.ok).toBe(false);
-    if (!ri.ok) {
-      expect(ri.error.type).toBe('api_error');
-      expect(ri.error.message).toContain('png attachment is an image');
-      if (ri.error.type === 'api_error') expect(ri.error.status).toBe(415);
-    }
+    expectApiError(ri, 'png attachment is an image', 415);
 
     // /shares resolve failure propagates
     const resolveFail: FetchFn = async (url) => {
