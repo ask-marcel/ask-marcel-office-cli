@@ -96,15 +96,29 @@ const isUnreachable = (e: GraphError): boolean => e.type === 'api_error' && [400
 // extra request. Absent for the rare drive without a quota facet.
 const driveSize = (d: DriveResource): number | null => (typeof d.quota?.used === 'number' ? d.quota.used : null);
 
+const newAccumulator = (drive: DriveResource, source: Source, groupId: string | null): Accumulator => ({
+  name: drive.name ?? '',
+  driveType: drive.driveType ?? '',
+  webUrl: drive.webUrl ?? '',
+  groupId,
+  size: driveSize(drive),
+  sources: new Set([source]),
+});
+
 const upsert = (drives: Map<string, Accumulator>, drive: DriveResource, source: Source, groupId: string | null): void => {
   const id = drive.id;
   if (typeof id !== 'string') return;
   const cur = drives.get(id);
   if (cur === undefined) {
-    drives.set(id, { name: drive.name ?? '', driveType: drive.driveType ?? '', webUrl: drive.webUrl ?? '', groupId, size: driveSize(drive), sources: new Set([source]) });
+    drives.set(id, newAccumulator(drive, source, groupId));
     return;
   }
   cur.sources.add(source);
+  fillGaps(cur, drive, groupId);
+};
+
+// A later vector fills what an earlier one left empty, never overwrites it.
+const fillGaps = (cur: Accumulator, drive: DriveResource, groupId: string | null): void => {
   if (cur.groupId === null && groupId !== null) cur.groupId = groupId;
   if (cur.name === '' && typeof drive.name === 'string') cur.name = drive.name;
   if (cur.driveType === '' && typeof drive.driveType === 'string') cur.driveType = drive.driveType;
@@ -261,6 +275,89 @@ const addSiteLibraries = async (graph: ReadGraph, drives: Map<string, Accumulato
   return sites.size > maxGroups;
 };
 
+// The ids of a listing's items that pass `keep`; none when the listing failed.
+const idSet = (listed: Result<ReadonlyArray<unknown>, GraphError>, keep: (item: unknown) => boolean): Set<string> => {
+  const ids = new Set<string>();
+  if (!listed.ok) return ids;
+  for (const item of listed.value) {
+    const id = keep(item) ? idOf(item) : undefined;
+    if (id !== undefined) ids.add(id);
+  }
+  return ids;
+};
+
+// The default drive of each team and member group, tagged by how the group was found.
+const addGroupDrives = async (
+  graph: ReadGraph,
+  groupIds: ReadonlyArray<string>,
+  found: { readonly teamIds: ReadonlySet<string>; readonly memberIds: ReadonlySet<string> },
+  drives: Map<string, Accumulator>,
+  partialErrors: PartialErrors
+): Promise<void> => {
+  const groupDriveResults = await Promise.all(groupIds.map((id) => graph.get(`/groups/${id}/drive`)));
+  groupIds.forEach((id, i) => {
+    const r = groupDriveResults[i];
+    if (r === undefined) return;
+    if (r.ok) {
+      if (found.teamIds.has(id)) upsert(drives, r.value as DriveResource, 'joinedTeam', id);
+      if (found.memberIds.has(id)) upsert(drives, r.value as DriveResource, 'memberOfGroup', id);
+    } else if (!isUnreachable(r.error)) {
+      partialErrors.push({ source: `/groups/${id}/drive`, error: r.error });
+    }
+  });
+};
+
+const driveRows = (drives: ReadonlyMap<string, Accumulator>): Array<{ readonly id: string } & Record<string, unknown>> =>
+  [...drives.entries()]
+    .map(([id, d]) => ({
+      id,
+      name: d.name,
+      driveType: d.driveType,
+      webUrl: d.webUrl,
+      sources: [...d.sources].sort((a, b) => a.localeCompare(b)),
+      ...(d.groupId !== null ? { groupId: d.groupId } : {}),
+      ...(d.size !== null ? { size: d.size } : {}),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+const driveListEnvelope = (value: ReadonlyArray<unknown>, fileEstimate: number | undefined, truncated: boolean, partialErrors: PartialErrors): Record<string, unknown> => ({
+  value,
+  count: value.length,
+  ...(fileEstimate !== undefined ? { fileEstimate } : {}),
+  ...(truncated ? { truncated: true } : {}),
+  ...(partialErrors.length > 0 ? { partialErrors } : {}),
+});
+
+// The fourth to seventh vectors, in order. True when any of them hit the cap.
+const addDiscoveredDrives = async (
+  graph: ReadGraph,
+  seeds: { readonly sharedIds: ReadonlyArray<string>; readonly channelTeamIds: ReadonlyArray<string> },
+  drives: Map<string, Accumulator>,
+  maxGroups: number,
+  partialErrors: PartialErrors
+): Promise<boolean> => {
+  tagKnown(drives, seeds.sharedIds, 'sharedWithMe');
+  const sharedCapHit = await enrichUnknownDrives(graph, seeds.sharedIds, 'sharedWithMe', drives, maxGroups, partialErrors);
+
+  // Fifth vector: private/shared channel drives (their own sites, not /groups/{id}/drive).
+  const channels = await collectChannelDriveIds(graph, seeds.channelTeamIds, maxGroups, partialErrors);
+  tagKnown(drives, channels.driveIds, 'channel');
+  const channelCapHit = await enrichUnknownDrives(graph, channels.driveIds, 'channel', drives, maxGroups, partialErrors);
+
+  // Sixth vector: drives behind recently-used / followed / trending items (activity signals).
+  const activityIds = await collectActivityDriveIds(graph, partialErrors);
+  tagKnown(drives, activityIds, 'activity');
+  const activityCapHit = await enrichUnknownDrives(graph, activityIds, 'activity', drives, maxGroups, partialErrors);
+
+  // Seventh vector: every OTHER document library of each known SharePoint site (not just the default).
+  const siteCapHit = await addSiteLibraries(graph, drives, maxGroups, partialErrors);
+  return sharedCapHit || channels.truncated || channelCapHit || activityCapHit || siteCapHit;
+};
+
+// With no drive found, the first failure is the answer; undefined when nothing failed.
+const firstFailure = (partialErrors: PartialErrors): GraphError | undefined =>
+  partialErrors.length > 0 ? (partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all drive-discovery sub-requests failed' }) : undefined;
+
 const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
   const parsed = schema.safeParse(params);
   if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
@@ -285,68 +382,23 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   const drives = new Map<string, Accumulator>();
   if (personalR.ok) for (const d of personalR.value) upsert(drives, d as DriveResource, 'personal', null);
 
-  const teamIds = new Set<string>();
-  if (teamsR.ok)
-    for (const t of teamsR.value) {
-      const id = idOf(t);
-      if (id !== undefined) teamIds.add(id);
-    }
-  const memberIds = new Set<string>();
-  if (groupsR.ok)
-    for (const g of groupsR.value) {
-      const id = isUnifiedGroup(g) ? idOf(g) : undefined;
-      if (id !== undefined) memberIds.add(id);
-    }
+  const teamIds = idSet(teamsR, () => true);
+  const memberIds = idSet(groupsR, isUnifiedGroup);
 
   const allGroupIds = [...new Set([...teamIds, ...memberIds])];
   const groupIds = allGroupIds.slice(0, maxGroups);
   let truncated = allGroupIds.length > maxGroups;
 
-  const groupDriveResults = await Promise.all(groupIds.map((id) => graph.get(`/groups/${id}/drive`)));
-  groupIds.forEach((id, i) => {
-    const r = groupDriveResults[i];
-    if (r === undefined) return;
-    if (r.ok) {
-      if (teamIds.has(id)) upsert(drives, r.value as DriveResource, 'joinedTeam', id);
-      if (memberIds.has(id)) upsert(drives, r.value as DriveResource, 'memberOfGroup', id);
-    } else if (!isUnreachable(r.error)) {
-      partialErrors.push({ source: `/groups/${id}/drive`, error: r.error });
-    }
-  });
+  await addGroupDrives(graph, groupIds, { teamIds, memberIds }, drives, partialErrors);
 
   const sharedIds = sharedR.ok ? sharedDriveIds(sharedR.value) : [];
-  tagKnown(drives, sharedIds, 'sharedWithMe');
-  if (await enrichUnknownDrives(graph, sharedIds, 'sharedWithMe', drives, maxGroups, partialErrors)) truncated = true;
-
-  // Fifth vector: private/shared channel drives (their own sites, not /groups/{id}/drive).
   const channelTeamIds = groupIds.filter((id) => teamIds.has(id));
-  const channels = await collectChannelDriveIds(graph, channelTeamIds, maxGroups, partialErrors);
-  tagKnown(drives, channels.driveIds, 'channel');
-  const channelCapHit = await enrichUnknownDrives(graph, channels.driveIds, 'channel', drives, maxGroups, partialErrors);
-  if (channels.truncated || channelCapHit) truncated = true;
+  if (await addDiscoveredDrives(graph, { sharedIds, channelTeamIds }, drives, maxGroups, partialErrors)) truncated = true;
 
-  // Sixth vector: drives behind recently-used / followed / trending items (activity signals).
-  const activityIds = await collectActivityDriveIds(graph, partialErrors);
-  tagKnown(drives, activityIds, 'activity');
-  if (await enrichUnknownDrives(graph, activityIds, 'activity', drives, maxGroups, partialErrors)) truncated = true;
+  const baseValue = driveRows(drives);
 
-  // Seventh vector: every OTHER document library of each known SharePoint site (not just the default).
-  if (await addSiteLibraries(graph, drives, maxGroups, partialErrors)) truncated = true;
-
-  const baseValue = [...drives.entries()]
-    .map(([id, d]) => ({
-      id,
-      name: d.name,
-      driveType: d.driveType,
-      webUrl: d.webUrl,
-      sources: [...d.sources].sort((a, b) => a.localeCompare(b)),
-      ...(d.groupId !== null ? { groupId: d.groupId } : {}),
-      ...(d.size !== null ? { size: d.size } : {}),
-    }))
-    .sort((a, b) => a.id.localeCompare(b.id));
-
-  if (baseValue.length === 0 && partialErrors.length > 0)
-    return err(partialErrors[0]?.error ?? { type: 'api_error', status: 500, message: 'all drive-discovery sub-requests failed' });
+  const failure = baseValue.length === 0 ? firstFailure(partialErrors) : undefined;
+  if (failure !== undefined) return err(failure);
 
   // Opt-in (`--count-files true`): one path-scoped driveItem Search query per drive → `estimatedFileCount`.
   const value = parsed.data.countFiles === 'true' ? await addEstimatedFileCounts(graph, baseValue, (e) => (e as { webUrl?: string }).webUrl) : baseValue;
@@ -354,13 +406,7 @@ const execute = async (graph: ReadGraph, params: Record<string, string>): Promis
   // Best-effort index-wide file count (driveItems) for context — NOT scoped to the drives above.
   const fileEstimate = await searchIndexTotal(graph, 'driveItem');
 
-  return ok({
-    value,
-    count: value.length,
-    ...(fileEstimate !== undefined ? { fileEstimate } : {}),
-    ...(truncated ? { truncated: true } : {}),
-    ...(partialErrors.length > 0 ? { partialErrors } : {}),
-  });
+  return ok(driveListEnvelope(value, fileEstimate, truncated, partialErrors));
 };
 
 const meta: ReadCommandMeta = {
