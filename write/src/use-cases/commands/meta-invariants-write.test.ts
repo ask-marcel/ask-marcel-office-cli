@@ -142,15 +142,9 @@ describe('command meta: invariants on every command of the write package', () =>
     // every name of the directory is a real command of the split.
     const valid = new Set<string>([...Object.keys(commands), ...WRITE_LIFECYCLE_ENTRIES.map((entry) => entry.name), ...COMMAND_DIRECTORY.keys()]);
     const verbKebab = /^(get|list|convert|download|extract|search|resolve|find|create|update|delete|read|my|next|microsoft|scopes)-[a-z0-9-]+$/;
-    const phantom: string[] = [];
-    for (const [name, command] of Object.entries(commands)) {
-      const prose = [
-        command.meta.summary,
-        command.meta.example,
-        command.meta.responseShape ?? '',
-        command.meta.bodyTemplate ?? '',
-        ...command.meta.options.map((o) => o.description),
-      ].join('\n');
+    // The phantom references in one command's prose.
+    const phantomsIn = (name: string, prose: string): string[] => {
+      const phantom: string[] = [];
       // (a) explicit `{<package>-bin} <name>` invocations: the directory must place <name> in that package.
       for (const m of prose.matchAll(/\{(?:(auth|read|write)-)?bin\}\s+([a-z][a-z0-9-]+)/g)) {
         const ref = m[2] ?? '';
@@ -161,7 +155,16 @@ describe('command meta: invariants on every command of the write package', () =>
         const tok = m[1] ?? '';
         if (verbKebab.test(tok) && !valid.has(tok)) phantom.push(`${name}: \`${tok}\``);
       }
-    }
+      return phantom;
+    };
+    const phantom = Object.entries(commands).flatMap(([name, command]) =>
+      phantomsIn(
+        name,
+        [command.meta.summary, command.meta.example, command.meta.responseShape ?? '', command.meta.bodyTemplate ?? '', ...command.meta.options.map((o) => o.description)].join(
+          '\n'
+        )
+      )
+    );
     expect(phantom).toEqual([]);
   });
 });
