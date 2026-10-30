@@ -1,4 +1,4 @@
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 
 // Graph has a known quirk where certain `--select` / `--orderby` values on the
 // tasks endpoint return the opaque `RequestBroker--ParseUri: Invalid request`

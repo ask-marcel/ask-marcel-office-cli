@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 
 /**
  * The ids a channel-scoped command was called with, so a rewritten error can

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CommandOptionMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { readSheetsAsCsv } from '../../infra/sheetjs-adapter.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { formatXlsxMetadata } from './xlsx-metadata-to-markdown.ts';
