@@ -9,6 +9,8 @@ import { formatZodError } from '@ask-marcel/office-core/use-cases/commands/forma
 import { keepQuotedOption, keepQuotedSchemaField } from './mail-quote-stripper.ts';
 import { convertZipArchive } from './zip-archive-to-markdown.ts';
 import { MAX_CELLS_OPTION, maxCellsField } from './xlsx-to-markdown.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 
 /**
  * Unzips a `.zip` Outlook mail attachment and converts every contained file in one
@@ -28,30 +30,32 @@ const schema = z.object({
   keepQuoted: keepQuotedSchemaField,
 });
 
-const execute = async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
-  const parsed = schema.safeParse(params);
-  if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
-  const { messageId, attachmentId } = parsed.data;
-  const includeMetadata = parsed.data.includeMetadata === 'true';
+const createExecute =
+  (_converters: Converters): ReadCommand['execute'] =>
+  async (graph: ReadGraph, params: Record<string, string>): Promise<Result<unknown, GraphError>> => {
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) return err({ type: 'validation_error', message: formatZodError(parsed.error) });
+    const { messageId, attachmentId } = parsed.data;
+    const includeMetadata = parsed.data.includeMetadata === 'true';
 
-  const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
-  if (!fetched.ok) return fetched;
-  const attachment = fetched.value as Record<string, unknown>;
+    const fetched = await graph.get(`/me/messages/${messageId}/attachments/${attachmentId}`);
+    if (!fetched.ok) return fetched;
+    const attachment = fetched.value as Record<string, unknown>;
 
-  const odataType = attachment['@odata.type'];
-  if (odataType !== '#microsoft.graph.fileAttachment') {
-    return err({
-      type: 'api_error',
-      status: 400,
-      message: `convert-mail-attachment-zip-to-markdown needs a fileAttachment whose bytes are a .zip (got ${typeof odataType === 'string' ? odataType : 'an attachment with no @odata.type'}). itemAttachment / referenceAttachment have no inline zip payload to unpack.`,
-    });
-  }
-  const contentBytes = attachment['contentBytes'];
-  if (typeof contentBytes !== 'string') {
-    return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
-  }
-  return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
-};
+    const odataType = attachment['@odata.type'];
+    if (odataType !== '#microsoft.graph.fileAttachment') {
+      return err({
+        type: 'api_error',
+        status: 400,
+        message: `convert-mail-attachment-zip-to-markdown needs a fileAttachment whose bytes are a .zip (got ${typeof odataType === 'string' ? odataType : 'an attachment with no @odata.type'}). itemAttachment / referenceAttachment have no inline zip payload to unpack.`,
+      });
+    }
+    const contentBytes = attachment['contentBytes'];
+    if (typeof contentBytes !== 'string') {
+      return err({ type: 'api_error', status: 400, message: 'fileAttachment has no contentBytes to unzip (pass `--select` was not used? the attachment may be empty).' });
+    }
+    return convertZipArchive(base64ToBytes(contentBytes), { includeMetadata, keepQuoted: parsed.data.keepQuoted === 'true', maxCells: parsed.data.maxCells });
+  };
 
 const meta: ReadCommandMeta = {
   summary:
@@ -81,4 +85,4 @@ const meta: ReadCommandMeta = {
   scopesRequired: ['Mail.Read'],
 };
 
-export { execute, meta, schema };
+export { createExecute, meta, schema };
