@@ -4,7 +4,7 @@ import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/files
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildSampleDocx, buildSampleXlsx, buildSampleZipArchive } from '../../test-helpers/office-fixtures.ts';
 import { executeLocal } from './convert-local-file-to-markdown.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const textOf = (result: { ok: boolean; value?: unknown; error?: { message: string } }): string => {

@@ -3,7 +3,7 @@ import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { executeLocal } from './convert-local-file-to-markdown.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 type Envelope = { readonly contentType?: string; readonly size?: number; readonly text?: string };
 

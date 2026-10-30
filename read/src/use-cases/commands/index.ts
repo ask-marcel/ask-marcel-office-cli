@@ -2,6 +2,9 @@ import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts
 import { readCommandOf } from '@ask-marcel/office-core/use-cases/commands/command-graph.ts';
 import type { Command, ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import { withUnknownParamRejection } from '@ask-marcel/office-core/use-cases/commands/reject-unknown-params.ts';
+import type { Converters } from '../ports/converters.ts';
+import type { CommandModule } from './converting-command.ts';
+import { withConverters } from './converting-command.ts';
 import * as diffDriveItemVersions from './diff-drive-item-versions.ts';
 import * as diffDriveItems from './diff-drive-items.ts';
 import * as downloadDriveItemAsMarkdown from './download-drive-item-as-markdown.ts';
@@ -207,7 +210,7 @@ import * as listRooms from './list-rooms.ts';
 import * as listRoomLists from './list-room-lists.ts';
 import * as listTrendingInsights from './list-trending-insights.ts';
 
-const modules: Record<string, ReadCommand> = {
+const modules: Record<string, CommandModule> = {
   'list-drives': listDrives,
   'get-drive-root-item': getDriveRootItem,
   'list-folder-files': listFolderFiles,
@@ -426,6 +429,8 @@ const modules: Record<string, ReadCommand> = {
 const registerCommands = (registered: Readonly<Record<string, ReadCommand>>): Record<string, Command<ReadGraph>> =>
   Object.fromEntries(Object.entries(registered).map(([name, command]) => [name, withUnknownParamRejection(readCommandOf(command))]));
 
-const commands = registerCommands(modules);
+/** The registry, each command given the converters it runs (ADR 0004); the composition root passes the real ones. */
+const createReadCommands = (converters: Converters): Record<string, Command<ReadGraph>> =>
+  registerCommands(Object.fromEntries(Object.entries(modules).map(([name, module]) => [name, withConverters(module, converters)])));
 
-export { commands, registerCommands };
+export { createReadCommands, registerCommands };
