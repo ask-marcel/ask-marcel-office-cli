@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { excludeMeetingResponses } from './mail-response-filter.ts';
 
 const invite = { id: 'i', '@odata.type': '#microsoft.graph.eventMessageRequest', subject: 'Kick-off' };
