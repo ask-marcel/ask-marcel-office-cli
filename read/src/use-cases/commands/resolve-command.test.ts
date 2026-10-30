@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 import { resolveCommand } from '@ask-marcel/office-core/use-cases/commands/resolve-command.ts';
 
 describe('resolving a command name an agent supplied', () => {

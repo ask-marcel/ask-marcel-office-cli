@@ -6,7 +6,7 @@ import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-clie
 import { buildPdfNoImages, buildSampleDocx, buildScannedPdf } from '../../test-helpers/office-fixtures.ts';
 import { MAIL_HINTS } from './convert-mail-attachment-to-markdown.ts';
 import { pagesField } from './image-extraction.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const binaryOf = (bytes: Uint8Array): Result<unknown, GraphError> => ok({ contentType: 'application/pdf', size: bytes.byteLength, base64: toBase64(bytes) });
