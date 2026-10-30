@@ -1,4 +1,6 @@
 import { FILE_HEADERS_ONLY, formatPatch, structuredPatch } from 'diff';
+import { MAX_EDITS } from '../domain/line-diff-limit.ts';
+import type { LineDiff } from '../use-cases/ports/converters.ts';
 
 /**
  * A unified line diff of two texts, through jsdiff (the `diff` package): the
@@ -11,10 +13,7 @@ import { FILE_HEADERS_ONLY, formatPatch, structuredPatch } from 'diff';
  * 10,000-line decks costs neither the time nor the memory of a full diff.
  */
 
-const MAX_EDITS = 1_000;
 const CONTEXT_LINES = 3;
-
-type LineDiff = { readonly patch: string; readonly added: number; readonly removed: number };
 
 // A render rarely ends with a newline; without one jsdiff marks the last line
 // "No newline at end of file" on both sides, which is noise here. An empty render

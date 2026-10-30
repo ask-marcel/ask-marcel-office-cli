@@ -1,8 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
-
-type SheetCsv = { readonly name: string; readonly csv: string };
+import type { SheetCsv } from '../use-cases/ports/converters.ts';
 
 const readSheetsAsCsv = async (bytes: Uint8Array): Promise<Result<ReadonlyArray<SheetCsv>, GraphError>> => {
   try {

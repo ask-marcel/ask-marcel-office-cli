@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
+import type { ZipEntry } from '../use-cases/ports/converters.ts';
 
 /**
  * Reads every file entry out of an arbitrary `.zip` archive as raw bytes,
@@ -12,8 +13,6 @@ import type { GraphError } from './graph-client.ts';
  * converter. try/catch is permitted here (src/infra/**, atelier rule 17): a
  * malformed-zip throw becomes a Result.err.
  */
-type ZipEntry = { readonly path: string; readonly bytes: Uint8Array };
-
 /**
  * Decode a legacy zip entry name — the raw filename bytes of an entry whose
  * UTF-8 flag (general-purpose bit 11) is NOT set and which carries no Info-ZIP

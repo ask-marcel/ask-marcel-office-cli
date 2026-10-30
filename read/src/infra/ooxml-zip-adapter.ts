@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
 import type { GraphError } from './graph-client.ts';
+import type { OoxmlZip } from '../use-cases/ports/converters.ts';
 
 /**
  * Thin wrapper around JSZip for opening already-fetched OOXML bytes
@@ -22,11 +23,6 @@ import type { GraphError } from './graph-client.ts';
  * enumerate numbered parts (`xl/comments1.xml`, `ppt/slides/slide*.xml`,
  * every `*.rels`) that can't be hardcoded.
  */
-type OoxmlZip = {
-  readonly read: (path: string) => string | undefined;
-  readonly list: () => ReadonlyArray<string>;
-};
-
 const openOoxmlZip = async (bytes: Uint8Array): Promise<Result<OoxmlZip, GraphError>> => {
   try {
     const zip = await JSZip.loadAsync(bytes);
