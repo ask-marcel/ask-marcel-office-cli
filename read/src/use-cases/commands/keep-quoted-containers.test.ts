@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { buildQuotedSampleMsg } from '../../test-helpers/office-fixtures.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 
