@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import type { MarkdownEnvelope } from './docx-to-markdown.ts';
 import { odfContentToMarkdown } from './odf-content-to-markdown.ts';
 import { formatOdfMetadata } from './odf-metadata-to-markdown.ts';

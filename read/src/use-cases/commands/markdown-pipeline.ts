@@ -1,7 +1,7 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err, ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
 import { embedInlineImages } from './inline-image-embedder.ts';
 import type { InlineAttachment } from './inline-image-embedder.ts';

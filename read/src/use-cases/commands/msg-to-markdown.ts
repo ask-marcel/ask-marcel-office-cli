@@ -1,6 +1,6 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
 import { extractMsg } from '../../infra/msg-reader-adapter.ts';
 import type { MsgAttachment, MsgRecipient, MsgRecipientKind, ParsedMsg } from '../../infra/msg-reader-adapter.ts';
 import { htmlToMarkdown } from '../../infra/turndown-adapter.ts';
