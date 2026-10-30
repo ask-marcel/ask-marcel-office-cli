@@ -1,4 +1,4 @@
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 
 /**
  * The Microsoft Search index's security-trimmed match count for one entity type

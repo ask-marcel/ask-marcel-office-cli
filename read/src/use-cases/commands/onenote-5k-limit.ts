@@ -1,8 +1,8 @@
 import type { Result } from '@ask-marcel/office-core/domain/result.ts';
 import { err } from '@ask-marcel/office-core/domain/result.ts';
 import type { ReadCommand } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import type { GraphError } from '../../infra/graph-client.ts';
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { GraphError } from '@ask-marcel/office-core/domain/graph-error.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 
 /**
  * Audit round-8 H2: when a tenant exceeds the 5000-item OneNote limit per
