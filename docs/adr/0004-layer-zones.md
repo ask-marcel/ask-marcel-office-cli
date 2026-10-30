@@ -37,8 +37,9 @@ On main 3eb2167 about 195 production imports break the rule:
    move to `core/src/domain/bin-names.ts`, with `NameSource` as a structural type. The presenter
    types its logger as a local type with the one method it calls, so it needs no port import.
 5. The converter adapters stay as runtime imports for now. The read use-cases zone allows only the
-   named adapter files, so a new infra import fails lint. This list is debt: a later change injects
-   the converters through a port.
+   named adapter files (`READ_USE_CASE_ADAPTERS` in `read/eslint.config.js`, passed to
+   `baseConfig`), so a new infra import fails lint. This list is debt: a later change injects the
+   converters through a port.
 6. The zones are one `no-restricted-imports` block per layer in `eslint.base.js`. Each block repeats
    the mock ban and the test-helpers ban, because ESLint replaces the options of a rule when two
    blocks match a file. The patterns match the relative paths and the
