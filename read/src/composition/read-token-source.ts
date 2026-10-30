@@ -14,7 +14,7 @@ import { createNodeProcessRunner } from '@ask-marcel/office-core/infra/process-r
 import type { SecondaryTokenCommands } from '@ask-marcel/office-core/infra/token-source-needed-by.ts';
 import type { CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
 import type { TokenSource } from '@ask-marcel/office-core/use-cases/ports/token-source.ts';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 
 // The secondary-token error messages name the read commands that need each
 // token, in name order. Deriving the lists from the registry flags keeps the

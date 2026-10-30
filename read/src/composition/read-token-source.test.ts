@@ -8,7 +8,7 @@ import { unsignedJwt } from '@ask-marcel/office-core/test-helpers/jwt.ts';
 import type { ProcessRunnerCall } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import { createProcessRunnerFake } from '@ask-marcel/office-core/test-helpers/process-runner-fake.ts';
 import type { CommandMeta } from '@ask-marcel/office-core/use-cases/commands/command-types.ts';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 import { buildReadTokenSource, createEnvThenHelperTokenSource, READ_NEEDED_BY } from './read-token-source.ts';
 
 // The read package signs only through a tier variable or the token helper of

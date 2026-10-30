@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 import { LIFECYCLE_ENTRIES } from '../use-cases/commands/lifecycle-entries.ts';
 import { commandPackage } from './single-package.ts';
 

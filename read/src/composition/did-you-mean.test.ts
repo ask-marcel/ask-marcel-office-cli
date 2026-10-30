@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test';
 import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/filesystem-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 import { buildCli } from './cli.ts';
 import { buildMcpServer } from './mcp.ts';
 

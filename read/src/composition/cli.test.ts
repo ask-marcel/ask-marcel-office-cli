@@ -5,7 +5,7 @@ import { createFileSystemFake } from '@ask-marcel/office-core/test-helpers/files
 import { buildMediaSamples } from '../test-helpers/office-fixtures.ts';
 import { createLoggerFake } from '@ask-marcel/office-core/test-helpers/logger-fake.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from '../use-cases/commands/index.ts';
+import { commands } from './read-commands.ts';
 import { buildCli } from './cli.ts';
 
 const captureStream = async (stream: 'stdout' | 'stderr', run: () => void | Promise<unknown>): Promise<string> => {
