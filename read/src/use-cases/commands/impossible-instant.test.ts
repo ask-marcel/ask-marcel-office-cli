@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { ok } from '@ask-marcel/office-core/domain/result.ts';
 import { fakeGraphClient } from '@ask-marcel/office-core/test-helpers/graph-client-fake.ts';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 // Every call is recorded: an instant that no calendar holds must be refused
 // before any request is built, never crash and never roll over to a real day.

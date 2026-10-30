@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { commands } from './index.ts';
+import { commands } from '../../composition/read-commands.ts';
 
 describe('commands index', () => {
   it('exports a non-empty commands record', () => {
