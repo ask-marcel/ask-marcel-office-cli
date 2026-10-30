@@ -1,4 +1,4 @@
-import type { ReadGraph } from '@ask-marcel/office-core/infra/read-graph.ts';
+import type { ReadGraph } from '@ask-marcel/office-core/use-cases/ports/graph.ts';
 import { nonEmpty } from './channel-message-html.ts';
 import type { ChannelMessage } from './channel-message-html.ts';
 
