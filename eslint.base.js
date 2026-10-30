@@ -81,6 +81,8 @@ export const baseConfig = (tsconfigRootDir) => [
     files: ['**/*.ts'],
     rules: {
       'func-style': ['error', 'expression'],
+      // Rule 35: a function has at most 10 paths. A nested function counts on its own.
+      complexity: ['error', 10],
       'no-console': ['error'],
       'prefer-template': 'error',
       quotes: ['error', 'single', { avoidEscape: true }],
